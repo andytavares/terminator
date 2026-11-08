@@ -1,0 +1,1907 @@
+.github/PULL_REQUEST_TEMPLATE.md
+  s_75776fa1f8e041::t_c7ae32af930edc 21
+.jscpd.json
+  s_75776fa1f8e041::t_2634d0960adb40 2
+README.md
+  s_75776fa1f8e041::t_2865cc32a37622 255,267
+docs/ARCHITECTURE.md
+  s_75776fa1f8e041::t_fc80878562196e 22-35,45,63-67,73,78,99,101-102,104,106,110-112,127,137,142,157,165,176,178,185,189-192,199,203,227,237,243-244,264,274,291,297,299,315,323,365,380,427,455,471-472,480,482,487,526,540,542-545,551,553,555-556,558,560,570,598,601,653,655,669,857
+docs/CONSTITUTION.md
+  s_75776fa1f8e041::t_289a1e92f92fb3 2-14,437,458,461,509
+docs/CONTRIBUTING.md
+  s_75776fa1f8e041::t_77b0f2d2e79614 79,85,87,106,115,142,150,152,212-221,227,230-232,234,302
+docs/EXTENSION-DEVELOPMENT.md
+  s_75776fa1f8e041::t_6b6edba1276185 5,61,92,109,117,148,203,422,489,570,596,778
+electron.vite.config.ts
+  s_75776fa1f8e041::t_4e139093a8aba2 17,19,29,39-40,48-51,68
+eslint.config.mjs
+  s_75776fa1f8e041::t_004b3b1b6bba5e 74,79,82-83,86,88,96,129-137,147-162,222-226,262,268-270,425,445
+extensions/CLAUDE.md
+  s_75776fa1f8e041::t_88a74bd753efb0 18
+extensions/foundry/CLAUDE.md
+  s_75776fa1f8e041::t_d8fb3f140e1f8d 82,136,143-144,165,169
+extensions/foundry/manifest.json
+  s_75776fa1f8e041::t_4381514b7fd48d 4
+extensions/foundry/package.json
+  s_75776fa1f8e041::t_fa79779892f855 3,7-10
+extensions/foundry/src/ipc/ui-registration.ts
+  s_75776fa1f8e041::t_e77efba8f6a189 12,73
+extensions/foundry/tests/background.spec.ts
+  s_75776fa1f8e041::t_5a2f9ffee5fb3c 3
+extensions/foundry/tests/channel-registry.spec.ts
+  s_75776fa1f8e041::t_002244ca7557fd 6
+extensions/foundry/tests/channel-schemas.spec.ts
+  s_75776fa1f8e041::t_a2718ecf9a2e90 6
+extensions/foundry/tests/components/App.spec.tsx
+  s_75776fa1f8e041::t_933a3365279cbf 9
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_75776fa1f8e041::t_2f82a7ea410b92 11
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_75776fa1f8e041::t_e2447e6e0cedeb 2
+extensions/foundry/tests/components/factory/HallScene.spec.tsx
+  s_75776fa1f8e041::t_562c8dae56a9a2 7
+extensions/foundry/tests/components/factory/HallThumbnail.spec.tsx
+  s_75776fa1f8e041::t_53e93812b78775 6
+extensions/foundry/tests/components/factory/StationMonitor.spec.tsx
+  s_75776fa1f8e041::t_56396d1e667b38 8
+extensions/foundry/tests/components/factory/hall-scene-light.spec.tsx
+  s_75776fa1f8e041::t_7ed65c74e84e10 7
+extensions/foundry/tests/data-root.spec.ts
+  s_75776fa1f8e041::t_e07cc86579ac06 11
+extensions/foundry/tests/factory/art/glyphs.spec.ts
+  s_75776fa1f8e041::t_a8cbb31c413471 9
+extensions/foundry/tests/factory/art/hall-labels.spec.ts
+  s_75776fa1f8e041::t_e77908137d51d9 18
+extensions/foundry/tests/factory/art/wall-decor.spec.ts
+  s_75776fa1f8e041::t_1270c0161be44d 9
+extensions/foundry/tests/factory/director.spec.ts
+  s_75776fa1f8e041::t_507ae83352a819 16
+extensions/foundry/tests/factory/replay.spec.ts
+  s_75776fa1f8e041::t_0c6bf5d4b788f1 9
+extensions/foundry/tests/factory/signs.spec.ts
+  s_75776fa1f8e041::t_a0b80bc54b06a0 5
+extensions/foundry/tests/factory/sim.spec.ts
+  s_75776fa1f8e041::t_540291fdbc70d4 2
+extensions/foundry/tests/factory/timeline-store.spec.ts
+  s_75776fa1f8e041::t_044a82d0d7867d 13-14
+extensions/foundry/tests/forge/converge.spec.ts
+  s_75776fa1f8e041::t_810a57d78fbece 15
+extensions/foundry/tests/forge/forge-loop-order.spec.ts
+  s_75776fa1f8e041::t_e677cf689039c2 14
+extensions/foundry/tests/forge/intake-source.spec.ts
+  s_75776fa1f8e041::t_3b30514176fbaa 8
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_75776fa1f8e041::t_55d751a7993d26 21-22
+extensions/foundry/tests/forge/refused-turn.spec.ts
+  s_75776fa1f8e041::t_3cfd15aa9a3e81 11
+extensions/foundry/tests/gates/store.spec.ts
+  s_75776fa1f8e041::t_94d97e78a0721e 7
+extensions/foundry/tests/helpers/foundry-activation.ts
+  s_75776fa1f8e041::t_4b414c029fc6c9 11
+extensions/foundry/tests/helpers/foundry-host.ts
+  s_75776fa1f8e041::t_c521543264e8ae 13,23-24,173
+extensions/foundry/tests/helpers/order-ledger.ts
+  s_75776fa1f8e041::t_90c65ee4e2a075 4
+extensions/foundry/tests/helpers/run-nodes.ts
+  s_75776fa1f8e041::t_f91c476615da66 6
+extensions/foundry/tests/home/commands.spec.ts
+  s_75776fa1f8e041::t_3281637c0fbd64 3,7
+extensions/foundry/tests/home/publish-single-flight.spec.ts
+  s_75776fa1f8e041::t_70379ace7e543a 6
+extensions/foundry/tests/home/publish.spec.ts
+  s_75776fa1f8e041::t_3cce3f864fa0c3 4,13
+extensions/foundry/tests/integration/forge/base-branch.spec.ts
+  s_75776fa1f8e041::t_34ba31d3dff0da 6
+extensions/foundry/tests/integration/forge/forge-loop-release.spec.ts
+  s_75776fa1f8e041::t_772b355a577f52 34
+extensions/foundry/tests/integration/forge/forge-loop.spec.ts
+  s_75776fa1f8e041::t_35f35a9c86bfd2 31
+extensions/foundry/tests/integration/hand-off.spec.ts
+  s_75776fa1f8e041::t_55e9d34eae6e30 24
+extensions/foundry/tests/integration/line/baseline.spec.ts
+  s_75776fa1f8e041::t_e005c0d649334e 12
+extensions/foundry/tests/integration/line/execute-run.spec.ts
+  s_75776fa1f8e041::t_1aad6666fd8330 26
+extensions/foundry/tests/integration/line/executor-deps.spec.ts
+  s_75776fa1f8e041::t_5ab45eee22c382 43
+extensions/foundry/tests/integration/line/integrate.spec.ts
+  s_75776fa1f8e041::t_73e86a293de681 10
+extensions/foundry/tests/integration/line/refinery-run.spec.ts
+  s_75776fa1f8e041::t_9d6c334fa7048b 25,94
+extensions/foundry/tests/integration/line/run-tail-ends.spec.ts
+  s_75776fa1f8e041::t_b91b699bb294a2 19
+extensions/foundry/tests/integration/line/universal-repository.spec.ts
+  s_75776fa1f8e041::t_9055e0bc26e876 23
+extensions/foundry/tests/integration/line/worktree.spec.ts
+  s_75776fa1f8e041::t_bb429204a00fd1 17
+extensions/foundry/tests/integration/runtime/diff-metrics.spec.ts
+  s_75776fa1f8e041::t_e5030c51687716 6
+extensions/foundry/tests/integration/runtime/supervised-runner.spec.ts
+  s_75776fa1f8e041::t_e308afb832ed3f 7-8,10
+extensions/foundry/tests/integration/runtime/supervision-unavailable.spec.ts
+  s_75776fa1f8e041::t_f2029c2a840e4c 15
+extensions/foundry/tests/integration/storage-folder.spec.ts
+  s_75776fa1f8e041::t_613a75991a7069 12
+extensions/foundry/tests/ipc/final-check-send-back-ipc.spec.ts
+  s_75776fa1f8e041::t_7397658217a537 14
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_75776fa1f8e041::t_54aa4d54a21f22 19
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_75776fa1f8e041::t_671612db802143 16,27
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_75776fa1f8e041::t_9d29f4b73c96de 13
+extensions/foundry/tests/ipc/interrupted-run-ipc.spec.ts
+  s_75776fa1f8e041::t_6ece1e58b2c6c8 15,27
+extensions/foundry/tests/ipc/ledger-channels.spec.ts
+  s_75776fa1f8e041::t_d4f34834413d94 18
+extensions/foundry/tests/ipc/order-delete-intake-ipc.spec.ts
+  s_75776fa1f8e041::t_b56f7c01438eea 15
+extensions/foundry/tests/ipc/read-path-ipc.spec.ts
+  s_75776fa1f8e041::t_b45fbda9b4fe52 12,20
+extensions/foundry/tests/ipc/run-actions-ipc.spec.ts
+  s_75776fa1f8e041::t_a1a29752e9a35a 18,25
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_75776fa1f8e041::t_c7a471703ed6b3 22
+extensions/foundry/tests/ipc/run-log.spec.ts
+  s_75776fa1f8e041::t_b4e95ee732a031 12
+extensions/foundry/tests/ipc/run-standing.spec.ts
+  s_75776fa1f8e041::t_3a0b7b40a992b3 16
+extensions/foundry/tests/ipc/sensor-channels.spec.ts
+  s_75776fa1f8e041::t_09dabae64459c1 14
+extensions/foundry/tests/ledger/append.spec.ts
+  s_75776fa1f8e041::t_ea779bcc0d95c3 6
+extensions/foundry/tests/line/ci-state.spec.ts
+  s_75776fa1f8e041::t_850ceba2ce3703 8
+extensions/foundry/tests/line/ci.spec.ts
+  s_75776fa1f8e041::t_e21f23813858ce 5
+extensions/foundry/tests/line/commit.spec.ts
+  s_75776fa1f8e041::t_e35443d4f3ba14 4
+extensions/foundry/tests/line/early-ship.spec.ts
+  s_75776fa1f8e041::t_3782a2f4d1e3b8 9-10
+extensions/foundry/tests/line/execution-waves.spec.ts
+  s_75776fa1f8e041::t_7016556f0bcb80 12-13
+extensions/foundry/tests/line/executor.spec.ts
+  s_75776fa1f8e041::t_0bfd5c962ae0c6 21-22
+extensions/foundry/tests/line/integrate.spec.ts
+  s_75776fa1f8e041::t_fd84ed5e0a9f34 29
+extensions/foundry/tests/line/observed-files.spec.ts
+  s_75776fa1f8e041::t_78fdb5234b28f3 7
+extensions/foundry/tests/line/pictures.spec.ts
+  s_75776fa1f8e041::t_a24167ff57453d 6
+extensions/foundry/tests/line/refinery-state.spec.ts
+  s_75776fa1f8e041::t_42eb427e839fb9 12
+extensions/foundry/tests/line/roles.spec.ts
+  s_75776fa1f8e041::t_e764432ee5c0ca 7
+extensions/foundry/tests/line/run-context.spec.ts
+  s_75776fa1f8e041::t_4868039351e4ec 4
+extensions/foundry/tests/line/rung-handback.spec.ts
+  s_75776fa1f8e041::t_3284131127ffe4 16
+extensions/foundry/tests/line/rung-output.spec.ts
+  s_75776fa1f8e041::t_8a08e2f8a119ea 18
+extensions/foundry/tests/line/ship-tail.spec.ts
+  s_75776fa1f8e041::t_f77e6fdf6bc369 15
+extensions/foundry/tests/line/skills-mount.spec.ts
+  s_75776fa1f8e041::t_74abb1f796a835 6
+extensions/foundry/tests/line/stop-refinery-tick.spec.ts
+  s_75776fa1f8e041::t_7ee329ee96b168 14-15
+extensions/foundry/tests/line/teardown.spec.ts
+  s_75776fa1f8e041::t_b1f66767210446 9
+extensions/foundry/tests/line/why-not-shipped.spec.ts
+  s_75776fa1f8e041::t_0f7ab139b72c1f 9
+extensions/foundry/tests/line/worktree.spec.ts
+  s_75776fa1f8e041::t_3a5a211c2a3491 18,20
+extensions/foundry/tests/live/linear-transition-live.spec.ts
+  s_75776fa1f8e041::t_3ed8388b8a6801 2,6-7
+extensions/foundry/tests/live/ship-live.spec.ts
+  s_75776fa1f8e041::t_a57376e2c8bdc8 14,120
+extensions/foundry/tests/order/order-standing-sources.spec.ts
+  s_75776fa1f8e041::t_40b2c6441213d9 7
+extensions/foundry/tests/order/standing.spec.ts
+  s_75776fa1f8e041::t_9e085aaec42882 8
+extensions/foundry/tests/order/store.spec.ts
+  s_75776fa1f8e041::t_8b122224638eb6 7
+extensions/foundry/tests/profile/store.spec.ts
+  s_75776fa1f8e041::t_06b40a08672e00 8
+extensions/foundry/tests/recipe/resolve.spec.ts
+  s_75776fa1f8e041::t_512e3bd970a0bc 17
+extensions/foundry/tests/runtime/adapter-contract.spec.ts
+  s_75776fa1f8e041::t_eb83a8e62053c6 4
+extensions/foundry/tests/runtime/claude-launch.spec.ts
+  s_75776fa1f8e041::t_5456101010f5c7 6
+extensions/foundry/tests/runtime/diff-metrics.spec.ts
+  s_75776fa1f8e041::t_ee69b2bf364bd4 10
+extensions/foundry/tests/runtime/feed/feed-log.spec.ts
+  s_75776fa1f8e041::t_93ab835a6ba2d2 5
+extensions/foundry/tests/runtime/feed/mutes.spec.ts
+  s_75776fa1f8e041::t_503a28bcc3e1c0 5
+extensions/foundry/tests/runtime/jsonl-log.spec.ts
+  s_75776fa1f8e041::t_9f6eaa6990ac1b 5
+extensions/foundry/tests/runtime/quick-actions.spec.ts
+  s_75776fa1f8e041::t_f8cdccc53cfef0 15,108
+extensions/foundry/tests/runtime/record-stall.spec.ts
+  s_75776fa1f8e041::t_0c3d21d7a7a32e 6
+extensions/foundry/tests/runtime/stop-supervision-runtime.spec.ts
+  s_75776fa1f8e041::t_c0c27357b6c4c9 13,19
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_75776fa1f8e041::t_039c30c58625e7 7-8,19
+extensions/foundry/tests/runtime/supervision-console.spec.ts
+  s_75776fa1f8e041::t_97015dd81a06ac 16
+extensions/foundry/tests/runtime/supervision.spec.ts
+  s_75776fa1f8e041::t_ce69d1fd59e9ba 4
+extensions/foundry/tests/runtime/tool-activity.spec.ts
+  s_75776fa1f8e041::t_38ade90d83c5fb 4
+extensions/foundry/tests/runtime/transcript-excerpt.spec.ts
+  s_75776fa1f8e041::t_25671632e659d7 5
+extensions/foundry/tests/runtime/transcript-tailer.spec.ts
+  s_75776fa1f8e041::t_c9ee2e7f57c56b 5
+extensions/foundry/tests/sensors/resolve.spec.ts
+  s_75776fa1f8e041::t_3742b247df5a28 6
+extensions/foundry/tests/sensors/schedule.spec.ts
+  s_75776fa1f8e041::t_e5576466822f74 8
+extensions/foundry/tests/sensors/sensor-tick.spec.ts
+  s_75776fa1f8e041::t_9c9c7a51154d10 13,20
+extensions/foundry/tests/sensors/stop-sensor-tick.spec.ts
+  s_75776fa1f8e041::t_ba399bf9432d0b 10-11
+extensions/foundry/tests/sensors/store.spec.ts
+  s_75776fa1f8e041::t_ee894f7a0a388b 7
+extensions/foundry/tests/state/foundry-index.spec.ts
+  s_75776fa1f8e041::t_5cd5b4523f4b2b 7
+extensions/foundry/tests/state/indexed-stores.spec.ts
+  s_75776fa1f8e041::t_a9dbf362cb67e7 12-13
+extensions/foundry/tests/state/model-catalog.spec.ts
+  s_75776fa1f8e041::t_be32522b0ce2b4 4
+extensions/foundry/tests/state/settings-effects.spec.ts
+  s_75776fa1f8e041::t_4f5047888ba4fa 7
+extensions/foundry/tests/state/settings.spec.ts
+  s_75776fa1f8e041::t_cb2b32bc83bbf3 18
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_75776fa1f8e041::t_2f33c1128903ac 11-12
+extensions/foundry/tests/verify/rules.spec.ts
+  s_75776fa1f8e041::t_e82a6a3b5d0ccf 16
+extensions/foundry/tests/verify/toolchain-probe.spec.ts
+  s_75776fa1f8e041::t_90b7901e857f94 5
+extensions/foundry/tests/workspace-root.spec.ts
+  s_75776fa1f8e041::t_2fac5f121b4016 5
+extensions/foundry/tsconfig.test.json
+  s_75776fa1f8e041::t_37962d038914da 6
+extensions/git-integration/CLAUDE.md
+  s_75776fa1f8e041::t_8ff53ab6e27af6 88-89
+extensions/git-integration/manifest.json
+  s_75776fa1f8e041::t_9bbfa9ad0f8b1a 4
+extensions/git-integration/package.json
+  s_75776fa1f8e041::t_4e4c4458fe60ba 3,7-10
+extensions/git-integration/src/components/syntax-theme.css
+  s_75776fa1f8e041::t_b67b07d879cab7 5
+extensions/git-integration/tests/integration/local-inventory.spec.ts
+  s_75776fa1f8e041::t_a02f961210122f 9
+extensions/git-integration/tests/integration/push.spec.ts
+  s_75776fa1f8e041::t_4cf67f1f3c49c2 7
+extensions/git-integration/tests/integration/status-watch-roots.spec.ts
+  s_75776fa1f8e041::t_b8e13cad97cac1 7
+extensions/git-integration/tests/integration/worktree.spec.ts
+  s_75776fa1f8e041::t_07e6e8dc6b9bdb 9
+extensions/git-integration/tests/unit/ChapterNav.spec.tsx
+  s_75776fa1f8e041::t_baa91163698013 9
+extensions/git-integration/tests/unit/FileHeader.spec.tsx
+  s_75776fa1f8e041::t_3a9c51d0b0bed6 10
+extensions/git-integration/tests/unit/GitFullView.disabled.spec.tsx
+  s_75776fa1f8e041::t_488940049fb47a 6
+extensions/git-integration/tests/unit/KeepBothModal.spec.tsx
+  s_75776fa1f8e041::t_239586e2194c89 7
+extensions/git-integration/tests/unit/PrDialog.form.spec.tsx
+  s_75776fa1f8e041::t_850fbe94c12fe3 7-9
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_75776fa1f8e041::t_5af512aab5ce20 19,53,61
+extensions/git-integration/tests/unit/PrReviewTab.close.spec.tsx
+  s_75776fa1f8e041::t_d1f4101e55f888 9
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_75776fa1f8e041::t_9e6b6ea22e90d1 15
+extensions/git-integration/tests/unit/ResumeCard.spec.tsx
+  s_75776fa1f8e041::t_520b85d2c920dc 14
+extensions/git-integration/tests/unit/RichContent.spec.tsx
+  s_75776fa1f8e041::t_bd50c6aa044317 10
+extensions/git-integration/tests/unit/StagingArea.spec.tsx
+  s_75776fa1f8e041::t_d35241ae8d9206 13
+extensions/git-integration/tests/unit/channel-schemas.spec.ts
+  s_75776fa1f8e041::t_7a15b0d4bf1326 4
+extensions/git-integration/tests/unit/git-repo-support.spec.ts
+  s_75776fa1f8e041::t_d31fd0be873b6f 3
+extensions/git-integration/tests/unit/git-settings-reader.spec.ts
+  s_75776fa1f8e041::t_d2eee8d95fae24 4
+extensions/git-integration/tests/unit/home-actions.spec.ts
+  s_75776fa1f8e041::t_656d772b8ceeaa 3
+extensions/git-integration/tests/unit/home-publisher.spec.ts
+  s_75776fa1f8e041::t_ade687c1290986 4,9
+extensions/git-integration/tests/unit/pr-signals.spec.ts
+  s_75776fa1f8e041::t_73942a43eee18f 4
+extensions/git-integration/tests/unit/pr-watch.spec.ts
+  s_75776fa1f8e041::t_00101168f87e06 3
+extensions/git-integration/tests/unit/remote-access.spec.ts
+  s_75776fa1f8e041::t_46ca642df47cb0 5
+extensions/git-integration/tests/unit/review-agent-draft.spec.ts
+  s_75776fa1f8e041::t_7808e4f9e3422b 5
+extensions/git-integration/tests/unit/review-agent-ipc.spec.ts
+  s_75776fa1f8e041::t_cd1b3ae30952e8 28-29
+extensions/git-integration/tests/unit/review-agent.spec.ts
+  s_75776fa1f8e041::t_9e5fa8ad2a2888 15
+extensions/git-integration/tests/unit/support/activate.ts
+  s_75776fa1f8e041::t_63c8cd83ccce97 11-12
+extensions/git-integration/tests/unit/support/git-repo.ts
+  s_75776fa1f8e041::t_cfb0cc47813c19 4
+extensions/git-integration/tests/unit/support/shell.ts
+  s_75776fa1f8e041::t_79a0ba0f683729 4
+extensions/git-integration/tests/unit/useAgentRuns.spec.tsx
+  s_75776fa1f8e041::t_f4c93cf2b833d7 7
+extensions/git-integration/tests/unit/usePaneWidth.spec.tsx
+  s_75776fa1f8e041::t_4d9f880525d4a0 5,12
+extensions/git-integration/tests/unit/useResizePanel.spec.tsx
+  s_75776fa1f8e041::t_951406dae92686 4
+extensions/git-integration/tests/unit/visible-pr.spec.ts
+  s_75776fa1f8e041::t_d3ae1b4a33e8fa 4
+extensions/git-integration/tests/unit/workspace-enabled.spec.ts
+  s_75776fa1f8e041::t_351329c398e58a 4
+extensions/git-integration/tests/unit/worktree.spec.ts
+  s_75776fa1f8e041::t_552da83b01c239 5
+extensions/git-integration/tests/unit/worktrees-cleanup-ipc.spec.ts
+  s_75776fa1f8e041::t_8ee064cc199cb3 5
+extensions/git-integration/tsconfig.test.json
+  s_75776fa1f8e041::t_a4f52ad8186407 6
+extensions/notepad/manifest.json
+  s_75776fa1f8e041::t_f2e35180937c3b 4
+extensions/notepad/package.json
+  s_75776fa1f8e041::t_9b0e69a72d8cfa 3,7-10
+extensions/notepad/tests/components/LivePreviewView.spec.tsx
+  s_75776fa1f8e041::t_3a1632db196633 8
+extensions/notepad/tests/components/NoteEditorView.spec.tsx
+  s_75776fa1f8e041::t_0b986b0f6546f8 12
+extensions/notepad/tests/components/PreviewWidgets.spec.tsx
+  s_75776fa1f8e041::t_cd99d47d3d5951 5
+extensions/notepad/tests/components/SearchOverlay.spec.tsx
+  s_75776fa1f8e041::t_44bed657e0c59f 5
+extensions/notepad/tests/components/helpers/note-surface.ts
+  s_75776fa1f8e041::t_f098ea85fd2a0a 4,6
+extensions/notepad/tests/components/useNotepadSettings.spec.tsx
+  s_75776fa1f8e041::t_9cb263f9d8c7a2 5
+extensions/notepad/tests/integration/db-reinit.spec.ts
+  s_75776fa1f8e041::t_e7288268245e46 5-6
+extensions/notepad/tests/integration/db/db.spec.ts
+  s_75776fa1f8e041::t_84251cf61228b5 3
+extensions/notepad/tests/integration/ipc/comments.ipc.spec.ts
+  s_75776fa1f8e041::t_02791b0ef156c1 9
+extensions/notepad/tests/integration/ipc/diagram-comments.ipc.spec.ts
+  s_75776fa1f8e041::t_f97efd5eef09d5 9
+extensions/notepad/tests/integration/ipc/diagrams.ipc.spec.ts
+  s_75776fa1f8e041::t_17a8707cab9530 13
+extensions/notepad/tests/integration/ipc/export.ipc.spec.ts
+  s_75776fa1f8e041::t_0ae420d77ff768 4-5,31
+extensions/notepad/tests/integration/ipc/folders.ipc.spec.ts
+  s_75776fa1f8e041::t_577d3695ef6b97 14
+extensions/notepad/tests/integration/ipc/notes.ipc.spec.ts
+  s_75776fa1f8e041::t_78cf52327867db 15,34
+extensions/notepad/tests/integration/ipc/search.ipc.spec.ts
+  s_75776fa1f8e041::t_e8b1616af48dde 9
+extensions/notepad/tests/integration/support/ipc-main-api.ts
+  s_75776fa1f8e041::t_4d13346f401670 4
+extensions/notepad/tests/unit/channel-schemas.spec.ts
+  s_75776fa1f8e041::t_d206d23d379b10 11
+extensions/notepad/tests/unit/editor/applyExternalDoc.spec.tsx
+  s_75776fa1f8e041::t_632a09a5346de8 7
+extensions/notepad/tests/unit/index.spec.ts
+  s_75776fa1f8e041::t_2cd55cc83ee392 5
+extensions/notepad/tests/unit/ipc/remote-access.spec.ts
+  s_75776fa1f8e041::t_98e08d51917d70 12
+extensions/notepad/tests/unit/renderer/App.spec.tsx
+  s_75776fa1f8e041::t_74123ec9c79811 6
+extensions/notepad/tsconfig.test.json
+  s_75776fa1f8e041::t_7e80afdb2da818 6
+extensions/remote-control/manifest.json
+  s_75776fa1f8e041::t_1f5e90c8ef2594 4
+extensions/remote-control/package.json
+  s_75776fa1f8e041::t_ec6a28b4ec88d7 3,7-10
+extensions/remote-control/tests/integration/bridge.route.spec.ts
+  s_75776fa1f8e041::t_f8a07d1867c61b 10
+extensions/remote-control/tests/integration/terminal.routes.spec.ts
+  s_75776fa1f8e041::t_fefe02e68609cd 12
+extensions/remote-control/tests/unit/extension-index.spec.ts
+  s_75776fa1f8e041::t_2b4b188f8e9ba6 4
+extensions/remote-control/tests/unit/lazy-server.spec.ts
+  s_75776fa1f8e041::t_b48b79f368beea 4
+extensions/remote-control/tests/unit/ngrok-manager.spec.ts
+  s_75776fa1f8e041::t_03dfed75e32bca 2-3
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_75776fa1f8e041::t_d58eb2ce9538f2 4,9
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_75776fa1f8e041::t_7e7a82ae6b39e3 12
+extensions/remote-control/tsconfig.test.json
+  s_75776fa1f8e041::t_8cbd53d25aefad 6
+extensions/task-vault/CLAUDE.md
+  s_75776fa1f8e041::t_6347b3a6335252 22-23
+extensions/task-vault/manifest.json
+  s_75776fa1f8e041::t_8ff8642a9005d4 4
+extensions/task-vault/package.json
+  s_75776fa1f8e041::t_c8141f01f21b29 3,7-10
+extensions/task-vault/tests/components/DailyLogDialogs.spec.tsx
+  s_75776fa1f8e041::t_bb3175710d750a 12
+extensions/task-vault/tests/components/DatabaseAdmin.spec.tsx
+  s_75776fa1f8e041::t_f40784bf013fb4 7
+extensions/task-vault/tests/components/helpers/bridge.ts
+  s_75776fa1f8e041::t_a9538c391c34e3 2,5
+extensions/task-vault/tests/index.spec.ts
+  s_75776fa1f8e041::t_a5802003498c37 5
+extensions/task-vault/tests/integration/channel-schemas.spec.ts
+  s_75776fa1f8e041::t_ee9118d50dec3d 3,17
+extensions/task-vault/tests/integration/home/publisher.spec.ts
+  s_75776fa1f8e041::t_4e1f3850ed1bd2 3
+extensions/task-vault/tests/integration/index-reset.spec.ts
+  s_75776fa1f8e041::t_025f12b6701e72 3,6
+extensions/task-vault/tests/integration/ipc/admin.ipc.spec.ts
+  s_75776fa1f8e041::t_6b57a6e9c69905 3
+extensions/task-vault/tests/integration/ipc/links.ipc.spec.ts
+  s_75776fa1f8e041::t_695bca12f2bd62 3
+extensions/task-vault/tests/integration/ipc/vault-contexts.ipc.spec.ts
+  s_75776fa1f8e041::t_b02c353f924bdb 3
+extensions/task-vault/tests/integration/notifications/task-scheduler.spec.ts
+  s_75776fa1f8e041::t_adb2f942d2e6e0 3-4
+extensions/task-vault/tests/integration/vault/db.spec.ts
+  s_75776fa1f8e041::t_7d0aacfef99d42 3
+extensions/task-vault/tests/integration/vault/ensure-next-occurrence.spec.ts
+  s_75776fa1f8e041::t_2d3b8a87dc840e 3
+extensions/task-vault/tests/ipc/remote-access.spec.ts
+  s_75776fa1f8e041::t_f752dd8a3f399f 13
+extensions/task-vault/tests/navigation.spec.ts
+  s_75776fa1f8e041::t_02a37ebb0919af 4
+extensions/task-vault/tests/renderer/App.spec.tsx
+  s_75776fa1f8e041::t_26f35149acdfb7 4
+extensions/task-vault/tests/support/vault-db.ts
+  s_75776fa1f8e041::t_045282a9d6f9c6 3,8
+extensions/task-vault/tsconfig.test.json
+  s_75776fa1f8e041::t_0d832f4a0cc890 6
+knip.jsonc
+  s_75776fa1f8e041::t_4e3fd8d0665c05 32,39-59
+package-lock.json
+  s_75776fa1f8e041::t_35ce905654f9f4 3,9,73,83,97,120,146,166,7146-7161,7190-7193,7283-7368,20332-20349,21660-21690,21730-21733
+package.json
+  s_75776fa1f8e041::t_35e0bd3c8755e0 3,7,32,38,48-50,121
+packages/core-main/package.json
+  s_75776fa1f8e041::t_0273a8f5a3da5e 1-16
+packages/core-main/src/agents/acp/agent-connection.ts
+  s_75776fa1f8e041::t_8f345996f1a1d1 10
+packages/core-main/src/agents/acp/agent-registry.ts
+  s_75776fa1f8e041::t_ceff210c19e5d8 6-7
+packages/core-main/src/agents/acp/agent-service-instance.ts
+  s_75776fa1f8e041::t_d46837ff69c9cf 4
+packages/core-main/src/agents/acp/agent-service.ts
+  s_75776fa1f8e041::t_d7a2fa1f1d5b04 38
+packages/core-main/src/agents/acp/record-agent-tab.ts
+  s_75776fa1f8e041::t_28c17f3df68292 4
+packages/core-main/src/agents/agent-session-watcher.ts
+  s_75776fa1f8e041::t_9fa4982580b3d3 3-4
+packages/core-main/src/agents/ask-watcher.ts
+  s_75776fa1f8e041::t_b685fea8348e84 9
+packages/core-main/src/agents/transcript-usage.ts
+  s_75776fa1f8e041::t_fb2467e200764d 2-6
+packages/core-main/src/breakout-windows.ts
+  s_75776fa1f8e041::t_04b96aea4e1226 2
+packages/core-main/src/extensions/api.ts
+  s_75776fa1f8e041::t_4974a236cb7024 32
+packages/core-main/src/extensions/ext-protocol.ts
+  s_75776fa1f8e041::t_33cc578ab310af 3
+packages/core-main/src/extensions/extension-exit.ts
+  s_75776fa1f8e041::t_a2a562f2e2442f 1
+packages/core-main/src/extensions/extension-host.ts
+  s_75776fa1f8e041::t_107c718e71c392 7-8
+packages/core-main/src/extensions/extension-usage.ts
+  s_75776fa1f8e041::t_cc33bed2b883e5 3
+packages/core-main/src/extensions/frame-bridge.ts
+  s_75776fa1f8e041::t_2c6f990f8e4356 10
+packages/core-main/src/git/branch-exclude.ts
+  s_75776fa1f8e041::t_8ee2c122188d54 1
+packages/core-main/src/git/git-service.ts
+  s_75776fa1f8e041::t_c616e955151934 3-4
+packages/core-main/src/home/attention-log.ts
+  s_75776fa1f8e041::t_a516333862bda3 5-9
+packages/core-main/src/home/home-feed.ts
+  s_75776fa1f8e041::t_c26767e66f12fa 7
+packages/core-main/src/home/scheduled-alerts.ts
+  s_75776fa1f8e041::t_7afb791188d831 2,4
+packages/core-main/src/home/schedules.ts
+  s_75776fa1f8e041::t_87f8fbc43a17db 4-6
+packages/core-main/src/home/thread-summary.ts
+  s_75776fa1f8e041::t_503011a5af0d6e 4
+packages/core-main/src/home/unattended-run.ts
+  s_75776fa1f8e041::t_71312778277b72 3-5,12
+packages/core-main/src/index.ts
+  s_75776fa1f8e041::t_a17688e30f4f9d 49
+packages/core-main/src/integrations/agent-context.ts
+  s_75776fa1f8e041::t_af44e6a2310a7c 4
+packages/core-main/src/integrations/context-sync.ts
+  s_75776fa1f8e041::t_fd6451f7018e4f 3
+packages/core-main/src/integrations/issue-link-store.ts
+  s_75776fa1f8e041::t_07bb4db3860f4b 4
+packages/core-main/src/integrations/issue-service.ts
+  s_75776fa1f8e041::t_c2af24d15e154b 8
+packages/core-main/src/integrations/providers/linear.provider.ts
+  s_75776fa1f8e041::t_74b21393116678 11
+packages/core-main/src/integrations/providers/provider.ts
+  s_75776fa1f8e041::t_ddbe9a1b3c8dcd 7
+packages/core-main/src/integrations/session-context.ts
+  s_75776fa1f8e041::t_11ef2101373fc8 4
+packages/core-main/src/integrations/tracker-error.ts
+  s_75776fa1f8e041::t_6e27d39390be9b 1
+packages/core-main/src/integrations/tracker-store.ts
+  s_75776fa1f8e041::t_49e805d53f09b5 10
+packages/core-main/src/ipc/agent-usage.ipc.ts
+  s_75776fa1f8e041::t_48e7326f888704 7-11,15-17
+packages/core-main/src/ipc/agents.ipc.ts
+  s_75776fa1f8e041::t_a4307bf958cb86 14
+packages/core-main/src/ipc/attention.ipc.ts
+  s_75776fa1f8e041::t_fe2db2e0a0c30c 4,8
+packages/core-main/src/ipc/extension.ipc.ts
+  s_75776fa1f8e041::t_fc900194e3981c 13
+packages/core-main/src/ipc/home-feed.ipc.ts
+  s_75776fa1f8e041::t_709eb9d575ea36 5
+packages/core-main/src/ipc/integrations.ipc.ts
+  s_75776fa1f8e041::t_cac029c2812f16 17-18
+packages/core-main/src/ipc/metrics.ipc.ts
+  s_75776fa1f8e041::t_f61e732d080fae 8
+packages/core-main/src/ipc/schedules.ipc.ts
+  s_75776fa1f8e041::t_9415484bdc4f5a 21
+packages/core-main/src/ipc/session-records.ipc.ts
+  s_75776fa1f8e041::t_fc372af99d0819 11-12,24
+packages/core-main/src/ipc/task.ipc.ts
+  s_75776fa1f8e041::t_633f5d23a25214 12
+packages/core-main/src/ipc/thread-summary.ipc.ts
+  s_75776fa1f8e041::t_18c5104cfb59bb 11
+packages/core-main/src/ipc/usage.ipc.ts
+  s_75776fa1f8e041::t_59baeec2cab1ee 8
+packages/core-main/src/ipc/workspace.ipc.ts
+  s_75776fa1f8e041::t_5ad73039d39e8d 13
+packages/core-main/src/mcp/manifest-tools.ts
+  s_75776fa1f8e041::t_e0e015d4fe505e 5
+packages/core-main/src/mcp/move-session.ts
+  s_75776fa1f8e041::t_1fd381d35616e7 4-5
+packages/core-main/src/mcp/registration.ts
+  s_75776fa1f8e041::t_084f3b43db3db9 10
+packages/core-main/src/mcp/renderer-tools.ts
+  s_75776fa1f8e041::t_5ca01093c38fbc 12
+packages/core-main/src/notifications/notification-manager.ts
+  s_75776fa1f8e041::t_d8c7b7dfface61 3,7,10-13,21
+packages/core-main/src/preload.ts
+  s_75776fa1f8e041::t_507183672f7651 2-6,8
+packages/core-main/src/remote/remote-accessible-channels.ts
+  s_75776fa1f8e041::t_a6c88baa237ab4 5,24
+packages/core-main/src/sessions/session-record-store.ts
+  s_75776fa1f8e041::t_9b0a53fae9a20c 9-11
+packages/core-main/src/sessions/session-snapshot.ts
+  s_75776fa1f8e041::t_6c6403737d9ced 3
+packages/core-main/src/storage/extension-settings-store.ts
+  s_75776fa1f8e041::t_c60dc1a94686a9 9
+packages/core-main/src/storage/settings-store.ts
+  s_75776fa1f8e041::t_9b4bcc0f47ac8e 8
+packages/core-main/src/storage/workspace-store.ts
+  s_75776fa1f8e041::t_4be8e48b5fd123 4,13
+packages/core-main/src/tasks/task-store.ts
+  s_75776fa1f8e041::t_89c8a4df3e960d 12-13
+packages/core-main/src/usage/usage-store.ts
+  s_75776fa1f8e041::t_e9381eb0d5d2b0 6-7
+packages/core-main/tests/integration/agents/acp/agent-connection.spec.ts
+  s_75776fa1f8e041::t_0be3a899cdbaad 2-4
+packages/core-main/tests/integration/agents/agent-session-watcher-arming.spec.ts
+  s_75776fa1f8e041::t_ac8ac895c4b09e 4-6,30,34
+packages/core-main/tests/integration/agents/agent-session-watcher.spec.ts
+  s_75776fa1f8e041::t_9adafcc5320ef0 5-7,30,34
+packages/core-main/tests/integration/agents/ask-watcher.spec.ts
+  s_75776fa1f8e041::t_20603f8fe5484f 4-5,19,21
+packages/core-main/tests/integration/agents/claude-hook.spec.ts
+  s_75776fa1f8e041::t_c8161fd25cc2f3 5,19
+packages/core-main/tests/integration/db/db.ipc.spec.ts
+  s_75776fa1f8e041::t_1ba997f9ec9e5a 3,12-13
+packages/core-main/tests/integration/db/index.spec.ts
+  s_75776fa1f8e041::t_5874a1c06edf6a 5-6
+packages/core-main/tests/integration/extensions/shell-scope.spec.ts
+  s_75776fa1f8e041::t_bed41e38a3df3f 13-15,42,53,79
+packages/core-main/tests/integration/fs/tree-watch.spec.ts
+  s_75776fa1f8e041::t_bf129f403288eb 4-5,10-11
+packages/core-main/tests/integration/fs/watch-and-git.spec.ts
+  s_75776fa1f8e041::t_c4a9c451b68cd8 5-9
+packages/core-main/tests/integration/git/branches-in-a-real-repo.spec.ts
+  s_75776fa1f8e041::t_0c55c9efbc6370 5,14
+packages/core-main/tests/integration/git/create-worktree.spec.ts
+  s_75776fa1f8e041::t_cd7eaa961c4765 4-5
+packages/core-main/tests/integration/git/git-service-stop.spec.ts
+  s_75776fa1f8e041::t_d36f254d156e9d 4-5,24-25
+packages/core-main/tests/integration/git/is-git-repo.spec.ts
+  s_75776fa1f8e041::t_a971aa907ac68d 4,21,45
+packages/core-main/tests/integration/home/schedules.spec.ts
+  s_75776fa1f8e041::t_f65d01f2a40dce 4-7
+packages/core-main/tests/integration/integrations/session-hook.spec.ts
+  s_75776fa1f8e041::t_128eed1a076586 5,23
+packages/core-main/tests/integration/ipc/fs.ipc.spec.ts
+  s_75776fa1f8e041::t_828f0595f567f6 4-6,15
+packages/core-main/tests/integration/ipc/schedules.ipc.spec.ts
+  s_75776fa1f8e041::t_509ab63612173c 6,19,23-24,28,31,59
+packages/core-main/tests/integration/ipc/shell.ipc.spec.ts
+  s_75776fa1f8e041::t_be71cf475bee79 5,17
+packages/core-main/tests/integration/main/usage/usage-database.spec.ts
+  s_75776fa1f8e041::t_5e961a52bc2792 4-5
+packages/core-main/tests/integration/main/usage/usage-store.spec.ts
+  s_75776fa1f8e041::t_cbd27a5bd09f20 3-5
+packages/core-main/tests/integration/mcp/relay.spec.ts
+  s_75776fa1f8e041::t_522c09d0cb44a2 4-5
+packages/core-main/tests/integration/mcp/server.spec.ts
+  s_75776fa1f8e041::t_96089de21578fb 8-11
+packages/core-main/tests/integration/shell/login-shell-path.spec.ts
+  s_75776fa1f8e041::t_882f75ba88e739 4-7
+packages/core-main/tests/integration/shell/shell-executor-login-path.spec.ts
+  s_75776fa1f8e041::t_2616b85981b110 4-6
+packages/core-main/tests/integration/shell/shell-executor-options.spec.ts
+  s_75776fa1f8e041::t_b4d2c76b38eec3 4-5
+packages/core-main/tests/integration/shell/shell-executor-stop.spec.ts
+  s_75776fa1f8e041::t_a68ae42f9ad92d 4-7
+packages/core-main/tests/integration/terminal/metrics-stop.spec.ts
+  s_75776fa1f8e041::t_50e469a58b2f83 4-7
+packages/core-main/tests/integration/terminal/run-in-terminal.spec.ts
+  s_75776fa1f8e041::t_b903b7e8301191 5,7,10,25,30,35-40,42
+packages/core-main/tests/unit/agents/acp/agent-connection.spec.ts
+  s_75776fa1f8e041::t_6af7ee15cf0882 2
+packages/core-main/tests/unit/agents/acp/agent-images-sessions.spec.ts
+  s_75776fa1f8e041::t_c2ca8a5ae7a6aa 2-5,9-11
+packages/core-main/tests/unit/agents/acp/agent-log.spec.ts
+  s_75776fa1f8e041::t_e053b1b1d0a073 4-5
+packages/core-main/tests/unit/agents/acp/agent-queue.spec.ts
+  s_75776fa1f8e041::t_bce5586b30fe07 3-6,10-12
+packages/core-main/tests/unit/agents/acp/agent-registry.spec.ts
+  s_75776fa1f8e041::t_fe177877f3db63 7
+packages/core-main/tests/unit/agents/acp/agent-service.spec.ts
+  s_75776fa1f8e041::t_04a60eb5736296 13-17,23-25
+packages/core-main/tests/unit/agents/acp/agent-steer.spec.ts
+  s_75776fa1f8e041::t_436467e6dcae4d 3-6,10-12
+packages/core-main/tests/unit/agents/acp/fake-agent.ts
+  s_75776fa1f8e041::t_4cc34ea23be7ee 15-17
+packages/core-main/tests/unit/agents/acp/record-agent-tab.spec.ts
+  s_75776fa1f8e041::t_59e87e8e91ed4c 6,9-10
+packages/core-main/tests/unit/agents/agent-turns.spec.ts
+  s_75776fa1f8e041::t_c6166b8b34c1f8 2
+packages/core-main/tests/unit/agents/agent-usage-ipc.spec.ts
+  s_75776fa1f8e041::t_9167b0036a6c2c 5,8-10,12,14-17
+packages/core-main/tests/unit/agents/claude-hook.spec.ts
+  s_75776fa1f8e041::t_093801dd88e522 5,19
+packages/core-main/tests/unit/agents/transcript-usage.spec.ts
+  s_75776fa1f8e041::t_ed6164b9d72aca 4-5,7-10
+packages/core-main/tests/unit/extensions/api-home.spec.ts
+  s_75776fa1f8e041::t_06c3a16e42fe27 5,13,18-20
+packages/core-main/tests/unit/extensions/api-issues.spec.ts
+  s_75776fa1f8e041::t_1bf8fbbb21e3dd 5,28-29,32,50,192,216,240,252
+packages/core-main/tests/unit/extensions/api-supervised-runs.spec.ts
+  s_75776fa1f8e041::t_6c51f8038a3d2a 13,18,22,25,42,56-57
+packages/core-main/tests/unit/extensions/api-v1.2.0.spec.ts
+  s_75776fa1f8e041::t_fe507a8ce68297 5,56,63,78,84,90-91,94-95
+packages/core-main/tests/unit/extensions/api.spec.ts
+  s_75776fa1f8e041::t_7980deb5fd6368 42,58,73,81,95-96,99-100
+packages/core-main/tests/unit/extensions/extension-host-start.spec.ts
+  s_75776fa1f8e041::t_c746769f47b178 5-8,32,41
+packages/core-main/tests/unit/extensions/extension-host-usage.spec.ts
+  s_75776fa1f8e041::t_e9a886f6d8a52d 5,23,28,36
+packages/core-main/tests/unit/extensions/extension-host.spec.ts
+  s_75776fa1f8e041::t_1f6c7987c89961 9,33,167,182,430
+packages/core-main/tests/unit/fs/fs-watcher.spec.ts
+  s_75776fa1f8e041::t_e43daa3d6710b9 3-4
+packages/core-main/tests/unit/fs/tree-watch.spec.ts
+  s_75776fa1f8e041::t_b359137a12233a 3
+packages/core-main/tests/unit/git/branch-exclude.spec.ts
+  s_75776fa1f8e041::t_9d68f027ca9015 2-3
+packages/core-main/tests/unit/git/git-repo-probe.spec.ts
+  s_75776fa1f8e041::t_ee9fe388d362c5 2,10-11,17
+packages/core-main/tests/unit/git/git-service.spec.ts
+  s_75776fa1f8e041::t_6f339a1a088851 2,4,15,42
+packages/core-main/tests/unit/github/github-api.spec.ts
+  s_75776fa1f8e041::t_89c5bfb6359201 3-4
+packages/core-main/tests/unit/home/attention-log.spec.ts
+  s_75776fa1f8e041::t_ffaaab4f6c8ce5 4,11
+packages/core-main/tests/unit/home/branch-name.spec.ts
+  s_75776fa1f8e041::t_4a2d8e29cc37e7 2
+packages/core-main/tests/unit/home/home-feed.spec.ts
+  s_75776fa1f8e041::t_a8e44a2b8e0502 2,5,9
+packages/core-main/tests/unit/home/scheduled-alerts.spec.ts
+  s_75776fa1f8e041::t_2340a6d3a422bd 2-3
+packages/core-main/tests/unit/home/thread-summary.spec.ts
+  s_75776fa1f8e041::t_bddd76989acfec 10-11
+packages/core-main/tests/unit/home/unattended-run.spec.ts
+  s_75776fa1f8e041::t_56d2547b2cb86d 5-7
+packages/core-main/tests/unit/integrations/agent-context.spec.ts
+  s_75776fa1f8e041::t_fc50ee153461ac 4-5,15,194
+packages/core-main/tests/unit/integrations/claude-settings-put-hook.spec.ts
+  s_75776fa1f8e041::t_2214bb619bea87 4-5
+packages/core-main/tests/unit/integrations/claude-settings-write.spec.ts
+  s_75776fa1f8e041::t_60202559f71a92 4-5
+packages/core-main/tests/unit/integrations/context-sync.spec.ts
+  s_75776fa1f8e041::t_1487633712ca7c 4-5,13,16-17,51,66-67
+packages/core-main/tests/unit/integrations/index.spec.ts
+  s_75776fa1f8e041::t_2b3e20a9c70b96 2,19,27-28,42,45,52,83
+packages/core-main/tests/unit/integrations/issue-link-store.spec.ts
+  s_75776fa1f8e041::t_6144ade511e91a 4,12,236,249,261
+packages/core-main/tests/unit/integrations/issue-service-transition.spec.ts
+  s_75776fa1f8e041::t_4041b852b8f5d1 2,6-7
+packages/core-main/tests/unit/integrations/issue-service.spec.ts
+  s_75776fa1f8e041::t_074fe9d718f015 2-5
+packages/core-main/tests/unit/integrations/providers/linear-create.spec.ts
+  s_75776fa1f8e041::t_d0958482a602aa 2-4
+packages/core-main/tests/unit/integrations/providers/linear-transition.spec.ts
+  s_75776fa1f8e041::t_228fab5fd8c0c1 2-4
+packages/core-main/tests/unit/integrations/providers/linear.provider.spec.ts
+  s_75776fa1f8e041::t_81ea911af4ae9e 2-3,9-10
+packages/core-main/tests/unit/integrations/providers/provider.spec.ts
+  s_75776fa1f8e041::t_7952f09f0b0f7d 2
+packages/core-main/tests/unit/integrations/session-context.spec.ts
+  s_75776fa1f8e041::t_7e9c22ef355978 4-5,50,54-55
+packages/core-main/tests/unit/integrations/session-hook.spec.ts
+  s_75776fa1f8e041::t_8547697625655b 4,12
+packages/core-main/tests/unit/integrations/tracker-error.spec.ts
+  s_75776fa1f8e041::t_02293729b520cc 2
+packages/core-main/tests/unit/integrations/tracker-store.spec.ts
+  s_75776fa1f8e041::t_993c185d2442c2 4,26
+packages/core-main/tests/unit/ipc/agent-ask.ipc.spec.ts
+  s_75776fa1f8e041::t_eac0103e291036 14-15,18,27
+packages/core-main/tests/unit/ipc/agent-turn.ipc.spec.ts
+  s_75776fa1f8e041::t_897db265ad2539 14-15,18,27
+packages/core-main/tests/unit/ipc/agents.ipc.spec.ts
+  s_75776fa1f8e041::t_2f8d3c3c59d2dc 24-25,29,35
+packages/core-main/tests/unit/ipc/app.ipc.spec.ts
+  s_75776fa1f8e041::t_facfddb2cf8556 30
+packages/core-main/tests/unit/ipc/attention.ipc.spec.ts
+  s_75776fa1f8e041::t_37f97de25b6c78 10,12,40,61
+packages/core-main/tests/unit/ipc/channel-registrar.spec.ts
+  s_75776fa1f8e041::t_681ae6f835d06c 13-15
+packages/core-main/tests/unit/ipc/claude-code.ipc.spec.ts
+  s_75776fa1f8e041::t_d8b7dea397cba9 14-15,17
+packages/core-main/tests/unit/ipc/core-channel-schemas.spec.ts
+  s_75776fa1f8e041::t_24604dd4652a1e 24-25,43-66,68-88
+packages/core-main/tests/unit/ipc/editor.ipc.spec.ts
+  s_75776fa1f8e041::t_19d57978b04014 2,11,16,19,24-25
+packages/core-main/tests/unit/ipc/extension.ipc.spec.ts
+  s_75776fa1f8e041::t_f294449c8992fc 26,35,38-39,49-50,70-71
+packages/core-main/tests/unit/ipc/fs.ipc.spec.ts
+  s_75776fa1f8e041::t_c8f93ce61ddff2 2,11
+packages/core-main/tests/unit/ipc/git.ipc.spec.ts
+  s_75776fa1f8e041::t_da38c557d5b851 24,27,30,33-34,61-63
+packages/core-main/tests/unit/ipc/home-feed.ipc.spec.ts
+  s_75776fa1f8e041::t_3f23cc4f86aecc 2,11-12,20-21
+packages/core-main/tests/unit/ipc/integrations.ipc.spec.ts
+  s_75776fa1f8e041::t_30ea1335f73a3e 4-5,23,30,41,62-63,76,96,120-121,161
+packages/core-main/tests/unit/ipc/invoke-table.spec.ts
+  s_75776fa1f8e041::t_a45c494d5bc39c 16-18
+packages/core-main/tests/unit/ipc/log.ipc.spec.ts
+  s_75776fa1f8e041::t_4bf2d3bdc65e44 13,17
+packages/core-main/tests/unit/ipc/notification.ipc.spec.ts
+  s_75776fa1f8e041::t_e9a612757ffb27 2,26,48
+packages/core-main/tests/unit/ipc/session-records.ipc.spec.ts
+  s_75776fa1f8e041::t_77743f639f2243 4-6,20,64,78,101
+packages/core-main/tests/unit/ipc/settings.ipc.spec.ts
+  s_75776fa1f8e041::t_51af5792a39c79 2,11,21
+packages/core-main/tests/unit/ipc/shell.ipc.spec.ts
+  s_75776fa1f8e041::t_8cc65d50ce3401 21
+packages/core-main/tests/unit/ipc/task.ipc.spec.ts
+  s_75776fa1f8e041::t_b2c933ce53f43c 2-3,39
+packages/core-main/tests/unit/ipc/terminal.ipc.spec.ts
+  s_75776fa1f8e041::t_c521b8ca4640c8 3,15,22-24,26-27,31-37
+packages/core-main/tests/unit/ipc/thread-summary.ipc.spec.ts
+  s_75776fa1f8e041::t_ba30b4fd94ca42 3,15-16,22,25-26,28-31,48,89
+packages/core-main/tests/unit/ipc/usage.ipc.spec.ts
+  s_75776fa1f8e041::t_249ecb068d3ac6 14-15,24
+packages/core-main/tests/unit/ipc/workspace.ipc.spec.ts
+  s_75776fa1f8e041::t_e7ae1ba8f6c19f 2,18,20-21,65,181
+packages/core-main/tests/unit/logger.spec.ts
+  s_75776fa1f8e041::t_c1f16474c97fbe 58,66,75,85,94,106,122,134,148,160,175,185,196,212,226
+packages/core-main/tests/unit/main/app-menu.spec.ts
+  s_75776fa1f8e041::t_86e1662e705961 2
+packages/core-main/tests/unit/main/app-updater.spec.ts
+  s_75776fa1f8e041::t_e1985e826ee8ca 47,49,51,55-56,78-79,262,273,284,299,309,318,325
+packages/core-main/tests/unit/main/background-mode.spec.ts
+  s_75776fa1f8e041::t_3a94f5fc91a157 27
+packages/core-main/tests/unit/main/breakout-windows.spec.ts
+  s_75776fa1f8e041::t_868615f013fa6a 10-11
+packages/core-main/tests/unit/main/claim-profile.spec.ts
+  s_75776fa1f8e041::t_480bd9bcaf5ac8 21,27
+packages/core-main/tests/unit/main/e2e-readiness.spec.ts
+  s_75776fa1f8e041::t_b2a03336141805 5,10
+packages/core-main/tests/unit/main/editor/known-editors.spec.ts
+  s_75776fa1f8e041::t_d735a8f61834ab 2
+packages/core-main/tests/unit/main/editor/open-in-editor.spec.ts
+  s_75776fa1f8e041::t_bc23d46123c206 12
+packages/core-main/tests/unit/main/extensions/api.spec.ts
+  s_75776fa1f8e041::t_819d8d5c8b0193 33,49,59,67,79
+packages/core-main/tests/unit/main/extensions/ext-protocol.spec.ts
+  s_75776fa1f8e041::t_7ef06a267bccfe 6
+packages/core-main/tests/unit/main/extensions/extension-exit.spec.ts
+  s_75776fa1f8e041::t_353a64e127c655 6-7
+packages/core-main/tests/unit/main/extensions/frame-bridge.spec.ts
+  s_75776fa1f8e041::t_6d38e1e22f3cb4 3-5,12-13,33-35
+packages/core-main/tests/unit/main/extensions/host/backend-loader.spec.ts
+  s_75776fa1f8e041::t_9b06b53f3ac85e 6
+packages/core-main/tests/unit/main/extensions/host/backend-reload.spec.ts
+  s_75776fa1f8e041::t_944270bc45d632 30,36-42,90
+packages/core-main/tests/unit/main/extensions/host/callbacks.spec.ts
+  s_75776fa1f8e041::t_50781e3e6efdc4 2
+packages/core-main/tests/unit/main/extensions/host/host-agents.spec.ts
+  s_75776fa1f8e041::t_bae023e51144f1 19-26
+packages/core-main/tests/unit/main/extensions/host/host-process.spec.ts
+  s_75776fa1f8e041::t_bb55f03bf630c1 18-27
+packages/core-main/tests/unit/main/extensions/host/rpc-endpoint.spec.ts
+  s_75776fa1f8e041::t_cd6f3121fb4ced 3-6
+packages/core-main/tests/unit/main/extensions/pty-stream.spec.ts
+  s_75776fa1f8e041::t_3944b95ed19f85 2-3
+packages/core-main/tests/unit/main/extensions/setting-scope.spec.ts
+  s_75776fa1f8e041::t_f33c1fe3744dd6 2-3
+packages/core-main/tests/unit/main/extensions/usage-capture.spec.ts
+  s_75776fa1f8e041::t_6966a00aee338d 5,20,29,36
+packages/core-main/tests/unit/main/extensions/window-view-usage.spec.ts
+  s_75776fa1f8e041::t_544b3685a86b66 3,7
+packages/core-main/tests/unit/main/ipc/extension.ipc.spec.ts
+  s_75776fa1f8e041::t_cdc7b83467334d 5,13,22,29-31
+packages/core-main/tests/unit/main/logger.spec.ts
+  s_75776fa1f8e041::t_cf2190671201cf 4,20,27,38
+packages/core-main/tests/unit/main/preload.spec.ts
+  s_75776fa1f8e041::t_c04da040df5f9d 3,22
+packages/core-main/tests/unit/main/profile-lock.spec.ts
+  s_75776fa1f8e041::t_e4e9ae9444f7fa 2
+packages/core-main/tests/unit/main/remote/bridge-event-bus.spec.ts
+  s_75776fa1f8e041::t_00a21bfae7eefc 2
+packages/core-main/tests/unit/main/safe-send.spec.ts
+  s_75776fa1f8e041::t_eb93fd01175af0 3-4
+packages/core-main/tests/unit/main/window-menu.spec.ts
+  s_75776fa1f8e041::t_dbf0c8d15f1843 2
+packages/core-main/tests/unit/mcp/alert-tool.spec.ts
+  s_75776fa1f8e041::t_d0c55da6e7f1cd 5,8,16-17
+packages/core-main/tests/unit/mcp/app-tools.spec.ts
+  s_75776fa1f8e041::t_cc333594b5f2f8 2-3
+packages/core-main/tests/unit/mcp/manifest-tools.spec.ts
+  s_75776fa1f8e041::t_004b457171df41 5,7-9
+packages/core-main/tests/unit/mcp/move-session.spec.ts
+  s_75776fa1f8e041::t_d30042e4d9bf9a 9,12,33-34
+packages/core-main/tests/unit/mcp/registration.spec.ts
+  s_75776fa1f8e041::t_e70fec47680217 4,8,11,22-23
+packages/core-main/tests/unit/mcp/relay.spec.ts
+  s_75776fa1f8e041::t_9da56012ba4e09 3-4
+packages/core-main/tests/unit/mcp/renderer-tools.spec.ts
+  s_75776fa1f8e041::t_6d97b48ff3b0af 4,12,46
+packages/core-main/tests/unit/mcp/socket-path.spec.ts
+  s_75776fa1f8e041::t_d7da6a758877e0 2
+packages/core-main/tests/unit/notifications/notification-manager.spec.ts
+  s_75776fa1f8e041::t_027ed395df67e9 29,32,36,54,56,486
+packages/core-main/tests/unit/sessions/session-record-store.spec.ts
+  s_75776fa1f8e041::t_8370d213952945 4-5,13,21
+packages/core-main/tests/unit/sessions/session-snapshot.spec.ts
+  s_75776fa1f8e041::t_b0c733ba7bd4b6 3-4,10,13-14,18,23-25
+packages/core-main/tests/unit/shell/shell-executor.spec.ts
+  s_75776fa1f8e041::t_55af7fa8db4f02 9-10
+packages/core-main/tests/unit/storage/cached-store.spec.ts
+  s_75776fa1f8e041::t_8c95373dc75268 38
+packages/core-main/tests/unit/storage/extension-settings-store.spec.ts
+  s_75776fa1f8e041::t_34dc82fc84f04b 34,40,48,53,63,73,90,103,118,120,133
+packages/core-main/tests/unit/storage/settings-store.spec.ts
+  s_75776fa1f8e041::t_e0a7e647c72eaf 41,53,66,82,94,102,112,120,132,155,158,172
+packages/core-main/tests/unit/storage/workspace-store.spec.ts
+  s_75776fa1f8e041::t_5b7f3aeec6f821 4,8,26
+packages/core-main/tests/unit/tasks/task-store.spec.ts
+  s_75776fa1f8e041::t_29a47ba2cc8a2b 5,13
+packages/core-main/tests/unit/terminal/flow-control.spec.ts
+  s_75776fa1f8e041::t_ee7f2f644110a5 6
+packages/core-main/tests/unit/terminal/metrics.ipc.spec.ts
+  s_75776fa1f8e041::t_22b9b6b12568d7 23,75,87,104,177,189,205,213,226,248,264,276,295,310,335,364,385,400,413,440,465,479
+packages/core-main/tests/unit/terminal/output-batcher.spec.ts
+  s_75776fa1f8e041::t_9a8bd6ddcfa1e6 6
+packages/core-main/tests/unit/terminal/output-relay.spec.ts
+  s_75776fa1f8e041::t_7251e4c8e69d08 2-6,8
+packages/core-main/tests/unit/terminal/project-sessions.spec.ts
+  s_75776fa1f8e041::t_ba163c4772098c 2-3
+packages/core-main/tests/unit/terminal/pty-manager.spec.ts
+  s_75776fa1f8e041::t_ed2ffb34b39677 2,44,63,84,481
+packages/core-main/tsconfig.json
+  s_75776fa1f8e041::t_d4d32a8999232b 11,13,16
+packages/core-renderer-remote/package.json
+  s_75776fa1f8e041::t_55a97548c4a364 1-14
+packages/core-renderer-remote/src/electron-api-shim.ts
+  s_75776fa1f8e041::t_c5993c33120779 4,7-10
+packages/core-renderer-remote/src/main.tsx
+  s_75776fa1f8e041::t_870d88c95649e9 6
+packages/core-renderer-remote/tests/unit/renderer-remote/App.spec.tsx
+  s_75776fa1f8e041::t_bfbb126b2238f7 5
+packages/core-renderer-remote/tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_75776fa1f8e041::t_36b4261fd0610b 2-8,43,55,101,138
+packages/core-renderer-remote/tests/unit/renderer-remote/mobile/MobileApp.spec.tsx
+  s_75776fa1f8e041::t_5d451bc42003bb 5,13,21,49,79,93,103,115,117,129,138,140,154
+packages/core-renderer-remote/tests/unit/renderer-remote/mobile/MobileControlToolbar.spec.tsx
+  s_75776fa1f8e041::t_5fda1ac685b14f 17
+packages/core-renderer-remote/tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_75776fa1f8e041::t_4e5ea0224cc833 5-6,29
+packages/core-renderer-remote/tests/unit/renderer-remote/mobile/MobileTerminalView.spec.tsx
+  s_75776fa1f8e041::t_c3bfdcd0fef555 5,10,60,66,114,128,139,153,164,182,190,205,218,230,239
+packages/core-renderer-remote/tests/unit/renderer-remote/mobile/useReconnect.spec.ts
+  s_75776fa1f8e041::t_461c3b758f7742 3,25,32,46,60,76,107,135,156,194,226,263
+packages/core-renderer-remote/tests/unit/renderer-remote/remote-client.spec.ts
+  s_75776fa1f8e041::t_191de9542267c4 18,31,48,56,73,80,91,98,107,115,123,135,145,152,164
+packages/core-renderer/extension-frame/frame-shim.ts
+  s_75776fa1f8e041::t_f1d7683255d99a 3-4,9-13,19,24-25,153
+packages/core-renderer/package.json
+  s_75776fa1f8e041::t_ee4cdb885533e3 1-17
+packages/core-renderer/src/App.tsx
+  s_75776fa1f8e041::t_507729abdcf611 15
+packages/core-renderer/src/components/AboutDialog.tsx
+  s_75776fa1f8e041::t_cdf77a68aa345e 3
+packages/core-renderer/src/components/ConfirmDialog.tsx
+  s_75776fa1f8e041::t_c1b6511d075c4c 18
+packages/core-renderer/src/components/ExtensionPanelPortal.tsx
+  s_75776fa1f8e041::t_fc8d27efe141cc 4-5
+packages/core-renderer/src/components/QuickActionsHost.tsx
+  s_75776fa1f8e041::t_258843ada1c07a 16
+packages/core-renderer/src/components/agent/attached-context.ts
+  s_75776fa1f8e041::t_a70e95a742d7fc 4
+packages/core-renderer/src/components/home/AcrossRepos.tsx
+  s_75776fa1f8e041::t_e36849eb5e6df2 10-11
+packages/core-renderer/src/components/home/DeskHeader.tsx
+  s_75776fa1f8e041::t_ad01cb7ada0608 9
+packages/core-renderer/src/components/home/InsightsCards.tsx
+  s_75776fa1f8e041::t_ec9e82c09b2b88 5-6
+packages/core-renderer/src/components/home/InsightsLower.tsx
+  s_75776fa1f8e041::t_475304918115cf 5-11
+packages/core-renderer/src/components/home/ScheduledView.tsx
+  s_75776fa1f8e041::t_27d420268c4f82 28-29
+packages/core-renderer/src/components/home/StartWork.tsx
+  s_75776fa1f8e041::t_b97035c5052112 8,39-40
+packages/core-renderer/src/components/home/ThreadDrawerAddLane.tsx
+  s_75776fa1f8e041::t_686785ee0dc6b2 7
+packages/core-renderer/src/components/home/TicketsColumn.tsx
+  s_75776fa1f8e041::t_ddba824ff35d11 9
+packages/core-renderer/src/components/home/TodayRail.tsx
+  s_75776fa1f8e041::t_b8ace0b48dac16 10
+packages/core-renderer/src/components/home/WeekCard.tsx
+  s_75776fa1f8e041::t_48f9cd81568860 7
+packages/core-renderer/src/components/home/WhenChoices.tsx
+  s_75776fa1f8e041::t_f0075c426f8db6 4
+packages/core-renderer/src/components/home/WorkspacePicker.tsx
+  s_75776fa1f8e041::t_84fba11860c306 5
+packages/core-renderer/src/components/home/YourMove.tsx
+  s_75776fa1f8e041::t_d28da52fb091ef 20
+packages/core-renderer/src/components/home/across-repos.ts
+  s_75776fa1f8e041::t_6b742f6f28da00 4-5
+packages/core-renderer/src/components/home/desk-search.ts
+  s_75776fa1f8e041::t_7988b76f8b4fa2 4
+packages/core-renderer/src/components/home/focus-options.ts
+  s_75776fa1f8e041::t_d53feb42d8b945 1-4
+packages/core-renderer/src/components/home/home-layout.ts
+  s_75776fa1f8e041::t_07ad5f2defed0c 2
+packages/core-renderer/src/components/home/lane-details.ts
+  s_75776fa1f8e041::t_385ebca5f8c7ac 2
+packages/core-renderer/src/components/home/scheduled-runs.ts
+  s_75776fa1f8e041::t_0cf1c70f792993 2,6-7
+packages/core-renderer/src/components/home/start-work-edit.ts
+  s_75776fa1f8e041::t_0943e2357c67a4 5-7
+packages/core-renderer/src/components/home/start-work-model.ts
+  s_75776fa1f8e041::t_02b48d187f0c66 12
+packages/core-renderer/src/components/home/start-work-schedule.ts
+  s_75776fa1f8e041::t_405834385631eb 8
+packages/core-renderer/src/components/home/start-work.ts
+  s_75776fa1f8e041::t_4f7209e43cad36 18-23
+packages/core-renderer/src/components/home/task-actions.ts
+  s_75776fa1f8e041::t_1c6fe181e9bbc3 7-13
+packages/core-renderer/src/components/home/useDeskModel.ts
+  s_75776fa1f8e041::t_4e05f48c920105 12
+packages/core-renderer/src/components/home/useInsightsData.ts
+  s_75776fa1f8e041::t_6bcfb5d4725fd5 6-7
+packages/core-renderer/src/components/home/useSessionUsage.ts
+  s_75776fa1f8e041::t_bc4e307d1f95bc 2
+packages/core-renderer/src/components/home/useThreadSummary.ts
+  s_75776fa1f8e041::t_e8e9489b0e8bc0 3
+packages/core-renderer/src/components/home/useWorkThreads.ts
+  s_75776fa1f8e041::t_524270983234a0 20-21
+packages/core-renderer/src/components/integrations/IssueDetails.tsx
+  s_75776fa1f8e041::t_bf6ced67c03a02 7
+packages/core-renderer/src/components/integrations/IssueDrawer.tsx
+  s_75776fa1f8e041::t_9da1ee1bd81f45 8
+packages/core-renderer/src/components/integrations/IssuePicker.tsx
+  s_75776fa1f8e041::t_ee90ff4534150e 5
+packages/core-renderer/src/components/integrations/LinkIssueDialog.tsx
+  s_75776fa1f8e041::t_83546db6104634 6
+packages/core-renderer/src/components/integrations/issue-sections.tsx
+  s_75776fa1f8e041::t_d045cfe0b5350c 4
+packages/core-renderer/src/components/integrations/use-issue-search.ts
+  s_75776fa1f8e041::t_8e1907c7f90f8e 4
+packages/core-renderer/src/components/overview/OverviewScreen.tsx
+  s_75776fa1f8e041::t_d76cef0bc76ce4 26
+packages/core-renderer/src/components/overview/WallTile.tsx
+  s_75776fa1f8e041::t_5b45ec5168ba44 17-18
+packages/core-renderer/src/components/session/ChoiceButtons.tsx
+  s_75776fa1f8e041::t_ccb11956359647 2
+packages/core-renderer/src/components/session/SessionLinkDialog.tsx
+  s_75776fa1f8e041::t_931f3fa4f182bf 7
+packages/core-renderer/src/components/session/StateChip.tsx
+  s_75776fa1f8e041::t_11c99f9491ee94 4
+packages/core-renderer/src/components/session/WorkItemCell.tsx
+  s_75776fa1f8e041::t_8a86ae74a99a7a 4-5
+packages/core-renderer/src/components/session/useSessionFacts.ts
+  s_75776fa1f8e041::t_aef01ae5ef54c3 7
+packages/core-renderer/src/components/settings/AgentsSettings.tsx
+  s_75776fa1f8e041::t_9e34d12fa64f66 3,5
+packages/core-renderer/src/components/settings/GlobalSettings.tsx
+  s_75776fa1f8e041::t_a00213ac27936b 6-7
+packages/core-renderer/src/components/settings/IntegrationsSettings.tsx
+  s_75776fa1f8e041::t_92efa842a207f7 7-8
+packages/core-renderer/src/components/settings/QuickActionsSettings.tsx
+  s_75776fa1f8e041::t_53a1fb4d5259a6 4-8
+packages/core-renderer/src/components/settings/WorkspaceSettings.tsx
+  s_75776fa1f8e041::t_fc5ac005e2ccc9 16
+packages/core-renderer/src/components/sidebar/BranchRow.tsx
+  s_75776fa1f8e041::t_59562d7f4d9741 5
+packages/core-renderer/src/components/sidebar/BranchSelect.tsx
+  s_75776fa1f8e041::t_99ca6d0149f808 4
+packages/core-renderer/src/components/sidebar/CreateProjectDialog.tsx
+  s_75776fa1f8e041::t_a6027225d10b51 5-10,15
+packages/core-renderer/src/components/sidebar/EditWorkspaceDialog.tsx
+  s_75776fa1f8e041::t_39892d6bdbf9f6 3
+packages/core-renderer/src/components/sidebar/MoveSessionDialog.tsx
+  s_75776fa1f8e041::t_1b1e312d74cea0 7-11
+packages/core-renderer/src/components/sidebar/ScratchSection.tsx
+  s_75776fa1f8e041::t_609143506dba01 2
+packages/core-renderer/src/components/sidebar/SidebarDialogs.tsx
+  s_75776fa1f8e041::t_59aad2abb7cd96 3
+packages/core-renderer/src/components/sidebar/SidebarList.tsx
+  s_75776fa1f8e041::t_3967fcbe2e6285 2
+packages/core-renderer/src/components/sidebar/UnifiedSidebar.tsx
+  s_75776fa1f8e041::t_8f3733419b9d73 4
+packages/core-renderer/src/components/sidebar/branch-actions.ts
+  s_75776fa1f8e041::t_4b5f6008ea26d1 2
+packages/core-renderer/src/components/sidebar/create-project.ts
+  s_75776fa1f8e041::t_9d35b935f981dd 1
+packages/core-renderer/src/components/sidebar/sidebar-mode.ts
+  s_75776fa1f8e041::t_68f457930fed88 2
+packages/core-renderer/src/components/sidebar/useSidebarRows.ts
+  s_75776fa1f8e041::t_d8f6e86fa63067 3
+packages/core-renderer/src/components/sidebar/useStalenessClock.ts
+  s_75776fa1f8e041::t_04c4bde83cf6e0 2
+packages/core-renderer/src/components/sidebar/workspace-form.tsx
+  s_75776fa1f8e041::t_04a707d1ae33c2 3
+packages/core-renderer/src/components/tasks/AddToTaskDialog.tsx
+  s_75776fa1f8e041::t_b3854a87f1dade 16
+packages/core-renderer/src/components/tasks/add-to-task-model.ts
+  s_75776fa1f8e041::t_4f0776f5f865d4 4-7
+packages/core-renderer/src/components/tasks/add-to-task.ts
+  s_75776fa1f8e041::t_46935fd3b36902 2
+packages/core-renderer/src/components/terminal/BreakoutWindowView.tsx
+  s_75776fa1f8e041::t_fec7bf8ddd35fd 6
+packages/core-renderer/src/components/terminal/TabBar.tsx
+  s_75776fa1f8e041::t_6658f354d3f9f6 27,30
+packages/core-renderer/src/components/terminal/TerminalPane.tsx
+  s_75776fa1f8e041::t_dc4689a1a95b5c 6
+packages/core-renderer/src/components/terminal/TerminalSession.tsx
+  s_75776fa1f8e041::t_c3352876668849 9
+packages/core-renderer/src/components/terminal/place-of.ts
+  s_75776fa1f8e041::t_b7a0b8d05172c0 3
+packages/core-renderer/src/components/usage/UsageScreen.tsx
+  s_75776fa1f8e041::t_c80af655b8d542 9-10
+packages/core-renderer/src/components/usage/usage-columns.tsx
+  s_75776fa1f8e041::t_1aa39c60fbd9d7 10
+packages/core-renderer/src/components/usage/usage-model.ts
+  s_75776fa1f8e041::t_49d65e561ad8c7 1-3
+packages/core-renderer/src/electron-api.d.ts
+  s_75776fa1f8e041::t_cf943033ed041a 1,3
+packages/core-renderer/src/extensions/loader.ts
+  s_75776fa1f8e041::t_c8fb18a292a99c 6
+packages/core-renderer/src/home/core-asks.ts
+  s_75776fa1f8e041::t_6719a6366c9bef 1-3
+packages/core-renderer/src/home/desk-order.ts
+  s_75776fa1f8e041::t_f60439c905aa49 1
+packages/core-renderer/src/home/desk-summary.ts
+  s_75776fa1f8e041::t_0ccfe6271c27f3 1
+packages/core-renderer/src/home/focus.ts
+  s_75776fa1f8e041::t_5ae4f582b631d4 1
+packages/core-renderer/src/home/insights.ts
+  s_75776fa1f8e041::t_f603d122d567a3 1-9
+packages/core-renderer/src/home/plan-the-day.ts
+  s_75776fa1f8e041::t_9d9cf7b523c73a 2
+packages/core-renderer/src/home/stored-shapes.ts
+  s_75776fa1f8e041::t_0549ccfb24e780 1
+packages/core-renderer/src/home/task-lanes.ts
+  s_75776fa1f8e041::t_e2173300ab4392 1-2
+packages/core-renderer/src/home/task-state.ts
+  s_75776fa1f8e041::t_d860440d0d4dd8 1
+packages/core-renderer/src/home/work-threads.ts
+  s_75776fa1f8e041::t_1ff090991eb0a1 1-4
+packages/core-renderer/src/hooks/useExtensionEscapeExit.ts
+  s_75776fa1f8e041::t_c61b88999a81bc 6
+packages/core-renderer/src/hooks/useSurfaceOpen.ts
+  s_75776fa1f8e041::t_afb561a95f9f97 2
+packages/core-renderer/src/lib/focus-terminal.ts
+  s_75776fa1f8e041::t_75b8d127e0231c 3
+packages/core-renderer/src/mcp/McpHost.tsx
+  s_75776fa1f8e041::t_d439380a8603ee 2
+packages/core-renderer/src/mcp/renderer-tools.ts
+  s_75776fa1f8e041::t_2717c92e212f48 8-9,21
+packages/core-renderer/src/quick-actions/custom-actions.ts
+  s_75776fa1f8e041::t_74b0bb5c911cda 1
+packages/core-renderer/src/quick-actions/custom-runtime.ts
+  s_75776fa1f8e041::t_313e212eb0614a 1
+packages/core-renderer/src/quick-actions/rank.ts
+  s_75776fa1f8e041::t_fc9ce98f8219a3 1
+packages/core-renderer/src/quick-actions/types.ts
+  s_75776fa1f8e041::t_04d27053ee1725 1
+packages/core-renderer/src/quick-actions/usage.ts
+  s_75776fa1f8e041::t_a41b74d2c72ac4 1
+packages/core-renderer/src/quick-actions/use-active-scope.ts
+  s_75776fa1f8e041::t_b8d8000a9e0384 4-5
+packages/core-renderer/src/quick-actions/use-core-quick-actions.ts
+  s_75776fa1f8e041::t_0b9e904352ad10 20-24
+packages/core-renderer/src/shell/MainArea.tsx
+  s_75776fa1f8e041::t_808e7fa5d6cad0 5
+packages/core-renderer/src/shell/agent-attention.ts
+  s_75776fa1f8e041::t_18f76822b2001d 8
+packages/core-renderer/src/shell/main-events.ts
+  s_75776fa1f8e041::t_f5986c56ba32c8 2,16
+packages/core-renderer/src/shell/terminal-launch.ts
+  s_75776fa1f8e041::t_2621ea22898329 2
+packages/core-renderer/src/sidebar/agent-state.ts
+  s_75776fa1f8e041::t_a4e09a7286c88f 1
+packages/core-renderer/src/sidebar/branch-display.ts
+  s_75776fa1f8e041::t_452a78e3f0e34d 1
+packages/core-renderer/src/sidebar/branch-rows.ts
+  s_75776fa1f8e041::t_1f63778390cc0f 4-10
+packages/core-renderer/src/sidebar/branch-state.ts
+  s_75776fa1f8e041::t_5841ac8ab9e3f7 2
+packages/core-renderer/src/sidebar/choice-prompt.ts
+  s_75776fa1f8e041::t_b88078a07ae3f1 1
+packages/core-renderer/src/sidebar/resume.ts
+  s_75776fa1f8e041::t_2a34d89363eaa6 1
+packages/core-renderer/src/sidebar/session-facts.ts
+  s_75776fa1f8e041::t_fcecd167777620 13
+packages/core-renderer/src/sidebar/session-status.ts
+  s_75776fa1f8e041::t_2516bbe0d34a00 1
+packages/core-renderer/src/sidebar/shown-in-main.ts
+  s_75776fa1f8e041::t_b91f876dbda7de 1,4
+packages/core-renderer/src/sidebar/state-icons.tsx
+  s_75776fa1f8e041::t_8230df042770e2 2
+packages/core-renderer/src/sidebar/task-groups.ts
+  s_75776fa1f8e041::t_4739dcf64031b8 1-2
+packages/core-renderer/src/sidebar/view-model.ts
+  s_75776fa1f8e041::t_a6cb737e3ce47b 1
+packages/core-renderer/src/sidebar/work-item.ts
+  s_75776fa1f8e041::t_cf96580eada589 1
+packages/core-renderer/src/stores/change-stats.store.ts
+  s_75776fa1f8e041::t_5a92c20c184918 2
+packages/core-renderer/src/stores/home-feed.store.ts
+  s_75776fa1f8e041::t_696d0b8391317f 2
+packages/core-renderer/src/stores/integrations.store.ts
+  s_75776fa1f8e041::t_7eda12f36700cc 9
+packages/core-renderer/src/stores/metrics.store.ts
+  s_75776fa1f8e041::t_825cfb261048f4 2
+packages/core-renderer/src/stores/notification.store.ts
+  s_75776fa1f8e041::t_6d3d52cce92542 2
+packages/core-renderer/src/stores/session-records.store.ts
+  s_75776fa1f8e041::t_9219ea3f2283b7 2-6
+packages/core-renderer/src/stores/session.store.ts
+  s_75776fa1f8e041::t_b6941cc28ec0a1 2-3,5
+packages/core-renderer/src/stores/settings.store.ts
+  s_75776fa1f8e041::t_edcf50476fd0f7 2,10-12
+packages/core-renderer/src/stores/task.store.ts
+  s_75776fa1f8e041::t_d2c7001d526b22 7
+packages/core-renderer/src/stores/workspace.store.ts
+  s_75776fa1f8e041::t_c04f3ce365fac1 2
+packages/core-renderer/src/terminal/breakout.ts
+  s_75776fa1f8e041::t_4840d537291183 1
+packages/core-renderer/src/terminal/navigate-to-session.ts
+  s_75776fa1f8e041::t_f4dcccb101c595 5
+packages/core-renderer/src/terminal/session-controller.ts
+  s_75776fa1f8e041::t_8642c86586de27 6,8
+packages/core-renderer/src/terminal/start-session.ts
+  s_75776fa1f8e041::t_c1484e9505adab 13-14
+packages/core-renderer/src/usage/record.ts
+  s_75776fa1f8e041::t_f9897ebc6ae377 1-5
+packages/core-renderer/src/usage/track-surfaces.ts
+  s_75776fa1f8e041::t_26690c65e74d24 4,7
+packages/core-renderer/src/utils/pane-tree.ts
+  s_75776fa1f8e041::t_eca9d8378b6e12 1
+packages/core-renderer/tests/integration/renderer/components/home/merge-threads.spec.tsx
+  s_75776fa1f8e041::t_ea1f33c777b925 3-7
+packages/core-renderer/tests/integration/renderer/home/agent-command.spec.ts
+  s_75776fa1f8e041::t_cfb6e4d5c15a2f 7
+packages/core-renderer/tests/unit/ConfirmDialog.spec.tsx
+  s_75776fa1f8e041::t_591d76e3ed224d 4
+packages/core-renderer/tests/unit/packages/extension-ui/dialog.spec.tsx
+  s_75776fa1f8e041::t_9a5a3c8dbd46fb 5-8
+packages/core-renderer/tests/unit/packages/extension-ui/fonts.spec.ts
+  s_75776fa1f8e041::t_df95581c92d2e6 10,37-39
+packages/core-renderer/tests/unit/packages/extension-ui/modal-shell.spec.tsx
+  s_75776fa1f8e041::t_2cfcc3efa251e9 5-7,9
+packages/core-renderer/tests/unit/packages/extension-ui/popover.spec.tsx
+  s_75776fa1f8e041::t_772f5ec452f462 5-6
+packages/core-renderer/tests/unit/renderer/App.render-count.spec.tsx
+  s_75776fa1f8e041::t_efcdf238e9d090 4-12,18,24-25,28-30,33,36,39,42-43
+packages/core-renderer/tests/unit/renderer/PrReviewWindow.spec.tsx
+  s_75776fa1f8e041::t_9f5cc2f0dfa3a6 4-10,12,15
+packages/core-renderer/tests/unit/renderer/agent/AgentView.spec.tsx
+  s_75776fa1f8e041::t_0a40a89275c6e3 7-12,90
+packages/core-renderer/tests/unit/renderer/agent/Composer.spec.tsx
+  s_75776fa1f8e041::t_944fc964d77329 6,12-21,24
+packages/core-renderer/tests/unit/renderer/agent/attached-context.spec.ts
+  s_75776fa1f8e041::t_d2f8d0d7c165db 14-17,22-24
+packages/core-renderer/tests/unit/renderer/agent/cite.spec.tsx
+  s_75776fa1f8e041::t_70c5ece2580a76 7,12-16,19
+packages/core-renderer/tests/unit/renderer/agent/context-reaches-agent.spec.tsx
+  s_75776fa1f8e041::t_907fd3ff3dfc6a 7-15,20
+packages/core-renderer/tests/unit/renderer/agent/fold-updates.spec.ts
+  s_75776fa1f8e041::t_e4c27783db9588 8
+packages/core-renderer/tests/unit/renderer/bundled-fonts.spec.ts
+  s_75776fa1f8e041::t_ab8c8d69552b17 2,8-10
+packages/core-renderer/tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_75776fa1f8e041::t_3c57fd1d409d02 5-7,35
+packages/core-renderer/tests/unit/renderer/components/AgentsSettings.spec.tsx
+  s_75776fa1f8e041::t_d3cab81ad5862b 5-11
+packages/core-renderer/tests/unit/renderer/components/AlertBadge.spec.tsx
+  s_75776fa1f8e041::t_3ea5c821983e43 4
+packages/core-renderer/tests/unit/renderer/components/AppBand.spec.tsx
+  s_75776fa1f8e041::t_515a40e6f6c78b 5
+packages/core-renderer/tests/unit/renderer/components/BranchRow.spec.tsx
+  s_75776fa1f8e041::t_6fc42d6f26a5d1 5-6
+packages/core-renderer/tests/unit/renderer/components/BranchSelect.spec.tsx
+  s_75776fa1f8e041::t_16822c275cf778 5-6,15
+packages/core-renderer/tests/unit/renderer/components/BreakoutDropZone.spec.tsx
+  s_75776fa1f8e041::t_acee89de686c30 4-9,15
+packages/core-renderer/tests/unit/renderer/components/BreakoutWindowView.spec.tsx
+  s_75776fa1f8e041::t_6e49107a70f67b 4-10,16,26
+packages/core-renderer/tests/unit/renderer/components/ChoiceButtons.spec.tsx
+  s_75776fa1f8e041::t_adc8cf32f70a30 5,17
+packages/core-renderer/tests/unit/renderer/components/CloseSessionButton.spec.tsx
+  s_75776fa1f8e041::t_b15fdc06ce5dc7 5
+packages/core-renderer/tests/unit/renderer/components/ContextMenu.spec.tsx
+  s_75776fa1f8e041::t_f6cd3e770770e1 5
+packages/core-renderer/tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_75776fa1f8e041::t_e83a9380771058 5-8,15-21,89
+packages/core-renderer/tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_75776fa1f8e041::t_818de343a8ca24 5-8,12-14,57
+packages/core-renderer/tests/unit/renderer/components/DeskModel.spec.tsx
+  s_75776fa1f8e041::t_3483d52e7cbebe 3,7-8,13-18,20-23,26,31,69
+packages/core-renderer/tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_75776fa1f8e041::t_ec235b9d947f73 5-11,38
+packages/core-renderer/tests/unit/renderer/components/ErrorBoundary.spec.tsx
+  s_75776fa1f8e041::t_fea4ab99df39c5 6-7
+packages/core-renderer/tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_75776fa1f8e041::t_700931dd53b5a6 5-6,10-12,18
+packages/core-renderer/tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_75776fa1f8e041::t_b296799dcc2491 5-10,45
+packages/core-renderer/tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_75776fa1f8e041::t_6f590f32b37fc1 7-10,20,24,32,35-37,40,43,46,49,52,56-70,144
+packages/core-renderer/tests/unit/renderer/components/InFlight.spec.tsx
+  s_75776fa1f8e041::t_be19697ac61593 5-15,18,28,31,50,53,58
+packages/core-renderer/tests/unit/renderer/components/Insights.spec.tsx
+  s_75776fa1f8e041::t_b561613c53f4d3 5-14,20,103
+packages/core-renderer/tests/unit/renderer/components/IntegrationsSettings.spec.tsx
+  s_75776fa1f8e041::t_80cadab247335b 5-9,58
+packages/core-renderer/tests/unit/renderer/components/IssueDetails.spec.tsx
+  s_75776fa1f8e041::t_763df57c17c0d4 5-7,123-125
+packages/core-renderer/tests/unit/renderer/components/IssueDrawer.spec.tsx
+  s_75776fa1f8e041::t_2cca80cda051ce 5-7,341-343
+packages/core-renderer/tests/unit/renderer/components/IssuePicker.spec.tsx
+  s_75776fa1f8e041::t_9340ad44460309 5-7,38
+packages/core-renderer/tests/unit/renderer/components/LeafPane.spec.tsx
+  s_75776fa1f8e041::t_300f6e483fd1c1 6-11,13
+packages/core-renderer/tests/unit/renderer/components/LinkIssueDialog.spec.tsx
+  s_75776fa1f8e041::t_d56593b1e4f11b 5-12
+packages/core-renderer/tests/unit/renderer/components/LivePreview.spec.tsx
+  s_75776fa1f8e041::t_e4063daa826e89 6-11,14
+packages/core-renderer/tests/unit/renderer/components/LogWindow.spec.tsx
+  s_75776fa1f8e041::t_362dd22587486d 5-6
+packages/core-renderer/tests/unit/renderer/components/MetricsBar.spec.tsx
+  s_75776fa1f8e041::t_7b9dfd99d61f29 4
+packages/core-renderer/tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_75776fa1f8e041::t_0b5d9df1a8c49a 5-8,13-14,18,92
+packages/core-renderer/tests/unit/renderer/components/NameTerminalDialog.spec.tsx
+  s_75776fa1f8e041::t_2d9b7c8049be20 5,25
+packages/core-renderer/tests/unit/renderer/components/NewSessionMenu.spec.tsx
+  s_75776fa1f8e041::t_930c78ddd8e9b4 5-12
+packages/core-renderer/tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_75776fa1f8e041::t_2421086c8df0f0 5-6,23-25,56
+packages/core-renderer/tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_75776fa1f8e041::t_0ed02bfa2b7680 6,13,18,26,31,34,39,43,53-57,310-311,313,330
+packages/core-renderer/tests/unit/renderer/components/PlanTheDay.spec.tsx
+  s_75776fa1f8e041::t_c76c1188664630 5-12,15,18,21,87
+packages/core-renderer/tests/unit/renderer/components/PromptPane.spec.tsx
+  s_75776fa1f8e041::t_b9d632f0b4e7d6 5-11
+packages/core-renderer/tests/unit/renderer/components/QuickActions.spec.tsx
+  s_75776fa1f8e041::t_dcbba6c15ac9c7 5-6,8
+packages/core-renderer/tests/unit/renderer/components/QuickActionsHost.spec.tsx
+  s_75776fa1f8e041::t_ba7bb5f6103aa8 4-5,8-17,19-24,26-27,32
+packages/core-renderer/tests/unit/renderer/components/QuickActionsSettings.spec.tsx
+  s_75776fa1f8e041::t_5250cf5f82c6a4 5-12
+packages/core-renderer/tests/unit/renderer/components/RepoHeader.spec.tsx
+  s_75776fa1f8e041::t_857e015dd772d1 5-6
+packages/core-renderer/tests/unit/renderer/components/ResumeButton.spec.tsx
+  s_75776fa1f8e041::t_3150d46d2e30e1 5,7,22
+packages/core-renderer/tests/unit/renderer/components/RunAsChoices.spec.tsx
+  s_75776fa1f8e041::t_7ba76b5015129e 6-7,20
+packages/core-renderer/tests/unit/renderer/components/ScheduledView.spec.tsx
+  s_75776fa1f8e041::t_cb57eb0c576be0 5-16,19
+packages/core-renderer/tests/unit/renderer/components/SessionLinkDialog.spec.tsx
+  s_75776fa1f8e041::t_c256a5f62892b5 5,10,29,31-32,37
+packages/core-renderer/tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_75776fa1f8e041::t_c44c5ef0ba332d 5-9,12,15,18,57
+packages/core-renderer/tests/unit/renderer/components/SidebarDialogs.spec.tsx
+  s_75776fa1f8e041::t_4f7a0e8709643d 4-6
+packages/core-renderer/tests/unit/renderer/components/SidebarHeader.spec.tsx
+  s_75776fa1f8e041::t_fbefc26c1061ae 5
+packages/core-renderer/tests/unit/renderer/components/SidebarSearch.spec.tsx
+  s_75776fa1f8e041::t_851ad3835b2a8b 5,12
+packages/core-renderer/tests/unit/renderer/components/SplitContainer.spec.tsx
+  s_75776fa1f8e041::t_61b5f57f1664b5 5
+packages/core-renderer/tests/unit/renderer/components/StartWork.spec.tsx
+  s_75776fa1f8e041::t_95816ad7304844 4-13,15-16,22,31,38,227
+packages/core-renderer/tests/unit/renderer/components/StartWorkAcrossRepos.spec.tsx
+  s_75776fa1f8e041::t_cdacdb242eefa2 5-13,20,25,122
+packages/core-renderer/tests/unit/renderer/components/StateChip.spec.tsx
+  s_75776fa1f8e041::t_e893e84f1feedb 4-5
+packages/core-renderer/tests/unit/renderer/components/StateGlyph.spec.tsx
+  s_75776fa1f8e041::t_2a631ee250c2b9 4-5
+packages/core-renderer/tests/unit/renderer/components/TabBar.spec.tsx
+  s_75776fa1f8e041::t_7043b2a812db84 5-15,23-26,28,42,52,54,56
+packages/core-renderer/tests/unit/renderer/components/TabBarTasks.spec.tsx
+  s_75776fa1f8e041::t_9da27522a76e9f 5-10,15,17
+packages/core-renderer/tests/unit/renderer/components/TaskDrawer.spec.tsx
+  s_75776fa1f8e041::t_3864fa0e853dd9 5-10,12-13,16,19,22
+packages/core-renderer/tests/unit/renderer/components/TaskDrawerAddLane.spec.tsx
+  s_75776fa1f8e041::t_243dacdd303c20 5-11,13-15,18,22,26,29
+packages/core-renderer/tests/unit/renderer/components/TaskList.spec.tsx
+  s_75776fa1f8e041::t_e7a180380680a2 5-13,15-16,19,22,30
+packages/core-renderer/tests/unit/renderer/components/TaskSwitcher.spec.tsx
+  s_75776fa1f8e041::t_b48b4200783343 5-6,11-12,23-30,86
+packages/core-renderer/tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_75776fa1f8e041::t_49b2c63d76869b 5-13,15
+packages/core-renderer/tests/unit/renderer/components/TerminalRow.spec.tsx
+  s_75776fa1f8e041::t_88270b819cb086 5-9
+packages/core-renderer/tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_75776fa1f8e041::t_d119d03a9535dd 4-7,85-86,96,136,961
+packages/core-renderer/tests/unit/renderer/components/ThreadDrawer.spec.tsx
+  s_75776fa1f8e041::t_87e1d7802bc00f 5-9,12,18,23,26,70
+packages/core-renderer/tests/unit/renderer/components/ToastContainer.spec.tsx
+  s_75776fa1f8e041::t_6525f49bfab48a 6-7
+packages/core-renderer/tests/unit/renderer/components/TodayRail.spec.tsx
+  s_75776fa1f8e041::t_adbfc99f5c1f20 5-11,15,60
+packages/core-renderer/tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_75776fa1f8e041::t_409b2b1f73c046 5-20,22,29,31-32,37,44,51,58,67,70,86,234
+packages/core-renderer/tests/unit/renderer/components/UnifiedSidebarTasks.spec.tsx
+  s_75776fa1f8e041::t_c9060da6ed7aa6 5-13,15-16,19
+packages/core-renderer/tests/unit/renderer/components/UsageScreen.spec.tsx
+  s_75776fa1f8e041::t_f5f75091ee4da1 5-6
+packages/core-renderer/tests/unit/renderer/components/WallTile.spec.tsx
+  s_75776fa1f8e041::t_b3111b743c9ad3 6,11,15,17-19,48
+packages/core-renderer/tests/unit/renderer/components/WorkItemCell.spec.tsx
+  s_75776fa1f8e041::t_b252a8e50d7f40 5-6
+packages/core-renderer/tests/unit/renderer/components/WorkspaceExtensionSettings.spec.tsx
+  s_75776fa1f8e041::t_d706e990028c18 5-11
+packages/core-renderer/tests/unit/renderer/components/WorkspaceSettings.spec.tsx
+  s_75776fa1f8e041::t_871013d7bacf62 5-9,13-14,64
+packages/core-renderer/tests/unit/renderer/components/answers.spec.tsx
+  s_75776fa1f8e041::t_69a96d13df5756 7,9
+packages/core-renderer/tests/unit/renderer/components/dropped-paths.spec.ts
+  s_75776fa1f8e041::t_4f17b7f06fa9dc 3-4
+packages/core-renderer/tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_75776fa1f8e041::t_c3af3e5433548a 5-11,16,25-26,29,33,36,219
+packages/core-renderer/tests/unit/renderer/components/extension-toggle-reload.spec.tsx
+  s_75776fa1f8e041::t_e2b86b4c16bf33 8-12,14
+packages/core-renderer/tests/unit/renderer/components/feature-usage-records.spec.tsx
+  s_75776fa1f8e041::t_32941f75a24996 6-15,19
+packages/core-renderer/tests/unit/renderer/components/home/HomeTasksLayout.spec.tsx
+  s_75776fa1f8e041::t_107ebf1b66463f 6-7,11,15,23,26,29,32,35,38,42,48-57,117
+packages/core-renderer/tests/unit/renderer/components/home/TaskRow.spec.tsx
+  s_75776fa1f8e041::t_4bd2cb414d5aec 4-11
+packages/core-renderer/tests/unit/renderer/components/home/merge-threads.spec.tsx
+  s_75776fa1f8e041::t_9040d7937a56e3 2-4
+packages/core-renderer/tests/unit/renderer/components/home/task-actions.spec.ts
+  s_75776fa1f8e041::t_6e752de8201ba7 2-8
+packages/core-renderer/tests/unit/renderer/components/loaded-stylesheets.ts
+  s_75776fa1f8e041::t_fd5eb7725b3bc0 8-9
+packages/core-renderer/tests/unit/renderer/components/sidebar/InboxSidebar.spec.tsx
+  s_75776fa1f8e041::t_669bf00c197724 5-9,12-13
+packages/core-renderer/tests/unit/renderer/components/sidebar/inbox-marks.spec.ts
+  s_75776fa1f8e041::t_b0fa376e9a5ddf 8
+packages/core-renderer/tests/unit/renderer/components/sidebar/inbox.spec.ts
+  s_75776fa1f8e041::t_06effc2ccf3f38 8-10
+packages/core-renderer/tests/unit/renderer/components/sidebar/sidebar-menus.spec.tsx
+  s_75776fa1f8e041::t_b797b8283d8d9f 5-7,20
+packages/core-renderer/tests/unit/renderer/components/start-work-branch.spec.tsx
+  s_75776fa1f8e041::t_28d23daf80e1b4 2-4
+packages/core-renderer/tests/unit/renderer/components/start-work-schedule.spec.tsx
+  s_75776fa1f8e041::t_f443354e5b0af5 3-13,16,21
+packages/core-renderer/tests/unit/renderer/components/tasks/AddToTaskDialog.spec.tsx
+  s_75776fa1f8e041::t_bc508a8477da47 5-12,87
+packages/core-renderer/tests/unit/renderer/components/use-desk-keys.spec.tsx
+  s_75776fa1f8e041::t_395918eef361d4 4
+packages/core-renderer/tests/unit/renderer/components/useNow.spec.tsx
+  s_75776fa1f8e041::t_5748e6ad8d6648 3
+packages/core-renderer/tests/unit/renderer/components/useSessionFacts.spec.tsx
+  s_75776fa1f8e041::t_a7879be687eb98 3-6,11,18
+packages/core-renderer/tests/unit/renderer/design-tokens-contrast.spec.ts
+  s_75776fa1f8e041::t_34703688acc7ad 11
+packages/core-renderer/tests/unit/renderer/diff-syntax-contrast.spec.ts
+  s_75776fa1f8e041::t_b6c876a3081c60 11
+packages/core-renderer/tests/unit/renderer/extension-base-css.spec.ts
+  s_75776fa1f8e041::t_ae6b17248fec6e 3-5,16
+packages/core-renderer/tests/unit/renderer/extensions/loader.spec.ts
+  s_75776fa1f8e041::t_b759379240fca7 6-12,16
+packages/core-renderer/tests/unit/renderer/extensions/registry.spec.ts
+  s_75776fa1f8e041::t_b1d4fb617f78dc 6-7
+packages/core-renderer/tests/unit/renderer/form-control-styling.spec.ts
+  s_75776fa1f8e041::t_e3070753a434ef 5,12,15-16,18,146,149-155,259
+packages/core-renderer/tests/unit/renderer/home/agent-command.spec.ts
+  s_75776fa1f8e041::t_71fc0bf40a5ddf 3
+packages/core-renderer/tests/unit/renderer/home/ask-on-home.spec.tsx
+  s_75776fa1f8e041::t_435bd197f11a1c 6-16,22,27
+packages/core-renderer/tests/unit/renderer/home/core-asks.spec.ts
+  s_75776fa1f8e041::t_ae10c063c13298 2
+packages/core-renderer/tests/unit/renderer/home/desk-actions.spec.ts
+  s_75776fa1f8e041::t_69726ee37e2e1f 3,7-8,17-21
+packages/core-renderer/tests/unit/renderer/home/desk-order.spec.ts
+  s_75776fa1f8e041::t_2e7e4086a001ce 9-10
+packages/core-renderer/tests/unit/renderer/home/desk-summary.spec.ts
+  s_75776fa1f8e041::t_c6482ce70856f0 2-3,5
+packages/core-renderer/tests/unit/renderer/home/desk-world.ts
+  s_75776fa1f8e041::t_cb6f8c8a3af935 1-3,5-7
+packages/core-renderer/tests/unit/renderer/home/dismissals.spec.ts
+  s_75776fa1f8e041::t_2bc86c82d5910f 9
+packages/core-renderer/tests/unit/renderer/home/dismissed-threads.spec.ts
+  s_75776fa1f8e041::t_f59f0c34a75565 9-11
+packages/core-renderer/tests/unit/renderer/home/focus.spec.ts
+  s_75776fa1f8e041::t_f66ad05e945789 3-5,74
+packages/core-renderer/tests/unit/renderer/home/insights.spec.ts
+  s_75776fa1f8e041::t_4db5ac73c36167 14-15,20-21
+packages/core-renderer/tests/unit/renderer/home/plan-the-day.spec.ts
+  s_75776fa1f8e041::t_c86d95708f097d 8-10
+packages/core-renderer/tests/unit/renderer/home/resume-request.spec.tsx
+  s_75776fa1f8e041::t_ac96b26a29ba0c 3,7,15,20-22
+packages/core-renderer/tests/unit/renderer/home/scheduled-runs.spec.ts
+  s_75776fa1f8e041::t_8ced3a8d881ef2 7-9
+packages/core-renderer/tests/unit/renderer/home/start-work-repo.spec.ts
+  s_75776fa1f8e041::t_d8f3a2ae377078 4-9
+packages/core-renderer/tests/unit/renderer/home/start-work-unattended.spec.ts
+  s_75776fa1f8e041::t_7ef6b1627e87bf 3-6,9
+packages/core-renderer/tests/unit/renderer/home/stored-shapes.spec.ts
+  s_75776fa1f8e041::t_040c2ea6d140f2 2
+packages/core-renderer/tests/unit/renderer/home/stored-state.spec.ts
+  s_75776fa1f8e041::t_bdded4d904f7d6 3-4,14,18
+packages/core-renderer/tests/unit/renderer/home/task-state.spec.ts
+  s_75776fa1f8e041::t_3dda8347d9d186 7,9
+packages/core-renderer/tests/unit/renderer/home/use-desk-keys.spec.ts
+  s_75776fa1f8e041::t_c99219c8691166 2
+packages/core-renderer/tests/unit/renderer/home/work-threads.spec.ts
+  s_75776fa1f8e041::t_07dfd7a59e12c4 8,10,12-13
+packages/core-renderer/tests/unit/renderer/hooks/useBranchSync.spec.tsx
+  s_75776fa1f8e041::t_ee22699c7474a1 3-7
+packages/core-renderer/tests/unit/renderer/hooks/useDismissSurfaceOnClick.spec.tsx
+  s_75776fa1f8e041::t_a2adb6e81e97b2 5-6
+packages/core-renderer/tests/unit/renderer/hooks/useDragReorder.spec.tsx
+  s_75776fa1f8e041::t_d7b8bf97a8e3d8 4-5
+packages/core-renderer/tests/unit/renderer/hooks/useExtensionEscapeExit.spec.tsx
+  s_75776fa1f8e041::t_f12df965cf8630 3-6,13
+packages/core-renderer/tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_75776fa1f8e041::t_6374cb25259b81 3-10,16-25,35
+packages/core-renderer/tests/unit/renderer/hooks/useSurfaceOpen.spec.tsx
+  s_75776fa1f8e041::t_bf455497fee23c 4-5
+packages/core-renderer/tests/unit/renderer/icon-from-name.spec.tsx
+  s_75776fa1f8e041::t_9f6b53779f3a60 2
+packages/core-renderer/tests/unit/renderer/lib/focus-terminal.spec.ts
+  s_75776fa1f8e041::t_29ee172dd5e179 2-5
+packages/core-renderer/tests/unit/renderer/lib/notifications.spec.ts
+  s_75776fa1f8e041::t_6bb9dc117af76b 2-4
+packages/core-renderer/tests/unit/renderer/logger.spec.ts
+  s_75776fa1f8e041::t_be4d99a79afaa4 3-6
+packages/core-renderer/tests/unit/renderer/mcp/McpHost.spec.tsx
+  s_75776fa1f8e041::t_7219243963b34e 4-9,12,14
+packages/core-renderer/tests/unit/renderer/mcp/renderer-tools.spec.tsx
+  s_75776fa1f8e041::t_61b0709dd37e76 2-8,14,17,22,27,32,34
+packages/core-renderer/tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_75776fa1f8e041::t_11b82b6ce350ba 2-3,5-8
+packages/core-renderer/tests/unit/renderer/quick-actions/custom-actions.spec.ts
+  s_75776fa1f8e041::t_e15b61b4f7d4db 6-7
+packages/core-renderer/tests/unit/renderer/quick-actions/custom-runtime.spec.ts
+  s_75776fa1f8e041::t_47b22675fc103e 2-4
+packages/core-renderer/tests/unit/renderer/quick-actions/extension-actions.spec.ts
+  s_75776fa1f8e041::t_ae1c1a7ed425a8 6-7
+packages/core-renderer/tests/unit/renderer/quick-actions/groups.spec.ts
+  s_75776fa1f8e041::t_3d624acfed0824 2-4
+packages/core-renderer/tests/unit/renderer/quick-actions/rank.spec.ts
+  s_75776fa1f8e041::t_3207961692c1ff 2-4
+packages/core-renderer/tests/unit/renderer/quick-actions/search.spec.ts
+  s_75776fa1f8e041::t_0b36047ee6821a 2-3
+packages/core-renderer/tests/unit/renderer/quick-actions/shortcut-behaviors.spec.ts
+  s_75776fa1f8e041::t_d4d7d4e3edf3dd 12-30
+packages/core-renderer/tests/unit/renderer/quick-actions/shortcut-conflict-guard.spec.tsx
+  s_75776fa1f8e041::t_e0678fd10d2e9d 3-8,13-14,16,103
+packages/core-renderer/tests/unit/renderer/quick-actions/surface-actions.spec.ts
+  s_75776fa1f8e041::t_40acafd43cffbd 6-7
+packages/core-renderer/tests/unit/renderer/quick-actions/usage.spec.ts
+  s_75776fa1f8e041::t_4d8a39c49f30a1 9-10
+packages/core-renderer/tests/unit/renderer/quick-actions/use-core-quick-actions.spec.tsx
+  s_75776fa1f8e041::t_93c2144dea4c31 6-14,20-22,30,34
+packages/core-renderer/tests/unit/renderer/quick-actions/variables.spec.ts
+  s_75776fa1f8e041::t_4b4f52851b0337 2
+packages/core-renderer/tests/unit/renderer/shell/agent-attention.spec.ts
+  s_75776fa1f8e041::t_d665825bb501a7 2-4
+packages/core-renderer/tests/unit/renderer/shell/core-tabs.spec.tsx
+  s_75776fa1f8e041::t_e714b616d6e536 3-6,9
+packages/core-renderer/tests/unit/renderer/shell/initial-load-home-feed.spec.tsx
+  s_75776fa1f8e041::t_cfa30823919c72 18,21,24,27,30,33,36,39-40,42-45
+packages/core-renderer/tests/unit/renderer/shell/main-events-usage.spec.tsx
+  s_75776fa1f8e041::t_102244bf9b5e18 3-4,6-10,12
+packages/core-renderer/tests/unit/renderer/shell/notification-feed.spec.tsx
+  s_75776fa1f8e041::t_34e107d5ebe4c0 3-6
+packages/core-renderer/tests/unit/renderer/shell/useSidebarVisibility.spec.tsx
+  s_75776fa1f8e041::t_c7ee11ba1319d3 5-8
+packages/core-renderer/tests/unit/renderer/sidebar-status-colour-independence.spec.ts
+  s_75776fa1f8e041::t_a2ce8950b2080d 12-14,27
+packages/core-renderer/tests/unit/renderer/sidebar-workspace-tint.spec.ts
+  s_75776fa1f8e041::t_8f0237827e475d 19-22
+packages/core-renderer/tests/unit/renderer/sidebar/agent-state.spec.ts
+  s_75776fa1f8e041::t_1fa8471cc26af7 2-3
+packages/core-renderer/tests/unit/renderer/sidebar/branch-display.spec.ts
+  s_75776fa1f8e041::t_b99d44a89bc656 6-7
+packages/core-renderer/tests/unit/renderer/sidebar/branch-rows-performance.spec.ts
+  s_75776fa1f8e041::t_3aab3287ad8de8 2-8
+packages/core-renderer/tests/unit/renderer/sidebar/branch-rows.spec.ts
+  s_75776fa1f8e041::t_299e2321c354df 6-14
+packages/core-renderer/tests/unit/renderer/sidebar/branch-state.spec.ts
+  s_75776fa1f8e041::t_0062723ef96625 2-3
+packages/core-renderer/tests/unit/renderer/sidebar/choice-prompt.spec.ts
+  s_75776fa1f8e041::t_0891343920596e 4
+packages/core-renderer/tests/unit/renderer/sidebar/collapse-state.spec.ts
+  s_75776fa1f8e041::t_5dee42ddb58bed 20
+packages/core-renderer/tests/unit/renderer/sidebar/fixtures/facts.ts
+  s_75776fa1f8e041::t_6554dca1c6c1c3 1
+packages/core-renderer/tests/unit/renderer/sidebar/lane-labels.spec.ts
+  s_75776fa1f8e041::t_33b3c58ba5514e 2
+packages/core-renderer/tests/unit/renderer/sidebar/manual-order.spec.ts
+  s_75776fa1f8e041::t_e562bcfa0981ad 2
+packages/core-renderer/tests/unit/renderer/sidebar/relative-time.spec.ts
+  s_75776fa1f8e041::t_1814870592366b 2
+packages/core-renderer/tests/unit/renderer/sidebar/resume.spec.ts
+  s_75776fa1f8e041::t_63561d22d4f56f 2,4
+packages/core-renderer/tests/unit/renderer/sidebar/screen.spec.ts
+  s_75776fa1f8e041::t_0e474e327d2d39 2
+packages/core-renderer/tests/unit/renderer/sidebar/session-facts.spec.ts
+  s_75776fa1f8e041::t_b0b227ff3852f3 2,10
+packages/core-renderer/tests/unit/renderer/sidebar/session-filter.spec.ts
+  s_75776fa1f8e041::t_c43830dbfe5420 2
+packages/core-renderer/tests/unit/renderer/sidebar/session-status.spec.ts
+  s_75776fa1f8e041::t_75b22ba2aec5ec 2-3
+packages/core-renderer/tests/unit/renderer/sidebar/shown-in-main.spec.ts
+  s_75776fa1f8e041::t_c82e8aa63662df 8-10
+packages/core-renderer/tests/unit/renderer/sidebar/task-groups.spec.ts
+  s_75776fa1f8e041::t_3e06349df35319 2-5
+packages/core-renderer/tests/unit/renderer/sidebar/views.spec.ts
+  s_75776fa1f8e041::t_c30d6ab1746f5f 21-23,29-30
+packages/core-renderer/tests/unit/renderer/sidebar/wall-order.spec.ts
+  s_75776fa1f8e041::t_0a2d4dfb410fe6 2-3,5
+packages/core-renderer/tests/unit/renderer/sidebar/wall-prefs.spec.ts
+  s_75776fa1f8e041::t_2a305ef104e4d6 7
+packages/core-renderer/tests/unit/renderer/sidebar/work-item.spec.ts
+  s_75776fa1f8e041::t_817e864bb8b920 2-3
+packages/core-renderer/tests/unit/renderer/stores/attached-context.store.spec.ts
+  s_75776fa1f8e041::t_f410abe19b95cd 7,12-18
+packages/core-renderer/tests/unit/renderer/stores/breakout.store.spec.ts
+  s_75776fa1f8e041::t_80558dcd4df842 2-4
+packages/core-renderer/tests/unit/renderer/stores/change-stats.store.spec.ts
+  s_75776fa1f8e041::t_03dd812e6aca4e 2-5
+packages/core-renderer/tests/unit/renderer/stores/extension-commands.store.spec.ts
+  s_75776fa1f8e041::t_a485c5407d9ac2 9
+packages/core-renderer/tests/unit/renderer/stores/home-feed.store.spec.ts
+  s_75776fa1f8e041::t_d7111ee59864e2 2,13
+packages/core-renderer/tests/unit/renderer/stores/integrations.store.spec.ts
+  s_75776fa1f8e041::t_25143f91e37027 2,25
+packages/core-renderer/tests/unit/renderer/stores/log.store.spec.ts
+  s_75776fa1f8e041::t_7afecf36648362 2
+packages/core-renderer/tests/unit/renderer/stores/metrics.store.spec.ts
+  s_75776fa1f8e041::t_76dee2e5024919 19
+packages/core-renderer/tests/unit/renderer/stores/navigation-sync.spec.ts
+  s_75776fa1f8e041::t_3da24527e63653 2-6
+packages/core-renderer/tests/unit/renderer/stores/navigation.store.spec.ts
+  s_75776fa1f8e041::t_0c6312cfe4327a 2
+packages/core-renderer/tests/unit/renderer/stores/notification.store.spec.ts
+  s_75776fa1f8e041::t_4d2e9ad07d513a 15-16
+packages/core-renderer/tests/unit/renderer/stores/session-records.store.spec.ts
+  s_75776fa1f8e041::t_5f690cba7d0057 2-5,28
+packages/core-renderer/tests/unit/renderer/stores/session.store.spec.ts
+  s_75776fa1f8e041::t_d1860c1353da33 17-23
+packages/core-renderer/tests/unit/renderer/stores/settings.store.spec.ts
+  s_75776fa1f8e041::t_155fef40a2db17 17-18
+packages/core-renderer/tests/unit/renderer/stores/task.store.spec.ts
+  s_75776fa1f8e041::t_813db5286a6400 2,25
+packages/core-renderer/tests/unit/renderer/stores/toast.store.spec.ts
+  s_75776fa1f8e041::t_315e9f787ead0a 3
+packages/core-renderer/tests/unit/renderer/stores/workspace.store.spec.ts
+  s_75776fa1f8e041::t_06347aa294140a 2-3,45-46,705,713,732
+packages/core-renderer/tests/unit/renderer/terminal/agent-tab.spec.tsx
+  s_75776fa1f8e041::t_d9843a6feee478 4,6-7
+packages/core-renderer/tests/unit/renderer/terminal/breakout.spec.ts
+  s_75776fa1f8e041::t_138ad813972a7d 3-13,15
+packages/core-renderer/tests/unit/renderer/terminal/close-session.spec.ts
+  s_75776fa1f8e041::t_bfa61de1eb0d87 2-3
+packages/core-renderer/tests/unit/renderer/terminal/navigate-to-session.spec.ts
+  s_75776fa1f8e041::t_c9613e1518aef9 3-20
+packages/core-renderer/tests/unit/renderer/terminal/output-router.spec.ts
+  s_75776fa1f8e041::t_02ea71932dc751 16
+packages/core-renderer/tests/unit/renderer/terminal/preview-window.spec.ts
+  s_75776fa1f8e041::t_4331c5ef8090b6 2
+packages/core-renderer/tests/unit/renderer/terminal/session-controller.spec.ts
+  s_75776fa1f8e041::t_1976e8d32c4189 4,22,46-50,56
+packages/core-renderer/tests/unit/renderer/terminal/start-session.spec.ts
+  s_75776fa1f8e041::t_0ec289a0e06ab4 6,9,19-20,22-28,35
+packages/core-renderer/tests/unit/renderer/terminal/switch-lane.spec.tsx
+  s_75776fa1f8e041::t_54b98841ca9207 2-7
+packages/core-renderer/tests/unit/renderer/terminal/tab-drag.spec.ts
+  s_75776fa1f8e041::t_e900942a7d8c39 9-12
+packages/core-renderer/tests/unit/renderer/terminal/terminal-rows.spec.tsx
+  s_75776fa1f8e041::t_3eedb561466fbc 2-5
+packages/core-renderer/tests/unit/renderer/terminal/webgl-contexts.spec.ts
+  s_75776fa1f8e041::t_8ee34243702ce0 2
+packages/core-renderer/tests/unit/renderer/usage/active-time.spec.ts
+  s_75776fa1f8e041::t_87f87704076e9a 2
+packages/core-renderer/tests/unit/renderer/usage/track-surfaces.spec.tsx
+  s_75776fa1f8e041::t_58dfcaba044808 3-4,6-11
+packages/core-renderer/tests/unit/renderer/usage/use-field-change-counter.spec.tsx
+  s_75776fa1f8e041::t_73ebe1128c9f8c 7,9
+packages/core-renderer/tests/unit/renderer/utils/pane-tree.spec.ts
+  s_75776fa1f8e041::t_00b198616654fc 2-3
+packages/core-renderer/tsconfig.json
+  s_75776fa1f8e041::t_fdc64ddc67f17a 17,19,23-26
+packages/core-shared/package.json
+  s_75776fa1f8e041::t_0636a2ccfa5fd9 1-15
+packages/core-shared/src/electron-api/api-type.ts
+  s_75776fa1f8e041::t_7e92605bc8a9c2 44
+packages/core-shared/src/electron-api/manifest.ts
+  s_75776fa1f8e041::t_a9b13b6161e3bf 4-6,10
+packages/core-shared/src/frame-wire.ts
+  s_75776fa1f8e041::t_ebff5cd24e507c 3
+packages/core-shared/src/types/index.ts
+  s_75776fa1f8e041::t_8b34caabc37a10 71
+packages/core-shared/tests/unit/extension-frame/frame-shim.spec.ts
+  s_75776fa1f8e041::t_4c1e8d0d7ccc2e 3-4,20
+packages/core-shared/tests/unit/home/home-feed.fixtures.ts
+  s_75776fa1f8e041::t_83cc04f2b40180 6
+packages/core-shared/tests/unit/integrations/branch-from-issue.spec.ts
+  s_75776fa1f8e041::t_1651c386ff532e 2-3
+packages/core-shared/tests/unit/packages/extension-sdk/renderer-declaration.spec.ts
+  s_75776fa1f8e041::t_5738646860214c 5,12
+packages/core-shared/tests/unit/renderer/home/fixtures.ts
+  s_75776fa1f8e041::t_e9398fa1c9055c 1-2
+packages/core-shared/tests/unit/shared/agent-sessions/ask.spec.ts
+  s_75776fa1f8e041::t_77bd26239efb36 7
+packages/core-shared/tests/unit/shared/agent-sessions/report.spec.ts
+  s_75776fa1f8e041::t_0a3c8fa679da39 2
+packages/core-shared/tests/unit/shared/branch-name.spec.ts
+  s_75776fa1f8e041::t_25822be64bd8af 2
+packages/core-shared/tests/unit/shared/breakout.spec.ts
+  s_75776fa1f8e041::t_64e739e8e0a9d8 2
+packages/core-shared/tests/unit/shared/double-escape.spec.ts
+  s_75776fa1f8e041::t_366710a9710f06 7
+packages/core-shared/tests/unit/shared/escape-context.spec.tsx
+  s_75776fa1f8e041::t_74d0b17c3f8615 2
+packages/core-shared/tests/unit/shared/home/attention-measures.spec.ts
+  s_75776fa1f8e041::t_be41d423c61f9f 15
+packages/core-shared/tests/unit/shared/model-prices.spec.ts
+  s_75776fa1f8e041::t_7769be7d8680ca 2
+packages/core-shared/tests/unit/shared/notifications/resolve-targets.spec.ts
+  s_75776fa1f8e041::t_6017e3efdcb21f 5
+packages/core-shared/tests/unit/shared/recurrence.spec.ts
+  s_75776fa1f8e041::t_8f661aad45ede3 3
+packages/core-shared/tests/unit/shared/schemas/extension.schema.spec.ts
+  s_75776fa1f8e041::t_b29a51e02a366c 2
+packages/core-shared/tests/unit/shared/schemas/settings.schema.spec.ts
+  s_75776fa1f8e041::t_c9cf8fad66ebd4 6-7,132
+packages/core-shared/tests/unit/shared/session-records/retention.spec.ts
+  s_75776fa1f8e041::t_7c9a5724c83f81 2-3
+packages/core-shared/tests/unit/shared/usage/core-features.spec.ts
+  s_75776fa1f8e041::t_d51e77ad0809d5 2-3
+packages/core-shared/tests/unit/shared/usage/usage-state.spec.ts
+  s_75776fa1f8e041::t_a932cb33dc5e87 2-3
+packages/core-shared/tsconfig.json
+  s_75776fa1f8e041::t_98e1ae00ac071c 14,16
+packages/extension-sdk/CHANGELOG.md
+  s_75776fa1f8e041::t_24f38f6018b262 223
+packages/extension-sdk/README.md
+  s_75776fa1f8e041::t_becc508a698cb8 4,41,72
+packages/extension-sdk/package.json
+  s_75776fa1f8e041::t_9d7bec8cc3d724 46-51
+packages/extension-sdk/tests/index.spec.ts
+  s_75776fa1f8e041::t_4fa4a6da3fdd33 12
+packages/extension-sdk/tests/node.spec.ts
+  s_75776fa1f8e041::t_d0028f6b42cb50 10
+packages/extension-sdk/types/api.d.ts
+  s_75776fa1f8e041::t_de44c051c90dee 3
+packages/extension-ui/README.md
+  s_75776fa1f8e041::t_b4cec6529a5050 86-87
+packages/extension-ui/package.json
+  s_75776fa1f8e041::t_aea2ca68d329d2 29-32
+packages/extension-ui/tests/unit/behaviour-matrix.spec.tsx
+  s_75776fa1f8e041::t_89dfcd686115e7 5-7
+packages/extension-ui/tests/unit/button.spec.tsx
+  s_75776fa1f8e041::t_9219e10e4fd51f 6
+packages/extension-ui/tests/unit/confirm-button.spec.tsx
+  s_75776fa1f8e041::t_44421beabee5dc 5
+packages/extension-ui/tests/unit/data-table.spec.tsx
+  s_75776fa1f8e041::t_f9c560cc9f0785 5-6
+packages/extension-ui/tests/unit/desk.spec.tsx
+  s_75776fa1f8e041::t_bc4bc196e3ed39 5-12
+packages/extension-ui/tests/unit/edges.spec.tsx
+  s_75776fa1f8e041::t_452d1b57cff578 6-8
+packages/extension-ui/tests/unit/empty-state.spec.tsx
+  s_75776fa1f8e041::t_6155eef4871b87 6-8
+packages/extension-ui/tests/unit/icon-tooltips.spec.tsx
+  s_75776fa1f8e041::t_f62669e6e3ce4a 2
+packages/extension-ui/tests/unit/layers.spec.ts
+  s_75776fa1f8e041::t_988e79025ff987 8
+packages/extension-ui/tests/unit/list-input.spec.tsx
+  s_75776fa1f8e041::t_c36a402b119f5f 5
+packages/extension-ui/tests/unit/markdown.spec.tsx
+  s_75776fa1f8e041::t_f1b0b86cc3aea7 5,16
+packages/extension-ui/tests/unit/menu.spec.tsx
+  s_75776fa1f8e041::t_154b7e607d9e0c 5
+packages/extension-ui/tests/unit/pushed-toasts.spec.tsx
+  s_75776fa1f8e041::t_a563ee7a3eeff7 4
+packages/extension-ui/tests/unit/relative-time.spec.tsx
+  s_75776fa1f8e041::t_d1b664d9849e51 4-5
+packages/extension-ui/tests/unit/segmented-control.spec.tsx
+  s_75776fa1f8e041::t_bc2bcbf60384d1 5
+packages/extension-ui/tests/unit/tabs.spec.tsx
+  s_75776fa1f8e041::t_1d621fe1a905f0 5
+packages/extension-ui/tests/unit/toast-store.spec.ts
+  s_75776fa1f8e041::t_2ba3dde9ab935f 2
+packages/extension-ui/tests/unit/toast.spec.tsx
+  s_75776fa1f8e041::t_fa2e561d7616e8 5-6
+packages/extension-ui/tests/unit/tokens.spec.ts
+  s_75776fa1f8e041::t_415a35537eee9d 5-6,9,14-15
+packages/extension-ui/tests/unit/use-polling.spec.tsx
+  s_75776fa1f8e041::t_9cf0e834b24d79 3
+packages/test-support/global-setup.ts
+  s_75776fa1f8e041::t_6c9556d1382482 8,12,14,25
+packages/test-support/package.json
+  s_75776fa1f8e041::t_71d4447ad51a4c 1-11
+packages/test-support/setup.ts
+  s_75776fa1f8e041::t_29462c7f91f8e6 3,6-12,46-49
+packages/test-support/src/electron-api.ts
+  s_75776fa1f8e041::t_fb0541f7c9e266 2
+packages/test-support/src/fake-backend-host.ts
+  s_75776fa1f8e041::t_e543e9ae1a63fe 2-3,44
+packages/test-support/src/frame-port.ts
+  s_75776fa1f8e041::t_9d0620aaeac50c 3
+packages/test-support/src/host-snapshot.ts
+  s_75776fa1f8e041::t_a6f07aa34d7ab1 1
+packages/test-support/src/leak-guard.ts
+  s_75776fa1f8e041::t_6a766b079472e7 22
+packages/test-support/src/main-task-store.ts
+  s_75776fa1f8e041::t_c2834ed817b645 2-3,5,21
+packages/test-support/src/message-ports.ts
+  s_75776fa1f8e041::t_03a93431d0b69d 2
+packages/test-support/src/quick-actions.ts
+  s_75776fa1f8e041::t_0552dd4200287f 1
+packages/test-support/src/renderer-stores.ts
+  s_75776fa1f8e041::t_f3bc579ebb6b86 13
+packages/test-support/src/seal-worker-environment.ts
+  s_75776fa1f8e041::t_d4b53e0d64cba1 1
+packages/test-support/src/store-state.ts
+  s_75776fa1f8e041::t_de22267ac9da2d 1-3
+packages/test-support/src/stores.ts
+  s_75776fa1f8e041::t_0d569aae61cb85 33
+packages/test-support/src/temp-dir.ts
+  s_75776fa1f8e041::t_3ca709d9d7616d 5
+packages/test-support/tests/integration/leak-guard.spec.ts
+  s_75776fa1f8e041::t_b4cec132ecdd75 4,6
+packages/test-support/tests/integration/network-guard.spec.ts
+  s_75776fa1f8e041::t_f74573b8de21ec 5
+packages/test-support/tests/unit/git-hook-env.spec.ts
+  s_75776fa1f8e041::t_e19fda6c752589 3-4
+packages/test-support/tests/unit/hang-bound.spec.ts
+  s_75776fa1f8e041::t_f178e52e5b1d07 2
+packages/test-support/tests/unit/launch-steps.spec.ts
+  s_75776fa1f8e041::t_16ddd32313fb7d 2
+packages/test-support/tests/unit/leak-guard.spec.ts
+  s_75776fa1f8e041::t_6498b116c9e989 2,4
+packages/test-support/tests/unit/network-guard.spec.ts
+  s_75776fa1f8e041::t_4e7727b0875c24 3,5
+packages/test-support/tests/unit/seal-environment.spec.ts
+  s_75776fa1f8e041::t_2d8d112a659a3e 2,41
+packages/test-support/tests/unit/temp-dir.spec.ts
+  s_75776fa1f8e041::t_77be61203ef5f9 5
+packages/test-support/tests/unit/unit-io-guard.spec.ts
+  s_75776fa1f8e041::t_db06da34478ed8 7
+packages/test-support/tests/unit/workers.spec.ts
+  s_75776fa1f8e041::t_abd9a141e7b505 2
+scripts/CLAUDE.md
+  s_75776fa1f8e041::t_b61126ae7ee471 12
+scripts/perf/app-metrics.mjs
+  s_75776fa1f8e041::t_d9b134fd07c483 36
+scripts/smoke-start.mjs
+  s_75776fa1f8e041::t_f072fa9543a262 29,85
+scripts/test-env.mjs
+  s_75776fa1f8e041::t_16736956499b13 12
+stryker.config.mjs
+  s_75776fa1f8e041::t_ca7c1a4a867281 11
+tests/e2e/design-system-fields.spec.ts
+  s_75776fa1f8e041::t_d1877d86f0bb93 103
+tests/e2e/e2e-environment.ts
+  s_75776fa1f8e041::t_085134596c05e2 30,32
+tests/e2e/extension-escape.spec.ts
+  s_75776fa1f8e041::t_9cb132207586dc 7-8
+tests/e2e/git-integration-contrast.entry.tsx
+  s_75776fa1f8e041::t_d9ee000c71705a 18,74,80,86,100,106,132,145-163,169,269,278,355,357,373,384-385
+tests/e2e/git-integration-stacking.spec.ts
+  s_75776fa1f8e041::t_8e91bab2cf34fa 51
+tests/e2e/global-setup.ts
+  s_75776fa1f8e041::t_1191b142e883ba 5,20
+tests/e2e/helpers.ts
+  s_75776fa1f8e041::t_a7d5e2e5b7677a 15-17,282,322
+tests/e2e/ipc-trace.ts
+  s_75776fa1f8e041::t_b503ad36c55d24 4
+tests/e2e/mcp.spec.ts
+  s_75776fa1f8e041::t_bf279cf85a8813 9
+tests/e2e/resume-session.spec.ts
+  s_75776fa1f8e041::t_c9f4ba97f10fb4 47
+tests/integration/e2e-harness/gh-stub.spec.ts
+  s_75776fa1f8e041::t_cbaecc7f418b49 6
+tests/integration/e2e-harness/leftover-processes.spec.ts
+  s_75776fa1f8e041::t_156ae4a0824822 11-12
+tests/integration/extensions/shell-scope-callers.spec.ts
+  s_75776fa1f8e041::t_779c46ebfbb390 5-6,34,45,72-73,102
+tests/integration/foundry-portability.spec.ts
+  s_75776fa1f8e041::t_1503f8a1a5323b 12
+tests/integration/git-test-env.spec.ts
+  s_75776fa1f8e041::t_b7dc435c0e54f1 5,48
+tests/integration/git/inherited-git-env.spec.ts
+  s_75776fa1f8e041::t_aa9c4aa96da02f 6
+tests/integration/remote-bridge-allowlist.spec.ts
+  s_75776fa1f8e041::t_bff82905e5c138 9,17
+tests/integration/scripts/check-single-copies.spec.ts
+  s_75776fa1f8e041::t_10b4134f44331d 5
+tests/integration/scripts/check-temp-leaks.spec.ts
+  s_75776fa1f8e041::t_d7613a3a76666e 4
+tests/integration/scripts/create-extension.spec.js
+  s_75776fa1f8e041::t_e1cc59feb5c70a 6
+tests/live/acp-claude.spec.ts
+  s_75776fa1f8e041::t_2163051ca6531e 6-12,18,21-24
+tests/live/foundry-roles.spec.ts
+  s_75776fa1f8e041::t_51c35e34585482 5-10,17,23,26-29
+tests/unit/lint/extension-rules.spec.ts
+  s_75776fa1f8e041::t_f724166fc342c6 78,146,182
+tests/unit/lint/size-limits.spec.ts
+  s_75776fa1f8e041::t_3dfc7b85c759af 14-17,40-41,46-48
+tests/unit/renderer/App.spec.tsx
+  s_75776fa1f8e041::t_ba14bfc4fa5a75 1-2,7-28,35-36,42-48,52,56,60,65,82,92,99,112,123,130,147,156,173,180,183,186,189,196,202,401,422-423
+tests/unit/scripts/bump-extension-versions.spec.ts
+  s_75776fa1f8e041::t_7951a7fb95c90a 24-26
+tests/unit/scripts/extension-runtime-modules.spec.ts
+  s_75776fa1f8e041::t_38f9c2468696af 5
+tests/unit/scripts/smoke-start.spec.ts
+  s_75776fa1f8e041::t_1c4682a178ab09 13,19
+tsconfig.json
+  s_75776fa1f8e041::t_23e128fac172ac 5,8,11
+tsconfig.test.json
+  s_75776fa1f8e041::t_50ef5c5bb2a395 8,11,26-32
+turbo.json
+  s_75776fa1f8e041::t_64fdb0f239fab9 1-13
+vite.config.remote.ts
+  s_75776fa1f8e041::t_de64ecbf93e49a 6,13-22
+vitest.config.ts
+  s_75776fa1f8e041::t_86d0521d7982ef 4-5,12,20,37-39,48-49,61,84,128-130,142-145,153,165
+docs/adr/152-the-core-is-split-into-workspace-packages.md
+  s_75776fa1f8e041::t_fb1553e6537dab 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "24e8f5845266d54e85b02ac0fbca9b89fe8c5828",
+  "prompts": {},
+  "sessions": {
+    "s_75776fa1f8e041": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0e6f6173-e406-4b5a-8671-7386b692887c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
