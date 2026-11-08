@@ -1,0 +1,106 @@
+extensions/foundry/tests/components/GateCard.spec.tsx
+  s_7a27f124c1e8e3::t_c43439dea5a913 58-62
+extensions/foundry/tests/forge/converge.spec.ts
+  s_7a27f124c1e8e3::t_f41505288fb2cc 59,64,104-128,227,500-503
+extensions/foundry/tests/channel-registry.spec.ts
+  s_7a27f124c1e8e3::t_ef3bad47842128 101-102
+  s_7a27f124c1e8e3::t_c6f3f5ec5d606f 5-8,51,114-123
+extensions/foundry/tests/footprint.spec.ts
+  s_7a27f124c1e8e3::t_32b28a2a820c04 5,37,39-46
+extensions/foundry/tests/components/App.spec.tsx
+  s_7a27f124c1e8e3::t_07e8b9e2f54bb9 205,481,525-545
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_7a27f124c1e8e3::t_ef4bbb62a2b9b2 249-253,258-261,266-268,270-272
+extensions/foundry/tests/factory/layout.spec.ts
+  s_7a27f124c1e8e3::t_cb698283f690a8 370-373
+extensions/foundry/tests/ipc/ui-channels.spec.ts
+  s_7a27f124c1e8e3::t_14ffdd21319a40 25,47,50
+extensions/foundry/tests/recipe/resolve.spec.ts
+  s_7a27f124c1e8e3::t_c05daea136be23 90,93
+extensions/foundry/tests/forge/red-team.spec.ts
+  s_7a27f124c1e8e3::t_e593a1d5d176cb 96
+extensions/foundry/tests/live/linear-transition-live.spec.ts
+  s_7a27f124c1e8e3::t_bfea99d9aafdcd 61
+extensions/foundry/tests/ledger/curator.spec.ts
+  s_7a27f124c1e8e3::t_fc049674c8e1b9 144-149,151-154
+  s_7a27f124c1e8e3::t_31777419271ae1 150
+  s_7a27f124c1e8e3::t_6f7f66a65b1546 155-158
+extensions/foundry/tests/verify/toolchain-probe.spec.ts
+  s_7a27f124c1e8e3::t_c05daea136be23 46-54
+extensions/foundry/tests/forge/interview.spec.ts
+  s_7a27f124c1e8e3::t_e593a1d5d176cb 64,66
+extensions/foundry/tests/forge/review-loop.spec.ts
+  s_7a27f124c1e8e3::t_982da66a6c1022 118,154
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_7a27f124c1e8e3::t_97dce453d9b2ae 380,385-387
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_7a27f124c1e8e3::t_86715bf9b7a693 180,187,545
+  s_7a27f124c1e8e3::t_78fb8af8e97f5b 1173,1175,1179
+extensions/foundry/tests/order/proposal.spec.ts
+  s_7a27f124c1e8e3::t_b57e54cc063915 65-67,70
+extensions/foundry/tests/gates/rules.spec.ts
+  s_7a27f124c1e8e3::t_e865de12129ac6 14,62-64,73,75,165-178,215-217,279,301,324
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_7a27f124c1e8e3::t_f949037782b185 1336-1337
+  s_7a27f124c1e8e3::t_c299a339830fcd 265-268
+  s_7a27f124c1e8e3::t_4d7e4b109a802c 188,216-225,227,229,231-239,264,271
+  s_7a27f124c1e8e3::t_a6b63641609e67 1323-1326,1328-1335,1338-1347
+  s_7a27f124c1e8e3::t_9122e5caaf5d36 269-270,548
+  s_7a27f124c1e8e3::t_350a4b53bf6350 1405-1422,2103
+  s_7a27f124c1e8e3::t_1e59fed0ba393e 2104-2108,2110
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 179-182,185,187
+  s_7a27f124c1e8e3::t_c05daea136be23 175-178
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 375-389
+  s_7a27f124c1e8e3::t_05f80ecc72c7b0 367-374
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_7a27f124c1e8e3::t_b7e573e002d1c0 215-217
+  s_7a27f124c1e8e3::t_b557030ab397fb 213
+extensions/foundry/tests/components/ForgeChecks.spec.tsx
+  s_7a27f124c1e8e3::t_97dce453d9b2ae 100,103
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_7a27f124c1e8e3::t_f81d463091fd92 372-373,375-376,378-379
+extensions/foundry/tests/order/compile.spec.ts
+  s_7a27f124c1e8e3::t_a6b63641609e67 3
+extensions/foundry/tests/order/lanes.spec.ts
+  s_7a27f124c1e8e3::t_7270e9de1f195f 151,153,155-156
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_7a27f124c1e8e3::t_19f518e52ed2b7 542-555,1471-1486
+  s_7a27f124c1e8e3::t_533b1a7bce982c 1454-1467,1469,1532-1536
+  s_7a27f124c1e8e3::t_d18851012f1c89 181-185,433,539-541
+  s_7a27f124c1e8e3::t_b5372a7ad977f0 898,904
+  s_7a27f124c1e8e3::t_44cc7c243c24e1 1452-1453,1470
+extensions/foundry/tests/order/standing.spec.ts
+  s_7a27f124c1e8e3::t_97dce453d9b2ae 185-186
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_7a27f124c1e8e3::t_fce174f3c5f068 828,852-870
+extensions/foundry/tests/line/executor.spec.ts
+  s_7a27f124c1e8e3::t_f36c66af1777cd 1645,1650-1651,1653-1654,1656
+  s_7a27f124c1e8e3::t_b8783b29e1c980 1323,1337,1340-1341,1344,1352,1380-1381
+  s_7a27f124c1e8e3::t_b04d3cac628b88 621-629,631-634,640,643,649,651
+  s_7a27f124c1e8e3::t_700c48f47c118a 17
+extensions/foundry/tests/line/roles.spec.ts
+  s_7a27f124c1e8e3::t_0bdf18f3c7b3cc 61-64
+  s_7a27f124c1e8e3::t_872d8878ff50ec 53,75
+extensions/foundry/tests/verify/verdict.spec.ts
+  s_7a27f124c1e8e3::t_c05daea136be23 59-60,68-69
+extensions/foundry/tests/ledger/append.spec.ts
+  s_7a27f124c1e8e3::t_daff0fc4a37f07 101,105-106,116-124,126,128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8ca89f26a6961ff3cf33555feeebb97e4ad7ec74",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
