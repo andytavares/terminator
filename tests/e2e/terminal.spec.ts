@@ -17,6 +17,7 @@ import {
 } from './helpers'
 import { recordShellOpens, shellOpens } from './main-stubs'
 import { expectCentredInWindow } from './modal-centre'
+import { expectTerminalFocused } from './session-views'
 
 // Terminals from an operator's side: opened, navigated, split, followed and closed. The three
 // flows share one app; each makes its own workspace, so none depends on another having run.
@@ -253,6 +254,7 @@ async function newTabBesideSplitTakesKeys(): Promise<void> {
   await expect(sessionTabs()).toHaveCount(2)
   await expect(sessionTabs().last()).toHaveClass(/tab-bar__tab--active/)
   await expect(visibleScreens()).toHaveCount(1)
+  await expectTerminalFocused(page)
   await page.keyboard.type('echo typed-into-new-tab')
   await page.keyboard.press('Enter')
   const visibleRows = async () => (await readTerminalRowsIn(visibleScreens().first())).join('\n')
@@ -290,6 +292,7 @@ test('a terminal is split, its pane listed, reached and closed, and the split ke
 async function printAndModClick(screen: Locator, line: string): Promise<void> {
   const page = screen.page()
   await screen.click()
+  await expectTerminalFocused(page)
   await page.keyboard.type(`printf '%s\\n' '${line}'`)
   await page.keyboard.press('Enter')
   const rowsOfLine = async () =>
@@ -333,12 +336,17 @@ async function filePathOpensOnModClick(folder: string): Promise<void> {
   await expect.poll(() => shellOpens(handle.app)).toContain(file)
 }
 
-async function bellNotifiesAndRevealsTab(): Promise<void> {
+async function bellNotifiesAndRevealsTab(folder: string): Promise<void> {
   const { page } = handle
+  // The bell waits for this file, which the test writes once the tab is in the background.
+  const ring = join(folder, 'ring-the-bell')
   await runQuickActionFromPanel(page, 'New tab')
-  await page.keyboard.type("sleep 2; printf '\\a'")
+  await expectTerminalFocused(page)
+  await page.keyboard.type(`until [ -e '${ring}' ]; do sleep 0.1; done; printf '\\a'`)
   await page.keyboard.press('Enter')
   await sessionTabs().first().click()
+  await expect(sessionTabs().first()).toHaveClass(/tab-bar__tab--active/)
+  writeFileSync(ring, '')
   const bell = page.locator('.app-band__entry[aria-label^="Notifications"]')
   await expect(bell).toHaveAttribute('aria-label', /unread/)
   await bell.click()
@@ -370,9 +378,7 @@ test("a terminal's links open outside the app, its bell notifies, and a plain br
   )
   await test.step('a file path in a terminal opens in its app on ⌘-click', () =>
     filePathOpensOnModClick(folder))
-  await test.step(
-    'a bell in a background tab notifies, and clicking the notification reveals the tab',
-    bellNotifiesAndRevealsTab
-  )
+  await test.step('a bell in a background tab notifies, and clicking the notification reveals the tab', () =>
+    bellNotifiesAndRevealsTab(folder))
   await test.step('× dismisses a notification', dismissRemovesNotification)
 })

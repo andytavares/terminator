@@ -194,6 +194,11 @@ function installFrameApi(link: FrameLink): void {
   Object.assign(window, { electronAPI: api as unknown as FrameElectronAPI })
 }
 
+// What the last Escape decided, on the page, so a test knows the key was read without guessing.
+function stampEscapeGesture(decision: 'suppressed' | 'pending' | 'exit'): void {
+  document.documentElement.setAttribute('data-escape-gesture', decision)
+}
+
 // Escape twice exits the extension; ⌘P/Ctrl+P opens quick actions and ⌘,/Ctrl+, opens
 // Settings. In a frame all are keydowns on this document, which main cannot see.
 function createFrameKeydown(post: (message: FrameRequest) => void) {
@@ -215,9 +220,12 @@ function createFrameKeydown(post: (message: FrameRequest) => void) {
       if (event.key !== 'Escape') return
       if (shouldSuppressExitGesture(escapeContextFromTarget(event.target, document))) {
         escapeDetector.reset()
+        stampEscapeGesture('suppressed')
         return
       }
-      if (escapeDetector.register(performance.now())) post({ type: 'request-exit' })
+      const paired = escapeDetector.register(performance.now())
+      stampEscapeGesture(paired ? 'exit' : 'pending')
+      if (paired) post({ type: 'request-exit' })
     },
   }
 }

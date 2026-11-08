@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ipcMain } from 'electron'
 
 // The handlers delegate to the real api.ts registry query functions, so this
 // spec uses the real api module and seeds the real globalRegistry, and the
@@ -36,8 +35,6 @@ vi.mock('electron-store', async () =>
   (await import('../../support/stores')).inMemoryElectronStore()
 )
 
-import { globalRegistry } from '../../../src/main/extensions/api'
-import { registerExtensionHandlers } from '../../../src/main/ipc/extension.ipc'
 import type { ExtensionHost } from '../../../src/main/extensions/extension-host'
 import { partialFake } from '../../support/fakes'
 
@@ -51,6 +48,15 @@ const mockExtensionHost = {
 }
 const extensionHost = partialFake<ExtensionHost>(mockExtensionHost)
 
+type ApiModule = typeof import('../../../src/main/extensions/api')
+type ExtensionIpcModule = typeof import('../../../src/main/ipc/extension.ipc')
+
+// Imported again for each test, after vi.resetModules(), so the registry and the
+// in-memory extension-settings store start empty every time.
+let ipcMain: (typeof import('electron'))['ipcMain']
+let globalRegistry: ApiModule['globalRegistry']
+let registerExtensionHandlers: ExtensionIpcModule['registerExtensionHandlers']
+
 function captureHandle(channel: string): (event: unknown, payload?: unknown) => unknown {
   const calls = vi.mocked(ipcMain.handle).mock.calls
   const match = calls.find(([ch]) => ch === channel)
@@ -59,9 +65,12 @@ function captureHandle(channel: string): (event: unknown, payload?: unknown) => 
 }
 
 function useExtensionHandlers(): void {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
-    ;(globalRegistry.settingsSections as Map<string, unknown>).clear()
+    vi.resetModules()
+    ;({ ipcMain } = await import('electron'))
+    ;({ globalRegistry } = await import('../../../src/main/extensions/api'))
+    ;({ registerExtensionHandlers } = await import('../../../src/main/ipc/extension.ipc'))
     registerExtensionHandlers(extensionHost, vi.fn())
   })
 }
@@ -231,7 +240,6 @@ describe('extension IPC handlers — extension:run-command', () => {
 
     expect(await run({}, { key: 'com.test.refresh' })).toEqual({ ok: true })
     expect(handler).toHaveBeenCalledOnce()
-    globalRegistry.commandHandlers.delete('com.test.refresh')
   })
 })
 

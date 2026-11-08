@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Frame } from '@playwright/test'
 import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
-import { extensionFrame } from './extension-page'
+import { extensionFrame, findExtensionFrame } from './extension-page'
 import { expectCentredInWindow } from './modal-centre'
 
 // Leaving an extension with the keyboard (feature 036, ADR 114). The keystroke has to start
@@ -60,24 +60,38 @@ async function viewReady(part: string): Promise<boolean> {
   return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
 }
 
+/** The extension's frame, once its document owns the keyboard: a key pressed before then
+ * lands on the host page, where the frame's listeners never see it. */
+async function focusedFrame(part: string): Promise<Frame> {
+  const frame = await findExtensionFrame(handle, part)
+  await frame.evaluate(() => window.focus())
+  await expect.poll(() => frame.evaluate(() => document.hasFocus())).toBe(true)
+  return frame
+}
+
+/** What the frame shim decided for the last Escape it read: 'pending', 'exit' or 'suppressed'. */
+function escapeDecision(frame: Frame): Promise<string | null> {
+  return frame.evaluate(() => document.documentElement.getAttribute('data-escape-gesture'))
+}
+
 /** Sends a key into an extension's frame as a real key press. */
 async function key(part: string, keyCode: string): Promise<void> {
-  const frame = extensionFrame(handle, part)
-  if (!frame) return
-  // The frame's document must own focus for its listeners to see the key.
-  await frame.evaluate(() => (document.body as HTMLElement).focus())
+  await focusedFrame(part)
   await handle.page.keyboard.press(keyCode)
-  // Let React commit the resulting state before the next call reads the DOM.
-  // A key can legitimately exit the extension, detaching the frame mid-wait.
-  await frame
-    .evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
-    .catch(() => {})
+}
+
+/** Presses Escape in an extension's frame, and waits until the frame shim has decided on it. */
+async function pressEscape(part: string): Promise<void> {
+  const frame = await focusedFrame(part)
+  await frame.evaluate(() => document.documentElement.removeAttribute('data-escape-gesture'))
+  await handle.page.keyboard.press('Escape')
+  await expect.poll(() => escapeDecision(frame)).not.toBeNull()
 }
 
 /** Two Escapes inside the gesture window. */
 async function pressEscapeTwice(part: string): Promise<void> {
-  await key(part, 'Escape')
-  await key(part, 'Escape')
+  await pressEscape(part)
+  await pressEscape(part)
 }
 
 /** The extension whose panel is on screen, or null. The panel div outlives the exit (it stays
@@ -114,12 +128,11 @@ async function nothingClaimsTheKey(part: string): Promise<void> {
   )
 }
 
+/** The last key asked for no exit, so the panel that shows now stays. */
 async function stillShowing(surface: Surface, why: string): Promise<void> {
-  // Two frames on the host: an exit the key requested would have reached the panel by now.
-  await handle.page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-  )
-  await expect.poll(() => activeExtensionPanel(), { message: why }).toBe(surface.id)
+  const frame = await findExtensionFrame(handle, surface.part)
+  expect(await escapeDecision(frame), why).not.toBe('exit')
+  expect(await activeExtensionPanel(), why).toBe(surface.id)
 }
 
 async function exitsToTheTerminal(surface: Surface, why: string): Promise<void> {
@@ -129,10 +142,8 @@ async function exitsToTheTerminal(surface: Surface, why: string): Promise<void> 
 /** Two Escapes, then the exit. The second key hides the frame it went to, and Chromium can drop
  * that key's acknowledgement (CI run 40594749096 waited out 180 s), so the exit is the signal. */
 async function leavesWithTwoEscapes(surface: Surface, why: string): Promise<void> {
-  await key(surface.part, 'Escape')
-  const frame = extensionFrame(handle, surface.part)
-  if (!frame) throw new Error(`${surface.id} has no frame to press Escape in`)
-  await frame.evaluate(() => (document.body as HTMLElement).focus())
+  await pressEscape(surface.part)
+  await focusedFrame(surface.part)
   const press = handle.page.keyboard.press('Escape')
   const exited = exitsToTheTerminal(surface, why)
   await Promise.race([Promise.all([press, exited]), exited])
@@ -143,10 +154,10 @@ async function leavesWithTwoEscapes(surface: Surface, why: string): Promise<void
 async function singleAndSlowEscapesStay(): Promise<void> {
   await showPanel(NOTES)
   await nothingClaimsTheKey(NOTES.part)
-  await key(NOTES.part, 'Escape')
+  await pressEscape(NOTES.part)
   await advanceClocks(NOTES.part, 900)
   await stillShowing(NOTES, 'a single Escape closed the extension')
-  await key(NOTES.part, 'Escape')
+  await pressEscape(NOTES.part)
   await advanceClocks(NOTES.part, 600)
   await stillShowing(NOTES, 'two Escapes further apart than the gesture window paired')
 }
@@ -250,8 +261,8 @@ async function draftKeepsItOpen(surface: DraftSurface): Promise<void> {
       message: `${label} offered no field to type in`,
     })
     .toBe(true)
-  await key(part, 'Escape')
-  await key(part, 'Escape')
+  await pressEscape(part)
+  await pressEscape(part)
   await stillShowing(surface, `${label} was closed by Escape while a draft was unsaved`)
   if (!surface.inline) return
   await expect.poll(() => inView<string>(part, `${FIELD}?.value ?? '<gone>'`)).toBe('UNSAVED DRAFT')
@@ -349,7 +360,7 @@ async function dialogTrapsFocusAndClosesOnEscape(): Promise<void> {
       message: 'Tab never leaves the dialog',
     })
     .toBe(true)
-  await key(NOTES.part, 'Escape')
+  await pressEscape(NOTES.part)
   await expect
     .poll(() => inView<boolean>(NOTES.part, `!document.querySelector('dialog[open]')`))
     .toBe(true)

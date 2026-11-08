@@ -77,7 +77,7 @@ async function createProject(): Promise<void> {
   await form.getByPlaceholder('Project name').fill('Launch the website')
   await form.getByPlaceholder('What does done look like?').fill('Live on the new domain')
   await form.getByPlaceholder('e.g. work').fill('Marketing')
-  await form.locator('.dtp__trigger').click()
+  await form.getByRole('button', { name: 'Pick a date' }).click()
   await vault.locator('.dtp__popover').getByRole('button', { name: 'Tomorrow' }).click()
   await form.getByRole('button', { name: 'Create project' }).click()
 
@@ -161,7 +161,7 @@ async function renameMoveAndDeadline(): Promise<void> {
     .toHaveProperty('deadline', undefined)
 
   await renamed.getByTitle('Set deadline').click()
-  await renamed.locator('.dtp__trigger').click()
+  await renamed.getByRole('button', { name: 'Pick a date' }).click()
   await vault.locator('.dtp__popover').getByRole('button', { name: '1 week' }).click()
   await renamed.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(renamed.getByTitle('Edit deadline')).toBeVisible()

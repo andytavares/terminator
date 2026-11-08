@@ -157,7 +157,8 @@ async function leaderTDSplitsAndTeachesShortcut(page: Page): Promise<void> {
 async function slashSearchFindsPush(page: Page): Promise<void> {
   await openPanel(page)
   await page.keyboard.press('/')
-  await expect(page.getByRole('combobox', { name: 'Search quick actions' })).toBeVisible()
+  // The search box mounts on `/` and takes focus in an effect; a key typed before then is lost.
+  await expect(page.getByRole('combobox', { name: 'Search quick actions' })).toBeFocused()
   await page.keyboard.type('push')
   await expect(page.getByRole('option', { name: /Push/ })).toBeVisible()
   await closePanel(page)

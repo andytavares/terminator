@@ -19,6 +19,7 @@ import {
   acceptingDialog,
 } from './helpers'
 import { answerFolderPicker } from './main-stubs'
+import { expectTerminalFocused } from './session-views'
 
 // The extension is tests/e2e/fixtures/extensions/probe, installed from its folder. The flow ends
 // on its branch's terminal, where the right-edge audit runs (docs/ARCHITECTURE.md, "Renderer choice").
@@ -311,6 +312,8 @@ async function measureRulerRow(
 // per-column drift, so a half-width pane roughly halves it and can round away to nothing.
 async function lastColumnGlyphNotClipped(): Promise<void> {
   const { page } = handle
+  await page.locator(PANE_SCREEN).click()
+  await expectTerminalFocused(page)
   if ((await page.locator(`${PANE_SCREEN} canvas`).count()) > 0) {
     await expectRulerInkInLastColumn(page)
     return

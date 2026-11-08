@@ -31,9 +31,11 @@ test.afterAll(async () => {
 })
 
 async function addTaskToToday(text: string): Promise<void> {
-  const addButton = vault.locator('.daily-log__add-btn')
-  if (await addButton.isVisible()) await addButton.click()
+  const addButton = vault.getByRole('button', { name: '+ Add task', exact: true })
   const input = vault.locator('.daily-log__add-row input')
+  // The day may open with its add row already open; wait for one of the two before reading which.
+  await expect(addButton.or(input)).toBeVisible()
+  if (await addButton.isVisible()) await addButton.click()
   await input.fill(text)
   await input.press('Enter')
   await expect(dailyLogTaskRow(vault, text)).toBeVisible()

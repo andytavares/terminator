@@ -86,10 +86,13 @@ async function startPrReview(): Promise<ExtensionView> {
  * queue remembers it in progress. */
 async function backInPrReview(): Promise<ExtensionView> {
   const view = await openCodeReviews(handle, 'Review Diff')
+  const startReview = view.getByRole('button', { name: /^(Start|Continue|Resume) review/ })
+  // Wait for the queue or the overview to draw before reading which one shows.
+  await expect(view.locator('.rd-row').or(startReview).first()).toBeVisible()
   if (await view.locator('.rd-row').first().isVisible()) {
     await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
   }
-  await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
+  await startReview.click()
   return view
 }
 

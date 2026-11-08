@@ -43,6 +43,7 @@ async function loadShimInFrame(): Promise<{ port: FakePort }> {
 beforeEach(() => {
   Reflect.deleteProperty(window, 'electronAPI')
   document.documentElement.removeAttribute('data-theme')
+  document.documentElement.removeAttribute('data-escape-gesture')
   document.documentElement.style.height = ''
   document.body.style.height = ''
   document.body.innerHTML = ''
@@ -224,6 +225,27 @@ describe('frame-shim keyboard gestures', () => {
     pressFrameKey('Escape')
     pressFrameKey('Escape')
     expect(port.posted).toContainEqual({ type: 'request-exit' })
+  })
+})
+
+describe('frame-shim Escape decisions', () => {
+  // The e2e specs read this to know a key was handled, and that it asked for no exit.
+  it('stamps the page with what each Escape decided: the first waits, the second exits', async () => {
+    await connectedFrame()
+    const decision = () => document.documentElement.getAttribute('data-escape-gesture')
+    pressFrameKey('Escape')
+    expect(decision()).toBe('pending')
+    pressFrameKey('Escape')
+    expect(decision()).toBe('exit')
+  })
+
+  it('stamps an Escape a modal dialog holds as suppressed', async () => {
+    await connectedFrame()
+    const dialog = document.body.appendChild(document.createElement('dialog'))
+    dialog.showModal()
+    pressFrameKey('Escape')
+    dialog.remove()
+    expect(document.documentElement.getAttribute('data-escape-gesture')).toBe('suppressed')
   })
 })
 

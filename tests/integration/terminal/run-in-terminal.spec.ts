@@ -114,7 +114,8 @@ describe('pty.runInTerminal, over a real PTY and the extension host port', () =>
 
   it('resolves null when the tab is closed before the process exits', async () => {
     const api = terminalHostApi()
-    onAdopt = (sessionId) => setTimeout(() => api.pty.closeTerminalTab(sessionId), 200)
+    // The close crosses the host port, so it lands after runInTerminal has subscribed to the exit.
+    onAdopt = (sessionId) => api.pty.closeTerminalTab(sessionId)
     await expect(runScriptInTerminal(api, 'sleep 30; exit 0')).resolves.toMatchObject({
       exitCode: null,
     })
