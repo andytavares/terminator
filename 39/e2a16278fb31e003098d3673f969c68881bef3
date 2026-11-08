@@ -1,0 +1,19 @@
+tests/unit/packages/extension-ui/markdown.spec.tsx
+  s_7a27f124c1e8e3::t_3d7f7f1f33cfd1 128,313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "39e2a16278fb31e003098d3673f969c68881bef3",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
