@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+  # Every pull request, stacked ones included, whatever branch it targets.
   pull_request:
-    branches: [main]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

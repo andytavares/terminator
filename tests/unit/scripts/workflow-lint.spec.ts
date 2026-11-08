@@ -73,6 +73,11 @@ const BROKEN_POLICIES = [
       (copy.text['ci.yml'] = copy.text['ci.yml'].replace('npm run lint:deps', '')),
   },
   {
+    broken: 'CI only on pull requests into main',
+    rule: /^ci\.yml runs on a pull request into any branch/,
+    breaks: (copy: Workflows) => (copy.ci.on = { pull_request: { branches: ['main'] } }),
+  },
+  {
     broken: 'a release workflow of its own',
     rule: /^No release\.yml/,
     breaks: (copy: Workflows) => copy.files.push('release.yml'),

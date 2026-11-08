@@ -118,6 +118,19 @@ describe('a failed check', () => {
   })
 })
 
+describe('a failed check beside another', () => {
+  it('prompts the live agent for a check that fails beside one already failing', async () => {
+    const unit = { ...failed, name: 'unit' }
+    const { feed, agents } = setup({ live: ['live-1'] })
+    await feed({ checks: [unit] })
+    await feed({ checks: [unit, failed] })
+    expect(agents.prompt).toHaveBeenCalledTimes(1)
+    const text = (agents.prompt.mock.calls[0] as unknown as [string, string])[1]
+    expect(text).toContain('The check "E2E" failed')
+    expect(text).not.toContain('The check "unit" failed')
+  })
+})
+
 describe('resuming an agent', () => {
   it('starts the recorded conversation once, then prompts it while it lives', async () => {
     const { feed, agents } = setup({ resumable: 'old-conversation' })

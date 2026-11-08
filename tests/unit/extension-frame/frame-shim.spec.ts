@@ -233,6 +233,19 @@ describe('frame-shim Escape decisions', () => {
     expect(decision()).toBe('exit')
   })
 
+  // Escape twice while typing used to close the extension and take the draft with it.
+  it('does not post request-exit on two Escapes in a text field, and leaves the draft there', async () => {
+    const { port } = await connectedFrame()
+    const field = document.body.appendChild(document.createElement('textarea'))
+    field.value = 'UNSAVED DRAFT'
+    field.focus()
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(port.posted).not.toContainEqual({ type: 'request-exit' })
+    expect(document.documentElement.getAttribute('data-escape-gesture')).toBe('suppressed')
+    expect(field.value).toBe('UNSAVED DRAFT')
+  })
+
   it('stamps an Escape a modal dialog holds as suppressed', async () => {
     await connectedFrame()
     const dialog = document.body.appendChild(document.createElement('dialog'))

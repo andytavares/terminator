@@ -160,6 +160,29 @@ describe('api.notifications.showToast', () => {
   })
 })
 
+// An extension's own switches, one per target: `${extensionId}.notify.${key}.{system,center,toast}`.
+function storeNotifyTargets(extensionId: string, targets: Record<string, boolean>): void {
+  for (const [target, on] of Object.entries(targets)) {
+    mockExtensionStore[`${extensionId}.notify.taskCompleted.${target}`] = on
+  }
+}
+
+describe('an extension notification follows its switches in Settings', () => {
+  it('goes nowhere when every target is switched off', () => {
+    storeNotifyTargets('muted.ext', { system: false, center: false, toast: false })
+    createExtensionAPI('muted.ext').notifications.showToast('success', 'Muted', 'taskCompleted')
+
+    expect(notificationManager.list().some((n) => n.title === 'Muted')).toBe(false)
+  })
+
+  it('reaches only the centre when only the centre is switched on', () => {
+    storeNotifyTargets('heard.ext', { system: false, center: true, toast: false })
+    createExtensionAPI('heard.ext').notifications.showToast('success', 'Heard', 'taskCompleted')
+
+    expect(notificationManager.list().find((n) => n.title === 'Heard')?.targets).toEqual(['center'])
+  })
+})
+
 function useExecMocks(): void {
   beforeEach(() => {
     vi.mocked(shellExecutor.assertCommandAllowed).mockReset()

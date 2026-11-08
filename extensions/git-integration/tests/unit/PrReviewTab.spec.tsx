@@ -56,7 +56,9 @@ vi.mock('../../src/components/pr-review/PrReviewView', () => ({
     onShowOverview,
     onPopOut,
     onApproved,
+    sinceInfo,
   }: {
+    sinceInfo?: { commitCount: number } | null
     onClose: () => void
     onRefresh: () => void
     onShowOverview?: () => void
@@ -64,6 +66,7 @@ vi.mock('../../src/components/pr-review/PrReviewView', () => ({
     onApproved?: () => void
   }) => (
     <div data-testid="pr-review-view">
+      {sinceInfo && <p>{sinceInfo.commitCount} commits since the last look</p>}
       <button onClick={onClose}>Close PR</button>
       {onApproved && <button onClick={onApproved}>Approved</button>}
       <button onClick={onRefresh}>Refresh PR</button>
@@ -344,6 +347,20 @@ describe('PrReviewTab — reconciles the stored session against the new head via
     expect([...viewedFiles]).toEqual([])
     expect([...changedSince]).toEqual(['a.ts'])
     expect([...newSinceLook]).toEqual(['scripts/e2e-burn-in.ts'])
+  })
+})
+
+describe('PrReviewTab — what changed since the last look', () => {
+  it('hands the review the number of commits pushed since the stored head', async () => {
+    storeSessionAt('/repo:::1', 'oldSha')
+    vi.mocked(githubModule.githubAPI.prCompare).mockResolvedValue({
+      rewritten: false,
+      commits: 1,
+      files: [{ path: 'a.ts', status: 'modified' }],
+    } as never)
+    await openPrAtHead('newSha')
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Start Review' }))
+    expect(await screen.findByText('1 commits since the last look')).toBeTruthy()
   })
 })
 

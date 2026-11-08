@@ -101,7 +101,7 @@ const MAC_RUNNER_LIMIT = 5
 /**
  * @typedef {{ name?: string, run?: string, uses?: string, with?: Record<string, unknown> }} Step
  * @typedef {{ 'runs-on'?: string, needs?: string | string[], strategy?: Record<string, any>, steps?: Step[] }} Job
- * @typedef {{ jobs: Record<string, Job> }} Workflow
+ * @typedef {{ on?: { pull_request?: { branches?: string[] } | null }, jobs: Record<string, Job> }} Workflow
  */
 
 /** The workflows the policies read: each parsed, each file's text, and the file names. */
@@ -205,6 +205,10 @@ const POLICIES = [
   [
     'Baselines are written only in story-baselines.yml, on the runner story-screenshots compares on',
     baselinesOnCompareImage,
+  ],
+  [
+    'ci.yml runs on a pull request into any branch, so a stacked pull request is checked too',
+    ({ ci }) => ci.on?.pull_request !== undefined && !ci.on.pull_request?.branches,
   ],
   [
     'No release.yml: a push to main that passes ci.yml is released by ci.yml (ADR 134)',

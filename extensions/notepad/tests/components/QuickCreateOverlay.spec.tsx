@@ -135,6 +135,18 @@ describe('QuickCreateOverlay saving a note', () => {
   })
 })
 
+describe('QuickCreateOverlay default tags', () => {
+  it('starts with the default tags from Settings, before anything is typed', async () => {
+    window.electronAPI.extension.getSettingsValues = vi
+      .fn()
+      .mockResolvedValue({ values: { 'terminator.notepad.defaultTags': 'e2e-tag, Deep Work' } })
+    useNotesStore.setState({ showQuickCreate: true })
+    render(<QuickCreateOverlay />)
+    expect(await screen.findByRole('button', { name: 'Remove tag e2e-tag' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Remove tag deep work' })).toBeTruthy()
+  })
+})
+
 describe('QuickCreateOverlay usage', () => {
   it('does not count Enter in an empty tag input', async () => {
     const user = userEvent.setup()

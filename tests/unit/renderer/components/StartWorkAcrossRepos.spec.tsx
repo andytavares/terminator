@@ -135,6 +135,23 @@ describe('Start work, Across repos — the branch name', () => {
   })
 })
 
+describe('Start work, Across repos — Terminal only', () => {
+  it('starts a terminal in each lane for Terminal only, and no agent', async () => {
+    const user = userEvent.setup()
+    const onClose = await openAcrossRepos(user)
+    await user.click(screen.getByRole('radio', { name: 'Terminal only' }))
+    await user.click(startButton(/Start 3 lanes/))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.inBranch.mock.calls.map(([projectId]) => projectId)).toEqual([
+      'p-ws-1',
+      'p-ws-2',
+      'p-ws-3',
+    ])
+    expect(launched.agentInBranch).not.toHaveBeenCalled()
+    expect(useTaskStore.getState().tasks).toHaveLength(1)
+  })
+})
+
 describe('Start work, Across repos — all repos start', () => {
   it('starts one lane per repo and records one task holding all three', async () => {
     const user = userEvent.setup()

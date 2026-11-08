@@ -84,11 +84,52 @@ async function rowMenuIsDrawnWhole(page: Page): Promise<void> {
   }
 }
 
+/** Run in the page: whether the open menu reaches past the sidebar, and is drawn on top there. */
+function menuPastSidebar(): { overhangs: boolean; onTop: boolean } {
+  const sidebar = document.querySelector('.unified-sidebar')!.getBoundingClientRect()
+  const panel = document.querySelector('[role="menu"]')!.getBoundingClientRect()
+  const x = sidebar.right + 4
+  const y = panel.top + panel.height / 2
+  return {
+    overhangs: panel.right > x,
+    onTop: document.elementFromPoint(x, y)?.closest('[role="menu"]') !== null,
+  }
+}
+
+/** Run in the page: the height of the chrome above the first repo header. SC-002 allows 99px. */
+function chromeAboveFirstRow(): number {
+  const sidebar = document.querySelector('.unified-sidebar')!.getBoundingClientRect()
+  const firstRow = document.querySelector('.repo-header')!.getBoundingClientRect()
+  return Math.round(firstRow.top - sidebar.top)
+}
+
+/** The panel is wider than a narrow sidebar, so it reaches past the edge: there it must be drawn
+ * over the pane beside it. Chromium resolves anchor() only with position-anchor: auto. */
+async function displayMenuIsAnchoredOnTop(page: Page): Promise<void> {
+  expect(await page.evaluate(chromeAboveFirstRow)).toBeLessThanOrEqual(99)
+  const sidebar = page.locator('.unified-sidebar')
+  const width = await sidebar.evaluate((element: HTMLElement) => element.style.width)
+  await sidebar.evaluate((element: HTMLElement) => (element.style.width = '200px'))
+  const trigger = page.getByRole('button', { name: 'Display', exact: true })
+  await trigger.click()
+  const menu = page.getByRole('menu', { name: 'Display' })
+  await expect(menu).toBeVisible()
+  const [menuBox, buttonBox] = await Promise.all([menu.boundingBox(), trigger.boundingBox()])
+  expect(menuBox!.y).toBeGreaterThanOrEqual(buttonBox!.y + buttonBox!.height)
+  expect(Math.round(menuBox!.x)).toBe(Math.round(buttonBox!.x))
+  expect(await page.evaluate(menuPastSidebar)).toEqual({ overhangs: true, onTop: true })
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await sidebar.evaluate((element: HTMLElement, before) => (element.style.width = before), width)
+}
+
 test("the sidebar marks only the session on screen, nothing under Home, and draws a row's menu whole", async () => {
   const { page } = handle
   await test.step('marks the terminal row of the branch on screen', () =>
     marksTheTerminalOnScreen(page))
   await test.step('marks only the newer repo once it is on screen', () => marksOnlyTheNewRepo(page))
   await test.step('marks nothing under Home', () => marksNothingUnderHome(page))
+  await test.step('draws the Display menu under its button, over the pane beside a narrow sidebar', () =>
+    displayMenuIsAnchoredOnTop(page))
   await test.step("draws a row's menu whole, on top of everything", () => rowMenuIsDrawnWhole(page))
 })

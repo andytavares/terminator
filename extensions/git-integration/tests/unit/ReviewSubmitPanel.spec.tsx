@@ -11,6 +11,8 @@ const mockRecordUsage = vi.fn()
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
     prReviewSubmit: (...args: unknown[]) => mockPrReviewSubmit(...args),
+    // Submitting clears the drafts, which saves the session.
+    sessionSet: async () => ({}),
   },
 }))
 
@@ -227,5 +229,34 @@ describe('ReviewSubmitPanel — unviewed files', () => {
   it('stays quiet once every file is viewed', () => {
     render(<ReviewSubmitPanel {...defaultProps} viewedCount={23} totalFiles={23} />)
     expect(screen.queryByText(/You have viewed/)).toBeNull()
+  })
+})
+
+describe('ReviewSubmitPanel — submitting pending drafts', () => {
+  it('sends each pending comment with the changes request', async () => {
+    const user = userEvent.setup()
+    mockPrReviewSubmit.mockResolvedValue({ success: true })
+    usePrReviewStore.setState({ drafts: [draft] })
+    render(<ReviewSubmitPanel {...defaultProps} />)
+    await user.click(screen.getByLabelText('Request changes'))
+    await user.click(screen.getByPlaceholderText(/Leave a summary comment/))
+    await user.paste('One timer nit.')
+    await user.click(screen.getByRole('button', { name: 'Submit changes request' }))
+    expect(await screen.findByText('Review submitted successfully.')).toBeTruthy()
+    expect(mockPrReviewSubmit).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      prNumber: 42,
+      event: 'REQUEST_CHANGES',
+      body: 'One timer nit.',
+      comments: [
+        {
+          path: 'src/hardware.py',
+          line: 62,
+          startLine: null,
+          side: 'RIGHT',
+          body: 'Good catch. I will reuse one timer.\nAnd reset its deadline.',
+        },
+      ],
+    })
   })
 })

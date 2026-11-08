@@ -18,8 +18,6 @@
         // electron-builder reads its config file by name
         // (https://www.electron.build/configuration); `npm run package`.
         "electron-builder.cjs",
-        // Installed by path as an extension: extension-lifecycle.spec.ts:25.
-        "tests/e2e/fixtures/extensions/probe/*.{cjs,js}",
         // Run by path as the e2e profiles' agent: tests/e2e/helpers.ts (STUB_AGENT).
         "tests/e2e/fixtures/acp-stub-agent.mjs",
         // Reached only through electron.vite.config.ts's alias for mermaid's ELK chunk.

@@ -152,6 +152,16 @@ describe('ScheduledView — the table, paused runs and editing', () => {
   })
 })
 
+describe('ScheduledView — after an edit', () => {
+  it('reads the list again when Start work closes, and shows the new time', async () => {
+    await shown()
+    act(() => useStartWorkStore.getState().openLauncher('', triage))
+    schedules.list.mockResolvedValue({ data: [{ ...triage, time: '14:30' }, summarise] })
+    act(() => useStartWorkStore.getState().closeLauncher())
+    expect(await within(rowOf('Triage the inbox')).findByText(/every day at 14:30/)).toBeTruthy()
+  })
+})
+
 describe('ScheduledView — pausing and resuming from the row menu', () => {
   it.each([
     {

@@ -12,7 +12,7 @@ const eslint = new ESLint({
 })
 // Typed rules need a file the test projects include; the text linted is the case's own.
 const UNIT_SPEC = 'tests/unit/lint/test-rules.spec.ts'
-const E2E_SPEC = 'tests/e2e/app-menu.spec.ts'
+const E2E_SPEC = 'tests/e2e/terminal.spec.ts'
 
 async function rulesHit(code: string, file = UNIT_SPEC): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath: path.join(repoRoot, file) })

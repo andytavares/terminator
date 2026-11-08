@@ -847,6 +847,38 @@ describe('PrOverviewPanel — merging the stack', () => {
   })
 })
 
+describe('PrOverviewPanel — after the stack merges', () => {
+  beforeEach(mockStackedPlan)
+
+  it('reloads the pull request, so the overview shows it merged', async () => {
+    const user = userEvent.setup()
+    /** The tab that owns the overview: its reload reads the pull request GitHub now reports. */
+    function OwningTab() {
+      const [pr, setPr] = React.useState<PrReviewDetail>({ ...basePr, baseRefName: 'feat/base' })
+      const reload = async () => setPr((shown) => ({ ...shown, state: 'merged' }))
+      return (
+        <PrOverviewPanel
+          repoRoot="/repo"
+          pr={pr}
+          sessionStatus="not-started"
+          onStartReview={vi.fn()}
+          onClose={vi.fn()}
+          onRefresh={reload}
+        />
+      )
+    }
+    render(<OwningTab />)
+    await user.click(
+      await within(headerActions()).findByRole('button', { name: 'Merge stack · 2' })
+    )
+    await user.click(screen.getAllByRole('button', { name: 'Merge 2 pull requests' })[0])
+    expect(
+      await within(headerActions()).findByRole('button', { name: 'Open revert PR' })
+    ).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Merged/)
+  })
+})
+
 describe('PrOverviewPanel — a stack that cannot merge', () => {
   beforeEach(mockStackedPlan)
 

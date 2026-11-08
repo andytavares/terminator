@@ -8,6 +8,16 @@ import { dashboardPrFixture } from './support/dashboard-pr'
 import { bindShellToAnswers } from './support/shell'
 import { eventually } from '../../../../tests/support/eventually'
 
+// The pull request watch keeps its state in an electron-store; this one keeps it in memory.
+const savedStores = vi.hoisted(() => new Map<string, unknown>())
+vi.mock('electron-store', () => ({
+  default: class {
+    get = (key: string) => savedStores.get(key)
+    set = (key: string, value: unknown) => void savedStores.set(key, value)
+    delete = (key: string) => void savedStores.delete(key)
+  },
+}))
+
 const issue = (key: string) => ({ key, tracker: 'linear' as const })
 
 function setupPublisher(myIssues: Array<ReturnType<typeof issue>> = [], autoPull = false) {
@@ -28,7 +38,10 @@ function setupPublisher(myIssues: Array<ReturnType<typeof issue>> = [], autoPull
   return { published, publisher, api, onActionDispose }
 }
 
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  savedStores.clear()
+})
 
 describe('dashboard refresh', () => {
   it('publishes the asks and facets of the refreshed pull requests', () => {
@@ -191,5 +204,53 @@ describe('merged search schedule', () => {
     searching.dispose()
     await vi.advanceTimersByTimeAsync(MERGED_REFRESH_MS)
     expect(search).toHaveBeenCalledTimes(2)
+  })
+})
+
+/** A publisher whose pull request watch is on and finds `agent-on-branch` live on the branch. */
+function watchingPublisher() {
+  bindShellToAnswers(() => 'worktree /work/widgets\nHEAD aaa\nbranch refs/heads/feat/login\n')
+  const prompt = vi.fn(async () => ({ stopReason: 'end_turn' }))
+  const api = partialFake<ExtensionAPI>({
+    home: { publish: () => {}, onAction: () => ({ dispose: () => {} }) },
+    issues: partialFake<ExtensionAPI['issues']>({
+      listMine: async () => ({ issues: [], failures: [] }),
+    }),
+    settings: partialFake<ExtensionAPI['settings']>({ get: (() => true) as never }),
+    agents: partialFake<ExtensionAPI['agents']>({
+      sessionsIn: async () => ({ live: ['agent-on-branch'], resumable: null }),
+      prompt,
+      onEnd: () => () => undefined,
+    }),
+    usage: { record: vi.fn() },
+    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  })
+  return { publisher: createHomePublisher(api, '/storage', () => ['/work/widgets']), prompt }
+}
+
+const watchReads = {
+  viewer: async () => 'andrew',
+  comments: async () => [],
+  failedLog: async () => 'AssertionError: expected 1 to be 2',
+}
+
+describe('dashboard refresh: the pull request watch', () => {
+  it('prompts the agent on the branch when a refresh shows a check that newly failed', async () => {
+    const { publisher, prompt } = watchingPublisher()
+    const check = { name: 'E2E', detailsUrl: 'https://github.com/acme/widgets/actions/runs/1' }
+    publisher.hooks.onDashboard(
+      { prs: [dashboardPrFixture({ checks: [{ ...check, state: 'passed' }] })], failed: [] },
+      watchReads
+    )
+    publisher.hooks.onDashboard(
+      { prs: [dashboardPrFixture({ checks: [{ ...check, state: 'failed' }] })], failed: [] },
+      watchReads
+    )
+    await eventually(() =>
+      expect(prompt).toHaveBeenCalledWith(
+        'agent-on-branch',
+        expect.stringContaining('The check "E2E" failed')
+      )
+    )
   })
 })

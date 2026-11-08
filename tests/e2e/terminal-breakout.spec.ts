@@ -185,17 +185,3 @@ test('a tab dragged out of the window opens on release, and dragged back docks',
     await expect(sessionTabs().nth(1)).toContainText(titles[1])
   })
 })
-
-test('a tab dragged onto another tab takes its place', async () => {
-  const { page } = handle
-  const titles = await test.step('three terminals', () =>
-    threeTerminalsSecondSelected('WS-Reorder'))
-  await test.step('the third tab dropped on the first moves to the front', async () => {
-    const first = (await sessionTabs().first().boundingBox())!
-    await dragTab(page, sessionTabs().last(), {
-      x: first.x + first.width / 2,
-      y: first.y + first.height / 2,
-    })
-    await expect(sessionTabs().first()).toContainText(titles[2])
-  })
-})

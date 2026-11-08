@@ -1634,6 +1634,11 @@ function configuredBudgetsTests() {
     })
     expect(r.order.budgets).toMatchObject({ agents: null, wallClockMinutes: 10 })
   })
+
+  it('starts with only the write-backs the operator left on', async () => {
+    const r = await seededWith({ writeBackDefault: () => ['status'] })
+    expect(r.order.writeBack).toEqual(['status'])
+  })
 }
 
 function readingEveryOrderTests() {

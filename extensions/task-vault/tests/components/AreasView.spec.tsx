@@ -309,6 +309,13 @@ function detailTaskCompletesTests() {
     )
   })
 
+  it('takes a completed task off the area, which lists what the vault answers', async () => {
+    const user = await openWorkArea()
+    bridge.responses['task-vault:vault:list-areas'] = { areas: [{ ...WORK, tasks: [] }, HOME] }
+    await user.click(screen.getByTitle('Complete'))
+    await eventually(() => expect(screen.queryByText('Plan sprint')).toBeNull())
+  })
+
   it('restores a finished task', async () => {
     const user = await openWorkArea()
     await user.click(screen.getByTitle('Restore'))

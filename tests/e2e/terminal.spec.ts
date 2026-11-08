@@ -1,6 +1,5 @@
-import { test, expect, type Locator } from '@playwright/test'
-import { rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { test, expect } from '@playwright/test'
+import { rmSync } from 'node:fs'
 import {
   AppHandle,
   launchApp,
@@ -11,22 +10,17 @@ import {
   e2eTempDir,
   projectGroup,
   workspaceRow,
-  runQuickActionFromPanel,
-  readTerminalRowsIn,
-  visibleTerminalScreen,
 } from './helpers'
-import { recordShellOpens, shellOpens } from './main-stubs'
 import { expectCentredInWindow } from './modal-centre'
-import { expectTerminalFocused, runInVisibleTerminal } from './session-views'
+import { openOverview, runInVisibleTerminal } from './session-views'
 
-// Terminals from an operator's side: opened, navigated, split, followed and closed. The three
+// Terminals from an operator's side: opened, navigated, split, followed and closed. The two
 // flows share one app; each makes its own workspace, so none depends on another having run.
 
 let handle: AppHandle
 
 test.beforeAll(async () => {
   handle = await launchApp()
-  await recordShellOpens(handle.app)
 })
 
 test.afterAll(async () => {
@@ -188,28 +182,10 @@ test('terminals are opened, followed, navigated and closed across branches', asy
   await terminalsAreManaged()
 })
 
-// ── Flow 2: split ───────────────────────────────────────────────────────────
+// ── Flow 2: a split terminal, in the sidebar and on the Overview wall ───────
 
 const splitBranch = () => projectGroup(handle.page, 'panes')
 const terminalRows = () => handle.page.locator('.terminal-row')
-
-/** Splitting worked, but the pane it made existed on screen and nowhere else: the sidebar
- * stopped at the branch, and the only way out was an invisible ⌘W. */
-async function splitPaneIsListedAndHideable(): Promise<void> {
-  await handle.page.keyboard.press('ControlOrMeta+d')
-  await expect(visibleScreens()).toHaveCount(2)
-  const disclosure = splitBranch().locator('.branch-row__disclosure')
-  await expect(disclosure, 'a branch with terminals offers a disclosure').toBeVisible()
-  // Collapsed by default: the sidebar still stops at the branch until asked.
-  await expect(terminalRows()).toHaveCount(0)
-  await disclosure.click()
-  await expect(terminalRows()).toHaveCount(2)
-  // The pane is nested under its root, not a sibling of it.
-  await expect(terminalRows().nth(0)).not.toHaveClass(/terminal-row--nested/)
-  await expect(terminalRows().nth(1)).toHaveClass(/terminal-row--nested/)
-  await disclosure.click()
-  await expect(terminalRows()).toHaveCount(0)
-}
 
 /** Run in the page: where each level of the open tree starts. */
 function treeDepths(): Record<'repo' | 'branch' | 'terminal' | 'pane', number> {
@@ -223,10 +199,14 @@ function treeDepths(): Record<'repo' | 'branch' | 'terminal' | 'pane', number> {
   }
 }
 
-async function treeStepsInAtEveryLevel(): Promise<void> {
+/** Only a laid-out window shows the indent; the renderer tests cover what is listed and nested. */
+async function paneStepsInUnderItsTerminal(): Promise<void> {
+  const { page } = handle
+  await page.keyboard.press('ControlOrMeta+d')
+  await expect(visibleScreens()).toHaveCount(2)
   await splitBranch().locator('.branch-row__disclosure').click()
   await expect(terminalRows()).toHaveCount(2)
-  const depths = await handle.page.evaluate(treeDepths)
+  const depths = await page.evaluate(treeDepths)
   // Each level sits to the right of the one above it; without this a pane read as a sibling of
   // the branch rather than as something inside it.
   expect(depths.repo).toBeLessThan(depths.branch)
@@ -234,149 +214,45 @@ async function treeStepsInAtEveryLevel(): Promise<void> {
   expect(depths.terminal).toBeLessThan(depths.pane)
 }
 
-async function paneClosesFromSidebar(): Promise<void> {
-  await expect(handle.page.locator('.leaf-pane__close').filter({ visible: true })).toHaveCount(2)
-  await terminalRows().last().hover()
-  await terminalRows().last().locator('.terminal-row__close').click()
-  await expect(terminalRows(), 'closing the pane removes its row').toHaveCount(1)
-  // One pane left means no split, so no per-pane titlebars either.
-  await expect(visibleScreens()).toHaveCount(1)
-  await splitBranch().locator('.branch-row__disclosure').click()
-}
+const PROBE = 'SPACING-PROBE-0123456789'
 
-async function newTabBesideSplitTakesKeys(): Promise<void> {
-  const { page } = handle
-  await runQuickActionFromPanel(page, 'Split down')
-  await expect(visibleScreens()).toHaveCount(2)
-  await runQuickActionFromPanel(page, 'New tab')
-  await expect(sessionTabs()).toHaveCount(2)
-  await expect(sessionTabs().last()).toHaveClass(/tab-bar__tab--active/)
-  await expect(visibleScreens()).toHaveCount(1)
-  await expectTerminalFocused(page)
-  await page.keyboard.type('echo typed-into-new-tab')
-  await page.keyboard.press('Enter')
-  const visibleRows = async () => (await readTerminalRowsIn(visibleScreens().first())).join('\n')
-  await expect.poll(visibleRows).toContain('typed-into-new-tab')
-}
-
-async function firstTabShowsItsSplitAgain(): Promise<void> {
-  await sessionTabs().first().click()
-  await expect(visibleScreens()).toHaveCount(2)
-  for (const screen of await visibleScreens().all()) {
-    expect((await readTerminalRowsIn(screen)).join('\n')).not.toContain('typed-into-new-tab')
-  }
-}
-
-test('a terminal is split, its pane listed, reached and closed, and the split kept per tab', async () => {
-  await workspaceWithBranch('Split', 'panes')
-  await test.step(
-    'a split pane is listed under the terminal it came from, and can be hidden',
-    splitPaneIsListedAndHideable
+/** Run in the page: the probe row's drawn width, and the width of the same text set in its font. */
+function probeWidths(text: string): { drawn: number; expected: number } | null {
+  const row = [...document.querySelectorAll('.live-preview .xterm-rows > div')].find((r) =>
+    r.textContent?.includes(text)
   )
-  await test.step('the tree steps in at every level', treeStepsInAtEveryLevel)
-  await test.step('a pane has its own close, and closes from the sidebar', paneClosesFromSidebar)
-  await test.step(
-    'New tab after Split down shows the new terminal, and typing reaches it',
-    newTabBesideSplitTakesKeys
-  )
-  await test.step('going back to the first tab shows its split again', firstTabShowsItsSplitAgain)
-})
-
-// ── Flow 3: links, the bell and a plain branch's name ───────────────────────
-
-/** Prints `line` alone on a row of the pane's `.xterm-screen` and ⌘-clicks (Ctrl off macOS)
- * its first characters. xterm sizes the screen to exactly its rows, so a row is the
- * screen's height over the number of rows. */
-async function printAndModClick(screen: Locator, line: string): Promise<void> {
-  const page = screen.page()
-  await screen.click()
-  await expectTerminalFocused(page)
-  await page.keyboard.type(`printf '%s\\n' '${line}'`)
-  await page.keyboard.press('Enter')
-  const rowsOfLine = async () =>
-    (await readTerminalRowsIn(screen)).filter((row) => row.startsWith(line)).length
-  await expect.poll(rowsOfLine).toBe(1)
-  const rows = await readTerminalRowsIn(screen)
-  const index = rows.findIndex((row) => row.startsWith(line))
-  const box = (await screen.boundingBox())!
-  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
-  await page.keyboard.down(modifier)
-  await page.mouse.click(box.x + 20, box.y + ((index + 0.5) * box.height) / rows.length)
-  await page.keyboard.up(modifier)
+  if (!(row instanceof HTMLElement)) return null
+  const scale = row.getBoundingClientRect().width / row.offsetWidth
+  const range = document.createRange()
+  range.selectNodeContents(row.firstElementChild ?? row)
+  const reference = document.createElement('span')
+  reference.style.cssText = 'position:absolute;white-space:pre;visibility:hidden'
+  const { fontFamily, fontSize } = getComputedStyle(row)
+  Object.assign(reference.style, { fontFamily, fontSize })
+  reference.textContent = row.textContent
+  document.body.appendChild(reference)
+  const expected = reference.getBoundingClientRect().width
+  reference.remove()
+  return { drawn: range.getBoundingClientRect().width / scale, expected }
 }
 
-async function renameRenamesPlainBranch(): Promise<void> {
+/** A tile is the DOM renderer, which measures glyphs when it is built. The probe's terminal is on
+ * a branch that is not on screen, so it built that renderer while detached. */
+async function wallDrawsNoGapsBetweenLetters(): Promise<void> {
   const { page } = handle
-  await projectGroup(page, 'scratchpad').click({ button: 'right' })
-  await page.locator('.ctx-menu__item', { hasText: 'Rename' }).click()
-  const input = page.locator('.branch-row__rename')
-  await input.fill('notebook')
-  await input.press('Enter')
-  await expect(projectGroup(page, 'notebook')).toBeVisible()
-  await page.reload()
-  await expect(projectGroup(page, 'notebook')).toBeVisible()
+  await openOverview(page)
+  await expect.poll(() => page.evaluate(probeWidths, PROBE)).not.toBeNull()
+  const widths = (await page.evaluate(probeWidths, PROBE))!
+  expect(widths.drawn).toBeCloseTo(widths.expected, -1)
 }
 
-async function urlOpensOnModClick(): Promise<void> {
-  const { page, app } = handle
-  await projectGroup(page, 'notebook').click()
-  // Two terminals on screen, so the click has to find the row in the right one.
-  await runQuickActionFromPanel(page, 'Split down')
-  await expect(visibleScreens()).toHaveCount(2)
-  await printAndModClick(visibleScreens().last(), 'https://example.com/e2e-link')
-  await expect.poll(() => shellOpens(app)).toContain('https://example.com/e2e-link')
-}
-
-async function filePathOpensOnModClick(folder: string): Promise<void> {
-  const file = join(folder, 'notes.txt')
-  writeFileSync(file, 'hello')
-  await printAndModClick(visibleTerminalScreen(handle.page), file)
-  await expect.poll(() => shellOpens(handle.app)).toContain(file)
-}
-
-async function bellNotifiesAndRevealsTab(folder: string): Promise<void> {
-  const { page } = handle
-  // The bell waits for this file, which the test writes once the tab is in the background.
-  const ring = join(folder, 'ring-the-bell')
-  await runQuickActionFromPanel(page, 'New tab')
-  await expectTerminalFocused(page)
-  await page.keyboard.type(`until [ -e '${ring}' ]; do sleep 0.1; done; printf '\\a'`)
-  await page.keyboard.press('Enter')
-  await sessionTabs().first().click()
-  await expect(sessionTabs().first()).toHaveClass(/tab-bar__tab--active/)
-  writeFileSync(ring, '')
-  const bell = page.locator('.app-band__entry[aria-label^="Notifications"]')
-  await expect(bell).toHaveAttribute('aria-label', /unread/)
-  await bell.click()
-  await page.locator('.notif-item', { hasText: 'needs attention' }).first().click()
-  await expect(sessionTabs().last()).toHaveClass(/tab-bar__tab--active/)
-}
-
-async function dismissRemovesNotification(): Promise<void> {
-  const { page } = handle
-  await page.locator('.app-band__entry[aria-label^="Notifications"]').click()
-  const before = await page.locator('.notif-item').count()
-  await page.locator('.notif-item__dismiss').first().click()
-  await expect(page.locator('.notif-item')).toHaveCount(before - 1)
-  const listed = await page.evaluate(() => window.electronAPI.notifications.list())
-  expect(listed.length).toBe(before - 1)
-  await page.keyboard.press('Escape')
-  await expect(page.locator('.notif-item')).toHaveCount(0)
-}
-
-test("a terminal's links open outside the app, its bell notifies, and a plain branch is renamed", async () => {
-  const folder = await workspaceWithBranch('Plain', 'scratchpad')
+test('a split terminal is listed a step in under its branch, and drawn on the wall without gaps', async () => {
+  await workspaceWithBranch('Split', 'probe')
+  await runInVisibleTerminal(handle.page, `echo ${PROBE}`)
+  await addAndSelectProject(handle.page, 'Split', 'panes')
+  await test.step('the sidebar draws each level of the tree a step in', paneStepsInUnderItsTerminal)
   await test.step(
-    'Rename renames a branch that no git branch names, and the name survives a reload',
-    renameRenamesPlainBranch
+    'the wall draws a terminal from another branch with no gaps between letters',
+    wallDrawsNoGapsBetweenLetters
   )
-  await test.step(
-    'a URL in a terminal opens in the browser on ⌘-click (Ctrl-click off macOS)',
-    urlOpensOnModClick
-  )
-  await test.step('a file path in a terminal opens in its app on ⌘-click', () =>
-    filePathOpensOnModClick(folder))
-  await test.step('a bell in a background tab notifies, and clicking the notification reveals the tab', () =>
-    bellNotifiesAndRevealsTab(folder))
-  await test.step('× dismisses a notification', dismissRemovesNotification)
 })

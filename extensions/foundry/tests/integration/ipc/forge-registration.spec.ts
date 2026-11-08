@@ -7,7 +7,12 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { fakeHost, seededRepository, temporaryDirectory } from '../../helpers/foundry-host.js'
+import {
+  fakeHost,
+  gitAt,
+  seededRepository,
+  temporaryDirectory,
+} from '../../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../../helpers/foundry-activation.js'
 import type { FoundryHost } from '../../helpers/foundry-host.js'
 import { createOrderStore } from '../../../src/order/store.js'
@@ -210,6 +215,16 @@ describe('the record of earlier decisions', () => {
   })
 })
 
+/** A runner whose every turn registers its session at once, named for its phase. */
+const registersEveryTurn = (async (input: {
+  phase: string
+  onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
+}) => {
+  const sessionId = `${input.phase}-1`
+  input.onRegistered({ sessionId, transcriptFrom: 0 })
+  return { sessionId, transcriptFrom: 0, terminalSessionId: 't', transcriptPath: '/none' }
+}) as never
+
 describe('deleting an order', () => {
   describe('an unknown order', anUnknownOrderTests)
   describe('deleting', forgeRegistrationDeletingTests)
@@ -234,14 +249,7 @@ function forgeRegistrationDeletingTests() {
       now: '2026-10-12T10:00:00.000Z',
     })
     await orderStoreAt(dataDir).save(order)
-    theRunner.start.mockImplementation((async (input: {
-      phase: string
-      onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
-    }) => {
-      const sessionId = `${input.phase}-1`
-      input.onRegistered({ sessionId, transcriptFrom: 0 })
-      return { sessionId, transcriptFrom: 0, terminalSessionId: 't', transcriptPath: '/none' }
-    }) as never)
+    theRunner.start.mockImplementation(registersEveryTurn)
     await host.call('foundry:order.converge', { id: 'WO-1', message: 'draft it' })
 
     const deleted = (await host.call('foundry:order.delete', { id: 'WO-1' })) as { ok: boolean }
@@ -252,3 +260,32 @@ function forgeRegistrationDeletingTests() {
     expect(listed.orders).toEqual([])
   })
 }
+
+describe('intake on a draft seeded from an idea', () => {
+  it('launches the architect read-only in the order’s own lane checkout, on its own branch', async () => {
+    const repo = await seededRepository(parent)
+    const seeded = (await host.call('foundry:order.create', {
+      source: { kind: 'typed', text: 'greet should take a name, in README.md' },
+      repoPaths: [repo],
+    })) as { order: { id: string; acceptance: unknown[] } }
+    const { id } = seeded.order
+    // A seeded draft has nothing to hand off: the state intake exists to move.
+    expect(seeded.order.acceptance).toEqual([])
+    theRunner.start.mockImplementation(registersEveryTurn)
+
+    await host.call('foundry:order.converge', { id })
+
+    const branch = `foundry/${id.toLowerCase()}`
+    const checkout = path.join(orderDir(dataDir, id), 'worktrees', 'app')
+    const started = theRunner.start.mock.calls.map(
+      (call) => call[0] as { phase: string; worktreePath: string }
+    )
+    const architect = started.find((input) => input.phase === 'architect')
+    expect(architect).toMatchObject({ mode: 'default', worktreePath: checkout, branch })
+    // One project per order (ADR-061): no intake session opens a checkout of its own.
+    expect(new Set(started.map((input) => input.worktreePath))).toEqual(new Set([checkout]))
+    const worktrees = (await gitAt(repo, 'worktree', 'list', '--porcelain')).stdout
+    expect(worktrees).toContain(`worktree ${fs.realpathSync(checkout)}\n`)
+    expect(worktrees).toContain(`branch refs/heads/${branch}\n`)
+  })
+})

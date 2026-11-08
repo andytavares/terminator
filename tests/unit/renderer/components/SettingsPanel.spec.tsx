@@ -851,6 +851,49 @@ describe('ExtensionsSection — editing each kind of setting', () => {
   })
 })
 
+const STORED_PAGE: SettingDefs = {
+  'com.test.on': { type: 'boolean', label: 'On', default: true },
+  'com.test.mode': {
+    type: 'enum',
+    label: 'Mode',
+    default: 'fast',
+    options: ['fast', 'safe'],
+  },
+  'com.test.tags': { type: 'string', label: 'Tags', default: '' },
+  'com.test.limit': { type: 'number', label: 'Limit', default: 5 },
+  'com.test.notify.taskCompleted.center': {
+    type: 'boolean',
+    label: 'Task completed → center',
+    default: true,
+  },
+}
+
+const STORED_VALUES = {
+  'com.test.on': false,
+  'com.test.mode': 'safe',
+  'com.test.tags': 'e2e-tag',
+  'com.test.limit': 13,
+  'com.test.notify.taskCompleted.center': false,
+}
+
+// What main stored is what a person sees on the page when it opens again, after a restart too.
+describe('ExtensionsSection — a page opened on stored values', () => {
+  setUpExtensionsSection()
+
+  it('shows each stored value, not the default', async () => {
+    await openSettingsOf(STORED_PAGE, STORED_VALUES)
+    expect(screen.getByRole('switch', { name: 'On' }).getAttribute('aria-checked')).toBe('false')
+    // The choice marks the picked option only by its class.
+    expect(screen.getByRole('button', { name: 'Safe' }).className).toContain('--active')
+    expect(screen.getByDisplayValue('e2e-tag')).toBeTruthy()
+    expect(screen.getByDisplayValue('13')).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'Task completed → center' })).toHaveProperty(
+      'checked',
+      false
+    )
+  })
+})
+
 describe('ExtensionsSection — editing each kind of setting — secrets and numbers', () => {
   setUpExtensionsSection()
 

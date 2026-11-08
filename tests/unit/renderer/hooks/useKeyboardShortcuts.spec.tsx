@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useNavigationStore } from '../../../../src/renderer/stores/navigation.store'
 import { useKeyboardShortcuts } from '../../../../src/renderer/hooks/useKeyboardShortcuts'
+import { useStartWorkStore } from '../../../../src/renderer/components/home/start-work'
 import type { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
 import {
   projectFixture,
@@ -630,5 +631,15 @@ describe('reopen closed tab', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('t', { metaKey: true, altKey: true })
     expect(createSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('useKeyboardShortcuts — Start work', () => {
+  it('opens Start work on Cmd+N', () => {
+    useStartWorkStore.getState().closeLauncher()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('n', { metaKey: true })
+    expect(useStartWorkStore.getState().open).toBe(true)
+    useStartWorkStore.getState().closeLauncher()
   })
 })

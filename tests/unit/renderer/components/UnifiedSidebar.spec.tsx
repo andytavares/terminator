@@ -871,6 +871,12 @@ describe('UnifiedSidebar — what the branch-first sidebar draws', () => {
     renderSidebar()
     await waitFor(() => expect(screen.getByTitle('~/repos/backend').textContent).toBe('Backend'))
   })
+
+  it('says branch, never project', () => {
+    renderSidebar()
+    expect(sidebar().textContent!.toLowerCase()).not.toContain('project')
+    expect(screen.getByRole('button', { name: 'New branch in Backend' })).toBeTruthy()
+  })
 })
 
 describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes', () => {
@@ -1227,9 +1233,10 @@ describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', (
   // The store's order and the drawn order are two different things the moment a
   // computed sort is on. A drop has to move the row the user actually dragged,
   // so the indices it works in are the drawn ones.
-  it('reorders by what is on screen, not by the stored order', async () => {
+  // A remount stands in for a reload: the order lives in main, the Manual sort in the saved view.
+  it('reorders by what is on screen, sends that order to main, and still draws it after a remount', async () => {
     setWorkspaces([ws2, ws1])
-    renderSidebar()
+    const { unmount } = renderSidebar()
     await pickSort('Name')
     expect(repoNames()).toEqual(['Backend', 'Frontend'])
 
@@ -1237,7 +1244,11 @@ describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', (
     fireEvent.dragStart(headers[0])
     fireEvent.drop(headers[1])
 
-    expect(useWorkspaceStore.getState().workspaces.map((w) => w.id)).toEqual(['ws-2', 'ws-1'])
+    expect(repoNames()).toEqual(['Frontend', 'Backend'])
+    expect(workspaceApi.reorder).toHaveBeenCalledWith(['ws-2', 'ws-1'])
+    unmount()
+    renderSidebar()
+    expect(repoNames()).toEqual(['Frontend', 'Backend'])
   })
 
   // Dropping under a computed sort used to write an order nothing would ever
@@ -1253,13 +1264,20 @@ describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', (
     fireEvent.drop(rows[1])
     expect(await checkedSort()).toBe('Manual')
   })
+})
 
-  it('reorders the branches inside one repo on drop', () => {
-    renderSidebar()
+describe('UnifiedSidebar — a drag is the manual order (Display → Manual) — a branch', () => {
+  it('reorders the branches inside one repo on drop, sends that order to main, and still draws it after a remount', () => {
+    const { unmount } = renderSidebar()
     const rows = branchRows()
     fireEvent.dragStart(rows[0])
     fireEvent.drop(rows[1])
     expect(branchIdsOf('ws-1')).toEqual(['p2', 'p1'])
+    expect(branchNames()).toEqual(['Jobs', 'main', 'Web'])
+    expect(projectApi.reorder).toHaveBeenCalledWith('ws-1', ['p2', 'p1'])
+    unmount()
+    renderSidebar()
+    expect(branchNames()).toEqual(['Jobs', 'main', 'Web'])
   })
 })
 
@@ -1399,6 +1417,19 @@ const terminalRow = (title: string) =>
 async function expandMain(): Promise<void> {
   await userEvent.setup().click(screen.getByRole('button', { name: 'Show terminals in main' }))
 }
+
+describe('UnifiedSidebar — the terminals under a branch — the keyboard', () => {
+  // Every way into a session asks its terminal for the keyboard, also when it is already showing.
+  it('gives the clicked terminal the keyboard, and again on a second click', async () => {
+    const user = userEvent.setup()
+    renderSidebar()
+    await expandMain()
+    await user.click(terminalRow('api-agent'))
+    expect(useSessionStore.getState().focusRequest).toEqual({ sessionId: 's2', nonce: 1 })
+    await user.click(terminalRow('api-agent'))
+    expect(useSessionStore.getState().focusRequest).toEqual({ sessionId: 's2', nonce: 2 })
+  })
+})
 
 describe('UnifiedSidebar — the terminals under a branch', () => {
   it('shows the terminal picked from them, and tells the host', async () => {

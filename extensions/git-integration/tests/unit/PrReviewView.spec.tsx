@@ -530,3 +530,19 @@ describe('PrReviewView (continued) — chapter keyboard navigation — marking t
     expect(screen.getByText('Chapter 2 of 3')).toBeTruthy()
   })
 })
+
+describe('PrReviewView — after a push', () => {
+  it('says how many commits came since the reviewer last looked', async () => {
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={mockPr}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+        sinceInfo={{ commitCount: 1, changedCount: 1, historyRewritten: false }}
+      />
+    )
+    expect(screen.getByText('1 commit since you last looked')).toBeTruthy()
+  })
+})

@@ -270,7 +270,7 @@ async function withWindowSize(
   }
 }
 
-async function openOrderIsAFrame(): Promise<void> {
+async function openOrderIsAFrame(): Promise<string> {
   // Asserted as behaviour, not as a stylesheet: the controls are on screen before and after
   // everything that can scroll has scrolled to its end (docs/research/forge-shaping-redesign.md).
   const id = await createTypedOrder(handle, {
@@ -290,6 +290,69 @@ async function openOrderIsAFrame(): Promise<void> {
       await misalignedOn(await extensionPage(handle, 'terminator.foundry'), 'Forge order')
     ).toEqual([])
   })
+  return id
+}
+
+/** Run in Foundry's view: how tall the page is, and how tall the window. */
+const PAGE_HEIGHT = '({ scroll: document.documentElement.scrollHeight, view: window.innerHeight })'
+
+/** Run in Foundry's view: the heights of the children of every seed and input row. */
+const ROW_HEIGHTS = `(function () {
+    var out = {}
+    var rows = document.querySelectorAll('.fdry-seed, .fdry-input')
+    for (var i = 0; i < rows.length; i++) {
+      var heights = []
+      for (var j = 0; j < rows[i].children.length; j++) {
+        heights.push(Math.round(rows[i].children[j].getBoundingClientRect().height * 100) / 100)
+      }
+      out[rows[i].className + ' ' + i] = heights
+    }
+    return out
+  })()`
+
+/** Run in Foundry's view: every element whose own text renders at 16px or more,
+ *  the untouched browser default. A container is not blamed for a child's text. */
+const OVERSIZED_TEXT = `(function () {
+    var out = []
+    var all = document.querySelectorAll('body *')
+    for (var i = 0; i < all.length; i++) {
+      var own = ''
+      for (var j = 0; j < all[i].childNodes.length; j++) {
+        if (all[i].childNodes[j].nodeType === 3) own += all[i].childNodes[j].textContent
+      }
+      if (own.trim() === '') continue
+      var size = parseFloat(getComputedStyle(all[i]).fontSize)
+      if (size >= 16) out.push(all[i].tagName.toLowerCase() + '.' + String(all[i].className || '') + ' "' + own.trim().slice(0, 40) + '" ' + size)
+    }
+    return out
+  })()`
+
+/** The order list fits the window, its row controls share one height, and no text on it renders
+ *  at the 16px browser default. Only a browser computes these, so they are read here. */
+async function forgeListDrawnToScale(id: string): Promise<string[]> {
+  await listOrdersInForge(handle, id)
+  // The rail was 260px whatever the window, so stacked panels ran past the bottom.
+  const size = await inFoundry<{ scroll: number; view: number }>(handle, PAGE_HEIGHT)
+  expect(size.scroll, 'the Forge needs scrolling to show its orders').toBeLessThanOrEqual(
+    size.view + 8
+  )
+  // Fields got one height in the shared stylesheet and buttons did not.
+  const rows = await inFoundry<Record<string, number[]>>(handle, ROW_HEIGHTS)
+  expect(Object.keys(rows).length, 'the Forge drew no seed row').toBeGreaterThan(0)
+  for (const [row, heights] of Object.entries(rows)) {
+    expect(new Set(heights).size, `${row}: ${heights.join(', ')}`).toBe(1)
+  }
+  return (await inFoundry<string[]>(handle, OVERSIZED_TEXT)).map((item) => `Forge: ${item}`)
+}
+
+async function surfacesDrawnToScale(id: string): Promise<void> {
+  const found = await forgeListDrawnToScale(id)
+  // The shared stylesheet sets no body size, so a rule that forgets one lands on 16px.
+  await expect.poll(() => clickByName(handle, 'button', 'Ledger')).toBe(true)
+  await expect.poll(() => bodyText(handle)).toContain('What do I keep rejecting?')
+  for (const item of await inFoundry<string[]>(handle, OVERSIZED_TEXT))
+    found.push(`Ledger: ${item}`)
+  expect(found, 'these render at the untouched 16px default').toEqual([])
 }
 
 async function budgetsOf(id: string): Promise<Record<string, number | null>> {
@@ -485,9 +548,12 @@ async function budgetRaisedAtGate(id: string, summary: string): Promise<void> {
 
 test('an open order is a frame whose budgets are set on Plan and raised at the gate, and an agreed order runs as a supervised agent', async () => {
   const step = test.step
-  await step(
+  const framed = await step(
     'an open order is a frame, and the controls that end it never scroll away',
     openOrderIsAFrame
+  )
+  await step('the order list fits the window and every surface draws to the product’s scale', () =>
+    surfacesDrawnToScale(framed)
   )
   const budgeted = await step('an order’s budgets are set on the Plan step', budgetsSetOnPlan)
   const written = await step('records written by hand are read after a restart', () =>

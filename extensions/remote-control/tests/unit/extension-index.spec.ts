@@ -409,6 +409,12 @@ function passwordGateTests() {
     expect(settings).not.toHaveProperty('password')
   })
 
+  it('answers get-settings with the viewer limit written in Settings', async () => {
+    const { channelHandler } = await activateWithSettings({ [`${EXT}.maxSubscribers`]: 13 })
+    const settings = await channelHandler('remote:get-settings')()
+    expect(settings.maxSubscribers).toBe(13)
+  })
+
   it('refuses to turn on while no password is set', async () => {
     const { values, channelHandler } = await activateWithSettings({})
     const result = await channelHandler('remote:toggle')({ enabled: true })

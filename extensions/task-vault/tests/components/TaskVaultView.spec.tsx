@@ -104,6 +104,12 @@ function viewLoadingTests() {
     expect(screen.getByTestId('calendar')).toBeTruthy()
   })
 
+  it('gives the daily log the stale threshold the vault answers with', async () => {
+    bridge.responses['task-vault:vault:get-today'] = { ...LOG, staleDaysThreshold: 3 }
+    const daily = await renderVaultView()
+    expect(daily.staleDaysThreshold).toBe(3)
+  })
+
   it('loads the viewed date instead of today, and reloads on pushes', async () => {
     useVaultNavStore.setState({ viewingDate: '2026-01-02' })
     await renderVaultView()

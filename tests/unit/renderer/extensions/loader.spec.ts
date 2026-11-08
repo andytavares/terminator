@@ -12,6 +12,7 @@ import {
 import { resetStore } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 import { registryState } from '../../../support/store-state'
+import { useLogStore } from '../../../../src/renderer/stores/log.store'
 
 // The real portal mounts a WebContentsView through IPC. This one shows what it
 // was asked to host.
@@ -22,6 +23,7 @@ vi.mock('../../../../src/renderer/components/ExtensionPanelPortal', () => ({
 
 beforeEach(() => {
   resetStore(useExtensionRegistry)
+  resetStore(useLogStore)
 })
 
 function makeExt(overrides: Partial<Extension> = {}): Extension {
@@ -286,5 +288,28 @@ describe('Quick Actions group allocation at init — reassigns a colliding mnemo
     const groups = registryState().quickActionGroups
     expect(groups).toHaveLength(2)
     expect(groups[1].mnemonic).not.toBe('g')
+  })
+})
+
+describe('Quick Actions group allocation at init — says in the log why a group lost its letter', () => {
+  it('puts the clash in the log window, naming who holds the letter and what was given instead', async () => {
+    await callInit([
+      {
+        id: 'terminator.git-integration',
+        contributes: { quickActions: { group: { mnemonic: 'g', label: 'Git' } } },
+      },
+      {
+        id: 'e2e.probe',
+        contributes: { quickActions: { group: { mnemonic: 'g', label: 'Probe' } } },
+      },
+    ])
+    expect(useLogStore.getState().entries).toMatchObject([
+      {
+        level: 'warn',
+        message: expect.stringContaining(
+          '"e2e.probe" wanted mnemonic "g" but it was taken by "terminator.git-integration"; assigned "p" instead.'
+        ),
+      },
+    ])
   })
 })

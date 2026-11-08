@@ -382,11 +382,11 @@ describe('TabBar — close button is hidden while renaming', () => {
 describe('TabBar — tab reordering', () => {
   const twoTabs = [session('ses-1', { tabTitle: 'Tab 1' }), session('ses-2', { tabTitle: 'Tab 2' })]
 
-  it('moves a tab dropped on another into that tab’s place', () => {
-    seedSessions(twoTabs, 'ses-1')
+  it('moves a tab dropped on another into that tab’s place, and shifts the tabs between', () => {
+    seedSessions([...twoTabs, session('ses-3', { tabTitle: 'Tab 3' })], 'ses-1')
     renderTabBar()
-    dragTab(sessionTabs()[0], sessionTabs()[1])
-    expect(tabTitles()).toEqual(['Tab 2', 'Tab 1'])
+    dragTab(sessionTabs()[2], sessionTabs()[0])
+    expect(tabTitles()).toEqual(['Tab 3', 'Tab 1', 'Tab 2'])
   })
 
   it('saves no order when a tab is dropped on itself', () => {

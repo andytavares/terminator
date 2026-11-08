@@ -205,3 +205,23 @@ describe('task-vault activate() Home feed', () => {
     )
   })
 })
+
+describe('task-vault activate() — the View menu', () => {
+  it('adds "Toggle Vault Calendar", ticked by its panel, which asks the window to toggle that panel', async () => {
+    const { api } = makeApi()
+    const { activate } = await import('../src/index.ts')
+    await activate(api)
+
+    const [item] = vi
+      .mocked(api.nativeMenu.addViewMenuItem)
+      .mock.calls.map(([options]) => options)
+      .filter((options) => options.label === 'Toggle Vault Calendar')
+    expect(item).toMatchObject({ type: 'checkbox', panelId: 'terminator.task-vault' })
+    item.onClick()
+
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'extension:toggle-panel',
+      'terminator.task-vault'
+    )
+  })
+})

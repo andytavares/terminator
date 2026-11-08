@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   mergeStack,
+  mergeStackChannels,
   revertPullRequest,
   stackOf,
   withoutAgentCredits,
@@ -184,5 +185,19 @@ describe('revertPullRequest', () => {
     })
     expect(calls.views).toEqual(['7:id'])
     expect(calls.api[0]).toMatchObject({ path: 'graphql', fields: { id: 'PR_node_7' } })
+  })
+})
+
+describe('the merge stack plan', () => {
+  it('lists the stack bottom first and merges it into the base of the bottom pull request', async () => {
+    const { ctx } = fakeContext({})
+    const plan = mergeStackChannels(ctx).find((c) => c.channel === 'github:merge-stack-plan')!
+    expect(await plan.run(AT_2)).toEqual({
+      into: 'main',
+      stack: [
+        { number: 1, title: 'PR 1', headRefName: 'feat/a', baseRefName: 'main' },
+        { number: 2, title: 'PR 2', headRefName: 'feat/b', baseRefName: 'feat/a' },
+      ],
+    })
   })
 })

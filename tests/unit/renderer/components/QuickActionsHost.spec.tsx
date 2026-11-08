@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // This spec checks the IPC payload, so it runs the real recorder (tests/setup.ts mocks it).
 vi.unmock('../../../../src/renderer/usage/record')
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import {
   QuickActionsHost,
@@ -278,5 +278,67 @@ describe('paletteFeature', () => {
     ['core.split-vertical', 'Split', ['core.split-vertical', 'Split']],
   ])('counts the palette item %s (%s) as %j', (id, label, feature) => {
     expect(paletteFeature({ id, label })).toEqual(feature)
+  })
+})
+
+const gitPush = {
+  key: 'terminator.git-integration:push',
+  extensionId: 'terminator.git-integration',
+  id: 'push',
+  label: 'Push',
+  category: 'Git',
+  requires: 'repo' as const,
+}
+
+describe('QuickActionsHost — a command that needs a repository', () => {
+  it('is dimmed with "No repository focused" when no workspace is open, and does not run', async () => {
+    resetStore(useWorkspaceStore)
+    api.getCommands.mockResolvedValue({ commands: [gitPush] })
+    const user = userEvent.setup()
+    renderHost()
+    await search(user, 'Push')
+    const row = await screen.findByRole('option', { name: /Push/ })
+    expect(row.textContent).toContain('No repository focused')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('status').textContent).toContain('No repository focused')
+    expect(screen.getByRole('dialog', { name: 'Quick actions' })).toBeTruthy()
+    expect(api.executeCommand).not.toHaveBeenCalled()
+  })
+})
+
+describe('QuickActionsHost — a command that needs a repository, with a branch focused', () => {
+  it("runs in the focused branch's worktree", async () => {
+    resetStore(useWorkspaceStore, {
+      workspaces: [workspaceFixture({ id: 'ws-1', folderPath: '/repo' })],
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [projectFixture({ id: 'p1', workspaceId: 'ws-1', worktreePath: '/repo-main' })]],
+      ]),
+      activeWorkspaceId: 'ws-1',
+      activeProjectId: 'p1',
+    })
+    api.getCommands.mockResolvedValue({ commands: [gitPush] })
+    const user = userEvent.setup()
+    renderHost()
+    await search(user, 'Push')
+    await screen.findByRole('option', { name: /Push/ })
+    await user.keyboard('{Enter}')
+    await waitFor(() =>
+      expect(api.executeCommand).toHaveBeenCalledWith(
+        gitPush.key,
+        expect.objectContaining({ repoRoot: '/repo-main' })
+      )
+    )
+  })
+})
+
+describe('QuickActionsHost — recent actions', () => {
+  it('lists an action run from the palette under Pinned & recent the next time it opens', async () => {
+    renderHost()
+    await runFound('Toggle sidebar')
+    await waitFor(() => expect(updateGlobal).toHaveBeenCalled())
+    cleanup()
+    renderHost()
+    const recent = screen.getByRole('listbox', { name: 'Pinned & recent' })
+    expect(within(recent).getByRole('option', { name: /Toggle sidebar/ })).toBeTruthy()
   })
 })

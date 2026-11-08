@@ -69,6 +69,7 @@ function remoteViewTests() {
   remoteViewFailureTests()
   describe('a tunnel that failed', remoteViewTunnelTests)
   describe('configuration and control', remoteViewControlTests)
+  describe('stored settings', remoteViewStoredSettingsTests)
   describe('usage', remoteViewUsageTests)
 }
 
@@ -207,6 +208,14 @@ function remoteViewTunnelTests() {
     emit('remote:status', { ...ON, publicUrl: null, ngrokError: 'ERR_NGROK_8012: upstream down' })
     await user.click(screen.getByRole('button', { name: 'Reconnect' }))
     expect(invoke).toHaveBeenCalledWith('remote:tunnel-reconnect', {})
+  })
+}
+
+function remoteViewStoredSettingsTests() {
+  it('shows the viewer limit stored in Settings', async () => {
+    invoke.mockResolvedValue({ ...SETTINGS, maxSubscribers: 13 })
+    render(<RemoteControlView />)
+    expect(await screen.findByText(/port 7681 · up to 13 viewers/)).toBeTruthy()
   })
 }
 

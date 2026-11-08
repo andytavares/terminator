@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, indexedProject, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
+import { setLocalClock } from '../support/clock'
 import { ProjectsBrowser } from '../../src/components/ProjectsBrowser'
 
 let bridge: ReturnType<typeof installVaultBridge>
@@ -79,6 +80,7 @@ describe('ProjectsBrowser list', () => {
 })
 describe('ProjectsBrowser creating', () => {
   describe('the form', createFormTests)
+  describe('the deadline', createDeadlineTests)
   describe('the area list', createAreaListTests)
   describe('cancelling', createCancelTests)
 })
@@ -197,6 +199,22 @@ function createFormTests() {
     const user = await openCreateForm()
     await user.type(screen.getByPlaceholderText('Project name'), 'Launch{Enter}')
     expect(await screen.findByText('A project with that name already exists.')).toBeTruthy()
+  })
+}
+
+function createDeadlineTests() {
+  it('creates a project with the deadline picked in the form', async () => {
+    setLocalClock('UTC', '2026-06-13T10:00:00.000Z')
+    const user = await openCreateForm()
+    await user.type(screen.getByPlaceholderText('Project name'), 'Move')
+    await user.click(screen.getByRole('button', { name: 'Pick a date' }))
+    await user.click(screen.getByRole('button', { name: 'Tomorrow' }))
+    await user.click(screen.getByRole('button', { name: 'Create project' }))
+    await eventually(() =>
+      expect(bridge.calls('task-vault:projects:create')).toEqual([
+        expect.objectContaining({ name: 'Move', deadline: '2026-06-14' }),
+      ])
+    )
   })
 }
 
@@ -421,6 +439,20 @@ function taskCompleteTests() {
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 't1' }])
     )
+  })
+
+  it('lists a completed task with the finished ones', async () => {
+    const user = await openTasks()
+    const card = within(projectCardNamed('Launch'))
+    expect(card.getByText('1 completed/cancelled')).toBeTruthy()
+    bridge.responses['task-vault:projects:get-tasks'] = {
+      tasks: [
+        task('t1', 'Write brief', { status: 'done' }),
+        task('t2', 'Kickoff', { status: 'done' }),
+      ],
+    }
+    await user.click(card.getByTitle('Complete'))
+    expect(await card.findByText('2 completed/cancelled')).toBeTruthy()
   })
 
   it("reopens a finished task on today's log", async () => {
