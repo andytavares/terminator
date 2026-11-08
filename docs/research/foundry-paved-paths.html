@@ -430,8 +430,7 @@ sequenceDiagram
   Note over A,F: v0.1.169 drops this prompt (fixed in PR #320)
   Note over F: cancelled turn fires neither onTurnEnd nor onEnd, so proposal.json stays unread
   F->>F: 8 min later: run.stalled; Forge still says "drafting the plan"
-</pre
-  >
+</pre>
   <ul>
     <li>
       <b>Plan draft.</b> The architect is declared
@@ -1150,8 +1149,7 @@ flowchart LR
   A -->|PreToolUse hook deny + reason| C[Claude]
   A -->|structured_output| P[order proposal]
   A -->|onUpdate / onEnd| S[stall rule + Floor]
-</pre
-  >
+</pre>
 
   <h3>Phase 1: the agent boundary (fixes today's plan-draft hang)</h3>
   <ol>

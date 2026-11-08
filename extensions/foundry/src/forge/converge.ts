@@ -351,5 +351,4 @@ export function applyArchitectAnswer(
 }
 
 export type ConvergeResult =
-  | { ok: true; order: WorkOrder; note: string }
-  | { ok: false; reason: string }
+  { ok: true; order: WorkOrder; note: string } | { ok: false; reason: string }

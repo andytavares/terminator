@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, realpathSync } from 'node:fs'
-import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
+import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk/unstable'
 import type {
   CancelNotification,
-  Client,
   InitializeRequest,
   InitializeResponse,
   LoadSessionRequest,
@@ -19,7 +18,8 @@ import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
   SessionConfigOption,
-} from '@agentclientprotocol/sdk'
+  SessionNotification,
+} from '@agentclientprotocol/sdk/unstable'
 import type {
   AgentConfigOption,
   AgentDescriptor,
@@ -42,8 +42,8 @@ const logger = makeLogger('agent-service')
 const DEFAULT_TIMEOUT_MS = 300_000
 const DEFAULT_START_TIMEOUT_MS = 60_000
 
-/** The calls the service makes on an agent: a `ClientSideConnection` has them all. */
-interface AgentCalls {
+/** The calls the service makes on an agent, over the client's ACP connection. @internal */
+export interface AgentCalls {
   initialize(params: InitializeRequest): Promise<InitializeResponse>
   newSession(params: NewSessionRequest): Promise<NewSessionResponse>
   loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse | void>
@@ -59,6 +59,12 @@ interface AgentCalls {
   readonly signal?: AbortSignal
 }
 
+/** What the client answers when the agent asks for permission or sends an update. */
+export interface AgentClient {
+  requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse>
+  sessionUpdate(params: SessionNotification): void
+}
+
 /** A started agent process: its ACP calls, and how to learn of and force its end. @internal */
 export interface AgentLink {
   agent: AgentCalls
@@ -70,7 +76,7 @@ export interface AgentLink {
 
 export interface AgentServiceDeps {
   /** Starts the agent's process. `client` receives the agent's requests and updates. */
-  connect(request: { agentId: string; client: Client }): Promise<AgentLink>
+  connect(request: { agentId: string; client: AgentClient }): Promise<AgentLink>
   listAgents(): AgentDescriptor[]
   defaultAgentId(): string
   log: AgentLog
@@ -172,6 +178,12 @@ function toConfigOptions(options: SessionConfigOption[] | null | undefined): Age
         ]
       : []
   )
+}
+
+/** False only when the agent lists its modes and this is not one of them: Gemini has no `auto`. */
+function offersMode(session: Session, mode: string): boolean {
+  const modes = session.configOptions.find((option) => option.id === 'mode')
+  return modes === undefined || modes.options.some((option) => option.value === mode)
 }
 
 function notify<T>(listeners: Set<(value: T) => void>, value: T): void {
@@ -321,11 +333,15 @@ class AcpAgentService implements AgentService {
 
   constructor(private readonly deps: AgentServiceDeps) {}
 
-  private readonly client: Client = {
+  private readonly client: AgentClient = {
     requestPermission: (params) => this.requestPermission(params),
     sessionUpdate: (params) => {
       const session = this.live(params.sessionId)
-      if (session) this.publishUpdate(session, params.update as AgentUpdate)
+      if (session) return this.publishUpdate(session, params.update as AgentUpdate)
+      logger.warn('agent update for no live session', {
+        sessionId: params.sessionId,
+        kind: params.update.sessionUpdate,
+      })
     },
   }
 
@@ -446,7 +462,9 @@ class AcpAgentService implements AgentService {
   /** The session, its options and its mode: all of it within the start time. */
   private async openSession(session: Session, input: StartAgentInput): Promise<void> {
     session.configOptions = await this.begin(session, input)
-    if (input.mode !== undefined) await this.applyMode(session, input.mode)
+    if (input.mode !== undefined && offersMode(session, input.mode)) {
+      await this.applyMode(session, input.mode)
+    }
   }
 
   private async applyMode(session: Session, mode: string): Promise<void> {
@@ -655,8 +673,11 @@ class AcpAgentService implements AgentService {
 
   private async send(session: Session, prompt: PromptRequest['prompt']): Promise<string> {
     session.sent += 1
+    logger.debug('agent prompt sent', { sessionId: session.id })
     try {
-      return (await session.link.agent.prompt({ sessionId: session.id, prompt })).stopReason
+      const { stopReason } = await session.link.agent.prompt({ sessionId: session.id, prompt })
+      logger.debug('agent prompt answered', { sessionId: session.id, stopReason })
+      return stopReason
     } finally {
       session.sent -= 1
     }

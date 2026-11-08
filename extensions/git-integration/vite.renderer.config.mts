@@ -6,5 +6,5 @@ import { extensionViewConfig } from '@terminator/extension-sdk/vite'
 // each view is its own chunk (src/renderer/App.tsx), the largest, shared code with CodeMirror and
 // highlight.js, is 771 kB. CI fails the build on any chunk warning.
 export default defineConfig(
-  extensionViewConfig(__dirname, { plugins: [react()], chunkSizeWarningLimit: 850 })
+  extensionViewConfig(import.meta.dirname, { plugins: [react()], chunkSizeWarningLimit: 850 })
 )

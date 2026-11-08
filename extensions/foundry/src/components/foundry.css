@@ -3453,7 +3453,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(120% 90% at 30% 12%, rgba(196, 255, 212, 0.07), transparent 45%),
+  background:
+    radial-gradient(120% 90% at 30% 12%, rgba(196, 255, 212, 0.07), transparent 45%),
     radial-gradient(140% 120% at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.55) 100%),
     repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.28) 0 1px, transparent 1px 3px);
 }

@@ -130,8 +130,10 @@ function BranchList({
   )
 }
 
-interface NewBranchItemProps
-  extends Pick<Props, 'newBranchLabel' | 'onNewBranch' | 'isNewSelected'> {
+interface NewBranchItemProps extends Pick<
+  Props,
+  'newBranchLabel' | 'onNewBranch' | 'isNewSelected'
+> {
   /** Wraps a choice so making it also closes the dropdown. */
   choosing: (run: () => void) => () => void
 }

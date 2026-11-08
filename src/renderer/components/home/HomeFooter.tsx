@@ -5,6 +5,7 @@ import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useHomeView } from './home-view'
 import { useWeekMeasures, type WeekMeasures } from './useWeekMeasures'
 import { ArchivedTasks } from './ArchivedTasks'
+import { DismissedTasks } from './DismissedTasks'
 
 /** "This week: 4 shipped · agents waited a median of 5 min on you"; null when neither is known. */
 function weekSentence(shipped: number | null, week: WeekMeasures | null): string | null {
@@ -17,7 +18,7 @@ function weekSentence(shipped: number | null, week: WeekMeasures | null): string
   return parts.length === 0 ? null : `This week: ${parts.join(' · ')}`
 }
 
-/** The week in one line, the way to Insights, and the archived tasks. */
+/** The week in one line, the way to Insights, and the dismissed and archived tasks. */
 export function HomeFooter(): React.JSX.Element {
   const shipped = useHomeFeedStore((s) => s.measures.find((m) => m.id === HOME_MEASURES.shipped))
   const week = useWeekMeasures()
@@ -30,6 +31,7 @@ export function HomeFooter(): React.JSX.Element {
         Open Insights <ArrowUpRight aria-hidden="true" />
       </button>
       <span className="home-foot__spacer" />
+      <DismissedTasks />
       <ArchivedTasks />
     </footer>
   )

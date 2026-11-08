@@ -455,8 +455,7 @@ async function migrateAndNotify(
 ): Promise<void> {
   const text = day.textOf(taskId)
   const result = (await invokeVault('task-vault:vault:migrate-task', { taskId, targetDate })) as
-    | { noop?: boolean }
-    | undefined
+    { noop?: boolean } | undefined
   if (result?.noop) return
   notify('info', text ? `Migrated: ${text}` : 'Task migrated', {
     key: 'taskMigrated',

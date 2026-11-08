@@ -7,11 +7,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Readable, Writable } from 'node:stream'
 import {
-  AgentSideConnection,
+  agent,
+  methods,
   ndJsonStream,
   PROTOCOL_VERSION,
   RequestError,
-} from '@agentclientprotocol/sdk'
+} from '@agentclientprotocol/sdk/unstable'
 import { SessionModeManager } from '@agentclientprotocol/claude-agent-acp/dist/session-mode.js'
 
 // The modes the real adapter offers, so a mode it would refuse is refused here too.
@@ -145,18 +146,32 @@ function prompter(connection) {
   }
 }
 
-function agent(connection) {
-  return {
-    initialize: async () => ({
-      protocolVersion: PROTOCOL_VERSION,
-      agentCapabilities: { loadSession: true, promptCapabilities: { image: true } },
-    }),
-    authenticate: async () => ({}),
-    ...sessionHandlers,
-    cancel: async ({ sessionId }) => cancels.get(sessionId)?.(),
-    prompt: prompter(connection),
-  }
+/** The calls the stub makes on the client. */
+function toClient(client) {
+  return { sessionUpdate: (params) => client.notify(methods.client.session.update, params) }
 }
 
-const stream = ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin))
-new AgentSideConnection(agent, stream)
+const withParams =
+  (answer) =>
+  ({ params }) =>
+    answer(params)
+
+const app = agent()
+  .onRequest(methods.agent.initialize, async () => ({
+    protocolVersion: PROTOCOL_VERSION,
+    agentCapabilities: { loadSession: true, promptCapabilities: { image: true } },
+  }))
+  .onRequest(methods.agent.authenticate, async () => ({}))
+  .onRequest(methods.agent.session.new, withParams(sessionHandlers.newSession))
+  .onRequest(methods.agent.session.load, withParams(sessionHandlers.loadSession))
+  .onRequest(methods.agent.session.setMode, withParams(sessionHandlers.setSessionMode))
+  .onRequest(
+    methods.agent.session.setConfigOption,
+    withParams(sessionHandlers.setSessionConfigOption)
+  )
+  .onRequest(methods.agent.session.prompt, ({ params, client }) =>
+    prompter(toClient(client))(params)
+  )
+  .onNotification(methods.agent.session.cancel, ({ params }) => cancels.get(params.sessionId)?.())
+
+app.connect(ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin)))

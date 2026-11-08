@@ -10,7 +10,8 @@ const DELETES_SESSIONS_KEY = 'terminator.home.dismissed-sessions'
 const FORGOTTEN_AFTER_MS = 30 * 24 * 60 * 60 * 1000
 
 interface DismissedThreadsState {
-  /** Work keys the operator dismissed, each with the time it was dismissed. Nothing brings one back but Undo or starting it again. */
+  /** Work keys the operator dismissed, each with the time it was dismissed. Undo, Restore, or a
+   * session started on it afterwards brings one back. */
   dismissed: Record<string, number>
   /** Of those, the ones whose row showed sessions when dismissed, by the same time: their ended
    * sessions are deleted (ADR 146). A pull request row or an older dismissal deletes nothing. */
@@ -68,9 +69,15 @@ export const useDismissedThreads = create<DismissedThreadsState>((set) => ({
     }),
 }))
 
-/** True once the operator dismissed the thread; later activity does not bring it back. */
-export function isDismissed(dismissed: Readonly<Record<string, number>>, key: string): boolean {
-  return dismissed[key] !== undefined
+/** True once the operator dismissed the thread, until a session starts on it afterwards (ADR 149).
+ * What its sessions print does not bring it back. */
+export function isDismissed(
+  dismissed: Readonly<Record<string, number>>,
+  thread: Pick<WorkThread, 'key' | 'sessions'>
+): boolean {
+  const dismissedAt = dismissed[thread.key]
+  if (dismissedAt === undefined) return false
+  return !thread.sessions.some((session) => Date.parse(session.startedAt) > dismissedAt)
 }
 
 /** The ended sessions of rows dismissed while they showed sessions, whose records are deleted for
@@ -81,6 +88,6 @@ export function endedSessionsOfDismissed(
   deletesSessions: Readonly<Record<string, number>>
 ): string[] {
   return threads
-    .filter((thread) => isDismissed(dismissed, thread.key) && thread.key in deletesSessions)
+    .filter((thread) => isDismissed(dismissed, thread) && thread.key in deletesSessions)
     .flatMap((thread) => thread.sessions.filter((s) => s.isClosed).map((s) => s.sessionId))
 }

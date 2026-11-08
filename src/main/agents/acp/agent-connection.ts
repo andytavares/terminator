@@ -1,10 +1,15 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { Readable, Writable } from 'node:stream'
-import { ClientSideConnection, ndJsonStream } from '@agentclientprotocol/sdk'
+import {
+  client as clientApp,
+  methods,
+  ndJsonStream,
+  type Stream,
+} from '@agentclientprotocol/sdk/unstable'
 import { loginShellPathReady } from '../../shell/login-shell-path.js'
 import type { AgentsSettings } from '../../../shared/schemas/settings.schema.js'
 import { binaryOnPath, CLAUDE_AGENT_ID, resolveAgent } from './agent-registry.js'
-import type { AgentServiceDeps } from './agent-service.js'
+import type { AgentCalls, AgentClient, AgentServiceDeps } from './agent-service.js'
 
 const STDERR_LIMIT = 16 * 1024
 
@@ -37,11 +42,34 @@ export function createConnector(settings: () => AgentsSettings): AgentServiceDep
       Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>
     )
     return {
-      agent: new ClientSideConnection(() => client, stream),
+      agent: connectClient(client, stream),
       onExit: (listener) => void exited.then(listener),
       kill: () => void child.kill(),
       stderrTail: () => stderr,
     }
+  }
+}
+
+/** Speaks ACP over `stream` as the client: `client` answers the agent, the result calls it.
+ * @internal */
+export function connectClient(client: AgentClient, stream: Stream): AgentCalls {
+  const { agent, signal } = clientApp()
+    .onRequest(methods.client.session.requestPermission, ({ params }) =>
+      client.requestPermission(params)
+    )
+    .onNotification(methods.client.session.update, ({ params }) => client.sessionUpdate(params))
+    .connect(stream)
+  return {
+    initialize: (params) => agent.request(methods.agent.initialize, params),
+    newSession: (params) => agent.request(methods.agent.session.new, params),
+    loadSession: (params) => agent.request(methods.agent.session.load, params),
+    setSessionMode: (params) => agent.request(methods.agent.session.setMode, params),
+    setSessionConfigOption: (params) =>
+      agent.request(methods.agent.session.setConfigOption, params),
+    prompt: (params) => agent.request(methods.agent.session.prompt, params),
+    cancel: (params) => agent.notify(methods.agent.session.cancel, params),
+    request: (method, params) => agent.request(method, params),
+    signal,
   }
 }
 

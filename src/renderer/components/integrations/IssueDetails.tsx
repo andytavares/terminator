@@ -19,8 +19,7 @@ export interface IssueDetailsProps {
 
 /** The outcome of one read: still running, the issue, or why it failed. */
 type IssueOutcome =
-  | { loading: true }
-  | { loading: false; issue: Issue | null; error: string | null }
+  { loading: true } | { loading: false; issue: Issue | null; error: string | null }
 
 interface IssueRead {
   outcome: IssueOutcome

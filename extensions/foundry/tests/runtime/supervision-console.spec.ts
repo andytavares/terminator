@@ -18,9 +18,8 @@ import { eventually } from '../../../../tests/support/eventually'
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 
 const { runtime, stallFirings } = await import('../../src/runtime/runtime-state.ts')
-const { startPaletteRefresh, stopPaletteRefresh } = await import(
-  '../../src/runtime/palette-commands.ts'
-)
+const { startPaletteRefresh, stopPaletteRefresh } =
+  await import('../../src/runtime/palette-commands.ts')
 const { notePending, noteResolved } = await import('../../src/runtime/held-calls.ts')
 
 let dataDir = ''

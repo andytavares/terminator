@@ -45,8 +45,13 @@ export function WorkspaceExtensionSettings({ workspaceId }: { workspaceId: strin
       <h3 className="settings-section__title">Extensions</h3>
       <p className="settings-section__desc">Override extension settings for this workspace.</p>
       {groups.map(({ schema, settings }) => (
-        <div key={schema.extensionId} className="extension-settings-panel">
-          <label className="settings-section__label">{schema.label}</label>
+        <div
+          key={schema.extensionId}
+          className="extension-settings-panel extension-settings-panel--card"
+        >
+          <h4 className="settings-section__label extension-settings-panel__heading">
+            {schema.label}
+          </h4>
           {settings.map(([key, def]) => (
             <WorkspaceSettingRow
               key={key}

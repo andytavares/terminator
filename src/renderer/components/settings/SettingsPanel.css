@@ -314,6 +314,18 @@
   padding: 2px 0 4px;
 }
 
+/* Workspace Settings: the panel stands alone, not under an extension row. */
+.extension-settings-panel--card {
+  border-top: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  margin-bottom: 12px;
+}
+
+.extension-settings-panel__heading {
+  margin: 0;
+  padding: 8px 12px 4px;
+}
+
 .extension-setting-row {
   display: grid;
   grid-template-columns: 1fr auto;

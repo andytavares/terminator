@@ -1,4 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
+
+// electron-store 12 refuses to open outside Electron; the stores this spec reaches live in memory.
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 import { hostSnapshot } from '../../support/host-snapshot'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { rmSync } from 'node:fs'

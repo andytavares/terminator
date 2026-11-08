@@ -2,8 +2,7 @@ import type { HomeAsk } from '../../shared/schemas/home-feed.schema'
 
 /** What the operator did with an item; kept so a re-render does not bring it back. */
 export type Dismissal =
-  | { kind: 'done'; at: number }
-  | { kind: 'snoozed'; at: number; until: number; signature: string }
+  { kind: 'done'; at: number } | { kind: 'snoozed'; at: number; until: number; signature: string }
 
 export type Dismissals = Readonly<Record<string, Dismissal>>
 

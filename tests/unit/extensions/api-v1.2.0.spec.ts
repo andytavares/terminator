@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// electron-store 12 refuses to open outside Electron; the stores this spec reaches live in memory.
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
+
 // ── Electron mock ────────────────────────────────────────────────────────────
 const mockSend = vi.fn()
 const mockWindow = {

@@ -11,9 +11,8 @@ beforeEach(() => {
   userData = makeTempDir('agent-context-')
 })
 
-const { buildAgentContext, MAX_CONTEXT_CHARS } = await import(
-  '../../../src/main/integrations/agent-context'
-)
+const { buildAgentContext, MAX_CONTEXT_CHARS } =
+  await import('../../../src/main/integrations/agent-context')
 
 function issue(over: Partial<Issue> = {}): Issue {
   return {

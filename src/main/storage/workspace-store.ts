@@ -15,7 +15,7 @@ import type {
 // Every write below is reached only through its IPC channel, which has already
 // parsed the payload with the schema named in its parameter type (ADR 096).
 
-interface StoreSchema {
+type StoreSchema = {
   workspaces: Workspace[]
   projects: Project[]
 }

@@ -4,6 +4,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { InboxList } from '../../../../../src/renderer/components/sidebar/InboxSidebar'
 import { useInboxMarks } from '../../../../../src/renderer/components/sidebar/inbox-marks'
+import { useStartWorkStore } from '../../../../../src/renderer/components/home/start-work'
 import type { WorkThread } from '../../../../../src/renderer/home/work-threads'
 import type { TaskState } from '../../../../../src/renderer/home/task-state'
 
@@ -173,6 +174,16 @@ const keyboardThreads = [
   }),
   threadOf('second', { startedAt: 1, sessions: [{ sessionId: 's2', lastActivityAt: NOW }] }),
 ]
+
+describe('InboxList — starting work', () => {
+  // The tree's new-terminal buttons are hidden in Inbox mode, so the Inbox has its own way in.
+  it('opens the Start work launcher, with no work listed', async () => {
+    useStartWorkStore.getState().closeLauncher()
+    renderInbox([])
+    await userEvent.click(screen.getByRole('button', { name: 'Start work' }))
+    expect(useStartWorkStore.getState().open).toBe(true)
+  })
+})
 
 describe('InboxList — opening and the keyboard', () => {
   const threads = keyboardThreads

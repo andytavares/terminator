@@ -9,8 +9,7 @@ export type ItemKind = 'note' | 'diagram'
 type ListedNote = NoteListItem | SearchResult
 
 export type MixedItem =
-  | { kind: 'note'; item: ListedNote }
-  | { kind: 'diagram'; item: DiagramListItem }
+  { kind: 'note'; item: ListedNote } | { kind: 'diagram'; item: DiagramListItem }
 
 /** An item as the list's menus and drag-and-drop refer to it. */
 export interface ItemRef {

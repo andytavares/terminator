@@ -1,4 +1,9 @@
 import { it, expect, beforeEach, describe, vi } from 'vitest'
+
+// electron-store 12 refuses to open outside Electron; the stores this spec reaches live in memory.
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 import * as path from 'node:path'
 import { collectAgentUsage } from '../../../src/main/ipc/agent-usage.ipc'
 import { forgetTranscriptCache } from '../../../src/main/agents/transcript-usage'

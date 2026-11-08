@@ -113,8 +113,7 @@ type RemoteBehavior = 'same' | 'omit' | 'stub'
 /** How an invoke method appears in the Terminator MCP server: a tool, or `false` for hidden.
  * `tool` is snake_case; `description` is one plain sentence for Claude. */
 type McpExposure =
-  | { tool: string; description: string; destructive?: true; readOnly?: true }
-  | false
+  { tool: string; description: string; destructive?: true; readOnly?: true } | false
 
 /** Whether extension views (WebContentsViews running an extension's renderer) receive the
  * method. 'shared': the app renderer and extension views both do. 'only': extension views do,

@@ -748,9 +748,8 @@ describe('workspace.store — localStorage initialisation', () => {
   it('loads expandedWorkspaceIds from localStorage on module init', async () => {
     localStorageStore['terminator.workspace.expanded'] = JSON.stringify(['ws-1', 'ws-2'])
     vi.resetModules()
-    const { useWorkspaceStore: freshStore } = await import(
-      '../../../../src/renderer/stores/workspace.store'
-    )
+    const { useWorkspaceStore: freshStore } =
+      await import('../../../../src/renderer/stores/workspace.store')
     expect(freshStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
     expect(freshStore.getState().expandedWorkspaceIds.has('ws-2')).toBe(true)
   })
@@ -758,9 +757,8 @@ describe('workspace.store — localStorage initialisation', () => {
   it('loads collapsedProjectIds from localStorage on module init', async () => {
     localStorageStore['terminator.project.collapsed'] = JSON.stringify(['p-1'])
     vi.resetModules()
-    const { useWorkspaceStore: freshStore } = await import(
-      '../../../../src/renderer/stores/workspace.store'
-    )
+    const { useWorkspaceStore: freshStore } =
+      await import('../../../../src/renderer/stores/workspace.store')
     expect(freshStore.getState().collapsedProjectIds.has('p-1')).toBe(true)
   })
 })
@@ -779,9 +777,8 @@ async function freshStoreWithPush() {
     },
   })
   vi.resetModules()
-  const { useWorkspaceStore: store } = await import(
-    '../../../../src/renderer/stores/workspace.store'
-  )
+  const { useWorkspaceStore: store } =
+    await import('../../../../src/renderer/stores/workspace.store')
   return { store, added, removed }
 }
 

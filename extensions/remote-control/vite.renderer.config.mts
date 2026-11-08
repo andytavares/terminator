@@ -2,4 +2,4 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { extensionViewConfig } from '@terminator/extension-sdk/vite'
 
-export default defineConfig(extensionViewConfig(__dirname, { plugins: [react()] }))
+export default defineConfig(extensionViewConfig(import.meta.dirname, { plugins: [react()] }))

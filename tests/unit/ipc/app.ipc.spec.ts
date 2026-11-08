@@ -26,9 +26,8 @@ beforeEach(async () => {
   vi.clearAllMocks()
   vi.resetModules()
   mainWindow = window
-  const { registerAppInfoHandlers, registerDialogHandlers } = await import(
-    '../../../src/main/ipc/app.ipc.js'
-  )
+  const { registerAppInfoHandlers, registerDialogHandlers } =
+    await import('../../../src/main/ipc/app.ipc.js')
   registerAppInfoHandlers()
   registerDialogHandlers(() => mainWindow as never)
 })
