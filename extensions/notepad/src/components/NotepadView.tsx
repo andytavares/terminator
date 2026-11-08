@@ -573,7 +573,7 @@ function LoadedNoteEditor({ session, readingMode, onGoToComment }: LoadedNoteEdi
 
 function NotepadRail(props: { session: NoteSession; toggles: PanelToggles }) {
   const { session, toggles } = props
-  const { selectedNoteId, editorViewRef, commentPanelRef } = session
+  const { selectedNoteId, editorViewRef } = session
   const { showOutline, showComments } = toggles
   return (
     <div className="notepad-view__rail" hidden={!selectedNoteId || (!showOutline && !showComments)}>
@@ -583,18 +583,32 @@ function NotepadRail(props: { session: NoteSession; toggles: PanelToggles }) {
           onClose={() => toggles.setShowOutline(false)}
         />
       )}
-      <div className="notepad-view__comments" ref={commentPanelRef} hidden={!showComments}>
-        {selectedNoteId && (
-          <CommentColumn
-            noteId={selectedNoteId}
-            draft={session.draft}
-            viewRef={editorViewRef}
-            anchorTops={session.anchorTops}
-            containerHeight={session.panelContentHeight}
-            activeCommentId={session.activeCommentId}
-          />
-        )}
-      </div>
+      <RailComments session={session} hidden={!showComments} />
+    </div>
+  )
+}
+
+function RailComments(props: { session: NoteSession; hidden: boolean }) {
+  const { session, hidden } = props
+  const { selectedNoteId, editorViewRef, commentPanelRef } = session
+  return (
+    <div
+      className="notepad-view__comments"
+      role="complementary"
+      aria-label="Comments"
+      ref={commentPanelRef}
+      hidden={hidden}
+    >
+      {selectedNoteId && (
+        <CommentColumn
+          noteId={selectedNoteId}
+          draft={session.draft}
+          viewRef={editorViewRef}
+          anchorTops={session.anchorTops}
+          containerHeight={session.panelContentHeight}
+          activeCommentId={session.activeCommentId}
+        />
+      )}
     </div>
   )
 }

@@ -82,7 +82,7 @@ describe('BranchSelect — shows no matching branches message when filter has no
     const user = userEvent.setup()
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: /main/i }))
-    expect(document.activeElement).toBe(screen.getByPlaceholderText('Search branches…'))
+    expect(screen.getByPlaceholderText('Search branches…').matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
@@ -146,11 +146,11 @@ async function openSelect(
 ): Promise<UserEvent> {
   const user = userEvent.setup()
   render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} {...props} />)
-  await user.click(document.querySelector('.branch-select__trigger')!)
+  await user.click(screen.getByRole('button', { expanded: false }))
   return user
 }
 const activeItems = (): string[] =>
-  [...document.querySelectorAll('.branch-select__item--active')].map((el) => el.textContent ?? '')
+  screen.getAllByRole('button', { current: true }).map((el) => el.textContent ?? '')
 
 describe('BranchSelect — closing on a press elsewhere', () => {
   it('closes on a pointer press outside it, and stays open for one inside', async () => {

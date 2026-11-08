@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -134,9 +134,9 @@ describe('TabBar — lane switcher — switching', () => {
     })
     renderTabBar()
     const lane = screen.getByRole('button', { name: /Frontend/ })
-    expect(lane.querySelector('[aria-label="Needs you"]')).not.toBeNull()
+    expect(within(lane).getByRole('img', { name: 'Needs you' })).toBeTruthy()
     const backend = screen.getByRole('button', { name: 'Backend' })
-    expect(backend.querySelector('[aria-label="Needs you"]')).toBeNull()
+    expect(within(backend).queryByRole('img', { name: 'Needs you' })).toBeNull()
   })
 })
 

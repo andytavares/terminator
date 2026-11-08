@@ -122,13 +122,15 @@ describe('WhyThisFile — importers', () => {
   it('draws importer buttons that submit nothing and icons hidden from assistive technology', () => {
     renderFile()
     expect(screen.getByRole('button', { name: 'store.ts' }).getAttribute('type')).toBe('button')
-    expect(document.querySelectorAll('.ri-factor-icon[aria-hidden="true"]')).toHaveLength(5)
+    const icons = screen.getAllByTestId('factor-icon')
+    expect(icons.map((icon) => icon.getAttribute('aria-hidden'))).toEqual(Array(5).fill('true'))
   })
 
   it('classes each factor by its severity in words', () => {
     renderFile(riskyScore({}, { churn90d: 60 }))
-    expect(document.querySelector('.ri-factor--high')).toBeTruthy()
-    expect(document.querySelector('.ri-factor--hi')).toBeNull()
+    const classes = screen.getAllByTestId('factor').map((factor) => factor.className)
+    expect(classes).toContain('ri-factor ri-factor--high')
+    expect(classes.every((name) => /--(high|medium|low|fine)$/.test(name))).toBe(true)
   })
 
   it('lists importers as buttons under an Importers heading', () => {

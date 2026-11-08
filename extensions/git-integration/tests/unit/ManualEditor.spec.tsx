@@ -37,17 +37,16 @@ function renderEditor(
   return { ...view, onSave, onCancel }
 }
 
-function editorView(container: HTMLElement): EditorView {
-  const content = container.querySelector('.cm-content') as HTMLElement
-  return EditorView.findFromDOM(content.parentElement!.parentElement as HTMLElement)!
+function editorView(): EditorView {
+  return EditorView.findFromDOM(screen.getByRole('textbox'))!
 }
 
-function documentText(container: HTMLElement): string {
-  return editorView(container).state.doc.toString()
+function documentText(): string {
+  return editorView().state.doc.toString()
 }
 
-function replaceDocument(container: HTMLElement, text: string) {
-  const view = editorView(container)
+function replaceDocument(text: string) {
+  const view = editorView()
   act(() => {
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } })
   })
@@ -65,28 +64,26 @@ describe('ManualEditor', () => {
   ])(
     'pre-populates with the longer side, theirs on a tie ($oursText / $theirsText)',
     ({ oursText, theirsText, expected }) => {
-      const { container } = renderEditor(makeBlock({ oursText, theirsText }))
-      expect(documentText(container)).toBe(expected)
+      renderEditor(makeBlock({ oursText, theirsText }))
+      expect(documentText()).toBe(expected)
     }
   )
 })
 
 describe('ManualEditor — strips conflict markers from pre-populated content', () => {
   it('strips conflict markers from pre-populated content', () => {
-    const { container } = renderEditor(
+    renderEditor(
       makeBlock({
         oursText: '<<<<<<< HEAD\nconst a = 1\n=======',
         theirsText: 'const b = 2',
       })
     )
-    expect(documentText(container)).toBe('const a = 1\n')
+    expect(documentText()).toBe('const a = 1\n')
   })
 
   it('pre-populates with resolvedText when block is already resolved', () => {
-    const { container } = renderEditor(
-      makeBlock({ isResolved: true, resolvedText: 'previously resolved text' })
-    )
-    expect(documentText(container)).toBe('previously resolved text')
+    renderEditor(makeBlock({ isResolved: true, resolvedText: 'previously resolved text' }))
+    expect(documentText()).toBe('previously resolved text')
   })
 
   it('passes the unedited pre-fill to onSave', async () => {
@@ -102,24 +99,24 @@ describe('ManualEditor — strips conflict markers from pre-populated content', 
 describe('ManualEditor — passes the edited document to onSave', () => {
   it('passes the edited document to onSave', async () => {
     const user = userEvent.setup()
-    const { container, onSave } = renderEditor(makeBlock())
-    replaceDocument(container, 'my custom edit')
+    const { onSave } = renderEditor(makeBlock())
+    replaceDocument('my custom edit')
     await user.click(screen.getByRole('button', { name: /Save/i }))
     expect(onSave).toHaveBeenCalledWith('my custom edit')
   })
 
   it('disables save while the document is blank and re-enables it after typing', () => {
-    const { container } = renderEditor(makeBlock())
+    renderEditor(makeBlock())
     const save = screen.getByRole('button', { name: /Save/i }) as HTMLButtonElement
-    replaceDocument(container, '   \n')
+    replaceDocument('   \n')
     expect(save.disabled).toBe(true)
-    replaceDocument(container, 'x')
+    replaceDocument('x')
     expect(save.disabled).toBe(false)
   })
 
   it('shows the line count of the edited document', () => {
-    const { container } = renderEditor(makeBlock())
-    replaceDocument(container, 'a\nb\nc')
+    renderEditor(makeBlock())
+    replaceDocument('a\nb\nc')
     expect(screen.getByText('3 lines')).toBeTruthy()
   })
 })
@@ -135,7 +132,7 @@ describe('ManualEditor — calls onCancel, and not onSave, when Cancel is clicke
 
   it('replaces the document when a suggested text arrives', () => {
     const block = makeBlock()
-    const { container, rerender, onSave } = renderEditor(block, { suggestedText: null })
+    const { rerender, onSave } = renderEditor(block, { suggestedText: null })
     rerender(
       <ManualEditor
         block={block as never}
@@ -144,7 +141,7 @@ describe('ManualEditor — calls onCancel, and not onSave, when Cancel is clicke
         suggestedText="kept mine"
       />
     )
-    expect(documentText(container)).toBe('kept mine')
+    expect(documentText()).toBe('kept mine')
   })
 })
 

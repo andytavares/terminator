@@ -86,8 +86,7 @@ beforeEach(() => {
 })
 
 async function dropSessionOnComposer(sessionId: string): Promise<void> {
-  const composer = document.querySelector('[data-context-drop="agent-1"]')!
-  fireEvent.drop(composer, {
+  fireEvent.drop(screen.getByRole('group', { name: 'Message composer' }), {
     dataTransfer: {
       types: [SESSION_DRAG_TYPE],
       getData: (type: string) => (type === SESSION_DRAG_TYPE ? sessionId : ''),
@@ -107,6 +106,7 @@ async function enter(label: string, text: string): Promise<void> {
 }
 
 async function citeInReply(quote: string, comment: string): Promise<void> {
+  // eslint-disable-next-line testing-library/no-node-access -- a Range needs the text node itself, which no query returns
   const node = screen.getByText(REPLY).firstChild!
   const start = REPLY.indexOf(quote)
   const range = document.createRange()

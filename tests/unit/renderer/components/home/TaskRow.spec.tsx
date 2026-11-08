@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { TaskRow } from '../../../../../src/renderer/components/home/TaskRow'
 import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
 import { SESSION_DRAG_TYPE } from '../../../../../src/renderer/components/agent/session-drag'
@@ -110,7 +110,7 @@ describe('TaskRow — drag feedback', () => {
     const { rate, webSide } = twoRows()
     fireEvent.dragStart(webSide, { dataTransfer: dataTransfer() })
     fireEvent.dragOver(rate, { dataTransfer: dataTransfer() })
-    const chip = rate.querySelector('.task-lane') as HTMLElement
+    const [chip] = within(rate).getAllByTitle(/./)
     // jsdom has no DragEvent, so the leave is a mouse event of that type, which carries relatedTarget.
     const leaveTo = (to: Element) =>
       act(() => {
@@ -136,7 +136,8 @@ describe('TaskRow — lane chips', () => {
     })
     thread.lanes = [lane(api, 'api'), lane(web, 'web'), lane(usage, 'web')]
     render(<TaskRow thread={thread} now={Date.now()} selected={false} />)
-    const chips = Array.from(document.querySelectorAll('.task-lane')).map((c) => c.textContent)
+    // Each lane chip carries its label as its tooltip; the actions button has a tooltip of its own.
+    const chips = screen.getAllByTitle(/^(api|web · .+)$/).map((chip) => chip.textContent)
     expect(chips).toEqual(['api', 'web · rate-limits', 'web · usage-page'])
   })
 })
@@ -175,11 +176,10 @@ describe('TaskRow — the age and the actions button each have their own space',
         selected={false}
       />
     )
-    const end = screen.getByRole('button', { name: 'Rate limits' }).querySelector('.task-row__end')
-    const age = end?.querySelector('.task-row__last')
+    const age = within(screen.getByRole('button', { name: 'Rate limits' })).getByText('now')
     const actions = screen.getByRole('button', { name: 'Work actions' })
-    expect(age?.textContent).toBe('now')
-    expect(end?.contains(actions)).toBe(true)
-    expect(age!.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // eslint-disable-next-line testing-library/no-node-access -- sharing one cell is the layout under test; the cell has no role
+    expect(age.parentElement!.contains(actions)).toBe(true)
+    expect(age.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })

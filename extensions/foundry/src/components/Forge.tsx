@@ -326,6 +326,11 @@ const GROUP_META: Record<FindingGroup, { readonly heading: string; readonly cls:
   resolved: { heading: 'Resolved', cls: 'done' },
 }
 
+/** The id of a finding's text, which names its card. */
+function findingTextId(finding: FindingView): string {
+  return `fdry-fnd-${finding.id}`
+}
+
 /** A group's findings, each its text and where it came from. */
 function FindingRows({
   findings,
@@ -335,8 +340,13 @@ function FindingRows({
   return (
     <>
       {findings.map((finding) => (
-        <div key={finding.id} className="fdry-fnd">
-          <span className="fdry-fnd-text">
+        <div
+          key={finding.id}
+          className="fdry-fnd"
+          role="group"
+          aria-labelledby={findingTextId(finding)}
+        >
+          <span className="fdry-fnd-text" id={findingTextId(finding)}>
             <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
               {finding.text}
             </Markdown>
@@ -1014,7 +1024,7 @@ function WatchButton({ forge }: ForgeProp) {
 function StatusStrip({ forge }: ForgeProp) {
   const { strip } = forge.r
   return (
-    <div className={`fdry-strip fdry-strip--${strip.tone}`}>
+    <div className={`fdry-strip fdry-strip--${strip.tone}`} role="group" aria-label="Forge status">
       <div className="fdry-strip-who">
         <span className="fdry-strip-icon" aria-hidden="true">
           <StripIconGlyph icon={strip.icon} />
@@ -1213,7 +1223,11 @@ function RowChip({ state }: { readonly state: Row['state'] }): React.JSX.Element
 
 function CheckRow({ forge, row }: ForgeProp & { readonly row: Row }) {
   return (
-    <div className={`fdry-chk${row.state === 'in-progress' ? ' fdry-chk--work' : ''}`}>
+    <div
+      className={`fdry-chk${row.state === 'in-progress' ? ' fdry-chk--work' : ''}`}
+      role="group"
+      aria-label={row.label}
+    >
       <span className="fdry-chk-icon" aria-hidden="true">
         <RowIcon state={row.state} />
       </span>
@@ -1403,7 +1417,10 @@ function AcceptanceSection({ forge }: ForgeProp) {
   const { order } = forge
   const matrix = coverageMatrix(order)
   return (
-    <section className={`fdry-field ${redrawn(forge, 'acceptance')}`}>
+    <section
+      className={`fdry-field ${redrawn(forge, 'acceptance')}`}
+      aria-labelledby="fdry-acceptance"
+    >
       <h3 className="fdry-field-h" id="fdry-acceptance" tabIndex={-1}>
         Acceptance criteria
       </h3>
@@ -1555,8 +1572,13 @@ function AssumptionsSection({ forge }: ForgeProp) {
   const assumptions = liveAssumptions(forge.order)
   if (assumptions.length === 0) return null
   return (
-    <section className={`fdry-field ${redrawn(forge, 'assumptions')}`}>
-      <h3 className="fdry-field-h">Assumptions</h3>
+    <section
+      className={`fdry-field ${redrawn(forge, 'assumptions')}`}
+      aria-labelledby="fdry-assumptions"
+    >
+      <h3 className="fdry-field-h" id="fdry-assumptions">
+        Assumptions
+      </h3>
       <p className="fdry-note">Strike any that are wrong. What depended on it is redrawn.</p>
       <div className="fdry-assume">
         {assumptions.map((assumption) => (
@@ -1663,8 +1685,11 @@ function FindingGroupBox({ group, findings, icon }: FindingGroupBoxProps) {
 function ResolvedGroup({ findings }: { readonly findings: readonly FindingView[] }) {
   if (findings.length === 0) return null
   return (
-    <details className="fdry-group fdry-group--resolved">
-      <summary className={`fdry-group-h fdry-group-h--${GROUP_META.resolved.cls}`}>
+    <details className="fdry-group fdry-group--resolved" aria-labelledby="fdry-resolved-h">
+      <summary
+        className={`fdry-group-h fdry-group-h--${GROUP_META.resolved.cls}`}
+        id="fdry-resolved-h"
+      >
         <Check aria-hidden="true" />
         {GROUP_META.resolved.heading} <span className="fdry-cnt">{findings.length}</span>
       </summary>
@@ -1677,8 +1702,11 @@ function NeedsYouGroup({ forge }: ForgeProp) {
   const findings = forge.findingsByGroup['needs-you']
   if (findings.length === 0) return null
   return (
-    <div className="fdry-group">
-      <div className={`fdry-group-h fdry-group-h--${GROUP_META['needs-you'].cls}`}>
+    <div className="fdry-group" role="group" aria-labelledby="fdry-needs-you-h">
+      <div
+        className={`fdry-group-h fdry-group-h--${GROUP_META['needs-you'].cls}`}
+        id="fdry-needs-you-h"
+      >
         <AlertCircle aria-hidden="true" />
         {GROUP_META['needs-you'].heading}{' '}
         <span className="fdry-cnt">
@@ -1713,29 +1741,35 @@ function NeedsYouFinding({ forge, finding }: ForgeProp & { readonly finding: Fin
   const choose = (next: FindingChoice): void =>
     forge.setFindingChoice((current) => ({ ...current, [finding.id]: next }))
   return (
-    <div className="fdry-fnd">
-      <span className="fdry-fnd-text">
+    <div className="fdry-fnd" role="group" aria-labelledby={findingTextId(finding)}>
+      <span className="fdry-fnd-text" id={findingTextId(finding)}>
         <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
           {finding.text}
         </Markdown>
       </span>
       <span className="fdry-fnd-meta">{finding.meta}</span>
-      <fieldset className="fdry-opts">
-        <legend className="fdry-opts-legend">Choose one</legend>
-        {FINDING_MOVES.map((move) => (
-          <label key={move.mode} className="fdry-opt">
-            <input
-              type="radio"
-              name={`finding-${finding.id}`}
-              checked={choice?.mode === move.mode}
-              onChange={() => choose({ mode: move.mode, text: keptText(choice, move.mode) })}
-            />
-            <span className="fdry-opt-text">{move.label}</span>
-          </label>
-        ))}
-      </fieldset>
+      <FindingMoves finding={finding} choice={choice} choose={choose} />
       <FindingText finding={finding} choice={choice} choose={choose} />
     </div>
+  )
+}
+
+function FindingMoves({ finding, choice, choose }: FindingProps) {
+  return (
+    <fieldset className="fdry-opts">
+      <legend className="fdry-opts-legend">Choose one</legend>
+      {FINDING_MOVES.map((move) => (
+        <label key={move.mode} className="fdry-opt">
+          <input
+            type="radio"
+            name={`finding-${finding.id}`}
+            checked={choice?.mode === move.mode}
+            onChange={() => choose({ mode: move.mode, text: keptText(choice, move.mode) })}
+          />
+          <span className="fdry-opt-text">{move.label}</span>
+        </label>
+      ))}
+    </fieldset>
   )
 }
 

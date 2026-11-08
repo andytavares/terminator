@@ -162,7 +162,7 @@ describe('the factory site card', () => {
     const onOpen = vi.fn()
     render(<FactorySite repoRoot="/repo" onOpen={onOpen} onShowList={vi.fn()} />)
     const link = await screen.findByRole('link', { name: 'Claude artifact' })
-    expect(link.closest('button')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Claude artifact/ })).toBeNull()
     await user.click(link)
     expect(openExternal).toHaveBeenCalledWith(ARTIFACT.url)
     expect(onOpen).not.toHaveBeenCalled()

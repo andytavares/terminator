@@ -54,14 +54,14 @@ const renderInbox = (threads: WorkThread[], now = NOW) =>
 const cardTitles = () =>
   within(screen.getByRole('list', { name: 'Inbox' }))
     .queryAllByRole('listitem')
-    .map((card) => card.querySelector('.inbox-card__title')!.textContent)
+    .map((card) => card.getAttribute('aria-label'))
 
 const settledTitles = () =>
   within(screen.getByRole('list', { name: 'Settled' }))
     .queryAllByRole('listitem')
-    .map((card) => card.querySelector('.inbox-card__title')!.textContent)
+    .map((card) => card.getAttribute('aria-label'))
 
-const cardFor = (title: string) => screen.getByText(title).closest('li')!
+const cardFor = (title: string) => screen.getByRole('listitem', { name: title })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -194,9 +194,9 @@ describe('InboxList — opening and the keyboard', () => {
     renderInbox(threads)
     await user.click(screen.getByRole('textbox', { name: 'Search' }))
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Work first/ }))
+    expect(screen.getByRole('button', { name: /Work first/ }).matches(':focus')).toBe(true)
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Work second/ }))
+    expect(screen.getByRole('button', { name: /Work second/ }).matches(':focus')).toBe(true)
     await user.keyboard('{ArrowUp}')
     await user.keyboard('{Enter}')
     expect(revealSession).toHaveBeenCalledWith('recent')
@@ -212,6 +212,6 @@ describe('InboxList — keys that belong to the controls', () => {
     const repo = screen.getByRole('combobox', { name: 'Repo' })
     repo.focus()
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(repo)
+    expect(repo.matches(':focus')).toBe(true)
   })
 })

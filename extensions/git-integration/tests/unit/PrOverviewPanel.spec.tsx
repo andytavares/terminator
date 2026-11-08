@@ -404,10 +404,15 @@ describe('PrOverviewPanel — the description', () => {
 
   it('clamps the description before any summary exists', () => {
     renderPanel()
-    const reading = screen.getByTestId('rich-content').parentElement
-    expect(reading?.classList.contains('pr-overview-reading--clamped')).toBe(true)
+    const reading = readingOf('This PR adds feature X.')
+    expect(reading.classList.contains('pr-overview-reading--clamped')).toBe(true)
   })
 })
+
+/** The clamped box that holds `text`: the description or a comment. */
+function readingOf(text: string): HTMLElement {
+  return screen.getAllByTestId('reading').find((reading) => reading.textContent === text)!
+}
 
 function stubDescriptionHeights(scrollHeight: number, clientHeight: number) {
   const proto = HTMLElement.prototype
@@ -447,10 +452,10 @@ describe('PrOverviewPanel — clamping the description', () => {
   async function expectClampThenExpand(user: UserEvent) {
     renderPanel()
     await user.click(await screen.findByRole('button', { name: 'Show full description' }))
-    const reading = screen.getByTestId('rich-content').parentElement
-    expect(reading?.classList.contains('pr-overview-reading--clamped')).toBe(false)
+    const reading = readingOf('This PR adds feature X.')
+    expect(reading.classList.contains('pr-overview-reading--clamped')).toBe(false)
     await user.click(screen.getByRole('button', { name: 'Show less' }))
-    expect(reading?.classList.contains('pr-overview-reading--clamped')).toBe(true)
+    expect(reading.classList.contains('pr-overview-reading--clamped')).toBe(true)
   }
 })
 
@@ -640,16 +645,15 @@ function shownCommentBodies(): string[] {
 }
 
 describe('PrOverviewPanel — the clamp fade', () => {
-  const fades = (element: Element | null) =>
-    element?.classList.contains('pr-overview-reading--overflows')
+  const fades = (element: Element) => element.classList.contains('pr-overview-reading--overflows')
 
   it('draws no fade over text that fits', async () => {
     const user = userEvent.setup()
     withComments([bobsComment])
     renderPanel()
-    expect(fades(screen.getByTestId('rich-content').parentElement)).toBe(false)
+    expect(fades(readingOf('This PR adds feature X.'))).toBe(false)
     await openDiscussion(user)
-    expect(fades(screen.getByText('Looks off').parentElement)).toBe(false)
+    expect(fades(readingOf('Looks off'))).toBe(false)
   })
 
   it('fades text that overflows the clamp, and not once it is opened', async () => {
@@ -657,7 +661,7 @@ describe('PrOverviewPanel — the clamp fade', () => {
     const restore = stubDescriptionHeights(900, 300)
     try {
       renderPanel()
-      const reading = screen.getByTestId('rich-content').parentElement
+      const reading = readingOf('This PR adds feature X.')
       expect(fades(reading)).toBe(true)
       await user.click(screen.getByRole('button', { name: 'Show full description' }))
       expect(fades(reading)).toBe(false)
@@ -703,10 +707,11 @@ describe('PrOverviewPanel — clamping a comment', () => {
     withComments(commentsNumbered(2))
     renderPanel()
     await openDiscussion(user)
-    const bodies = screen.getAllByText(/^Comment \d$/).map((element) => element.parentElement)
-    expect(bodies.every((body) => body?.classList.contains('pr-overview-reading--clamped'))).toBe(
-      true
-    )
+    const bodies = [readingOf('Comment 1'), readingOf('Comment 2')]
+    expect(bodies.map((body) => body.classList.contains('pr-overview-reading--clamped'))).toEqual([
+      true,
+      true,
+    ])
   })
 
   it('offers the full text of a long comment', async () => {
@@ -717,7 +722,7 @@ describe('PrOverviewPanel — clamping a comment', () => {
       renderPanel()
       await openDiscussion(user)
       await user.click(screen.getByRole('button', { name: 'Show full comment' }))
-      const body = screen.getByText('Looks off').parentElement
+      const body = readingOf('Looks off')
       expect(body?.classList.contains('pr-overview-reading--clamped')).toBe(false)
     } finally {
       restore()

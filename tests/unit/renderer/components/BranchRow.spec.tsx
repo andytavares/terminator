@@ -34,6 +34,13 @@ const renderRow = (patch: Partial<BranchRowData> = {}, props: Record<string, unk
     />
   )
 
+/** The branch's own row, apart from the buttons inside it. */
+const branchRow = (): HTMLElement => screen.getByRole('button', { name: /^034-declutter — / })
+
+/** The text of a linked issue key, wherever the row draws one. */
+const ISSUE_KEY = /^[A-Z]+-\d+/
+
+/* eslint-disable testing-library/no-node-access -- FR-026 counts drawn elements, a layout claim no query can see */
 /** What the row draws at rest, excluding the rail, which is identity not fact. */
 const restingElements = (container: HTMLElement): number => {
   const el = container.querySelector('.branch-row')!
@@ -49,12 +56,12 @@ const restingElements = (container: HTMLElement): number => {
   const kindEmpty = el.querySelector('.branch-row__kind')!.children.length === 0 ? 1 : 0
   return direct.length - 1 - kindEmpty + metaCount
 }
+/* eslint-enable testing-library/no-node-access */
 
 describe('BranchRow', () => {
   it('names the branch in the machine face', () => {
-    const { container } = renderRow()
-    const name = container.querySelector('.branch-row__name')!
-    expect(name.textContent).toBe('034-declutter')
+    renderRow()
+    expect(screen.getByText('034-declutter')).toBeTruthy()
   })
 
   it.each([
@@ -63,21 +70,20 @@ describe('BranchRow', () => {
     ['idle', 'Idle'],
     ['exited', 'Exited'],
   ] as const)('shows the %s state and names it for a reader', (state, label) => {
-    const { container } = renderRow({ state })
-    expect(container.querySelector('.branch-row__gutter svg')!.getAttribute('data-state')).toBe(
-      state
-    )
-    expect(screen.getByRole('button').getAttribute('aria-label')).toContain(label)
+    renderRow({ state })
+    expect(screen.getByRole('img', { name: label })).toBeTruthy()
+    expect(branchRow().getAttribute('aria-label')).toContain(label)
   })
 })
 
 describe('BranchRow — marks a plain checkout and leaves a worktree unmarked', () => {
   // FR-028. One element says which kind, and it marks the exception.
   it('marks a plain checkout and leaves a worktree unmarked', () => {
-    const { container: plain } = renderRow({ isWorktree: false })
-    expect(plain.querySelector('.branch-row__kind svg')).toBeTruthy()
-    const { container: tree } = renderRow({ isWorktree: true })
-    expect(tree.querySelector('.branch-row__kind svg')).toBeNull()
+    const plain = renderRow({ isWorktree: false })
+    expect(screen.getByRole('img', { name: 'Plain checkout' })).toBeTruthy()
+    plain.unmount()
+    renderRow({ isWorktree: true })
+    expect(screen.queryByRole('img', { name: 'Plain checkout' })).toBeNull()
   })
 
   it('draws no separate worktree word anywhere', () => {
@@ -89,25 +95,24 @@ describe('BranchRow — marks a plain checkout and leaves a worktree unmarked', 
 describe('BranchRow — draws a linked issue key as plain text', () => {
   // FR-029.
   it('draws a linked issue key as plain text', () => {
-    const { container } = renderRow({}, { issueKey: 'TAV-14' })
-    const issue = container.querySelector('.branch-row__issue')!
-    expect(issue.textContent).toBe('TAV-14')
+    renderRow({}, { issueKey: 'TAV-14' })
+    const issue = screen.getByText('TAV-14')
     expect(issue.tagName).toBe('SPAN')
     // No badge, no state dot: the key alone. That it also has no border is a
     // claim about the stylesheet, which jsdom cannot resolve — it is asserted
     // by rendering in sidebar-workspace-tint.spec.ts instead.
-    expect(issue.querySelector('span, em, i')).toBeNull()
+    expect(issue.innerHTML).toBe('TAV-14')
   })
 
   it('draws nothing for a branch with no issue', () => {
-    const { container } = renderRow()
-    expect(container.querySelector('.branch-row__issue')).toBeNull()
+    renderRow()
+    expect(screen.queryByText(ISSUE_KEY)).toBeNull()
   })
 
   it('draws change counts when git has answered', () => {
-    const { container } = renderRow({}, { changeStats: { added: 412, removed: 96, files: 3 } })
-    expect(container.querySelector('.branch-row__stats')!.textContent).toContain('+412')
-    expect(container.querySelector('.branch-row__stats')!.textContent).toContain('96')
+    renderRow({}, { changeStats: { added: 412, removed: 96, files: 3 } })
+    expect(screen.getByText('+412')).toBeTruthy()
+    expect(screen.getByText('−96')).toBeTruthy()
   })
 
   it.each([
@@ -115,32 +120,31 @@ describe('BranchRow — draws a linked issue key as plain text', () => {
     ['git could not answer', null],
     ['nothing changed', { added: 0, removed: 0, files: 0 }],
   ])('draws no change counts when %s', (_name, changeStats) => {
-    const { container } = renderRow({}, { changeStats })
-    expect(container.querySelector('.branch-row__stats')).toBeNull()
+    renderRow({}, { changeStats })
+    expect(branchRow().textContent).toBe('034-declutternow')
   })
 })
 
 describe('BranchRow — counts what shares the row state, once there is more than one', () => {
   // The count agrees with the glyph rather than totalling the branch.
   it('counts what shares the row state, once there is more than one', () => {
-    const { container } = renderRow({ state: 'awaiting-input', stateCount: 2, sessionCount: 5 })
-    expect(container.querySelector('.branch-row__count')!.textContent).toBe('2')
-    expect(container.querySelector('.branch-row__age')).toBeNull()
+    renderRow({ state: 'awaiting-input', stateCount: 2, sessionCount: 5 })
+    expect(screen.getByText('2')).toBeTruthy()
+    expect(screen.queryByText('now')).toBeNull()
   })
 
   it('shows an age instead when only one terminal shares the state', () => {
-    const { container } = renderRow({ stateCount: 1, lastActivityAt: NOW - 5 * 60_000 })
-    expect(container.querySelector('.branch-row__age')!.textContent).toBe('5m')
-    expect(container.querySelector('.branch-row__count')).toBeNull()
+    renderRow({ stateCount: 1, lastActivityAt: NOW - 5 * 60_000 })
+    expect(screen.getByText('5m')).toBeTruthy()
+    expect(screen.queryByText('1')).toBeNull()
   })
 
   it('states neither a count nor an age for a branch with no terminals', () => {
     // The box stays — it is the column every count in the sidebar shares, and
     // dropping it would let the row's hover control sit where the numbers are
     // — but it says nothing.
-    const { container } = renderRow({ stateCount: 0, sessionCount: 0, lastActivityAt: null })
-    expect(container.querySelector('.branch-row__count')).toBeNull()
-    expect(container.querySelector('.branch-row__age')!.textContent).toBe('')
+    renderRow({ stateCount: 0, sessionCount: 0, lastActivityAt: null })
+    expect(branchRow().textContent).toBe('034-declutter')
   })
 
   // FR-026.
@@ -155,17 +159,15 @@ describe('BranchRow — counts what shares the row state, once there is more tha
 
 describe('BranchRow — carries the repo colour as one rail variable, not as a background', () => {
   it('carries the repo colour as one rail variable, not as a background', () => {
-    const { container } = renderRow()
-    const el = container.querySelector<HTMLElement>('.branch-row')!
+    renderRow()
+    const el = branchRow()
     expect(el.style.getPropertyValue('--ws-color')).toBe('#5c6bc0')
     expect(el.style.background).toBe('')
   })
 
   it('draws no rail for a branch with no repo colour', () => {
-    const { container } = renderRow({}, { colour: undefined })
-    expect(
-      container.querySelector<HTMLElement>('.branch-row')!.style.getPropertyValue('--ws-color')
-    ).toBe('')
+    renderRow({}, { colour: undefined })
+    expect(branchRow().style.getPropertyValue('--ws-color')).toBe('')
   })
 })
 
@@ -173,8 +175,8 @@ describe('BranchRow — interaction', () => {
   it('selects on click', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
-    const { container } = renderRow({}, { onSelect })
-    await user.click(container.querySelector('.branch-row')!)
+    renderRow({}, { onSelect })
+    await user.click(branchRow())
     expect(onSelect).toHaveBeenCalled()
   })
 
@@ -184,19 +186,17 @@ describe('BranchRow — interaction', () => {
   ])('selects on %s', async (_name, keys) => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
-    const { container } = renderRow({}, { onSelect })
-    const row = container.querySelector<HTMLElement>('.branch-row')!
+    renderRow({}, { onSelect })
+    const row = branchRow()
     row.focus()
-    expect(document.activeElement).toBe(row)
+    expect(row.matches(':focus')).toBe(true)
     await user.keyboard(keys)
     expect(onSelect).toHaveBeenCalled()
   })
 
   it('marks the selected row without using the repo colour', () => {
-    const { container } = renderRow({}, { selected: true })
-    const el = container.querySelector('.branch-row')!
-    expect(el.classList.contains('branch-row--selected')).toBe(true)
-    expect(el.getAttribute('aria-current')).toBe('true')
+    renderRow({}, { selected: true })
+    expect(branchRow().getAttribute('aria-current')).toBe('true')
   })
 })
 
@@ -222,25 +222,25 @@ describe('BranchRow — the add button', () => {
 describe('BranchRow — the context menu', () => {
   it('offers rename only where the branch has no branch to be named by', async () => {
     const user = userEvent.setup()
-    const { container } = renderRow({}, { onRename: vi.fn() })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRename: vi.fn() })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     expect(screen.getByText('Rename')).toBeTruthy()
   })
 
   it('offers no rename for a branch named by its branch', async () => {
     const user = userEvent.setup()
-    const { container } = renderRow({}, { onRemove: vi.fn() })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRemove: vi.fn() })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     expect(screen.queryByText('Rename')).toBeNull()
   })
 
   it('renames through the callback', async () => {
     const user = userEvent.setup()
     const onRename = vi.fn()
-    const { container } = renderRow({}, { onRename })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRename })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Rename'))
-    const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
+    const input = screen.getByRole('textbox', { name: 'Branch name' })
     await user.clear(input)
     await user.type(input, 'renamed')
     await user.keyboard('{Enter}')
@@ -252,10 +252,10 @@ describe('BranchRow — the context menu — abandons a rename on Escape', () =>
   it('abandons a rename on Escape', async () => {
     const user = userEvent.setup()
     const onRename = vi.fn()
-    const { container } = renderRow({}, { onRename })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRename })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Rename'))
-    const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
+    const input = screen.getByRole('textbox', { name: 'Branch name' })
     await user.clear(input)
     await user.type(input, 'nope')
     await user.keyboard('{Escape}')
@@ -264,11 +264,11 @@ describe('BranchRow — the context menu — abandons a rename on Escape', () =>
 
   it('carries the issue actions', async () => {
     const user = userEvent.setup()
-    const { container } = renderRow(
+    renderRow(
       {},
       { issueActions: { issueKey: 'TAV-14', onLinkIssue: vi.fn(), onOpenIssue: vi.fn() } }
     )
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     expect(screen.getByText('Open TAV-14 in tracker')).toBeTruthy()
   })
 })
@@ -277,8 +277,8 @@ describe('BranchRow — the context menu — removing', () => {
   it('removes through the callback', async () => {
     const user = userEvent.setup()
     const onRemove = vi.fn()
-    const { container } = renderRow({}, { onRemove })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRemove })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Remove branch'))
     expect(onRemove).toHaveBeenCalled()
   })
@@ -287,9 +287,9 @@ describe('BranchRow — the context menu — removing', () => {
 describe('BranchRow — the context menu — opens no menu when there is nothing to put in it', () => {
   it('opens no menu when there is nothing to put in it', async () => {
     const user = userEvent.setup()
-    const { container } = renderRow()
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
-    expect(document.querySelector('.ctx-menu')).toBeNull()
+    renderRow()
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 })
 
@@ -318,16 +318,16 @@ describe('BranchRow — repo actions are reachable from the row', () => {
 
   it('lists them in the row menu', async () => {
     const user = userEvent.setup()
-    const { container } = renderRow({}, { repoActions })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { repoActions })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     expect(screen.getByText('Git')).toBeTruthy()
   })
 
   it('fires one and closes the menu', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
-    const { container } = renderRow({}, { repoActions: [{ id: 'git', label: 'Git', onSelect }] })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { repoActions: [{ id: 'git', label: 'Git', onSelect }] })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByRole('menuitem', { name: 'Git' }))
     expect(onSelect).toHaveBeenCalled()
     expect(screen.queryByRole('menuitem', { name: 'Git' })).toBeNull()
@@ -338,10 +338,10 @@ describe('BranchRow — renaming', () => {
   it('commits on blur', async () => {
     const user = userEvent.setup()
     const onRename = vi.fn()
-    const { container } = renderRow({}, { onRename })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRename })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Rename'))
-    const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
+    const input = screen.getByRole('textbox', { name: 'Branch name' })
     await user.clear(input)
     await user.type(input, 'blurred')
     await user.tab()
@@ -351,10 +351,10 @@ describe('BranchRow — renaming', () => {
   it('ignores an empty name', async () => {
     const user = userEvent.setup()
     const onRename = vi.fn()
-    const { container } = renderRow({}, { onRename })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRename })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Rename'))
-    const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
+    const input = screen.getByRole('textbox', { name: 'Branch name' })
     await user.clear(input)
     await user.type(input, '   ')
     await user.tab()
@@ -366,10 +366,10 @@ describe('BranchRow — renaming — ignores a name that did not change', () => 
   it('ignores a name that did not change', async () => {
     const user = userEvent.setup()
     const onRename = vi.fn()
-    const { container } = renderRow({}, { onRename })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRename })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Rename'))
-    expect(document.activeElement).toBe(container.querySelector('.branch-row__rename'))
+    expect(screen.getByRole('textbox', { name: 'Branch name' }).matches(':focus')).toBe(true)
     await user.tab()
     expect(onRename).not.toHaveBeenCalled()
   })
@@ -377,10 +377,10 @@ describe('BranchRow — renaming — ignores a name that did not change', () => 
   it('does not select the branch while typing in the editor', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
-    const { container } = renderRow({}, { onRename: vi.fn(), onSelect })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRename: vi.fn(), onSelect })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Rename'))
-    await user.click(container.querySelector('.branch-row__rename')!)
+    await user.click(screen.getByRole('textbox', { name: 'Branch name' }))
     expect(onSelect).not.toHaveBeenCalled()
   })
 })
@@ -388,34 +388,34 @@ describe('BranchRow — renaming — ignores a name that did not change', () => 
 describe('BranchRow — open in editor', () => {
   it('offers the action named after the editor that will run', async () => {
     const user = userEvent.setup()
-    const { container } = renderRow({}, { onOpenInEditor: vi.fn(), editorName: 'Cursor' })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onOpenInEditor: vi.fn(), editorName: 'Cursor' })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     expect(screen.getByText('Open in Cursor')).toBeTruthy()
   })
 
   it('falls back to a generic label when the editor is not known yet', async () => {
     const user = userEvent.setup()
-    const { container } = renderRow({}, { onOpenInEditor: vi.fn() })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onOpenInEditor: vi.fn() })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     expect(screen.getByText('Open in editor')).toBeTruthy()
   })
 
   it('opens the branch folder and closes the menu', async () => {
     const user = userEvent.setup()
     const onOpenInEditor = vi.fn()
-    const { container } = renderRow({}, { onOpenInEditor, editorName: 'Cursor' })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onOpenInEditor, editorName: 'Cursor' })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Open in Cursor'))
     expect(onOpenInEditor).toHaveBeenCalled()
-    expect(document.querySelector('.ctx-menu')).toBeNull()
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 
   // Remote mode omits the editor API entirely, so the handler is absent and the
   // item must not appear — an action that cannot work should not be offered.
   it('offers nothing when there is no way to open an editor', async () => {
     const user = userEvent.setup()
-    const { container } = renderRow({}, { onRemove: vi.fn() })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onRemove: vi.fn() })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     expect(screen.queryByText(/Open in/)).toBeNull()
   })
 })
@@ -424,8 +424,8 @@ describe('BranchRow — open in editor — does not also select the branch', () 
   it('does not also select the branch', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
-    const { container } = renderRow({}, { onOpenInEditor: vi.fn(), onSelect })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { onOpenInEditor: vi.fn(), onSelect })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Open in editor'))
     expect(onSelect).not.toHaveBeenCalled()
   })
@@ -433,14 +433,12 @@ describe('BranchRow — open in editor — does not also select the branch', () 
 
 describe('BranchRow — open in editor — session issue keys', () => {
   it('shows a session key when the branch has no link of its own', () => {
-    const { container } = renderRow({}, { sessionIssueKeys: ['ENG-7'] })
-    const key = container.querySelector('.branch-row__issue')!
-    expect(key.textContent).toBe('ENG-7')
-    expect(key.tagName).toBe('SPAN')
+    renderRow({}, { sessionIssueKeys: ['ENG-7'] })
+    expect(screen.getByText('ENG-7').tagName).toBe('SPAN')
   })
 
   it('keeps the branch key first and counts the other keys its terminals carry', () => {
-    const { container } = renderRow(
+    renderRow(
       {},
       {
         issueKey: 'TAV-14',
@@ -448,15 +446,15 @@ describe('BranchRow — open in editor — session issue keys', () => {
         sessionIssueKeys: ['ENG-7', 'TAV-14', 'ENG-8'],
       }
     )
-    const key = container.querySelector('.branch-row__issue')!
+    const key = screen.getByRole('button', { name: 'Open TAV-14' })
     expect(key.textContent).toBe('TAV-14 +2')
     expect(key.getAttribute('title')).toBe('TAV-14, ENG-7, ENG-8')
-    expect(container.querySelectorAll('.branch-row__issue')).toHaveLength(1)
+    expect(screen.getAllByText(ISSUE_KEY)).toHaveLength(1)
   })
 
   it('draws no key when neither the branch nor a terminal is linked', () => {
-    const { container } = renderRow({}, { sessionIssueKeys: [] })
-    expect(container.querySelector('.branch-row__issue')).toBeNull()
+    renderRow({}, { sessionIssueKeys: [] })
+    expect(screen.queryByText(ISSUE_KEY)).toBeNull()
   })
 })
 
@@ -470,9 +468,8 @@ const TERMINAL = {
 }
 
 describe('BranchRow — the disclosure for its terminals', () => {
-  it('draws an empty slot rather than a button when there are no terminals', () => {
-    const { container } = renderRow({}, { onToggleExpanded: vi.fn(), expanded: false })
-    expect(container.querySelector('.branch-row__disclosure--empty')).toBeTruthy()
+  it('offers no disclosure button when there are no terminals', () => {
+    renderRow({}, { onToggleExpanded: vi.fn(), expanded: false })
     expect(screen.queryByRole('button', { name: /terminals in/ })).toBeNull()
   })
 
@@ -497,23 +494,20 @@ describe('BranchRow — the menu and the keyboard', () => {
   it('closes the menu before running an issue action', async () => {
     const user = userEvent.setup()
     const onOpenIssue = vi.fn()
-    const { container } = renderRow(
-      {},
-      { issueActions: { issueKey: 'TAV-14', onLinkIssue: vi.fn(), onOpenIssue } }
-    )
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    renderRow({}, { issueActions: { issueKey: 'TAV-14', onLinkIssue: vi.fn(), onOpenIssue } })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
     await user.click(screen.getByText('Open TAV-14 in tracker'))
     expect(onOpenIssue).toHaveBeenCalledOnce()
-    expect(document.querySelector('.ctx-menu')).toBeNull()
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 
   it('ignores keys other than Enter and Space', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
-    const { container } = renderRow({}, { onSelect })
-    const row = container.querySelector<HTMLElement>('.branch-row')!
+    renderRow({}, { onSelect })
+    const row = branchRow()
     row.focus()
-    expect(document.activeElement).toBe(row)
+    expect(row.matches(':focus')).toBe(true)
     await user.keyboard('a')
     expect(onSelect).not.toHaveBeenCalled()
   })

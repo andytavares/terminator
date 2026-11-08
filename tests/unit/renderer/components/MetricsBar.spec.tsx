@@ -4,9 +4,11 @@ import React from 'react'
 import { MetricsBar } from '../../../../src/renderer/components/overview/MetricsBar'
 
 describe('MetricsBar', () => {
-  it('renders skeleton elements when system is null', () => {
-    const { container } = render(<MetricsBar system={null} />)
-    expect(container.querySelectorAll('.skeleton--metrics').length).toBeGreaterThan(0)
+  it('marks the metrics busy until the first sample arrives', () => {
+    render(<MetricsBar system={null} />)
+    expect(screen.getByRole('group', { name: 'System metrics' }).getAttribute('aria-busy')).toBe(
+      'true'
+    )
   })
 
   it('renders CPU percentage when metrics are provided', () => {
@@ -22,6 +24,7 @@ describe('MetricsBar', () => {
       />
     )
     expect(screen.getByText(/42%/)).toBeTruthy()
+    expect(screen.getByRole('meter', { name: 'CPU' }).getAttribute('aria-valuenow')).toBe('42')
   })
 })
 
@@ -70,7 +73,7 @@ describe('MetricsBar — CPU bar colour', () => {
     [75, /f08c00|240.*140.*0/],
     [50, /var\(--tm-accent\)/],
   ])('colours the CPU bar at %i%% as %s', (cpuPercent, colour) => {
-    const { container } = render(
+    render(
       <MetricsBar
         system={{
           cpuPercent,
@@ -81,7 +84,7 @@ describe('MetricsBar — CPU bar colour', () => {
         }}
       />
     )
-    const fill = container.querySelector('.metrics-bar__bar-fill') as HTMLElement
+    const fill = screen.getByRole('meter', { name: 'CPU' })
     // The browser normalises a hex colour to rgb().
     expect(fill.style.background).toMatch(colour)
   })

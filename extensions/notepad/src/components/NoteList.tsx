@@ -429,7 +429,11 @@ function ListBody(props: { view: ListView; activeTagNames: string[] }): React.JS
   const showsNothing = isEmpty && (folders.length === 0 || model.isFiltering)
 
   return (
-    <div className="notepad-note-list__notes" {...view.drag.listDropHandlers}>
+    <div
+      className="notepad-note-list__notes"
+      data-testid="notepad-note-list-drop-zone"
+      {...view.drag.listDropHandlers}
+    >
       {showsNothing && model.isFiltering && (
         <div className="notepad-note-list__no-results">
           {noResultsText(activeTagNames, searchQuery)}
@@ -476,9 +480,10 @@ function FolderSection({ folder, view }: FolderSectionProps): React.JSX.Element 
   const dropModifier = folderDrop.isOver ? ' notepad-folder-header--drop-target' : ''
 
   return (
-    <div className="notepad-folder-section">
+    <div className="notepad-folder-section" role="group" aria-label={folder.name}>
       <div
         className={'notepad-folder-header' + dropModifier}
+        data-testid="notepad-folder-header"
         onContextMenu={(e) => {
           e.preventDefault()
           const { clientX: x, clientY: y } = e

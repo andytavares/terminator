@@ -117,7 +117,7 @@ describe('NotepadView opening a note', () => {
     render(<NotepadView />)
     await eventually(() => expect(bridge.calls('terminator.notepad:notes.get')).toHaveLength(1))
     await act(async () => undefined)
-    expect(document.querySelector('.cm-editor')).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
 
     await act(async () => answerBody({ data: { body: BODY } }))
     await eventually(() => expect(mountedEditorView().state.doc.toString()).toBe(BODY))
@@ -193,10 +193,9 @@ describe('NotepadView changes from another surface', () => {
   it('toggles the comment margin with Cmd+Alt+M', async () => {
     const user = userEvent.setup()
     await openNote()
-    const margin = document.querySelector<HTMLElement>('.notepad-view__comments')!
-    expect(margin.hidden).toBe(false)
+    expect(screen.getByRole('complementary', { name: 'Comments' })).toBeDefined()
     await user.keyboard('{Meta>}{Alt>}[KeyM]{/Alt}{/Meta}')
-    expect(margin.hidden).toBe(true)
+    expect(screen.queryByRole('complementary', { name: 'Comments' })).toBeNull()
   })
 })
 
@@ -224,7 +223,7 @@ describe('NotepadView with Notepad settings changed', () => {
   it('draws the editor at the configured font size', async () => {
     storeSettings({ 'terminator.notepad.editorFontSize': 20 })
     await openNote()
-    const editor = document.querySelector<HTMLElement>('.notepad-editor-cm')!
+    const editor = screen.getByTestId('editor')
     await eventually(() =>
       expect(editor.style.getPropertyValue('--notepad-editor-font-size')).toBe('20px')
     )
@@ -277,11 +276,9 @@ describe('NotepadView toolbar Read mode', () => {
 describe('NotepadView toolbar panel buttons', () => {
   it('the rail holds the outline above the comments', async () => {
     await openNote()
-    const rail = document.querySelector('.notepad-view__rail')!
-    expect([...rail.children].map((panel) => panel.className)).toEqual([
-      'notepad-outline',
-      'notepad-view__comments',
-    ])
+    const outline = screen.getByRole('navigation', { name: 'Outline' })
+    const comments = screen.getByRole('complementary', { name: 'Comments' })
+    expect(outline.compareDocumentPosition(comments)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
   it('outline is a pressed toggle that hides the outline when pressed', async () => {
@@ -291,7 +288,7 @@ describe('NotepadView toolbar panel buttons', () => {
     expect(outline.getAttribute('aria-pressed')).toBe('true')
     await user.click(outline)
     expect(outline.getAttribute('aria-pressed')).toBe('false')
-    expect(document.querySelector('.notepad-outline')).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Outline' })).toBeNull()
   })
 
   it('comments is a pressed toggle that hides the comment margin when pressed', async () => {
@@ -301,6 +298,6 @@ describe('NotepadView toolbar panel buttons', () => {
     expect(comments.getAttribute('aria-pressed')).toBe('true')
     await user.click(comments)
     expect(comments.getAttribute('aria-pressed')).toBe('false')
-    expect(document.querySelector<HTMLElement>('.notepad-view__comments')?.hidden).toBe(true)
+    expect(screen.queryByRole('complementary', { name: 'Comments' })).toBeNull()
   })
 })

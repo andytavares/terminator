@@ -132,7 +132,7 @@ describe('AgentPanel', () => {
     const { container } = render(
       <AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />
     )
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('shows the ask state for the scope label', () => {
@@ -186,12 +186,9 @@ describe('AgentPanel — renders a finding body as markdown, so code reads as co
       findings: [{ ...finding1, body: '`computeRiskScore` runs twice per file.' }],
     })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
-    const { container } = render(
-      <AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />
-    )
-    const code = container.querySelector('.ap-fnd-body code')
-    expect(code?.textContent).toBe('computeRiskScore')
-    expect(container.querySelector('.ap-fnd-body')?.textContent).not.toContain('`')
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
+    expect(screen.getByRole('code').textContent).toBe('computeRiskScore')
+    expect(screen.getByText(/runs twice per file/).textContent).not.toContain('`')
   })
 })
 
@@ -238,7 +235,7 @@ describe('AgentPanel — dismisses a finding and hides its card', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Close agent panel' }))
     expect(useReviewUiStore.getState().agentPanelScope).toBeNull()
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 })
 

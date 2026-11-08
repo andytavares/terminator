@@ -158,7 +158,7 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
         onClick={() => setOpen((o) => !o)}
       >
         View
-        {settingsChanged(v) && <span className="vm-dot" aria-hidden="true" />}
+        {settingsChanged(v) && <span className="vm-dot" aria-hidden="true" data-testid="vm-dot" />}
         <ChevronDown aria-hidden="true" className="tm-icon-sm" />
       </Button>
       {open && (

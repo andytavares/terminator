@@ -1,6 +1,6 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
+import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -101,14 +101,12 @@ function seedRecords(...records: SessionRecordListing[]): void {
   resetStore(useSessionRecordsStore, { records: new Map(records.map((r) => [r.sessionId, r])) })
 }
 
-const sessionTabs = () => [...document.querySelectorAll('.tab-bar__tab--session')]
-const isActive = (tab: Element) => tab.classList.contains('tab-bar__tab--active')
+const sessionTabs = () => screen.queryAllByRole('tab')
+const isActive = (tab: Element) => tab.getAttribute('aria-selected') === 'true'
 const savedOrder = () => useSessionStore.getState().projectViews.get('proj-1')?.order
 
 function tabTitles(): string[] {
-  return [...document.querySelectorAll('.tab-bar__tab--session .tab-bar__title')].map(
-    (title) => title.textContent ?? ''
-  )
+  return sessionTabs().map((tab) => tab.getAttribute('aria-label') ?? '')
 }
 
 function pointerAt(
@@ -266,6 +264,7 @@ describe('TabBar — the close button', () => {
       projectsByWorkspaceId: new Map(),
     })
     const { container } = renderTabBar()
+    // eslint-disable-next-line testing-library/no-node-access -- the tint is a CSS variable on the row's wrapper, which has no role
     const tabBarStack = container.querySelector('.tab-bar-stack') as HTMLElement
     expect(tabBarStack.style.getPropertyValue('--ws-color')).toBe('#ff0000')
   })
@@ -351,7 +350,7 @@ describe('TabBar — Escape in rename input cancels the rename', () => {
     renderTabBar()
     await user.dblClick(screen.getByTitle('Double-click to rename'))
     await user.type(screen.getByRole('textbox'), '-edited')
-    expect(document.activeElement).toBe(screen.getByRole('textbox'))
+    expect(screen.getByRole('textbox').matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(tabTitles()).toEqual(['bash'])
     expect(screen.queryByRole('textbox')).toBeNull()
@@ -404,7 +403,7 @@ describe('TabBar — context menu', () => {
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     expect(screen.getByText('Rename')).toBeTruthy()
     expect(screen.getByText('Move to branch…')).toBeTruthy()
@@ -416,7 +415,7 @@ describe('TabBar — context menu', () => {
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     await user.click(screen.getByText('Move to branch…'))
     expect(screen.getByTestId('move-session-dialog')).toBeTruthy()
@@ -428,7 +427,7 @@ describe('TabBar — context menu — closes context menu on global click', () =
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     expect(screen.getByText('Rename')).toBeTruthy()
     await user.click(document.body)
@@ -439,7 +438,7 @@ describe('TabBar — context menu — closes context menu on global click', () =
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     await user.click(screen.getByText('Close tab'))
     expect(terminalClose).toHaveBeenCalledWith('ses-1')
@@ -452,7 +451,7 @@ describe('TabBar — context menu — opens rename inline via context menu Renam
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     await user.click(screen.getByText('Rename'))
     expect(screen.getByRole('textbox')).toBeTruthy()
@@ -473,7 +472,7 @@ describe('TabBar — session work item', () => {
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     expect(screen.getByText('Link issue…')).toBeTruthy()
     expect(screen.queryByText('Remove session link')).toBeNull()
@@ -488,7 +487,7 @@ describe('TabBar — session work item — offers change and remove, and removes
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     seedRecords(recordOf('ses-1', { link: ENG_4 }))
     renderTabBar()
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     expect(screen.getByText('Change linked issue…')).toBeTruthy()
     await user.click(screen.getByText('Remove session link'))
@@ -501,7 +500,7 @@ describe('TabBar — MoveSessionDialog onMoved callback', () => {
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     await userEvent.click(screen.getByText('Move to branch…'))
     expect(screen.getByTestId('move-session-dialog')).toBeTruthy()
@@ -516,7 +515,7 @@ describe('TabBar — MoveSessionDialog onMoved callback — onScratchDeactivate'
     const onScratchDeactivate = vi.fn()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar({ onScratchDeactivate })
-    const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+    const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
     await userEvent.click(screen.getByText('Move to branch…'))
     expect(screen.getByTestId('move-session-dialog')).toBeTruthy()
@@ -547,10 +546,8 @@ describe('TabBar — the session bar states whose terminals it shows (US3, FR-01
   setUpTabBarTheSessionBar()
 
   it('names the branch that owns the tabs', () => {
-    const { container } = renderTabBar()
-    const scope = container.querySelector('.tab-bar__scope')
-    expect(scope).toBeTruthy()
-    expect(scope!.textContent).toContain('main')
+    renderTabBar()
+    expect(screen.getByText(/main/).textContent).toContain('main')
   })
 })
 
@@ -568,27 +565,30 @@ describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
   it('gives every tab its own state glyph', () => {
     seedSessions(EACH_STATE)
     renderTabBar()
-    const states = sessionTabs().map((t) =>
-      t.querySelector('.tab-bar__state svg')?.getAttribute('data-state')
-    )
-    expect(states).toEqual(['awaiting-input', 'working', 'idle', 'exited'])
+    const states = sessionTabs().map((tab) => within(tab).getByRole('img').innerHTML)
+    expect(states.map((glyph) => glyph.match(/data-state="([^"]*)"/)?.[1])).toEqual([
+      'awaiting-input',
+      'working',
+      'idle',
+      'exited',
+    ])
   })
 
   it('distinguishes the four states by shape, not by colour', () => {
     seedSessions(EACH_STATE)
     renderTabBar()
-    const glyphs = sessionTabs().map((t) => t.querySelector('.tab-bar__state svg')!)
-    expect(new Set(glyphs.map((svg) => svg.getAttribute('data-state'))).size).toBe(4)
-    expect(glyphs.map((svg) => svg.getAttribute('style'))).toEqual([null, null, null, null])
-    expect(glyphs.map((svg) => svg.getAttribute('stroke'))).toEqual(Array(4).fill('currentColor'))
+    const glyphs = sessionTabs().map((tab) => within(tab).getByRole('img').innerHTML)
+    expect(new Set(glyphs).size).toBe(4)
+    expect(glyphs.filter((svg) => svg.includes('style='))).toEqual([])
+    expect(glyphs.map((svg) => svg.match(/stroke="([^"]*)"/)?.[1])).toEqual(
+      Array(4).fill('currentColor')
+    )
   })
 
   it('names the state for a reader, since a shape says nothing aloud', () => {
     seedSessions([session('a', { bellCount: 1 })])
-    const { container } = renderTabBar()
-    expect(container.querySelector('.tab-bar__state')!.getAttribute('aria-label')).toBe(
-      'Waiting on you'
-    )
+    renderTabBar()
+    expect(within(sessionTabs()[0]).getByRole('img', { name: 'Waiting on you' })).toBeTruthy()
   })
 })
 
@@ -597,7 +597,7 @@ describe('TabBar — the terminals the sidebar stopped listing (US3) — shows t
   it('shows the unread bell count', () => {
     seedSessions([session('a'), session('b', { bellCount: 4 })], 'a')
     renderTabBar()
-    expect(sessionTabs()[1].querySelector('.alert-badge--tab')!.textContent).toBe('4')
+    expect(within(sessionTabs()[1]).getByLabelText('4 alerts').textContent).toBe('4')
   })
 
   // FR-023 as amended. The description is reachable, and drawn nowhere.
@@ -630,23 +630,22 @@ describe('TabBar — the terminals the sidebar stopped listing (US3) — draws n
     seedSessions([session('a'), session('b')], 'a')
     renderTabBar()
     const [a, b] = sessionTabs()
-    expect(a.querySelector('.tab-bar__close')).toBeTruthy()
-    expect(b.querySelector('.tab-bar__close')).toBeNull()
+    expect(within(a).getByTitle('Close tab')).toBeTruthy()
+    expect(within(b).queryByTitle('Close tab')).toBeNull()
   })
 })
 
 describe('TabBar — the terminals the sidebar stopped listing (US3) — marks the row overflowed so the hidden tabs are discoverable', () => {
   it('marks the row overflowed so the hidden tabs are discoverable', () => {
     seedSessions(Array.from({ length: 12 }, (_, i) => session(`s${i}`)))
-    const { container } = renderTabBar()
-    expect(container.querySelector('.tab-bar--sessions')!.classList.toString()).toMatch(
-      /tab-bar--scrollable/
-    )
+    renderTabBar()
+    expect(screen.getByRole('tablist').className).toMatch(/tab-bar--scrollable/)
   })
 })
 
 const noted = session('ses-1', { tabTitle: 'claude' })
-const noteInput = () => document.querySelector<HTMLInputElement>('.tab-bar__note-input')
+const noteInput = () =>
+  screen.queryByPlaceholderText<HTMLInputElement>('What is this session doing?')
 
 /** The hooks every "TabBar — the description, edited from the tab (054 FR-006)" describe registers. */
 function setUpTabBarTheDescriptionEdited(): void {
@@ -889,15 +888,13 @@ describe('TabBar — a tab let go somewhere it does not leave from', () => {
 
 describe('TabBar — a tab let go on an agent composer', () => {
   beforeEach(() => seedSessions(threeTabs))
-  afterEach(() => {
-    document.querySelectorAll('[data-context-drop]').forEach((composer) => composer.remove())
-  })
 
   it('attaches its session to that agent tab, and neither reorders nor breaks out', async () => {
     renderTabBar()
     const composer = document.createElement('div')
     composer.dataset.contextDrop = 'agent-1'
     document.body.append(composer)
+    onTestFinished(() => composer.remove())
     dragTab(sessionTabs()[1], composer)
     await eventually(() => expect(attachSessions).toHaveBeenCalledWith('agent-1', ['ses-2']))
     expect(tabTitles()).toEqual(['Tab 1', 'Tab 2', 'Tab 3'])

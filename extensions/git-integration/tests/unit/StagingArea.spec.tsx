@@ -94,8 +94,7 @@ describe('StagingArea — file status badge tooltips', () => {
   )
 })
 
-const sectionTitled = (title: string) =>
-  screen.getByText(title).closest('.staging-area__section') as HTMLElement
+const sectionTitled = (title: string) => screen.getByRole('group', { name: title })
 
 describe('StagingArea — states', () => {
   it('shows loading state when status is null', () => {
@@ -251,7 +250,7 @@ describe('StagingArea — interactions — highlights selected file row', () => 
       setStatus: mockSetStatus,
       selectedFile: 'selected.ts',
     })
-    const { container } = render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    expect(container.querySelector('.staging-area__file-row--selected')).toBeTruthy()
+    render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
+    expect(screen.getByTestId('staging-file-row').getAttribute('aria-current')).toBe('true')
   })
 })

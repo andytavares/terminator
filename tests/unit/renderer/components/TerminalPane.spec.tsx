@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
 import { act, render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
@@ -38,7 +38,6 @@ function fileAt(path: string): File {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  document.querySelectorAll('dialog').forEach((dialog) => dialog.remove())
   seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     getActiveSessionForProject: mockGetActive,
@@ -97,14 +96,6 @@ describe('TerminalPane', () => {
 })
 
 describe('TerminalPane — renders container when sessions exist', () => {
-  it('renders container when sessions exist', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'Terminal', type: 'human' }])
-    mockGetActive.mockReturnValue('ses-1')
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    expect(container.querySelector('.terminal-pane')).toBeTruthy()
-    expect(container.querySelector('.terminal-pane__container')).toBeTruthy()
-  })
-
   it('clears the bell count of the session it shows', () => {
     seedRealSessions({ sessions: [{ id: 'ses-1', bellCount: 3 }], activeSessionId: 'ses-1' })
     render(<TerminalPane projectId="proj-1" />)
@@ -124,8 +115,8 @@ describe('TerminalPane — calls terminal focus when pane is clicked with an act
       mount: vi.fn(),
       unmount: vi.fn(),
     })
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    await user.click(container.querySelector('.terminal-pane')!)
+    render(<TerminalPane projectId="proj-1" />)
+    await user.click(screen.getByTestId('terminal-pane'))
     expect(mockFocus).toHaveBeenCalled()
   })
 })
@@ -140,8 +131,8 @@ describe('TerminalPane — pastes dropped file paths into the active terminal se
       mount: vi.fn(),
       unmount: vi.fn(),
     })
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    const pane = container.querySelector('.terminal-pane')!
+    render(<TerminalPane projectId="proj-1" />)
+    const pane = screen.getByTestId('terminal-pane')
     const file = fileAt('/Users/me/report.pdf')
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
     expect(mockPaste).toHaveBeenCalledWith('/Users/me/report.pdf')
@@ -158,8 +149,8 @@ describe('TerminalPane — does not call paste when no active session on drop', 
       mount: vi.fn(),
       unmount: vi.fn(),
     })
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    const pane = container.querySelector('.terminal-pane')!
+    render(<TerminalPane projectId="proj-1" />)
+    const pane = screen.getByTestId('terminal-pane')
     const file = fileAt('/x.txt')
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
     expect(mockPaste).not.toHaveBeenCalled()
@@ -173,10 +164,10 @@ describe('TerminalPane — accepts a file drag and refuses any other drag', () =
   ])('drag of $types is accepted: $accepted', ({ types, accepted }) => {
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
     mockGetActive.mockReturnValue('ses-1')
-    const { container } = render(<TerminalPane projectId="proj-1" />)
+    render(<TerminalPane projectId="proj-1" />)
     const event = new Event('dragover', { bubbles: true, cancelable: true })
     Object.defineProperty(event, 'dataTransfer', { value: { types } })
-    container.querySelector('.terminal-pane')!.dispatchEvent(event)
+    screen.getByTestId('terminal-pane').dispatchEvent(event)
     expect(event.defaultPrevented).toBe(accepted)
   })
 })
@@ -361,6 +352,7 @@ function openModal(): HTMLDialogElement {
   const dialog = document.createElement('dialog')
   dialog.setAttribute('open', '')
   document.body.appendChild(dialog)
+  onTestFinished(() => dialog.remove())
   return dialog
 }
 
@@ -453,8 +445,9 @@ describe('TerminalPane — split mode (layout present)', () => {
 describe('TerminalPane — split mode (layout present) — renders split container instead of single pane when layout exists', () => {
   it('renders split container instead of single pane when layout exists', () => {
     withTwoPaneSplit()
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    expect(container.querySelector('.terminal-pane--split')).toBeTruthy()
+    render(<TerminalPane projectId="proj-1" />)
+    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.queryByTestId('terminal-pane')).toBeNull()
   })
 })
 
@@ -466,10 +459,11 @@ describe('TerminalPane — split mode (layout present) — dragging the divider'
       activeSessionId: 'ses-1',
       paneLayouts: [twoPaneLayout()],
     })
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    const divider = container.querySelector('.split-container__divider') as HTMLElement
-    const outerContainer = container.querySelector('.split-container') as HTMLElement
-    outerContainer.getBoundingClientRect = () => new DOMRect(0, 0, 400, 300)
+    render(<TerminalPane projectId="proj-1" />)
+    const divider = screen.getByRole('separator')
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 400, 300)
+    )
     await user.pointer([
       { keys: '[MouseLeft>]', target: divider, coords: { clientX: 200 } },
       { coords: { clientX: 300 } },

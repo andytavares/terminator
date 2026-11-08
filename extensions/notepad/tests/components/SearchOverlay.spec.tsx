@@ -68,7 +68,7 @@ function searchOverlayClosingTests() {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const onClose = vi.fn()
     render(<SearchOverlay onClose={onClose} />)
-    expect(document.activeElement).toBe(screen.getByPlaceholderText(/search across all notes/i))
+    expect(screen.getByPlaceholderText(/search across all notes/i).matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })

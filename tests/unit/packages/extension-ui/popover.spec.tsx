@@ -69,10 +69,10 @@ describe('Popover — focus', () => {
     opener.focus()
 
     const { unmount } = renderPopover()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Today' }))
+    expect(screen.getByRole('button', { name: 'Today' }).matches(':focus')).toBe(true)
 
     unmount()
-    expect(document.activeElement).toBe(opener)
+    expect(opener.matches(':focus')).toBe(true)
     opener.remove()
   })
 
@@ -90,7 +90,7 @@ describe('Popover — focus', () => {
     renderPopover()
     screen.getByRole('button', { name: 'Tomorrow' }).focus()
     await user.tab()
-    expect(document.activeElement).toBe(document.body)
+    expect(document.body.matches(':focus-within')).toBe(false)
   })
 })
 

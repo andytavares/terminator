@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, beforeAll, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 // Imported with the file rather than inside a test: the pane's module graph
 // (highlight.js among it) takes about a second to load under vitest, and a
@@ -314,13 +314,33 @@ const oneLineDiff = () => oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'const x = 1')]
 async function renderDiffPane(diff: unknown, props: Partial<typeof defaultProps> = {}) {
   mockPrFileDiff.mockResolvedValue({ diff })
   const view = await renderPane(props)
-  await waitFor(() => expect(view.container.querySelector('.rs-hunk-anchor')).toBeTruthy())
+  await findFirstHunk()
   return view
 }
 
-/** Waits for the pane to mount its first hunk row. */
-const findFirstHunk = (container: HTMLElement) =>
-  waitFor(() => expect(container.querySelector('.rs-hunk-anchor')).toBeTruthy())
+/** Waits for the pane to mount its first hunk header, which carries a "Section viewed" box. */
+const findFirstHunk = () => screen.findAllByRole('checkbox', { name: 'Section viewed' })
+
+/** The mounted code rows, top to bottom: gap and hunk rows are left out. */
+const codeRows = () =>
+  screen.queryAllByRole('row').filter((row) => row.classList.contains('diff-line'))
+
+/** The mounted code row of new-side line `line`. */
+const rowOfLine = (line: number) =>
+  codeRows().find((row) => row.getAttribute('data-new-line') === String(line))!
+
+/** A code row's comment button in the line-number gutter. */
+const gutterButton = (row: HTMLElement) => within(row).getByRole('button', { name: 'Add comment' })
+
+/** A unified code row's code cell, its last. */
+const codeCell = (row: HTMLElement) => within(row).getAllByRole('cell').at(-1)!
+
+/** The code rows the reviewer has selected. */
+const selectedRows = () => screen.queryAllByRole('row', { selected: true })
+
+/** Whether the pane draws the split view's side tables. */
+const drawsSplit = () =>
+  screen.getAllByRole('table').some((table) => table.classList.contains('diff-table--split'))
 
 /** Line 1 of src/foo.ts, right side, as the reviewer's selection. */
 function selectLineOne() {
@@ -603,9 +623,9 @@ describe('ReviewDiffPane — switches to split view mode when Split button is cl
   it('switches to split view mode when Split button is clicked', async () => {
     const diff = oneHunk('@@ -1,3 +1,3 @@', [ctxLine(1, 'x'), addLine(2, 'y'), removeLine(2, 'z')])
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
-    const { container } = await renderDiffPane(diff)
+    await renderDiffPane(diff)
 
-    await waitFor(() => expect(container.querySelector('.diff-table--split')).toBeTruthy())
+    await waitFor(() => expect(drawsSplit()).toBe(true))
   })
 })
 
@@ -636,18 +656,18 @@ describe('ReviewDiffPane — a gutter drag across rows keeps the multi-line sele
       '@@ -1,3 +1,3 @@',
       [1, 2, 3].map((n) => ctxLine(n))
     )
-    const { container } = await renderDiffPane(diff)
+    await renderDiffPane(diff)
 
-    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
+    const rows = codeRows()
     // A press and release on different elements clicks their common ancestor.
     await user.pointer([
-      { keys: '[MouseLeft>]', target: rows[0].querySelector('.diff-gutter-btn')! },
+      { keys: '[MouseLeft>]', target: gutterButton(rows[0]) },
       { target: rows[1] },
-      { target: rows[2].querySelector('.diff-line__content')! },
+      { target: codeCell(rows[2]) },
       { keys: '[/MouseLeft]' },
     ])
 
-    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(3))
+    await waitFor(() => expect(selectedRows()).toHaveLength(3))
     expect(screen.getByRole('button', { name: /^Comment/ })).toBeTruthy()
     expect(uiStore.getState().selection).toEqual({
       path: 'src/foo.ts',
@@ -665,22 +685,22 @@ describe('ReviewDiffPane — a background click after the drag has settled still
       '@@ -1,2 +1,2 @@',
       [1, 2].map((n) => ctxLine(n))
     )
-    const { container } = await renderDiffPane(diff)
+    await renderDiffPane(diff)
 
-    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
+    const rows = codeRows()
     // The drag ends with a zero-delay timer that lets the click after it through. user-event
     // waits one zero-delay tick after the release, so that timer has fired before the click below.
     const user = userEvent.setup()
     await user.pointer([
-      { keys: '[MouseLeft>]', target: rows[0].querySelector('.diff-gutter-btn')! },
+      { keys: '[MouseLeft>]', target: gutterButton(rows[0]) },
       { target: rows[1] },
       { keys: '[/MouseLeft]' },
     ])
-    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(2))
+    await waitFor(() => expect(selectedRows()).toHaveLength(2))
 
-    await user.click(rows[0].querySelector('.diff-line__content')!)
+    await user.click(codeCell(rows[0]))
 
-    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(0))
+    await waitFor(() => expect(selectedRows()).toHaveLength(0))
     expect(uiStore.getState().selection).toBeNull()
   })
 })
@@ -860,8 +880,8 @@ async function renderSplit(overrides: Partial<typeof defaultProps> = {}) {
     diffViewMode: 'split',
   })
   const view = await renderPane(overrides)
-  await waitFor(() => expect(view.container.querySelector('.rs-hunk-anchor')).toBeTruthy())
-  await waitFor(() => expect(document.querySelector('.diff-table--split')).toBeTruthy())
+  await findFirstHunk()
+  await waitFor(() => expect(drawsSplit()).toBe(true))
   return view
 }
 
@@ -948,10 +968,9 @@ describe('ReviewDiffPane — pending drafts (S5)', () => {
         },
       ],
     })
-    const { container } = await renderPane()
+    await renderPane()
     await screen.findByText(/sent when you submit your review/)
-    const code = container.querySelector('.rs-thread-bd code')
-    expect(code?.textContent).toBe('fetch(filter)')
+    expect(screen.getAllByRole('code').map((code) => code.textContent)).toContain('fetch(filter)')
   })
 })
 
@@ -998,6 +1017,14 @@ describe('ReviewDiffPane — jump to the tests for a block', () => {
   })
 })
 
+/** The virtual list entry that holds new-side line `line`. */
+const entryOfLine = (line: number) =>
+  screen.getAllByTestId('diff-entry').find((entry) =>
+    within(entry)
+      .queryAllByRole('row')
+      .some((row) => row.getAttribute('data-new-line') === String(line))
+  )!
+
 describe('ReviewDiffPane — jump to the tests for a block — opening one', () => {
   useOneRowViewport()
 
@@ -1008,10 +1035,8 @@ describe('ReviewDiffPane — jump to the tests for a block — opening one', () 
     await jumpToTests(user)
     await user.click(await screen.findByRole('button', { name: /src\/foo\.ts:2/ }))
     expect(prStore.getState().currentFilePath).toBe('src/foo.ts')
-    const entry = document
-      .querySelector('[data-new-line="2"]')!
-      .closest<HTMLElement>('[data-index]')!
-    const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
+    const entry = entryOfLine(2)
+    const scroller = screen.getByTestId('review-diff-scroll')
     await waitFor(() =>
       expect(scroller.scrollTo).toHaveBeenCalledWith(
         expect.objectContaining({ top: Number(entry.dataset.index) * ROW_PX })
@@ -1035,11 +1060,12 @@ const renderTwoHunks = (props: Partial<typeof defaultProps> = {}) =>
   renderDiffPane(keyTwoHunkDiff, props)
 
 /** The scroll position of the entry holding the hunk at `hunkIndex`. */
-const topOfHunk = (hunkIndex: number) =>
-  Number(
-    document.querySelectorAll('.rs-hunk-anchor')[hunkIndex].closest<HTMLElement>('[data-index]')!
-      .dataset.index
-  ) * ROW_PX
+const topOfHunk = (hunkIndex: number) => {
+  const hunkEntries = screen
+    .getAllByTestId('diff-entry')
+    .filter((entry) => within(entry).queryByRole('checkbox', { name: 'Section viewed' }))
+  return Number(hunkEntries[hunkIndex].dataset.index) * ROW_PX
+}
 
 /** The hunk at line 1, the scope the agent keys act on without a selection. */
 const firstHunkScope = {
@@ -1056,7 +1082,7 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
 
   it('nextHunk scrolls the next hunk header into view', async () => {
     await renderTwoHunks()
-    const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
+    const scroller = screen.getByTestId('review-diff-scroll')
     window.dispatchEvent(new CustomEvent('review:next-hunk'))
     expect(topOfHunk(1)).toBeGreaterThan(0)
     expect(scroller.scrollTo).toHaveBeenLastCalledWith(
@@ -1066,7 +1092,7 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
 
   it('prevHunk scrolls the previous hunk header into view', async () => {
     await renderTwoHunks()
-    const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
+    const scroller = screen.getByTestId('review-diff-scroll')
     window.dispatchEvent(new CustomEvent('review:next-hunk')) // move to hunk 1 first
     expect(scroller.scrollTo).toHaveBeenLastCalledWith(
       expect.objectContaining({ top: topOfHunk(1) })
@@ -1223,7 +1249,7 @@ describe('ReviewDiffPane — insight gutter chips (R4)', () => {
     expect(screen.getByText('+6')).toBeTruthy()
     expect(screen.getByText('untested')).toBeTruthy()
     // The gutter column is sized to its widest chip ("untested"), so it never overlaps code.
-    const gut = screen.getByText('untested').closest('td') as HTMLElement
+    const gut = screen.getAllByRole('cell').find((cell) => within(cell).queryByText('untested'))!
     expect(gut.className).toBe('rs-gut')
     expect(gut.style.width).toBe('78px')
   })
@@ -1255,20 +1281,23 @@ const renderLoaded = async (
 ) => {
   mockPrFileDiff.mockResolvedValue({ diff })
   const view = await renderPane(props)
-  await waitFor(() => expect(view.container.querySelector('.diff-hunk-header')).toBeTruthy())
+  await findFirstHunk()
   return view
 }
-const expandedRows = (c: HTMLElement) => c.querySelectorAll('tr[data-expanded="true"]')
 
-/** Clicks the button labelled `label` in gap row `index`. */
-const clickGap = (c: HTMLElement, index: number, label: string) =>
-  userEvent
-    .setup()
-    .click(
-      (c.querySelectorAll('.diff-gap-row')[index] as HTMLElement).querySelector(
-        `button[aria-label${label.endsWith('*') ? '^' : ''}="${label.replace(/\*$/, '')}"]`
-      )!
-    )
+/** The code rows revealed from the file text, top to bottom. */
+const expandedRows = () => codeRows().filter((row) => row.getAttribute('data-expanded') === 'true')
+
+/** The gaps between hunks, each with its expand buttons. */
+const gaps = () => screen.queryAllByRole('group', { name: 'Unchanged lines' })
+
+/** Clicks the button labelled `label` in gap `index`. */
+const clickGap = (index: number, label: string) =>
+  userEvent.setup().click(within(gaps()[index]).getByRole('button', { name: label }))
+
+/** The unified view's hunk header cells. */
+const unifiedHunkHeaders = () =>
+  screen.queryAllByRole('cell').filter((cell) => cell.classList.contains('diff-hunk-header'))
 
 /** The PR head's file text is the 100 numbered lines. */
 const useFileContent = () =>
@@ -1280,22 +1309,24 @@ describe('ReviewDiffPane expandable context', () => {
   useFileContent()
 
   it('shows no expanded rows and fetches nothing on first render', async () => {
-    const { container } = await renderLoaded()
-    expect(expandedRows(container).length).toBe(0)
+    await renderLoaded()
+    expect(expandedRows().length).toBe(0)
     expect(mockPrFileContent).not.toHaveBeenCalled()
   })
 
   it('offers the right buttons per gap kind without touching hunk headers', async () => {
-    const { container } = await renderLoaded()
-    const rows = Array.from(container.querySelectorAll('.diff-gap-row'))
+    await renderLoaded()
+    const rows = gaps()
     expect(rows.length).toBe(3)
     const names = rows.map((r) =>
-      Array.from(r.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))
+      within(r)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label'))
     )
     expect(names[0]).toEqual(['Show 9 unchanged lines'])
     expect(names[1]).toEqual(['Show 20 lines below', 'Show all 37 lines', 'Show 20 lines above'])
     expect(names[2]).toEqual(['Show 20 lines below', 'Show all lines'])
-    expect(container.querySelectorAll('.diff-hunk-header').length).toBe(2)
+    expect(unifiedHunkHeaders().length).toBe(2)
   })
 })
 
@@ -1303,9 +1334,9 @@ describe('ReviewDiffPane expandable context — fetches once on the first click 
   useFileContent()
 
   it('fetches once on the first click and renders 20 numbered rows below the hunk', async () => {
-    const { container } = await renderLoaded()
-    await clickGap(container, 1, 'Show 20 lines below')
-    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
+    await waitFor(() => expect(expandedRows().length).toBe(20))
     expect(mockPrFileContent).toHaveBeenCalledTimes(1)
     expect(mockPrFileContent).toHaveBeenCalledWith({
       repoRoot: '/repo',
@@ -1313,15 +1344,15 @@ describe('ReviewDiffPane expandable context — fetches once on the first click 
       path: 'src/foo.ts',
       ref: 'abc',
     })
-    const rows = Array.from(expandedRows(container))
+    const rows = Array.from(expandedRows())
     expect(rows[0].getAttribute('data-old-line')).toBe('13')
     expect(rows[0].getAttribute('data-new-line')).toBe('13')
     expect(rows[19].getAttribute('data-new-line')).toBe('32')
     expect(rows[0].classList.contains('diff-line--expanded')).toBe(true)
     expect(rows[0].textContent).toContain('line 13')
 
-    await clickGap(container, 1, 'Show 17 unchanged lines')
-    await waitFor(() => expect(expandedRows(container).length).toBe(37))
+    await clickGap(1, 'Show 17 unchanged lines')
+    await waitFor(() => expect(expandedRows().length).toBe(37))
     expect(mockPrFileContent).toHaveBeenCalledTimes(1)
   })
 })
@@ -1330,10 +1361,10 @@ describe('ReviewDiffPane expandable context — a gap no bigger than one step op
   useFileContent()
 
   it('reveals the whole 9-line gap above the first hunk', async () => {
-    const { container } = await renderLoaded()
-    await clickGap(container, 0, 'Show 9 unchanged lines')
-    await waitFor(() => expect(expandedRows(container).length).toBe(9))
-    const rows = Array.from(expandedRows(container))
+    await renderLoaded()
+    await clickGap(0, 'Show 9 unchanged lines')
+    await waitFor(() => expect(expandedRows().length).toBe(9))
+    const rows = Array.from(expandedRows())
     expect(rows[0].getAttribute('data-new-line')).toBe('1')
     expect(rows[8].getAttribute('data-new-line')).toBe('9')
   })
@@ -1361,13 +1392,13 @@ describe('ReviewDiffPane expandable context — Show all removes that expander a
         },
       ],
     }
-    const { container } = await renderLoaded(shifted)
-    await clickGap(container, 1, 'Show 8 unchanged lines')
-    await waitFor(() => expect(expandedRows(container).length).toBe(8))
-    const rows = Array.from(expandedRows(container))
+    await renderLoaded(shifted)
+    await clickGap(1, 'Show 8 unchanged lines')
+    await waitFor(() => expect(expandedRows().length).toBe(8))
+    const rows = Array.from(expandedRows())
     expect(rows[0].getAttribute('data-new-line')).toBe('13')
     expect(rows[0].getAttribute('data-old-line')).toBe('12')
-    expect(container.querySelectorAll('.diff-gap-row').length).toBe(2)
+    expect(gaps().length).toBe(2)
   })
 })
 
@@ -1380,15 +1411,16 @@ describe('ReviewDiffPane expandable context — renders revealed rows in split v
       diffViewMode: 'split' as const,
     })
     mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
-    const { container } = await renderPane()
-    await waitFor(() => expect(container.querySelector('.diff-split-header')).toBeTruthy())
-    await clickGap(container, 1, 'Show 20 lines below')
-    await waitFor(() =>
-      expect(container.querySelectorAll('tr[data-expanded="true"]').length).toBe(40)
-    )
-    expect(container.querySelectorAll('.diff-table--left tr[data-old-line="13"]').length).toBe(1)
-    expect(container.querySelectorAll('.diff-table--right tr[data-new-line="13"]').length).toBe(1)
-    expect(container.querySelectorAll('.diff-hunk-header').length).toBe(0)
+    await renderPane()
+    await findFirstHunk()
+    await clickGap(1, 'Show 20 lines below')
+    await waitFor(() => expect(expandedRows().length).toBe(40))
+    // A split row names only its own side's line, so line 13 shows once on each side.
+    const lineThirteen = (side: string) =>
+      expandedRows().filter((row) => row.getAttribute(`data-${side}-line`) === '13')
+    expect(lineThirteen('old').length).toBe(1)
+    expect(lineThirteen('new').length).toBe(1)
+    expect(unifiedHunkHeaders().length).toBe(0)
   })
 })
 
@@ -1397,12 +1429,11 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
 
   it('hides Comment but keeps the other actions when the selection includes a revealed line', async () => {
     await useRealUiStore()
-    const { container } = await renderLoaded()
-    await clickGap(container, 1, 'Show 20 lines below')
-    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
+    await waitFor(() => expect(expandedRows().length).toBe(20))
 
-    const row = container.querySelector('tr[data-new-line="13"]')!
-    await userEvent.setup().click(row.querySelector('.diff-gutter-btn')!)
+    await userEvent.setup().click(gutterButton(rowOfLine(13)))
     await screen.findByRole('button', { name: /Ask agent/ })
     expect(screen.queryByRole('button', { name: /Comment/ })).toBeNull()
     expect(screen.getByRole('button', { name: /Add note/ })).toBeTruthy()
@@ -1416,9 +1447,8 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
 
   it('still offers Comment for a selection inside the diff', async () => {
     await useRealUiStore()
-    const { container } = await renderLoaded()
-    const row = container.querySelector('tr[data-new-line="11"]')!
-    await userEvent.setup().click(row.querySelector('.diff-gutter-btn')!)
+    await renderLoaded()
+    await userEvent.setup().click(gutterButton(rowOfLine(11)))
     await screen.findByRole('button', { name: /Comment/ })
   })
 })
@@ -1428,21 +1458,21 @@ describe('ReviewDiffPane expandable context — says the file is too large and o
 
   it('says the file is too large and offers no buttons', async () => {
     mockPrFileContent.mockResolvedValue({ tooLarge: true })
-    const { container } = await renderLoaded()
-    await clickGap(container, 1, 'Show 20 lines below')
+    await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
     await waitFor(() =>
       expect(screen.getAllByText('This file is too large to expand here.').length).toBe(3)
     )
-    expect(container.querySelectorAll('.diff-gap-row button').length).toBe(0)
+    expect(gaps().flatMap((gap) => within(gap).queryAllByRole('button'))).toHaveLength(0)
   })
 
   it('shows the error with Retry, and Retry fetches again', async () => {
     mockPrFileContent.mockResolvedValueOnce({ error: 'NETWORK_DOWN' })
-    const { container } = await renderLoaded()
-    await clickGap(container, 1, 'Show 20 lines below')
+    await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
     await waitFor(() => expect(screen.getAllByText('NETWORK_DOWN').length).toBe(3))
     await userEvent.setup().click(screen.getAllByRole('button', { name: 'Retry' })[0])
-    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    await waitFor(() => expect(expandedRows().length).toBe(20))
     expect(mockPrFileContent).toHaveBeenCalledTimes(2)
   })
 })
@@ -1451,32 +1481,32 @@ describe('ReviewDiffPane expandable context — resets expansions when another f
   useFileContent()
 
   it('resets expansions when another file opens', async () => {
-    const { container, rerender } = await renderLoaded()
-    await clickGap(container, 1, 'Show 20 lines below')
-    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    const { rerender } = await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
+    await waitFor(() => expect(expandedRows().length).toBe(20))
 
     const other = { ...mockFile, path: 'src/bar.ts' }
     mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
     rerender(<ReviewDiffPane {...defaultProps} file={other} />)
     await screen.findByTitle('src/bar.ts')
-    await waitFor(() => expect(container.querySelectorAll('.diff-gap-row').length).toBe(3))
-    expect(expandedRows(container).length).toBe(0)
+    await waitFor(() => expect(gaps().length).toBe(3))
+    expect(expandedRows().length).toBe(0)
   })
 
   it('shows no expanders for a binary file', async () => {
-    const { container } = await renderPane({ file: { ...mockFile, isBinary: true } })
-    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
+    await renderPane({ file: { ...mockFile, isBinary: true } })
+    expect(gaps().length).toBe(0)
   })
 
   it('shows no expanders for a truncated diff', async () => {
-    const { container } = await renderLoaded({ ...twoHunkDiff, truncated: true })
-    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
+    await renderLoaded({ ...twoHunkDiff, truncated: true })
+    expect(gaps().length).toBe(0)
   })
 
   it('shows no expanders for an added file', async () => {
     const added = oneHunk('@@ -0,0 +1,2 @@', [addLine(1, 'a'), addLine(2, 'b')])
-    const { container } = await renderLoaded(added)
-    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
+    await renderLoaded(added)
+    expect(gaps().length).toBe(0)
   })
 })
 
@@ -1600,10 +1630,10 @@ describe('ReviewDiffPane — fetch and render cost — a drag over the diff re-r
   it('a drag over the diff re-renders only the rows whose selection changed', async () => {
     const user = userEvent.setup()
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
-    const { container } = await renderPane()
-    await findFirstHunk(container)
-    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
-    await user.pointer({ keys: '[MouseLeft>]', target: rows[0].querySelector('.diff-gutter-btn')! })
+    await renderPane()
+    await findFirstHunk()
+    const rows = codeRows()
+    await user.pointer({ keys: '[MouseLeft>]', target: gutterButton(rows[0]) })
     rowRenderSpy.mockClear()
 
     await user.pointer([{ target: rows[1] }, { target: rows[2] }])
@@ -1617,25 +1647,27 @@ describe('ReviewDiffPane — fetch and render cost — dragging the split divide
     const user = userEvent.setup()
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
-    const { container } = await renderPane()
-    await findFirstHunk(container)
-    vi.spyOn(
-      container.querySelector('.review-diff-scroll')!,
-      'getBoundingClientRect'
-    ).mockReturnValue({ width: 400 } as DOMRect)
+    await renderPane()
+    await findFirstHunk()
+    vi.spyOn(screen.getByTestId('review-diff-scroll'), 'getBoundingClientRect').mockReturnValue({
+      width: 400,
+    } as DOMRect)
     rowRenderSpy.mockClear()
 
     await user.pointer([
       {
         keys: '[MouseLeft>]',
-        target: container.querySelector('.diff-split-resize-handle')!,
+        target: screen.getAllByRole('separator', { name: 'Resize split' })[0],
         coords: { clientX: 100 },
       },
       { coords: { clientX: 140 } },
       { keys: '[/MouseLeft]' },
     ])
 
-    expect(container.querySelector<HTMLElement>('.diff-table--left')!.style.width).toBe('60%')
+    const left = screen
+      .getAllByRole('table')
+      .find((table) => table.classList.contains('diff-table--left'))!
+    expect(left.style.width).toBe('60%')
     expect(rowRenderSpy).not.toHaveBeenCalled()
   })
 })
@@ -1644,13 +1676,13 @@ describe('ReviewDiffPane — fetch and render cost — mounts few rows', () => {
   it('mounts only the rows near the viewport of a 2,000-line file', async () => {
     layOut(800)
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
-    const { container } = await renderPane()
-    await findFirstHunk(container)
+    await renderPane()
+    await findFirstHunk()
 
-    const mounted = container.querySelectorAll('tr.diff-line').length
+    const mounted = codeRows().length
     expect(mounted).toBeGreaterThan(800 / ROW_PX - 1)
     expect(mounted).toBeLessThan(MOUNTED_ROWS_CAP)
-    expect(container.querySelector('[data-new-line="1500"]')).toBeNull()
+    expect(rowOfLine(1500)).toBeUndefined()
   })
 })
 
@@ -1658,17 +1690,14 @@ describe('ReviewDiffPane — fetch and render cost — mounts the rows it scroll
   it('mounts the rows it scrolls to', async () => {
     layOut(800)
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
-    const { container } = await renderPane()
-    await findFirstHunk(container)
-    const scroller = container.querySelector<HTMLElement>('.review-diff-scroll')!
+    await renderPane()
+    await findFirstHunk()
+    const scroller = screen.getByTestId('review-diff-scroll')
 
     Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 1500 * ROW_PX })
     fireEvent.scroll(scroller)
 
-    const mountedLines = () =>
-      Array.from(container.querySelectorAll<HTMLElement>('tr.diff-line')).map((row) =>
-        Number(row.dataset.newLine)
-      )
+    const mountedLines = () => codeRows().map((row) => Number(row.dataset.newLine))
     await waitFor(() => expect(Math.min(...mountedLines())).toBeGreaterThan(1000))
     expect(mountedLines().length).toBeLessThan(MOUNTED_ROWS_CAP)
   })
@@ -1678,16 +1707,15 @@ describe('ReviewDiffPane — hunk rows read as prose', () => {
   it('names the enclosing symbol and hides the line ranges', async () => {
     const diff = oneHunk('@@ -1,3 +1,3 @@ def add(a, b):', [ctxLine(1, 'return a + b')])
     const { container } = await renderDiffPane(diff)
-    const row = container.querySelector('.diff-hunk-header')!
-    expect(row.textContent).toContain('in add')
-    expect(row.querySelector('code')?.textContent).toBe('add')
+    expect(screen.getByText(wholeText('in add'))).toBeTruthy()
+    expect(screen.getByRole('code').textContent).toBe('add')
     expect(container.textContent).not.toContain('@@')
   })
 
   it('shows the context text when it names no symbol', async () => {
     const diff = oneHunk('@@ -1,3 +1,3 @@ (', [ctxLine(1, 'x')])
     const { container } = await renderDiffPane(diff)
-    expect(container.querySelector('.diff-hunk-header')!.textContent).toContain('(')
+    expect(unifiedHunkHeaders()[0].textContent).toContain('(')
     expect(container.textContent).not.toContain('@@')
   })
 })
@@ -1698,11 +1726,11 @@ describe('ReviewDiffPane — gap of one line', () => {
       ...hunkAt(start),
       header: `@@ -${start},3 +${start},3 @@`,
     }))
-    const { container } = await renderLoaded({ path: 'src/foo.ts', isBinary: false, hunks })
-    const between = container.querySelectorAll('.diff-gap-row')[1]
+    await renderLoaded({ path: 'src/foo.ts', isBinary: false, hunks })
+    const between = gaps()[1]
     expect(between.textContent).toContain('Show 1 unchanged line')
     expect(between.textContent).not.toContain('1 unchanged lines')
-    expect(between.querySelectorAll('button').length).toBe(1)
+    expect(within(between).getAllByRole('button').length).toBe(1)
   })
 })
 
@@ -1715,16 +1743,19 @@ describe('ReviewDiffPane — changed words in the unified view', () => {
 
   it('marks the changed words of a replaced pair and nothing else', async () => {
     const { container } = await renderDiffPane(replaced)
+    // The marks sit inside the highlighted HTML and carry no role, so they are found by class.
+    // eslint-disable-next-line testing-library/no-node-access -- see above
     const added = container.querySelectorAll('.diff-word--add')
+    // eslint-disable-next-line testing-library/no-node-access -- see above
     const removed = container.querySelectorAll('.diff-word--remove')
     expect(Array.from(added).map((n) => n.textContent)).toEqual(['pull_up', 'True'])
     expect(Array.from(removed).map((n) => n.textContent)).toEqual(['bounce_time', '0.05'])
   })
 
   it('leaves an unpaired added line unmarked', async () => {
-    const { container } = await renderDiffPane(replaced)
-    const unpaired = container.querySelector('tr[data-new-line="44"]')!
-    expect(unpaired.querySelector('.diff-word--add')).toBeNull()
+    await renderDiffPane(replaced)
+    const unpaired = rowOfLine(44)
+    expect(unpaired.innerHTML).not.toContain('diff-word--add')
     expect(unpaired.textContent).toContain('self.contact = settings.contact')
   })
 })

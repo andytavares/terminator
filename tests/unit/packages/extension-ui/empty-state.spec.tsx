@@ -79,6 +79,7 @@ describe('EmptyState — renders a secondary action beside the primary', () => {
 describe('EmptyState — renders an icon flat, with no colour of its own', () => {
   it('renders an icon flat, with no colour of its own', () => {
     const { container } = render(<EmptyState {...base} icon={FileText} />)
+    // eslint-disable-next-line testing-library/no-node-access -- a flat icon is aria-hidden, so no role or label finds it; its colour attributes are what this test checks
     const svgs = container.querySelectorAll('svg')
     expect(svgs).toHaveLength(1)
     // Principle XII: icons inherit currentColor and are sized by CSS.
@@ -162,6 +163,7 @@ describe('IconButton — comes in a small size for dense rows and chips', () => 
 
   it('sizes the icon by CSS rather than by a size prop', () => {
     const { container } = render(<IconButton icon={FileText} label="List view" onClick={noop} />)
+    // eslint-disable-next-line testing-library/no-node-access -- the icon is aria-hidden, so no role or label finds it; its size attribute is what this test checks
     const svg = container.querySelector('svg')!
     // Principle XII forbids the size prop; lucide's default 24 stays and CSS
     // decides what is drawn.

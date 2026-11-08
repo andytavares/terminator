@@ -106,27 +106,26 @@ describe('ContributionsSection — counts Contributions as opened plus merged pl
 describe('ContributionsSection — marks a lower count with a red down delta', () => {
   it('draws one down arrow beside the lower merged count', async () => {
     const period = { opened: 96, merged: 70, reviewed: 235, total: 401 }
-    const { container } = await renderSection(makeReply({ period }))
-    expect(screen.getByText('+47 vs prev period')).toBeDefined()
-    expect(screen.getByText('−2 vs prev period')).toBeDefined()
-    expect(container.querySelectorAll('.ct-delta--down')).toHaveLength(1)
-    expect(container.querySelectorAll('.ct-delta--up')).toHaveLength(3)
+    await renderSection(makeReply({ period }))
+    expect(screen.getByText('−2 vs prev period').classList.contains('ct-delta--down')).toBe(true)
+    const ups = screen.getAllByText(/^\+\d+ vs prev period$/)
+    expect(ups.map((delta) => delta.classList.contains('ct-delta--up'))).toEqual([true, true, true])
   })
 })
 
 describe('ContributionsSection — draws 53 week columns', () => {
   it('renders a column per week', async () => {
-    const { container } = await renderSection(makeReply())
-    expect(container.querySelectorAll('.ct-week')).toHaveLength(53)
+    await renderSection(makeReply())
+    expect(screen.getAllByTestId('heatmap-week')).toHaveLength(53)
   })
 })
 
 describe('ContributionsSection — scales the heatmap to its width', () => {
   it('splits the width into one fractional column per week and places months by percent', async () => {
-    const { container } = await renderSection(makeReply())
-    const weeks = container.querySelector<HTMLElement>('.ct-weeks')
-    expect(weeks?.style.gridTemplateColumns).toBe('repeat(53, minmax(0, 1fr))')
-    const months = [...container.querySelectorAll<HTMLElement>('.ct-months span')]
+    await renderSection(makeReply())
+    const weeks = screen.getByTestId('heatmap-weeks')
+    expect(weeks.style.gridTemplateColumns).toBe('repeat(53, minmax(0, 1fr))')
+    const months = screen.getAllByTestId('heatmap-month')
     const offsets = months.map((month) => month.style.getPropertyValue('--ct-month-at'))
     expect(offsets[0]).toBe('0%')
     expect(offsets.every((offset) => /^\d+(\.\d+)?%$/.test(offset))).toBe(true)
@@ -135,8 +134,9 @@ describe('ContributionsSection — scales the heatmap to its width', () => {
 
 describe('ContributionsSection — does not draw future days', () => {
   it('hides the cells after today and titles a day with its count', async () => {
-    const { container } = await renderSection(makeReply())
-    expect(container.querySelectorAll('.ct-day[style*="hidden"]').length).toBeGreaterThan(0)
+    await renderSection(makeReply())
+    const days = screen.getAllByTestId('heatmap-day')
+    expect(days.filter((day) => day.style.visibility === 'hidden').length).toBeGreaterThan(0)
     expect(screen.getByTitle('3 contributions on Thu, Oct 15, 2026')).toBeDefined()
   })
 })

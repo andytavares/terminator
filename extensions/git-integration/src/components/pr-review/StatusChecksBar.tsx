@@ -144,9 +144,10 @@ export function GroupedCheckList({ checks }: { checks: StatusCheck[] }) {
       {GROUP_ORDER.map(({ state, heading }) => {
         const inGroup = checks.filter((check) => check.state === state)
         if (inGroup.length === 0) return null
+        const title = `${heading} · ${inGroup.length}`
         return (
-          <section key={state} className="pr-checks-group">
-            <h4 className="pr-checks-group-heading">{`${heading} · ${inGroup.length}`}</h4>
+          <section key={state} className="pr-checks-group" aria-label={title}>
+            <h4 className="pr-checks-group-heading">{title}</h4>
             <CheckList checks={inNaturalOrder(inGroup)} />
           </section>
         )

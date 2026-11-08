@@ -13,9 +13,10 @@ type ShellProps = React.ComponentProps<typeof ModalShell>
 
 function renderShell(overrides: Partial<ShellProps> = {}) {
   const onDismiss = overrides.onDismiss ?? vi.fn()
+  const { children = <button>Appearance</button> } = overrides
   const utils = render(
     <ModalShell label="Settings" {...overrides} onDismiss={onDismiss}>
-      {overrides.children ?? <button>Appearance</button>}
+      {children}
     </ModalShell>
   )
   return { ...utils, onDismiss, dialog: screen.getByRole('dialog') }
@@ -94,7 +95,7 @@ describe('ModalShell — dismissal — when dismissible is false', () => {
     const user = userEvent.setup()
     const { onDismiss } = renderShell({ dismissible: false })
     await user.click(screen.getByRole('button', { name: 'Appearance' }))
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Appearance' }))
+    expect(screen.getByRole('button', { name: 'Appearance' }).matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(onDismiss).not.toHaveBeenCalled()
   })
@@ -119,7 +120,7 @@ describe('ModalShell — a caller with its own Escape', () => {
       children: <input aria-label="Search" onKeyDown={(e) => e.preventDefault()} />,
     })
     await user.click(screen.getByRole('textbox', { name: 'Search' }))
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Search' }))
+    expect(screen.getByRole('textbox', { name: 'Search' }).matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(onDismiss).not.toHaveBeenCalled()
   })
@@ -156,7 +157,7 @@ describe('ModalShell — nested', () => {
     const onInner = vi.fn()
     render(<NestedShells onOuter={onOuter} onInner={onInner} />)
     await user.click(screen.getByRole('button', { name: 'Inside' }))
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Inside' }))
+    expect(screen.getByRole('button', { name: 'Inside' }).matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(onInner).toHaveBeenCalledTimes(1)
     expect(onOuter).not.toHaveBeenCalled()
@@ -184,7 +185,7 @@ describe('ModalShell — nested inside one that is not dismissible', () => {
       </ModalShell>
     )
     await user.click(screen.getByRole('button', { name: 'Inside' }))
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Inside' }))
+    expect(screen.getByRole('button', { name: 'Inside' }).matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(onInner).toHaveBeenCalledTimes(1)
   })

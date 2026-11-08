@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ModalShell } from '../../../../packages/extension-ui/src/ModalShell'
 import { Toast, ToastRegion } from '../../../../packages/extension-ui/src/Toast'
@@ -16,7 +16,7 @@ describe('Toast', () => {
     // role="status" is what lets a toast appear over an open dialog without
     // interrupting whoever is typing in it.
     expect(screen.getByRole('status').textContent).toContain('Saved')
-    expect(document.activeElement).toBe(document.body)
+    expect(document.body.matches(':focus-within')).toBe(false)
   })
 
   it('dismisses itself after its duration', () => {
@@ -87,7 +87,7 @@ describe('Toast — with no action', () => {
 describe('ToastRegion', () => {
   it('renders nothing when there is nothing to say', () => {
     const { container } = render(<ToastRegion toasts={[]} onDismiss={vi.fn()} />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('dismisses the toast that was closed, not the first one', async () => {
@@ -110,6 +110,7 @@ describe('ToastRegion', () => {
     const { container } = render(
       <ToastRegion toasts={[{ id: 'a', message: 'Saved' }]} onDismiss={vi.fn()} />
     )
+    // eslint-disable-next-line testing-library/no-node-access -- the region is a plain wrapper with no role; its z-index is what this test checks
     const region = container.querySelector('.tmui-toast-region') as HTMLElement
     expect(Number(region.style.zIndex)).toBe(400)
   })
@@ -130,23 +131,27 @@ function AppWithToast({ modals }: { modals: string[] }): React.JSX.Element {
 
 // Everything outside an open modal dialog is inert and painted over, a toast included.
 describe('ToastRegion — while a modal shell is open', () => {
-  const holderOf = (toast: HTMLElement) => toast.closest('dialog')?.getAttribute('aria-label')
+  const holderOf = (): (string | null)[] =>
+    screen
+      .queryAllByRole('dialog')
+      .filter((dialog) => within(dialog).queryByRole('status') !== null)
+      .map((dialog) => dialog.getAttribute('aria-label'))
 
   it('renders in the page when none is open', () => {
     render(<AppWithToast modals={[]} />)
-    expect(holderOf(screen.getByRole('status'))).toBeUndefined()
+    expect(holderOf()).toEqual([])
   })
 
   it('renders inside the shell opened last', () => {
     render(<AppWithToast modals={['Settings', 'Reset']} />)
-    expect(holderOf(screen.getByRole('status'))).toBe('Reset')
+    expect(holderOf()).toEqual(['Reset'])
   })
 
   it('moves to the shell beneath, then back to the page, as they close', () => {
     const { rerender } = render(<AppWithToast modals={['Settings', 'Reset']} />)
     rerender(<AppWithToast modals={['Settings']} />)
-    expect(holderOf(screen.getByRole('status'))).toBe('Settings')
+    expect(holderOf()).toEqual(['Settings'])
     rerender(<AppWithToast modals={[]} />)
-    expect(holderOf(screen.getByRole('status'))).toBeUndefined()
+    expect(holderOf()).toEqual([])
   })
 })

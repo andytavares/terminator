@@ -357,11 +357,12 @@ function ShortcutChips({ picker, props }: PaneProps): React.JSX.Element {
   const current = showCalendar ? picker.datePart : picker.timePart
   const pick = showCalendar ? picker.selectDate : picker.timeShortcut
   return (
-    <div className="dtp__shortcuts">
+    <div className="dtp__shortcuts" role="group" aria-label="Shortcuts">
       {chips.map((s) => (
         <button
           key={s.label}
           type="button"
+          aria-pressed={current === s.getValue()}
           className={`dtp__chip${current === s.getValue() ? ' dtp__chip--active' : ''}`}
           onClick={() => pick(s.getValue())}
         >
@@ -389,6 +390,7 @@ function CalendarDay({ cell, datePart, min, onSelect }: DayProps): React.JSX.Ele
     <button
       type="button"
       disabled={isDisabled}
+      aria-pressed={isSelected}
       className={className}
       onClick={() => onSelect(cellStr)}
     >
@@ -400,7 +402,7 @@ function CalendarDay({ cell, datePart, min, onSelect }: DayProps): React.JSX.Ele
 function CalendarPane({ picker, props }: PaneProps): React.JSX.Element {
   const { displayYear, displayMonth, prev, next } = picker.month
   return (
-    <div className="dtp__calendar">
+    <div className="dtp__calendar" role="group" aria-label="Calendar">
       <div className="dtp__cal-header">
         <IconButton icon={ChevronLeft} label="Previous month" size="sm" onClick={prev} />
         <span className="dtp__cal-month-label">
@@ -432,6 +434,7 @@ function HalfButton({ picker, half }: { picker: Picker; half: AmPm }): React.JSX
   return (
     <button
       type="button"
+      aria-pressed={picker.amPm === half}
       className={`dtp__ampm-btn${picker.amPm === half ? ' dtp__ampm-btn--active' : ''}`}
       onClick={() => picker.toggleHalf(half)}
     >
@@ -448,11 +451,12 @@ function TimePane({ picker, timeListRef }: TimeProps): React.JSX.Element {
         <HalfButton picker={picker} half="AM" />
         <HalfButton picker={picker} half="PM" />
       </div>
-      <div ref={timeListRef} className="dtp__time-list">
+      <div ref={timeListRef} className="dtp__time-list" role="group" aria-label="Times">
         {visibleSlots.map((slot) => (
           <button
             key={slot}
             type="button"
+            aria-pressed={slot === picker.timePart}
             className={`dtp__time-slot${slot === picker.timePart ? ' dtp__time-slot--selected' : ''}`}
             onClick={() => picker.selectTime(slot)}
           >
@@ -505,7 +509,12 @@ function triggerClass(value: string, open: boolean): string {
 function TriggerButton({ props, open, onToggle }: TriggerProps): React.JSX.Element {
   const Icon = props.mode === 'time' ? Clock : Calendar
   return (
-    <button type="button" className={triggerClass(props.value, open)} onClick={onToggle}>
+    <button
+      type="button"
+      aria-expanded={open}
+      className={triggerClass(props.value, open)}
+      onClick={onToggle}
+    >
       <Icon className="tm-icon" />
       <span className="dtp__trigger-label">{triggerLabel(props)}</span>
     </button>

@@ -180,7 +180,7 @@ function DayDots({ rows }: { rows: DayData[] }) {
   return (
     <span className="cal-drawer__dots">
       {dots.slice(0, 3).map((s) => (
-        <span key={s} className={statusDotClass(s)} />
+        <span key={s} className={statusDotClass(s)} data-testid="cal-dot" />
       ))}
     </span>
   )

@@ -47,7 +47,7 @@ describe('ArchiveView sections', () => {
     render(<ArchiveView />)
     const tasks = await screen.findByRole('tab', { name: 'Completed tasks, 0' })
     await user.click(tasks)
-    expect(document.activeElement).toBe(tasks)
+    expect(tasks.matches(':focus')).toBe(true)
     await user.keyboard('{ArrowRight}')
     expect(
       screen.getByRole('tab', { name: 'Archived projects, 1' }).getAttribute('aria-selected')

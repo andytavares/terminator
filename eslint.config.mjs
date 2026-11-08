@@ -368,6 +368,8 @@ export default defineConfig([
       ],
       'testing-library/prefer-presence-queries': 'error',
       'testing-library/prefer-screen-queries': 'error',
+      // Query what a person perceives (role, label, text), not the DOM's structure (T-READABLE).
+      'testing-library/no-node-access': 'error',
     },
   },
   {

@@ -103,6 +103,7 @@ function FileDiffBody({ diff, view }: { diff: FileDiff; view: ViewState }) {
   return (
     <div
       className="file-diff-view__scroll"
+      data-testid="diff-scroll"
       ref={scrollRef}
       style={choose(viewMode === 'split', splitStyle, undefined)}
     >

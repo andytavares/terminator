@@ -173,6 +173,7 @@ function drawingTests() {
     const { container } = render(
       <HallScene map={map} worldRef={worldRef} states={{}} reducedMotion />
     )
+    // eslint-disable-next-line testing-library/no-node-access -- an aria-hidden canvas has no role or label; its size is what this test checks
     const canvas = container.querySelector('canvas')
     expect(canvas?.getAttribute('aria-hidden')).toBe('true')
     expect(canvas?.width).toBe(map.width * 16)

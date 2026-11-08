@@ -78,7 +78,7 @@ async function mountComposer(running = false): Promise<void> {
 }
 
 const box = (): HTMLTextAreaElement => screen.getByLabelText('Message the agent')
-const composer = (): HTMLElement => document.querySelector('[data-context-drop="agent-1"]')!
+const composer = (): HTMLElement => screen.getByRole('group', { name: 'Message composer' })
 const attached = (): AttachedContext => attachedOf('agent-1')(useAttachedContextStore.getState())
 
 const sessionDrag = (ids: string) => ({

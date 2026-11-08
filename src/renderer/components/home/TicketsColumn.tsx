@@ -172,7 +172,7 @@ export function TicketsColumn(): React.JSX.Element {
   const today = useFocusStore((s) => s.days[localDateKey(Date.now())] ?? NO_FOCUS)
   const close = (): void => setOpenTicket(null)
   return (
-    <div className="plan__column">
+    <div className="plan__column" role="group" aria-label="Tickets">
       <h3 className="plan__title">
         {term.trim() !== '' ? 'TICKETS · SEARCH RESULTS' : 'TICKETS · MINE'}
       </h3>

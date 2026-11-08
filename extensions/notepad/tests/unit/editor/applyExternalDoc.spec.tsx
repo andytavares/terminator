@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import React from 'react'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { NoteEditor, applyExternalDoc } from '../../../src/editor/NoteEditor'
@@ -74,8 +74,8 @@ function applyExternalDocLocalEditsTests() {
 
   it('is not reported to the editor owner as a local edit', () => {
     const onChange = vi.fn()
-    const { container } = render(<NoteEditor initialDoc="before" onChange={onChange} />)
-    const view = EditorView.findFromDOM(container.querySelector<HTMLElement>('.cm-editor')!)!
+    render(<NoteEditor initialDoc="before" onChange={onChange} />)
+    const view = EditorView.findFromDOM(screen.getByRole('textbox'))!
 
     applyExternalDoc(view, 'after')
 

@@ -101,10 +101,11 @@ function noteOutlineUpdatingTests() {
 
   it('follows the body as it is edited', () => {
     setBody('# One')
-    const { container } = render(<NoteOutline onSelect={vi.fn()} onClose={vi.fn()} />)
-    expect(container.querySelectorAll('.notepad-outline__item')).toHaveLength(1)
+    render(<NoteOutline onSelect={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'One' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Two' })).toBeNull()
 
     act(() => setBody('# One\n## Two'))
-    expect(container.querySelectorAll('.notepad-outline__item')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Two' })).toBeDefined()
   })
 }

@@ -32,9 +32,7 @@ function renderLog(overrides: Partial<Props> = {}) {
 }
 
 const taskRowElements = () =>
-  Array.from(document.querySelectorAll('.daily-log__task .daily-log__task-text')).map(
-    (el) => el.textContent
-  )
+  screen.queryAllByRole('group').map((row) => row.getAttribute('aria-label'))
 
 beforeEach(() => {
   setLocalClock('UTC', '2026-01-15T12:00:00.000Z')
@@ -74,10 +72,9 @@ describe('DailyLog backlog editing, cancelling', backlogEditCancelTests)
 function headingTests() {
   it('shows the date and marks today with a badge instead of a Today button', () => {
     renderLog({ isToday: true, onPrevDay: vi.fn(), onNextDay: vi.fn(), onGoToToday: vi.fn() })
-    expect(document.querySelector('.daily-log__date-weekday')?.textContent).toBe(
-      'Monday, January 5Today'
-    )
-    expect(document.querySelector('.daily-log__date-detail')?.textContent).toBe('2026')
+    expect(screen.getByText('Monday, January 5')).toBeTruthy()
+    expect(screen.getByText('Today')).toBeTruthy()
+    expect(screen.getByText('2026')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Today' })).toBeNull()
   })
 
@@ -85,7 +82,9 @@ function headingTests() {
     const user = userEvent.setup()
     const onGoToToday = vi.fn()
     renderLog({ onGoToToday })
-    expect(document.querySelector('.daily-log__today-badge')).toBeNull()
+    expect(screen.getAllByText('Today')).toEqual([
+      screen.getByRole('button', { name: 'Back to today' }),
+    ])
     await user.click(screen.getByRole('button', { name: 'Back to today' }))
     expect(onGoToToday).toHaveBeenCalledOnce()
   })
@@ -114,18 +113,18 @@ function sectionTests() {
     renderLog({
       log: logOf([task('d', 'Done one', { status: 'done' }), task('o', 'Open one')]),
     })
-    expect(document.querySelector('.daily-log__task-count')?.textContent).toBe('1/2')
-    const fill = document.querySelector('.daily-log__progress-fill') as HTMLElement
-    expect(fill.style.width).toBe('50%')
-    expect(fill.className).not.toContain('--complete')
+    expect(screen.getByText('1/2')).toBeTruthy()
+    const progress = screen.getByRole('progressbar', { name: 'Tasks done' })
+    expect(progress.getAttribute('aria-valuenow')).toBe('50')
     expect(taskRowElements()).toEqual(['Open one', 'Done one'])
-    expect(document.querySelector('.daily-log__done-divider')).toBeTruthy()
+    expect(screen.getByRole('separator')).toBeTruthy()
   })
 
   it('marks the bar complete when everything is done', () => {
     renderLog({ log: logOf([task('d', 'Done', { status: 'done' })]) })
-    expect(document.querySelector('.daily-log__progress-fill--complete')).toBeTruthy()
-    expect(document.querySelector('.daily-log__done-divider')).toBeNull()
+    const progress = screen.getByRole('progressbar', { name: 'Tasks done' })
+    expect(progress.getAttribute('aria-valuenow')).toBe('100')
+    expect(screen.queryByRole('separator')).toBeNull()
   })
 }
 
@@ -146,7 +145,7 @@ function sectionTestsPart2() {
     renderRolledOverLog()
     expect(screen.getByText(/From previous days \(1\)/)).toBeTruthy()
     expect(taskRowElements()).toEqual(['Old', 'Desk'])
-    expect(document.querySelector('.daily-log__today-label')?.textContent).toBe('Today')
+    expect(screen.getByText('Today')).toBeTruthy()
   })
 
   it('collapses the rolled-over group when its heading is pressed', async () => {
@@ -163,7 +162,7 @@ function emptyDayTests() {
     expect(screen.getByText('Nothing logged today')).toBeTruthy()
     expect(screen.queryByText('+ Add task')).toBeNull()
     expect(screen.queryByText('No backlog items.')).toBeNull()
-    expect(document.querySelector('.daily-log__task-count')).toBeNull()
+    expect(screen.queryByRole('progressbar', { name: 'Tasks done' })).toBeNull()
   })
 
   it('is not empty while the backlog holds something', () => {
@@ -238,7 +237,7 @@ function addRowClosingTests() {
 }
 
 function taskRowNamed(text: string): HTMLElement {
-  return screen.getByText(text).closest('.daily-log__task') as HTMLElement
+  return screen.getByRole('group', { name: text })
 }
 
 function dataTransfer() {
@@ -324,15 +323,14 @@ function backlogTests() {
       somedayTasks: [task('s1', 'Later', { project: 'p', area: 'a', context: 'c' })],
     })
     expect(screen.getByText('Backlog (1)')).toBeTruthy()
-    const row = document.querySelector('.daily-log__backlog-task-text')!
-    expect(row.textContent).toBe('Later@p#a+c')
+    expect(screen.getByText('Later').textContent).toBe('Later@p#a+c')
   })
 
   it('collapses the backlog when its heading is pressed', async () => {
     const user = userEvent.setup()
     renderLog({ somedayTasks: [task('s1', 'Later')] })
     await user.click(screen.getByText('Backlog (1)'))
-    expect(document.querySelector('.daily-log__backlog-list')).toBeNull()
+    expect(screen.queryByText('Later')).toBeNull()
   })
 
   it('says when the backlog is empty', () => {

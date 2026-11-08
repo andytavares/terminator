@@ -157,12 +157,12 @@ describe('ReviewInspector — moves to the File tab with the arrow keys', () => 
     )
     const agentTab = screen.getByRole('tab', { name: 'Agent' })
     act(() => agentTab.focus())
-    expect(document.activeElement).toBe(agentTab)
+    expect(agentTab.matches(':focus')).toBe(true)
 
     await user.keyboard('{ArrowRight}')
 
     expect(onTabChange).toHaveBeenCalledWith('file')
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Why this file' }))
+    expect(screen.getByRole('tab', { name: 'Why this file' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -224,8 +224,7 @@ describe('ReviewInspector — closes on Escape', () => {
   it('leaves the DOM when Escape is pressed', async () => {
     const user = userEvent.setup()
     render(<DrawerHarness />)
-    expect(screen.getByRole('tablist', { name: 'Inspector' })).toBeTruthy()
-    expect(document.activeElement).toBe(document.body)
+    expect(screen.getByRole('tablist', { name: 'Inspector' }).matches(':focus-within')).toBe(false)
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
   })

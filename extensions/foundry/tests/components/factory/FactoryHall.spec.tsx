@@ -200,16 +200,15 @@ function addressingAndBadgesTests() {
 
   it('leaves the station unbadged when nothing is waiting on the operator', async () => {
     mount()
-    await screen.findByRole('button', { name: /Build the thing/ })
-    const station = screen.getByRole('button', { name: /Build the thing/ })
-    expect(station.querySelector('.fdry-hall-flag')).toBeNull()
+    const station = await screen.findByRole('button', { name: /Build the thing/ })
+    expect(station.getAttribute('aria-label')).not.toMatch(/needs you/)
   })
 
   it('flags a station whose session is stranded', async () => {
     mount({ view: hallView({ stranded: ['s-1'] }) })
-    await screen.findByRole('button', { name: /Build the thing/ })
-    const station = screen.getByRole('button', { name: /Build the thing/ })
-    expect(station.querySelector('.fdry-hall-flag')).not.toBeNull()
+    expect(
+      await screen.findByRole('button', { name: /^Build the thing, .*, needs you$/ })
+    ).toBeTruthy()
   })
 }
 
@@ -220,9 +219,9 @@ function pendingAsksTests() {
         { requestId: 'r-1', sessionId: 's-1', toolName: 'Bash', summary: '', detail: null, at: 0 },
       ],
     })
-    await screen.findByRole('button', { name: /Build the thing/ })
-    const station = screen.getByRole('button', { name: /Build the thing/ })
-    expect(station.querySelector('.fdry-hall-flag')).not.toBeNull()
+    expect(
+      await screen.findByRole('button', { name: /^Build the thing, .*, needs you$/ })
+    ).toBeTruthy()
   })
 }
 
@@ -338,7 +337,7 @@ function theOrderBarTests() {
   it('keeps the order bar above the hall rather than over its top row', async () => {
     mount()
     const back = await screen.findByRole('button', { name: /All halls/ })
-    const frame = document.querySelector('.fdry-hall-frame') as HTMLElement
+    const frame = screen.getByTestId('hall-frame')
     expect(frame.contains(back)).toBe(false)
     expect(back.compareDocumentPosition(frame) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
@@ -352,12 +351,10 @@ function calloutsRaisedTogetherTests() {
     await screen.findByRole('button', { name: /Build the other/ })
     current = twoStations('passed')
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
-    await eventually(() =>
-      expect(document.querySelectorAll('.fdry-hall-overlay .fdry-callout')).toHaveLength(2)
-    )
-    const lifts = [...document.querySelectorAll<HTMLElement>('.fdry-callout')].map((c) =>
-      c.style.getPropertyValue('--fdry-lift')
-    )
+    await eventually(() => expect(screen.getAllByTestId('callout')).toHaveLength(2))
+    const lifts = screen
+      .getAllByTestId('callout')
+      .map((c) => c.style.getPropertyValue('--fdry-lift'))
     expect(new Set(lifts).size).toBe(2)
   })
 }
@@ -372,8 +369,7 @@ function calloutsOnStateChangeTests() {
     })
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
     await eventually(() => {
-      const bubble = document.querySelector('.fdry-hall-overlay .fdry-callout') as HTMLElement
-      expect(bubble.textContent).toBe('Done')
+      expect(screen.getByTestId('callout').textContent).toBe('Done')
     })
   })
 }
@@ -485,15 +481,13 @@ function replayingCiTests() {
       name: 'Replay position',
     })) as HTMLInputElement
     await waitFor(() =>
-      expect(document.querySelector('.fdry-callout[data-pinned="true"]')?.textContent).toBe(
+      expect(screen.queryByTestId('pinned-callout')?.textContent).toBe(
         'Waiting on checks · 1 of 2 done'
       )
     )
     // eslint-disable-next-line testing-library/prefer-user-event -- user-event cannot move a range input to a value
     fireEvent.change(position, { target: { value: position.max } })
-    await waitFor(() =>
-      expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
-    )
+    await waitFor(() => expect(screen.queryByTestId('pinned-callout')).toBeNull())
   })
 }
 
@@ -692,7 +686,7 @@ function towerCalloutsTests() {
     )[]
     mount({ view: shipView(pending) })
     await waitFor(() =>
-      expect(document.querySelector('.fdry-callout[data-pinned="true"]')?.textContent).toBe(
+      expect(screen.queryByTestId('pinned-callout')?.textContent).toBe(
         'Waiting on checks · 12 of 19 done'
       )
     )
@@ -702,7 +696,7 @@ function towerCalloutsTests() {
   it('pins no wait when every check has landed', async () => {
     mount({ view: shipView(['pass', 'pass']) })
     await screen.findByRole('img', { name: 'Checks · 2 passed · 0 failed' })
-    expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
+    expect(screen.queryByTestId('pinned-callout')).toBeNull()
   })
 }
 
@@ -763,11 +757,7 @@ function factoryHallLinksTests() {
         source: { key: 'TAV-15', url: ticketUrl },
       }),
     })
-    const bar = await waitFor(() => {
-      const found = document.querySelector('.fdry-hall-hud') as HTMLElement | null
-      if (found === null) throw new Error('the heads-up bar is not drawn yet')
-      return found
-    })
+    const bar = await screen.findByRole('group', { name: 'Order bar' })
     await user.click(within(bar).getByRole('link', { name: '#233' }))
     await user.click(within(bar).getByRole('link', { name: 'TAV-15' }))
     expect(openExternal).toHaveBeenCalledWith(pullUrl)
@@ -779,7 +769,7 @@ function gateCardsTests() {
   it('bounds a gate card that opens below its station by the room down to the bottom edge', async () => {
     mount({ view: hallView({ waiting: [readyGate()] }) })
     await screen.findByRole('button', { name: 'Mark ready' })
-    const card = document.querySelector('.fdry-card--gate') as HTMLElement
+    const card = screen.getByRole('group', { name: 'Mark the pull request ready for review' })
     // The default hall puts the station's foot 6 of 13 tiles down.
     expect(card.classList.contains('is-below')).toBe(true)
     expect(card.style.top).toBe('46.15384615384615%')

@@ -31,7 +31,7 @@ describe('Menu', () => {
 
   it('opens on its first item', () => {
     renderMenu()
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+    expect(screen.getByRole('menuitem', { name: 'Rename' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -40,20 +40,20 @@ describe('Menu — keys', () => {
     renderMenu()
     const user = userEvent.setup()
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Move' }))
+    expect(screen.getByRole('menuitem', { name: 'Move' }).matches(':focus')).toBe(true)
     await user.keyboard('{ArrowUp}{ArrowUp}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(screen.getByRole('menuitem', { name: 'Delete' }).matches(':focus')).toBe(true)
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+    expect(screen.getByRole('menuitem', { name: 'Rename' }).matches(':focus')).toBe(true)
   })
 
   it('jumps to the first and last item with Home and End', async () => {
     renderMenu()
     const user = userEvent.setup()
     await user.keyboard('{End}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(screen.getByRole('menuitem', { name: 'Delete' }).matches(':focus')).toBe(true)
     await user.keyboard('{Home}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+    expect(screen.getByRole('menuitem', { name: 'Rename' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -67,9 +67,9 @@ describe('Menu — keys from outside the items', () => {
         <button role="menuitem">Three</button>
       </Menu>
     )
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Filter' }))
+    expect(screen.getByRole('textbox', { name: 'Filter' }).matches(':focus')).toBe(true)
     await userEvent.setup().keyboard('{ArrowUp}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Three' }))
+    expect(screen.getByRole('menuitem', { name: 'Three' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -109,6 +109,6 @@ describe('Menu — disabled items', () => {
       </Menu>
     )
     await userEvent.setup().keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Three' }))
+    expect(screen.getByRole('menuitem', { name: 'Three' }).matches(':focus')).toBe(true)
   })
 })

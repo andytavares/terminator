@@ -21,7 +21,7 @@ function SignalRow({ signal }: { signal: Signal }) {
   const Icon = SIGNAL_ICONS[signal.kind]
   return (
     <li className={`pr-rail-signal pr-rail-signal--${signal.tone}`} title={signal.source}>
-      <Icon className="pr-rail-signal-icon" aria-hidden />
+      <Icon className="pr-rail-signal-icon" aria-hidden data-testid="signal-icon" />
       <span className="pr-rail-signal-label">{signal.label}</span>
       <span className="pr-rail-signal-value">
         {signal.value}

@@ -55,7 +55,7 @@ describe('IssueDetails — the issue', () => {
     expect(screen.getByText(/Unify Linear connections/)).toBeTruthy()
     expect(screen.getByText('Andrew')).toBeTruthy()
     expect(screen.getByText('In Progress')).toBeTruthy()
-    expect(document.querySelector('.issue-markdown h2')?.textContent).toBe('Summary')
+    expect(screen.getByRole('heading', { level: 2, name: 'Summary' })).toBeTruthy()
     expect(screen.getByText('Fold it into P0.')).toBeTruthy()
   })
 

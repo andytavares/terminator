@@ -98,7 +98,7 @@ describe('ConflictResolver', () => {
     renderResolver(2)
     expect(screen.queryByRole('button', { name: /Confirm/ })).toBeNull()
     await user.click(screen.getByRole('button', { name: /Keep theirs/ }))
-    expect(screen.getByText('Preview').parentElement!.textContent).toContain('const x = 100')
+    expect(screen.getByRole('group', { name: 'Preview' }).textContent).toContain('const x = 100')
     expect(mockResolveConflict).not.toHaveBeenCalled()
   })
 })
@@ -186,10 +186,9 @@ describe('ConflictResolver — navigates between conflicts with the arrow keys',
 describe('ConflictResolver — resolves with the edited text and strategy manual from the editor', () => {
   it('resolves with the edited text and strategy manual from the editor', async () => {
     const user = userEvent.setup()
-    const { container } = renderResolver(1)
+    renderResolver(1)
     await user.click(screen.getByRole('button', { name: /Edit manually/ }))
-    const content = container.querySelector('.cm-content') as HTMLElement
-    const view = EditorView.findFromDOM(content.parentElement!.parentElement as HTMLElement)!
+    const view = EditorView.findFromDOM(screen.getByRole('textbox'))!
     act(() => {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'const x = 42' } })
     })
@@ -203,11 +202,10 @@ describe('ConflictResolver — resolves with the edited text and strategy manual
 
   it('pushes the other side into the open editor on Keep theirs, without resolving', async () => {
     const user = userEvent.setup()
-    const { container } = renderResolver(1)
+    renderResolver(1)
     await user.click(screen.getByRole('button', { name: /Edit manually/ }))
     await user.click(screen.getByRole('button', { name: /Keep theirs/ }))
-    const content = container.querySelector('.cm-content') as HTMLElement
-    const view = EditorView.findFromDOM(content.parentElement!.parentElement as HTMLElement)!
+    const view = EditorView.findFromDOM(screen.getByRole('textbox'))!
     expect(view.state.doc.toString()).toBe('const x = 100')
     expect(mockResolveConflict).not.toHaveBeenCalled()
   })
@@ -249,7 +247,7 @@ describe('ConflictPanel — side labels', () => {
     { isRebase: false, labels: ['Your version', 'Incoming changes'] },
     { isRebase: true, labels: ['Theirs (branch)', 'Your version'] },
   ])('labels ours and theirs $labels when isRebase is $isRebase', ({ isRebase, labels }) => {
-    const { container } = render(
+    render(
       <ConflictPanel
         block={baseBlock}
         isRebase={isRebase}
@@ -258,14 +256,14 @@ describe('ConflictPanel — side labels', () => {
         onSelectTheirs={vi.fn()}
       />
     )
-    const sideLabels = container.querySelectorAll('.conflict-panel__label-text')
-    expect(Array.from(sideLabels, (label) => label.textContent)).toEqual(labels)
+    const sideLabels = screen.getAllByText(/^(Your version|Theirs \(branch\)|Incoming changes)$/)
+    expect(sideLabels.map((label) => label.textContent)).toEqual(labels)
   })
 })
 
 describe('ConflictPanel — marks ours side selected when pendingStrategy is ours', () => {
   it('marks ours side selected when pendingStrategy is ours', () => {
-    const { container } = render(
+    render(
       <ConflictPanel
         block={baseBlock}
         isRebase={false}
@@ -274,12 +272,10 @@ describe('ConflictPanel — marks ours side selected when pendingStrategy is our
         onSelectTheirs={vi.fn()}
       />
     )
-    const isSelected = (side: string) =>
-      container
-        .querySelector(`.conflict-panel__side--${side}`)!
-        .classList.contains('conflict-panel__side--selected')
-    expect(isSelected('ours')).toBe(true)
-    expect(isSelected('theirs')).toBe(false)
+    const pressed = (label: RegExp) =>
+      screen.getByRole('button', { name: label }).getAttribute('aria-pressed')
+    expect(pressed(/^Your version/)).toBe('true')
+    expect(pressed(/^Incoming changes/)).toBe('false')
   })
 })
 

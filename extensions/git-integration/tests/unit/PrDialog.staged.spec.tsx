@@ -47,8 +47,8 @@ function open(branch: string, hasStagedChanges: boolean) {
   )
 }
 
-const valueOf = (placeholder: string) =>
-  (screen.getByPlaceholderText(placeholder) as HTMLInputElement).value
+const valueOf = (label: string) =>
+  (screen.getByRole('textbox', { name: label }) as HTMLInputElement).value
 
 describe('PrDialog with staged changes — the draft', () => {
   it('fills commit message, title and description from the draft and says who drafted them', async () => {
@@ -58,19 +58,19 @@ describe('PrDialog with staged changes — the draft', () => {
     expect(screen.getByText('Commit and open a pull request')).toBeTruthy()
     expect(screen.getByText(/Drafting from the staged diff/)).toBeTruthy()
     await waitFor(() => expect(valueOf('Commit message')).toBe('Add login form'))
-    expect(valueOf('Pull request title')).toBe('Add login')
+    expect(valueOf('Title')).toBe('Add login')
     expect(
-      (screen.getByPlaceholderText(/Describe your changes/) as HTMLTextAreaElement).value
+      (screen.getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement).value
     ).toBe('Adds a login form.')
     expect(screen.getByText(/Drafted by Claude from the staged diff/)).toBeTruthy()
-    expect(screen.queryByPlaceholderText('branch-name')).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'New branch' })).toBeNull()
   })
 
   it('offers a new branch, not the default-branch warning, on the default branch', async () => {
     vi.spyOn(reviewAgentAPI, 'draftChange').mockResolvedValue({ draft: DRAFT })
     open('main', true)
 
-    await waitFor(() => expect(valueOf('branch-name')).toBe('add-login'))
+    await waitFor(() => expect(valueOf('New branch')).toBe('add-login'))
     expect(screen.queryByText(/creating a PR from the default branch/)).toBeNull()
   })
 
@@ -81,7 +81,7 @@ describe('PrDialog with staged changes — the draft', () => {
     open('feature/x', true)
 
     expect(await screen.findByText('The agent is not signed in.')).toBeTruthy()
-    expect(valueOf('Pull request title')).toBe('')
+    expect(valueOf('Title')).toBe('')
     expect(valueOf('Commit message')).toBe('')
   })
 })
@@ -160,14 +160,14 @@ describe('PrDialog with staged changes — a retry after an edit', () => {
       .mockResolvedValueOnce({ number: 9, url: 'https://github.com/o/r/pull/9' })
     const user = userEvent.setup()
     open('main', true)
-    await waitFor(() => expect(valueOf('branch-name')).toBe('add-login'))
+    await waitFor(() => expect(valueOf('New branch')).toBe('add-login'))
     const submit = () =>
       user.click(screen.getByRole('button', { name: 'Commit, push and create PR' }))
 
     await submit()
     expect(await screen.findByText(/GitHub is down/)).toBeTruthy()
-    await user.clear(screen.getByPlaceholderText('branch-name'))
-    await user.type(screen.getByPlaceholderText('branch-name'), 'renamed')
+    await user.clear(screen.getByRole('textbox', { name: 'New branch' }))
+    await user.type(screen.getByRole('textbox', { name: 'New branch' }), 'renamed')
     await submit()
 
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
@@ -182,7 +182,7 @@ describe('PrDialog without staged changes', () => {
 
     expect(screen.getByText('Open Pull Request')).toBeTruthy()
     expect(screen.getByText(/creating a PR from the default branch/)).toBeTruthy()
-    expect(screen.queryByPlaceholderText('Commit message')).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Commit message' })).toBeNull()
     expect(draft).not.toHaveBeenCalled()
   })
 })

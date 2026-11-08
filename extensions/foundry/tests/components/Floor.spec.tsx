@@ -495,9 +495,8 @@ describe('a node with skills', () => {
 
   it('omits the line for a node with no skills', async () => {
     mount(reply({ skills: { 'N-1': ['ci-fix'] } }))
-    await screen.findAllByText('builder')
-    const n2 = document.querySelector('[title="N-2"]')?.closest('span')
-    expect(n2?.textContent).not.toContain('Skills:')
+    await screen.findByText(/Skills: ci-fix/)
+    expect(screen.getAllByText(/^Skills:/)).toHaveLength(1)
   })
 })
 
@@ -650,10 +649,8 @@ function messageLinesTests() {
     await screen.findByText(/WO-1/)
     await user.click(await screen.findByRole('button', { name: 'Transcript' }))
     const panel = await screen.findByRole('region', { name: 'builder' })
-    await waitFor(() => expect(panel.querySelector('pre.fdry-transcript')).not.toBeNull())
-    expect(panel.querySelector('pre.fdry-transcript')?.textContent).toBe(
-      'checking\nRead: /repo/a.ts\nBash: npm test'
-    )
+    const log = await within(panel).findByRole('log', { name: 'Transcript' })
+    expect(log.textContent).toBe('checking\nRead: /repo/a.ts\nBash: npm test')
   })
 
   it('says so when there is nothing yet, rather than showing an empty box', async () => {
@@ -827,8 +824,7 @@ function floorWhatItShowsTests() {
 
   it('names the step, not the session id nobody chose', async () => {
     mount(reply({ labels: { 'N-1': 'builder · U-1 the first bit' } }), { stalls: [FIRING] })
-    const heading = await screen.findByText(/Stopped making progress/)
-    const panel = heading.closest('section') as HTMLElement
+    const panel = await screen.findByRole('region', { name: /Stopped making progress/ })
     expect(within(panel).getByText(/builder · U-1/)).toBeTruthy()
     expect(within(panel).queryByText('s-1')).toBeNull()
   })
@@ -916,11 +912,9 @@ function labelAndIdTests() {
 
   it('keeps the id as the tooltip of a step that was not skipped, describing nothing else', async () => {
     mount(reply({ labels: LABELS }))
-    const chip = await waitFor(() =>
-      screen.getByText(/builder · U-1 refresh/).closest('.fdry-unit')
-    )
-    expect(chip?.getAttribute('title')).toBe('N-1')
-    expect(chip?.getAttribute('aria-describedby')).toBeNull()
+    const chip = await screen.findByRole('group', { name: /builder · U-1 refresh/ })
+    expect(chip.getAttribute('title')).toBe('N-1')
+    expect(chip.getAttribute('aria-describedby')).toBeNull()
   })
 }
 
@@ -1038,15 +1032,13 @@ describe('a run whose agents are gone', () => {
 function theBandTests() {
   it('says so at the top, across the width, before anything only there to be read', async () => {
     mount(ORPHANED)
-    await screen.findByText(/Nothing is running this/)
-    const band = document.querySelector('.fdry-standing')
-    expect(band?.textContent).toMatch(/Nothing is running this/)
+    const band = await screen.findByRole('region', { name: /Nothing is running this/ })
+    expect(band.className).toContain('fdry-standing')
   })
 
   it('names the steps that stopped, as a person would read them', async () => {
     mount(ORPHANED)
-    const heading = await screen.findByText(/Nothing is running this/)
-    const band = heading.closest('section') as HTMLElement
+    const band = await screen.findByRole('region', { name: /Nothing is running this/ })
     expect(within(band).getByText(/builder · U-1/)).toBeTruthy()
   })
 
@@ -1145,7 +1137,7 @@ function theBuildingChipTests() {
     // under a band saying nothing was running it, and the two together are
     // worse than either — one of them is lying and the surface will not say
     // which.
-    const chip = document.querySelector('.fdry-unit') as HTMLElement
+    const chip = screen.getByRole('group', { name: 'builder · U-1 the first bit' })
     expect(chip.textContent).toContain('stopped')
     expect(chip.className).toContain('is-orphaned')
   })
@@ -1153,7 +1145,7 @@ function theBuildingChipTests() {
   it('leaves a genuinely running chip alone', async () => {
     mount(reply())
     await screen.findByText(/WO-1/)
-    const chip = document.querySelector('.fdry-unit') as HTMLElement
+    const chip = chipOf('builder')
     expect(chip.textContent).toContain('building')
     expect(chip.className).not.toContain('is-orphaned')
   })
@@ -1359,13 +1351,14 @@ function answeringTheGateTests() {
 function optionsAndWhoseMoveTests() {
   it('marks the band as yours when the move is yours', async () => {
     mount(reply({ standing: standing({ turn: 'you' }) }))
-    await waitFor(() => expect(document.querySelector('.fdry-standing.is-yours')).not.toBeNull())
+    const band = await screen.findByRole('region', { name: 'Building' })
+    expect(band.classList.contains('is-yours')).toBe(true)
   })
 
   it('leaves the band quiet while Foundry is the one working', async () => {
     mount(reply({ standing: standing({ turn: 'foundry' }) }))
-    await screen.findByText('Building')
-    expect(document.querySelector('.fdry-standing.is-yours')).toBeNull()
+    const band = await screen.findByRole('region', { name: 'Building' })
+    expect(band.classList.contains('is-yours')).toBe(false)
   })
 }
 
@@ -1438,7 +1431,8 @@ function noStandingTests() {
   it('renders the run when the host sends no standing', async () => {
     mount(reply())
     await screen.findByText('Stop the run')
-    expect(document.querySelector('.fdry-standing')).toBeNull()
+    const regions = screen.queryAllByRole('region')
+    expect(regions.filter((region) => region.className.includes('fdry-standing'))).toEqual([])
   })
 }
 
@@ -1663,9 +1657,8 @@ describe('a gate on the Floor', () => {
     const user = userEvent.setup()
     mount(reply({ pulls: [PULL], source: TICKET, waiting: [READY_GATE], standing: HALTED_AT_G1 }))
     await screen.findByText('Ready for you to look at')
-    const line = screen
-      .getByText('Ready for you to look at')
-      .closest('.fdry-gate-card') as HTMLElement
+    // The band holds the waiting gate's line; the order's own links sit outside it.
+    const line = screen.getByRole('region', { name: 'Halted — your move' })
     await user.click(within(line).getByRole('link', { name: /#233/ }))
     expect(openExternal).toHaveBeenCalledWith(PULL.url)
     await user.click(within(line).getByRole('link', { name: /TAV-15/ }))
@@ -1677,7 +1670,7 @@ function node(over: Record<string, unknown>) {
   return { ...NODES[0], ...over }
 }
 function chipOf(label: string): HTMLElement {
-  return screen.getAllByText(label)[0].closest('.fdry-unit') as HTMLElement
+  return screen.getAllByRole('group', { name: label })[0]
 }
 
 describe('the step chips', () => {
@@ -1728,9 +1721,9 @@ function skippedStepsTests() {
     await screen.findByText('architect')
     const chip = chipOf('architect')
     expect(chip.getAttribute('title')).toBe(`Skipped: ${reason}`)
-    const described = chip.getAttribute('aria-describedby')
-    expect(described).not.toBeNull()
-    expect(document.getElementById(described as string)?.textContent).toBe(`Skipped: ${reason}`)
+    expect(
+      screen.getByRole('group', { name: 'architect', description: `Skipped: ${reason}` })
+    ).toBe(chip)
   })
 }
 
@@ -1770,8 +1763,11 @@ function floorTheTranscriptTests() {
     await screen.findByText('verifier')
     await user.click(within(chipOf('verifier')).getByRole('button', { name: 'Transcript' }))
     const panel = await screen.findByRole('region', { name: 'verifier' })
-    expect(panel.closest('.fdry-lane')).toBe(chipOf('verifier').closest('.fdry-lane'))
-    expect(chipOf('builder').closest('.fdry-lane')?.contains(panel)).toBe(false)
+    const verifierLane = within(screen.getByRole('group', { name: 'lane 2' }))
+    expect(verifierLane.getByRole('region', { name: 'verifier' })).toBe(panel)
+    expect(verifierLane.getByRole('group', { name: 'verifier' })).toBeTruthy()
+    const builderLane = within(screen.getByRole('group', { name: 'lane 1' }))
+    expect(builderLane.queryByRole('region', { name: 'verifier' })).toBeNull()
   })
 }
 
@@ -1782,9 +1778,8 @@ function refusalsBesideTheStepTests() {
     await screen.findAllByText('builder')
     await user.click(await screen.findByRole('button', { name: /^Attach to/ }))
     const message = await screen.findByText('builder finished at 09:41; its agent has closed.')
-    expect(message.closest('.fdry-problem')).toBeNull()
-    expect(message.closest('.fdry-lane')).toBe(chipOf('builder').closest('.fdry-lane'))
-    expect(chipOf('builder').nextElementSibling).toBe(message)
+    // lane 1 holds only this builder, so its alert sits beside that step.
+    expect(within(screen.getByRole('group', { name: 'lane 1' })).getByRole('alert')).toBe(message)
   })
 
   it('shows a refusal to open the terminal beside its step as well', async () => {
@@ -1793,6 +1788,6 @@ function refusalsBesideTheStepTests() {
     await screen.findAllByText('builder')
     await user.click(await screen.findByRole('button', { name: /^Attach to/ }))
     const message = await screen.findByText('That agent is no longer in an agent tab.')
-    expect(chipOf('builder').nextElementSibling).toBe(message)
+    expect(within(screen.getByRole('group', { name: 'lane 1' })).getByRole('alert')).toBe(message)
   })
 }

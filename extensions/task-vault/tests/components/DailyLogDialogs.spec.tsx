@@ -13,7 +13,7 @@ import { pressOutside } from '../../../../tests/support/modal'
 
 let bridge: ReturnType<typeof installVaultBridge>
 
-const modal = () => document.querySelector('.daily-log__block-modal') as HTMLElement
+const modal = () => screen.queryByRole('dialog') as HTMLElement
 
 beforeEach(() => {
   setLocalClock('UTC', '2026-01-15T12:00:00.000Z')

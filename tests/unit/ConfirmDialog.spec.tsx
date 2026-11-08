@@ -19,25 +19,21 @@ describe('ConfirmDialog — applies danger class to confirm button when danger p
 
 describe('ConfirmDialog — gives two dialogs distinct label ids rather than a shared literal', () => {
   it('gives two dialogs distinct label ids rather than a shared literal', () => {
-    const { container } = render(
+    render(
       <>
         <ConfirmDialog {...baseProps} />
         <ConfirmDialog {...baseProps} title="Second" />
       </>
     )
-    const ids = Array.from(container.querySelectorAll('dialog')).map((d) =>
-      d.getAttribute('aria-labelledby')
-    )
+    const ids = screen.getAllByRole('dialog').map((d) => d.getAttribute('aria-labelledby'))
     expect(ids).toHaveLength(2)
     expect(ids[0]).not.toBe(ids[1])
   })
 
   it('styles the description by class rather than inline', () => {
-    const { container } = render(
-      <ConfirmDialog {...baseProps} description="This will delete all 4 projects." />
-    )
-    const desc = container.querySelector('.tmui-dialog__description')
-    expect(desc).toBeTruthy()
-    expect(desc?.getAttribute('style')).toBeFalsy()
+    render(<ConfirmDialog {...baseProps} description="This will delete all 4 projects." />)
+    const desc = screen.getByText('This will delete all 4 projects.')
+    expect(desc.className).toContain('tmui-dialog__description')
+    expect(desc.getAttribute('style')).toBeFalsy()
   })
 })

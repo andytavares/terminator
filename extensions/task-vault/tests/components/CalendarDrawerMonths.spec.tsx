@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually } from './helpers/bridge'
 
@@ -42,8 +42,6 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-const monthLabel = () => document.querySelector('.cal-drawer__month-label')?.textContent
-
 describe('CalendarDrawer months', monthTests)
 describe('CalendarDrawer day marks', dayMarkTests)
 describe('CalendarDrawer days', dayTests)
@@ -53,9 +51,9 @@ function monthTests() {
   it('wraps the year going back from January', async () => {
     const user = userEvent.setup()
     render(<CalendarDrawer />)
-    expect(monthLabel()).toBe('January 2026')
+    expect(screen.getByText('January 2026')).toBeDefined()
     await user.click(screen.getByRole('button', { name: 'Previous month' }))
-    expect(monthLabel()).toBe('December 2025')
+    expect(screen.getByText('December 2025')).toBeDefined()
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:get-calendar-month')).toContainEqual({
         year: 2025,
@@ -70,7 +68,7 @@ function monthTests() {
     await user.click(screen.getByRole('button', { name: 'Previous month' }))
     await user.click(screen.getByRole('button', { name: 'Next month' }))
     await user.click(screen.getByRole('button', { name: 'Next month' }))
-    expect(monthLabel()).toBe('February 2026')
+    expect(screen.getByText('February 2026')).toBeDefined()
   })
 }
 
@@ -80,7 +78,7 @@ function dayMarkTests() {
     const late = await screen.findByRole('button', { name: '2026-01-10 · 1 of 2 still open' })
     expect(late.className).toContain('cal-drawer__cell--overdue')
     const done = screen.getByRole('button', { name: '2026-01-20 · 1 done' })
-    expect(done.querySelector('.cal-dot')?.className).toBe('cal-dot cal-dot--done')
+    expect(within(done).getByTestId('cal-dot').className).toBe('cal-dot cal-dot--done')
     expect(statusDotClass('blocked')).toBe('cal-dot cal-dot--blocked')
     expect(statusDotClass('odd')).toBe('cal-dot cal-dot--open')
   })

@@ -149,7 +149,7 @@ describe('TaskList — a folded group header is one button', () => {
     const user = userEvent.setup()
     render(<TaskList />)
     act(() => quietHeader().focus())
-    expect(document.activeElement).toBe(quietHeader())
+    expect(quietHeader().matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
     await user.keyboard(' ')
@@ -159,7 +159,7 @@ describe('TaskList — a folded group header is one button', () => {
   it('is focusable and holds no second button inside it', () => {
     render(<TaskList />)
     expect(quietHeader().tabIndex).toBe(0)
-    expect(quietHeader().querySelector('button, [role="button"]')).toBeNull()
+    expect(within(quietHeader()).queryByRole('button')).toBeNull()
   })
 })
 
@@ -207,7 +207,7 @@ describe('TaskList — selection and grouping', () => {
     render(<TaskList />)
     const row = rowNamed('PR overview shows status before story')
     act(() => row.focus())
-    expect(document.activeElement).toBe(row)
+    expect(row.matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(useDeskSelection.getState().openThreadKey).toBe('linear:TAV-20')
   })

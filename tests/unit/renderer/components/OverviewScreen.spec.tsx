@@ -128,8 +128,9 @@ describe('OverviewScreen — the Monitor wall', () => {
 
 describe('OverviewScreen — the Monitor wall — keeps every tile in one grid, so a state change moves a tile without remounting it', () => {
   it('keeps every tile in one grid, so a state change moves a tile without remounting it', () => {
-    const { rerender, container } = render(<OverviewScreen />)
-    const grid = container.querySelector('.wall__grid')!
+    const { rerender } = render(<OverviewScreen />)
+    const grid = screen.getByRole('group', { name: 'Terminals' })
+    // eslint-disable-next-line testing-library/no-node-access -- the claim is that each tile is a direct child of the one grid
     expect(tiles().every((t) => t.parentElement === grid)).toBe(true)
     const preview = screen.getByTestId('preview-b')
     state.facts = state.facts.map((f) =>
@@ -155,13 +156,13 @@ describe('OverviewScreen — the Monitor wall — keeps every tile in one grid, 
 describe('OverviewScreen — the Monitor wall — changes tile size and remembers it', () => {
   it('changes tile size and remembers it', async () => {
     const user = userEvent.setup()
-    const { container } = render(<OverviewScreen />)
+    render(<OverviewScreen />)
     const sizes = screen.getByRole('radiogroup', { name: 'Tile size' })
     expect(within(sizes).getByRole('radio', { name: 'Medium' }).getAttribute('aria-checked')).toBe(
       'true'
     )
     await user.click(within(sizes).getByRole('radio', { name: 'Large' }))
-    expect(container.querySelector('.wall__grid')!.getAttribute('data-size')).toBe('l')
+    expect(screen.getByRole('group', { name: 'Terminals' }).getAttribute('data-size')).toBe('l')
     expect(JSON.parse(localStorage.getItem('terminator.wall.prefs')!).size).toBe('l')
   })
 })
@@ -184,8 +185,8 @@ describe('OverviewScreen — the Monitor wall — order', () => {
       'terminator.wall.prefs',
       JSON.stringify({ size: 's', pinNeeds: false, thenBy: 'state' })
     )
-    const { container } = render(<OverviewScreen />)
-    expect(container.querySelector('.wall__grid')!.getAttribute('data-size')).toBe('s')
+    render(<OverviewScreen />)
+    expect(screen.getByRole('group', { name: 'Terminals' }).getAttribute('data-size')).toBe('s')
     expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull()
   })
 })

@@ -58,7 +58,7 @@ describe('CloseSessionButton — still ends a live session when removing is also
     )
     const button = screen.getByRole('button', { name: 'Close zsh' })
     await user.click(button)
-    expect(document.activeElement).toBe(button)
+    expect(button.matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(behind).not.toHaveBeenCalled()
   })

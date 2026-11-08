@@ -148,7 +148,7 @@ describe('SessionLinkDialog — keeps its keys from reaching the row or tile beh
         </div>
       )
       await user.tab()
-      expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+      expect(screen.getByRole('dialog').matches(':focus-within')).toBe(true)
       await user.keyboard(key)
       expect(behind).not.toHaveBeenCalled()
     }

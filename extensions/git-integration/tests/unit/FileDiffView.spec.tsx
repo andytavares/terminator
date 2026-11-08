@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, beforeAll, beforeEach, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { FileDiff } from '../../src/schemas/git.schema'
 
@@ -69,17 +69,17 @@ describe('FileDiffView', () => {
 describe('FileDiffView — Unified and Split toggle', () => {
   it('switches to split view when Split is clicked', async () => {
     const user = userEvent.setup()
-    const { container } = await renderDiff()
+    await renderDiff()
     await user.click(screen.getByRole('radio', { name: 'Split' }))
-    expect(container.querySelector('.diff-table--split')).toBeTruthy()
+    expect(screen.getByRole('table').classList.contains('diff-table--split')).toBe(true)
   })
 
   it('switches back to unified view from split', async () => {
     const user = userEvent.setup()
-    const { container } = await renderDiff()
+    await renderDiff()
     await user.click(screen.getByRole('radio', { name: 'Split' }))
     await user.click(screen.getByRole('radio', { name: 'Unified' }))
-    expect(container.querySelector('.diff-table:not(.diff-table--split)')).toBeTruthy()
+    expect(screen.getByRole('table').classList.contains('diff-table--split')).toBe(false)
   })
 })
 
@@ -99,9 +99,13 @@ describe('FileDiffView — stale banner and notices', () => {
   })
 
   it('renders add/remove lines with correct classes', async () => {
-    const { container } = await renderDiff()
-    expect(container.querySelector('.diff-line--add')).toBeTruthy()
-    expect(container.querySelector('.diff-line--remove')).toBeTruthy()
+    await renderDiff()
+    expect(screen.getByRole('row', { name: /const b = 3/ }).className).toBe(
+      'diff-line diff-line--add'
+    )
+    expect(screen.getByRole('row', { name: /const b = 2/ }).className).toBe(
+      'diff-line diff-line--remove'
+    )
   })
 
   it('renders split view with hunk header', async () => {
@@ -127,13 +131,11 @@ describe('FileDiffView — split view of a remove-only hunk', () => {
     })
     await renderDiff({ diff })
     await user.click(screen.getByRole('radio', { name: 'Split' }))
-    const oldSide = screen.getByText('deleted line').closest('td')
-    const newSide = oldSide?.parentElement?.querySelector('.diff-line__content--new-side')
-    expect(oldSide?.className).toBe(
-      'diff-line__content diff-line__content--remove diff-line__content--old-side'
-    )
-    expect(newSide?.className).toBe(
-      'diff-line__content diff-line__content--empty diff-line__content--new-side'
+    expect(cellClasses(/deleted line/)).toEqual(
+      expect.arrayContaining([
+        'diff-line__content diff-line__content--remove diff-line__content--old-side',
+        'diff-line__content diff-line__content--empty diff-line__content--new-side',
+      ])
     )
   })
 })
@@ -151,25 +153,35 @@ describe('FileDiffView — split view of an add-only hunk', () => {
     })
     await renderDiff({ diff })
     await user.click(screen.getByRole('radio', { name: 'Split' }))
-    const newSide = screen.getByText('added line').closest('td')
-    const oldSide = newSide?.parentElement?.querySelector('.diff-line__content--old-side')
-    expect(newSide?.className).toBe(
-      'diff-line__content diff-line__content--add diff-line__content--new-side'
-    )
-    expect(oldSide?.className).toBe(
-      'diff-line__content diff-line__content--empty diff-line__content--old-side'
+    expect(cellClasses(/added line/)).toEqual(
+      expect.arrayContaining([
+        'diff-line__content diff-line__content--empty diff-line__content--old-side',
+        'diff-line__content diff-line__content--add diff-line__content--new-side',
+      ])
     )
   })
 })
+
+/** The split view's cells on the row that shows `content`, by class. */
+function cellClasses(content: RegExp): string[] {
+  const cells = within(screen.getByRole('row', { name: content })).getAllByRole('cell')
+  return cells.map((cell) => cell.className)
+}
+
+/** The split view's divider cell on the row that shows `content`. */
+function dividerBeside(content: RegExp): HTMLElement {
+  const cells = within(screen.getByRole('row', { name: content })).getAllByRole('cell')
+  return cells.find((cell) => cell.classList.contains('diff-table__split-divider'))!
+}
 
 // The divider drag listens on window; user-event's moves bubble there from the divider.
 describe('FileDiffView — split divider', () => {
   it('keeps the split position when the divider is pressed and released without moving', async () => {
     const user = userEvent.setup()
-    const { container } = await renderDiff()
+    await renderDiff()
     await user.click(screen.getByRole('radio', { name: 'Split' }))
-    const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
-    const divider = container.querySelector('.diff-table__split-divider') as Element
+    const scrollEl = screen.getByTestId('diff-scroll')
+    const divider = dividerBeside(/const a = 1/)
     await user.pointer([
       { keys: '[MouseLeft>]', target: divider, coords: { clientX: 300 } },
       { keys: '[/MouseLeft]' },
@@ -182,9 +194,9 @@ describe('FileDiffView — split divider', () => {
 describe('FileDiffView — moves split position on mousemove while dragging', () => {
   it('moves split position on mousemove while dragging', async () => {
     const user = userEvent.setup()
-    const { container } = await renderDiff()
+    await renderDiff()
     await user.click(screen.getByRole('radio', { name: 'Split' }))
-    const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
+    const scrollEl = screen.getByTestId('diff-scroll')
     vi.spyOn(scrollEl, 'getBoundingClientRect').mockReturnValue({
       width: 800,
       height: 400,
@@ -196,7 +208,7 @@ describe('FileDiffView — moves split position on mousemove while dragging', ()
       y: 0,
       toJSON: () => ({}),
     })
-    const divider = container.querySelector('.diff-table__split-divider') as Element
+    const divider = dividerBeside(/const a = 1/)
     await user.pointer([
       { keys: '[MouseLeft>]', target: divider, coords: { clientX: 400 } },
       { coords: { clientX: 450 } },

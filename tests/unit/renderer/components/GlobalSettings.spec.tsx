@@ -100,32 +100,37 @@ describe('GlobalSettings', () => {
     await user.click(screen.getByRole('radio', { name: 'Light' }))
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ appearance: { theme: 'light' } })
   })
-
-  it('saves a scrollback limit inside the allowed range', async () => {
-    const user = userEvent.setup()
-    render(<GlobalSettings />)
-    // The field is controlled and drops out-of-range values, so typing key by
-    // key never reaches 8000 (8, 80, 800 snap back): paste the whole value.
-    await user.tripleClick(screen.getByDisplayValue('5000'))
-    await user.paste('8000')
-    expect(mockUpdateGlobal).toHaveBeenCalledWith({ terminal: { scrollbackLimit: 8000 } })
-  })
 })
 
-// The scrollback field is controlled and drops out-of-range values, so these
-// paste the whole value rather than type key by key.
-describe('GlobalSettings — scrollback range and text fields', () => {
+describe('GlobalSettings — the scrollback limit', () => {
+  it('keeps each digit typed and saves the limit when Enter commits it', async () => {
+    const user = userEvent.setup()
+    render(<GlobalSettings />)
+    const input = screen.getByDisplayValue('5000')
+    await user.clear(input)
+    await user.type(input, '8000')
+    expect((input as HTMLInputElement).value).toBe('8000')
+    expect(mockUpdateGlobal).not.toHaveBeenCalled()
+    await user.keyboard('{Enter}')
+    expect(mockUpdateGlobal).toHaveBeenCalledWith({ terminal: { scrollbackLimit: 8000 } })
+  })
+
   it.each([
     ['below the minimum', '500'],
     ['above the maximum', '200000'],
-  ])('does not save a scrollback limit %s', async (_case, limit) => {
+  ])('refuses a limit %s when the field loses focus and says why', async (_case, limit) => {
     const user = userEvent.setup()
     render(<GlobalSettings />)
-    await user.tripleClick(screen.getByDisplayValue('5000'))
-    await user.paste(limit)
+    const input = screen.getByDisplayValue('5000')
+    await user.clear(input)
+    await user.type(input, limit)
+    await user.tab()
     expect(mockUpdateGlobal).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toBe('Enter a number from 1,000 to 100,000.')
   })
+})
 
+describe('GlobalSettings — text fields', () => {
   it('saves the worktree base directory when the field loses focus', async () => {
     const user = userEvent.setup()
     render(<GlobalSettings />)
@@ -222,8 +227,8 @@ describe('GlobalSettings — Notifications — checking a target on a core notif
   it('checking a target on a core notification override row saves that override', async () => {
     const user = userEvent.setup()
     render(<GlobalSettings />)
-    const row = screen.getByText('Terminal bell (session needs attention)').closest('div')!
-    const systemCheckbox = within(row.parentElement as HTMLElement).getAllByRole('checkbox')[0]
+    const row = screen.getByRole('group', { name: 'Terminal bell (session needs attention)' })
+    const systemCheckbox = within(row).getAllByRole('checkbox')[0]
     await user.click(systemCheckbox)
     expect(mockUpdateGlobal).toHaveBeenCalledWith({
       notifications: { overrides: { terminalBell: ['system'] } },

@@ -50,7 +50,7 @@ function installSettings(overrides: WorkspaceSettingsValue['overrides'] = {}): v
 }
 
 /** The settings field whose heading is `label`. */
-const fieldOf = (label: string): HTMLElement => screen.getByText(label).parentElement!
+const fieldOf = (label: string): HTMLElement => screen.getByRole('group', { name: label })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -100,7 +100,7 @@ describe('WorkspaceSettings — the theme', () => {
   it('offers dark, light and the global default', () => {
     render(<WorkspaceSettings workspaceId="ws-1" />)
     const radios = within(fieldOf('Theme')).getAllByRole('radio')
-    expect(radios.map((radio) => radio.parentElement!.textContent)).toEqual([
+    expect(radios.map((radio) => (radio as HTMLInputElement).labels?.[0]?.textContent)).toEqual([
       'Dark',
       'Light',
       'Use global default',
@@ -124,26 +124,29 @@ describe('WorkspaceSettings — the theme', () => {
   })
 })
 
-/** Replaces the scrollback field's whole value, as one paste over the selection. */
-async function enterScrollback(user: ReturnType<typeof userEvent.setup>, value: string) {
+/** Types `value` into the scrollback field key by key, over an emptied field. */
+async function typeScrollback(user: ReturnType<typeof userEvent.setup>, value: string) {
   const input = within(fieldOf('Scrollback Limit')).getByRole('spinbutton')
-  await user.tripleClick(input)
-  await user.paste(value)
+  await user.clear(input)
+  await user.type(input, value)
 }
 
 describe('WorkspaceSettings — the scrollback limit', () => {
-  it('saves a value within range', async () => {
+  it('saves a value typed key by key when the field loses focus', async () => {
     const user = userEvent.setup()
     render(<WorkspaceSettings workspaceId="ws-1" />)
-    await enterScrollback(user, '8000')
+    await typeScrollback(user, '8000')
+    await user.tab()
     expect(updateWorkspace).toHaveBeenCalledWith('ws-1', { terminal: { scrollbackLimit: 8000 } })
   })
 
-  it('does not save a value below 1000', async () => {
+  it('refuses a value below 1000 when Enter commits it and says why', async () => {
     const user = userEvent.setup()
     render(<WorkspaceSettings workspaceId="ws-1" />)
-    await enterScrollback(user, '100')
+    await typeScrollback(user, '100')
+    await user.keyboard('{Enter}')
     expect(updateWorkspace).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toBe('Enter a number from 1,000 to 100,000.')
   })
 
   it('clears the scrollback override with "Use global default"', async () => {
@@ -263,7 +266,7 @@ describe("WorkspaceSettings — the workspace's own default shell", () => {
     render(<WorkspaceSettings workspaceId="ws-1" />)
     expect(shellBox().value).toBe('/bin/fish')
 
-    const field = shellBox().closest('div')!
+    const field = fieldOf('Default Shell')
     await user.click(within(field).getByRole('button', { name: 'Use global default' }))
 
     expect(updateWorkspace).toHaveBeenCalledWith('ws-1', { terminal: { defaultShell: undefined } })

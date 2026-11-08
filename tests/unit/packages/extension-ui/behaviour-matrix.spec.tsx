@@ -84,8 +84,8 @@ describe('behaviour matrix: Popover', () => {
   it(`${CHECKS[4]}, and is not announced as modal`, async () => {
     const user = userEvent.setup()
     const onDismiss = vi.fn()
-    const { container } = render(<PopoverHarness onDismiss={onDismiss} />)
-    const surface = container.querySelector('[data-tmui-surface]') as HTMLElement
+    render(<PopoverHarness onDismiss={onDismiss} />)
+    const surface = screen.getByRole('group', { name: 'Options' })
     expect(surface.getAttribute('aria-modal')).toBeNull()
     await user.click(document.body)
     expect(onDismiss).toHaveBeenCalled()

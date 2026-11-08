@@ -72,7 +72,7 @@ const HEAT_MAX = 4
 
 function HeatStrip({ days }: { days: readonly number[] }): React.JSX.Element {
   return (
-    <div className="desk-heat" aria-hidden="true">
+    <div className="desk-heat" aria-hidden="true" data-testid="heat-strip">
       {days.slice(-HEAT_CELLS).map((level, index) => (
         <i
           key={index}

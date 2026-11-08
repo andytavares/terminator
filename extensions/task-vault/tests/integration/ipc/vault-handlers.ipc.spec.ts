@@ -214,12 +214,14 @@ describe('task-vault:vault:edit-task', () => {
     })
   })
 
-  it('returns STALE_ID for an unknown task and creates no project', async () => {
+  it('returns STALE_ID for an unknown task and creates no project or area', async () => {
     expect(
-      await harness.invoke('task-vault:vault:edit-task', { taskId: 'gone', text: 'hi @x' })
+      await harness.invoke('task-vault:vault:edit-task', { taskId: 'gone', text: 'hi @x #home' })
     ).toEqual({
       error: 'STALE_ID',
     })
+    expect(await db.query(`SELECT id FROM projects`)).toEqual([])
+    expect(await db.query(`SELECT id FROM areas`)).toEqual([])
   })
 })
 

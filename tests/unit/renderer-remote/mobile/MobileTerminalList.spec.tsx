@@ -125,7 +125,7 @@ describe('MobileTerminalList — Enter on a workspace terminal', () => {
     await renderList([workspace], [terminal])
     const row = screen.getByRole('button', { name: 'myapp' })
     row.focus()
-    expect(document.activeElement).toBe(row)
+    expect(row.matches(':focus')).toBe(true)
     await userEvent.keyboard('{Enter}')
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-enter-ws',
@@ -145,7 +145,7 @@ describe('MobileTerminalList — triggers onSelectTerminal via Enter key on fall
     await renderList([workspace], [unmatched])
     const row = screen.getByRole('button', { name: 'Scratch 1 · enter-scratch' })
     row.focus()
-    expect(document.activeElement).toBe(row)
+    expect(row.matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-enter-global',
@@ -194,7 +194,7 @@ describe('MobileTerminalList — long-press', () => {
       createdAt: '2026-06-20T10:00:00.000Z',
     }
     await renderList([workspace], [unmatched])
-    const btn = screen.getByText('Scratch 1 · longpress').closest('button')!
+    const btn = screen.getByRole('button', { name: 'Scratch 1 · longpress' })
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     await act(async () => {
       vi.advanceTimersByTime(600)
@@ -212,7 +212,7 @@ describe('MobileTerminalList — touchEnd before 500ms cancels long-press and no
       createdAt: '2026-06-20T10:00:00.000Z',
     }
     await renderList([workspace], [unmatched])
-    const btn = screen.getByText('Scratch 1 · touchend').closest('button')!
+    const btn = screen.getByRole('button', { name: 'Scratch 1 · touchend' })
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     fireEvent.touchEnd(btn)
     await act(async () => {
@@ -231,7 +231,7 @@ describe('MobileTerminalList — touchMove before 500ms cancels long-press and n
       createdAt: '2026-06-20T10:00:00.000Z',
     }
     await renderList([workspace], [unmatched])
-    const btn = screen.getByText('Scratch 1 · touchmove').closest('button')!
+    const btn = screen.getByRole('button', { name: 'Scratch 1 · touchmove' })
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     fireEvent.touchMove(btn)
     await act(async () => {
@@ -289,8 +289,8 @@ describe('MobileTerminalList — second touchStart on a different terminal cance
       createdAt: '2026-06-20T10:00:00.000Z',
     }
     await renderList([], [termA, termB])
-    const btnA = screen.getByText('Scratch 1 · timer-a').closest('button')!
-    const btnB = screen.getByText('Scratch 2 · timer-b').closest('button')!
+    const btnA = screen.getByRole('button', { name: 'Scratch 1 · timer-a' })
+    const btnB = screen.getByRole('button', { name: 'Scratch 2 · timer-b' })
     // Start long-press on A, then immediately start one on B
     fireEvent.touchStart(btnA, { touches: [{ clientX: 10, clientY: 10 }] })
     fireEvent.touchStart(btnB, { touches: [{ clientX: 20, clientY: 20 }] })
@@ -353,6 +353,7 @@ describe('MobileTerminalList — backdrop touchStart does not close context menu
     expect(screen.getAllByText('Move to workspace')).toHaveLength(1)
 
     // touchStart on the backdrop should NOT close the menu (user-event has no touch input)
+    // eslint-disable-next-line testing-library/no-node-access -- the backdrop is a bare div with no role, label or text
     const backdrop = document.querySelector('.mobile-context-menu-backdrop') as HTMLElement
     expect(backdrop).not.toBeNull()
     fireEvent.touchStart(backdrop)

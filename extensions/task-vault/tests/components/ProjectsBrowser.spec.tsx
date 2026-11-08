@@ -52,10 +52,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const projectCardNamed = (name: string) =>
-  screen
-    .getByText(name, { selector: '.projects-browser__name' })
-    .closest('.projects-browser__card') as HTMLElement
+const projectCardNamed = (name: string) => screen.getByRole('group', { name })
 
 async function renderBrowser() {
   const user = userEvent.setup()
@@ -223,11 +220,11 @@ function createAreaListTests() {
   it('closes the area list with Escape and opens it again with Enter', async () => {
     const user = await openCreateForm()
     await user.type(screen.getByPlaceholderText('e.g. work'), 'W{Escape}')
-    expect(document.querySelector('.area-combobox__dropdown')).toBeNull()
+    expect(screen.queryByRole('listbox', { name: 'Areas' })).toBeNull()
     await user.keyboard('{Enter}')
-    expect(document.querySelector('.area-combobox__dropdown')).not.toBeNull()
+    expect(screen.getByRole('listbox', { name: 'Areas' })).toBeTruthy()
     await user.keyboard('{Escape}')
-    expect(document.querySelector('.area-combobox__dropdown')).toBeNull()
+    expect(screen.queryByRole('listbox', { name: 'Areas' })).toBeNull()
   })
 }
 
@@ -370,8 +367,8 @@ function linkTests() {
   it('links a project to a terminal session named by workspace and project', async () => {
     const user = await renderBrowser()
     await user.click(within(projectCardNamed('Launch')).getByTitle('Link to terminal session'))
-    const option = await screen.findByRole('option', { name: 'Home › terminator › zsh' })
-    await user.selectOptions(option.closest('select')!, 'sess-12345678')
+    const select = await screen.findByRole('combobox', { name: 'Terminal session' })
+    await user.selectOptions(select, 'Home › terminator › zsh')
     await eventually(() =>
       expect(bridge.calls('task-vault:links:create')).toEqual([
         { projectFilePath: 'Launch', targetId: 'sess-12345678' },

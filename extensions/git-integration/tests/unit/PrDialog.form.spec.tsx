@@ -50,8 +50,8 @@ const defaultProps = {
 }
 
 // The Title and Description labels are not tied to their fields, so the placeholder names them.
-const titleBox = () => screen.getByPlaceholderText('Pull request title')
-const descriptionBox = () => screen.queryByPlaceholderText(/Describe your changes/)
+const titleBox = () => screen.getByRole('textbox', { name: 'Title' })
+const descriptionBox = () => screen.queryByRole('textbox', { name: 'Description' })
 const createButton = () => screen.findByRole('button', { name: 'Create PR' })
 
 describe('PrDialog', () => {

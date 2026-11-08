@@ -136,7 +136,7 @@ function detailKeysTests() {
     await user.click(editButtons()[0])
     await user.clear(textarea())
     await user.type(textarea(), 'changed')
-    expect(document.activeElement).toBe(textarea())
+    expect(textarea().matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('textbox')).toBeNull()
     await user.click(editButtons()[0])
@@ -149,7 +149,7 @@ function detailKeysTests() {
     await screen.findByText('it')
     await user.click(editButtons()[0])
     await user.click(textarea())
-    expect(document.activeElement).toBe(textarea())
+    expect(textarea().matches(':focus')).toBe(true)
     await user.keyboard('{Meta>}{Enter}{/Meta}')
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:save-task-detail')).toHaveLength(1)

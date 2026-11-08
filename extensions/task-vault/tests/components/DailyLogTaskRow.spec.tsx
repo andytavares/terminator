@@ -79,7 +79,7 @@ function selectTests() {
 function selectTestsPart2() {
   it('marks the selected finished row, its text struck through', () => {
     renderDailyLog(task('t1', 'Write', { status: 'done' }), { selectedTaskId: 't1' })
-    expect(document.querySelector('.daily-log__task--selected')).not.toBeNull()
+    expect(screen.getByRole('group', { name: 'Write' }).getAttribute('aria-current')).toBe('true')
     expect(screen.getByText('Write').className).toContain('daily-log__task-text--strikethrough')
   })
 
@@ -238,7 +238,7 @@ function blockedTests() {
   it('shows why a blocked task is blocked, with no checkbox', () => {
     renderDailyLog(blockedTask(), { onSelectTask: vi.fn() })
     expect(screen.getByTitle('Check in: 2 days').textContent).toBe('⊘ waiting')
-    expect(document.querySelector('.daily-log__task--blocked')).not.toBeNull()
+    expect(screen.getByRole('img', { name: 'blocked' })).toBeTruthy()
     expect(screen.queryByTitle('Complete task')).toBeNull()
   })
 
@@ -286,7 +286,7 @@ function finishedTests() {
 
   it('shows a cancelled task with the cancelled row and text styles', () => {
     renderDailyLog(task('t1', 'Write', { status: 'cancelled' }), { onSelectTask: vi.fn() })
-    expect(document.querySelector('.daily-log__task--cancelled')).not.toBeNull()
+    expect(screen.getByRole('img', { name: 'cancelled' })).toBeTruthy()
     expect(screen.getByText('Write').className).toContain('daily-log__task-text--cancelled')
   })
 
@@ -315,8 +315,8 @@ function metaTests() {
       }),
       { onSelectTask: vi.fn() }
     )
-    const meta = document.querySelector('.daily-log__task-meta')!
-    expect(meta.textContent).toContain('@p+c#adue:2026-02-01⊘ why')
+    const row = screen.getByRole('group', { name: 'Write' })
+    expect(row.textContent).toContain('@p+c#adue:2026-02-01⊘ why')
     expect(
       screen.getByTitle(`Check in: ${new Date('2026-03-01T09:00').toLocaleString()}`)
     ).toBeTruthy()
@@ -327,7 +327,7 @@ function metaTests() {
 function metaTestsPart2() {
   it('shows no meta line for a plain task, and midnight as 12 AM', () => {
     renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    expect(document.querySelector('.daily-log__task-meta')).toBeNull()
+    expect(screen.queryByTitle(/^Repeats:/)).toBeNull()
     cleanup()
     renderDailyLog(task('t1', 'Write', { recurrenceRule: 'daily', recurrenceNotifyAt: '00:30' }), {
       onSelectTask: vi.fn(),

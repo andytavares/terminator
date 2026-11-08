@@ -21,7 +21,7 @@ export function MetricsBar({ system }: Props): React.JSX.Element {
   const cpuPct = Math.round(system.cpuPercent)
   const memPct = (system.memUsedBytes / system.memTotalBytes) * 100
   return (
-    <div className="metrics-bar">
+    <div className="metrics-bar" role="group" aria-label="System metrics">
       <BarMetric label="CPU" percent={cpuPct} colour={cpuColour(cpuPct)}>
         {cpuPct}%
       </BarMetric>
@@ -48,7 +48,7 @@ function cpuColour(percent: number): string {
 /** Each metric's label over a skeleton, until the first sample arrives. */
 function MetricsPlaceholder(): React.JSX.Element {
   return (
-    <div className="metrics-bar">
+    <div className="metrics-bar" role="group" aria-label="System metrics" aria-busy="true">
       {['CPU', 'MEM', 'NET'].map((label) => (
         <div key={label} className="metrics-bar__item">
           <span className="metrics-bar__label">{label}</span>
@@ -74,6 +74,11 @@ function BarMetric({ label, percent, colour, children }: BarMetricProps): React.
       <div className="metrics-bar__bar-track">
         <div
           className="metrics-bar__bar-fill"
+          role="meter"
+          aria-label={label}
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
           style={{ width: `${percent}%`, background: colour }}
         />
       </div>

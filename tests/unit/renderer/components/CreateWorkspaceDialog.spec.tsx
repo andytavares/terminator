@@ -127,11 +127,11 @@ describe('CreateWorkspaceDialog — does not update folder path when Browse is c
 
   it('selects a color swatch on click', async () => {
     const user = userEvent.setup()
-    const { container } = render(<CreateWorkspaceDialog onClose={vi.fn()} />)
-    const swatches = container.querySelectorAll('.dialog__color-swatch')
-    // Click second color swatch (index 1 = #7B68EE)
-    await user.click(swatches[1])
-    expect(swatches[1].classList.contains('dialog__color-swatch--selected')).toBe(true)
+    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    const swatch = screen.getByRole('button', { name: 'Color #7B68EE' })
+    expect(swatch.getAttribute('aria-pressed')).toBe('false')
+    await user.click(swatch)
+    expect(swatch.getAttribute('aria-pressed')).toBe('true')
   })
 })
 

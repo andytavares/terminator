@@ -25,7 +25,7 @@ export function MetricCard({
   children,
 }: MetricCardProps): React.JSX.Element {
   return (
-    <div className="tmui-metric-card">
+    <div className="tmui-metric-card" role="group" aria-label={question}>
       <div className="tmui-metric-card__question">
         {question}
         {qualifier ? <span className="tmui-metric-card__qualifier"> {qualifier}</span> : null}

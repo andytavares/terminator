@@ -56,7 +56,7 @@ describe('ResumeButton — does not open the row or tile it sits on', () => {
       </div>
     )
     await user.click(screen.getByRole('button', { name: 'Resume claude' }))
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(screen.getByRole('button', { name: 'Resume claude' }).matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(behind).not.toHaveBeenCalled()
   })

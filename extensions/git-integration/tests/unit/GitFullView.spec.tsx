@@ -406,9 +406,9 @@ describe('GitFullView — shows push error when push fails after commit & push',
   it('focuses the commit message box on git:focus-commit-message for this repo', async () => {
     await renderView('/repo')
     const textarea = screen.getByPlaceholderText('Commit message…')
-    expect(document.activeElement).not.toBe(textarea)
+    expect(textarea.matches(':focus')).toBe(false)
     channelHandlers.get('git:focus-commit-message')?.({ repoRoot: '/repo' })
-    await waitFor(() => expect(document.activeElement).toBe(textarea))
+    await waitFor(() => expect(textarea.matches(':focus')).toBe(true))
   })
 })
 
@@ -417,7 +417,7 @@ describe('GitFullView — ignores git:focus-commit-message for a different repo'
     await renderView('/repo')
     const textarea = screen.getByPlaceholderText('Commit message…')
     channelHandlers.get('git:focus-commit-message')?.({ repoRoot: '/other-repo' })
-    expect(document.activeElement).not.toBe(textarea)
+    expect(textarea.matches(':focus')).toBe(false)
   })
 
   it('opens the PR dialog on git:open-pr-dialog for this repo', async () => {
@@ -460,7 +460,7 @@ describe('GitFullView — a Commit… or Create PR… run before the view existe
     leavePendingRequest({ kind: 'commit', repoRoot: '/repo' })
     await renderView('/repo')
     const textarea = screen.getByPlaceholderText('Commit message…')
-    await waitFor(() => expect(document.activeElement).toBe(textarea))
+    await waitFor(() => expect(textarea.matches(':focus')).toBe(true))
   })
 
   it('opens the PR dialog for a pending Create PR… on this repo', async () => {

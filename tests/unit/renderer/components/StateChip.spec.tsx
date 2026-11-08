@@ -15,7 +15,7 @@ describe('StateChip', () => {
     (state, label, shape) => {
       render(<StateChip state={state} />)
       const chip = screen.getByRole('img', { name: label })
-      expect(chip.querySelector('svg')?.getAttribute('class')).toContain(shape)
+      expect(chip.innerHTML).toContain(`class="lucide ${shape}`)
       expect(chip.className).toContain(`state-chip--${state}`)
       expect(screen.getByText(label)).toBeTruthy()
     }
@@ -29,10 +29,10 @@ describe('StateChip', () => {
   })
 
   it('never colours the glyph inline', () => {
-    const { container } = render(<StateChip state="awaiting-input" />)
-    const nodes = [...container.querySelectorAll<HTMLElement>('*')]
-    expect(nodes.map((node) => node.style?.color ?? '').filter(Boolean)).toEqual([])
-    const strokes = nodes.map((node) => node.getAttribute('stroke') ?? 'currentColor')
-    expect(strokes.filter((stroke) => stroke !== 'currentColor')).toEqual([])
+    render(<StateChip state="awaiting-input" />)
+    const markup = screen.getByRole('img', { name: 'Waiting on you' }).outerHTML
+    expect(markup).not.toMatch(/style="[^"]*color/)
+    const strokes = markup.match(/stroke="[^"]*"/g) ?? []
+    expect(strokes.filter((stroke) => stroke !== 'stroke="currentColor"')).toEqual([])
   })
 })

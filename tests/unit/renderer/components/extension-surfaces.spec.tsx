@@ -128,6 +128,9 @@ beforeEach(() => {
 const commandLabels = (): string[] =>
   useExtensionRegistry.getState().commands.map((command) => command.label)
 
+/** The first branch row: a button named "<branch> — <state>". */
+const branchRow = () => screen.getAllByRole('button', { name: / — / })[0]
+
 const renderSidebar = (groupBy: GroupKey) => {
   saveOpeningViewGrouping(groupBy)
   return render(<UnifiedSidebar {...sidebarProps} />)
@@ -142,17 +145,17 @@ describe('surface 2: the workspace tab is reachable and fires with the owning wo
   it('opens from the repo header when grouped by workspace', async () => {
     const user = userEvent.setup()
     const onSelectWorkspaceTab = vi.fn()
-    const { container } = renderWithWorkspaceTab('workspace', onSelectWorkspaceTab)
-    await user.click(container.querySelector('.repo-header__action')!)
+    renderWithWorkspaceTab('workspace', onSelectWorkspaceTab)
+    await user.click(screen.getByRole('button', { name: 'Fake Workspace Tab' }))
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
   })
 
   it('opens from the branch row menu when ungrouped, as there is no repo header', async () => {
     const user = userEvent.setup()
     const onSelectWorkspaceTab = vi.fn()
-    const { container } = renderWithWorkspaceTab('none', onSelectWorkspaceTab)
-    expect(container.querySelector('.repo-header__action')).toBeNull()
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    renderWithWorkspaceTab('none', onSelectWorkspaceTab)
+    expect(screen.queryByRole('button', { name: 'Fake Workspace Tab' })).toBeNull()
+    fireEvent.contextMenu(branchRow())
     await user.click(screen.getByText('Fake Workspace Tab'))
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
   })
@@ -161,15 +164,15 @@ describe('surface 2: the workspace tab is reachable and fires with the owning wo
 describe.each(GROUPINGS)('the branch scope survives %s grouping', (groupBy) => {
   it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', async () => {
     const user = userEvent.setup()
-    const { container } = renderSidebar(groupBy)
-    await user.click(container.querySelector('.branch-row')!)
+    renderSidebar(groupBy)
+    await user.click(branchRow())
     expect(useWorkspaceStore.getState().activeProjectId).toBe('p1')
   })
 
   it('a new terminal can be created for the branch scope', async () => {
     const user = userEvent.setup()
-    const { container } = renderSidebar(groupBy)
-    await user.click(container.querySelector('.branch-row__action')!)
+    renderSidebar(groupBy)
+    await user.click(screen.getAllByRole('button', { name: /^New terminal in / })[0])
     expect(mockCreateSession).toHaveBeenCalledWith({
       projectId: 'p1',
       type: 'human',

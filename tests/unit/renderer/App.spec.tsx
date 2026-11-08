@@ -900,8 +900,8 @@ describe('App — renders MetricsBar when showMetricsBar is true', () => {
     setupApp({
       globalSettings: settingsWith({ ui: { hasSeenWelcome: true, showMetricsBar: true } }),
     })
-    const { container } = render(<App />)
-    expect(container.querySelector('.app-global-metrics')).toBeTruthy()
+    render(<App />)
+    expect(screen.getByRole('group', { name: 'System metrics' })).toBeTruthy()
   })
 
   it('UnifiedSidebar onSelectScratchSession activates scratch view for chosen session', () => {
@@ -1899,45 +1899,50 @@ describe('App — terminals that fail to start', () => {
   })
 })
 
-function mountExtensionFrame(extensionId: string, viewParam: string): HTMLIFrameElement {
-  const panel = document.createElement('div')
-  panel.setAttribute('data-extension-panel', extensionId)
-  panel.setAttribute('data-view-param', viewParam)
-  const frame = document.createElement('iframe')
-  panel.appendChild(frame)
-  document.body.appendChild(panel)
-  return frame
+/** A panel and its frame, as the extension host draws them, beside the app. */
+function ExtensionFrame(props: { extensionId: string; viewParam: string }): React.JSX.Element {
+  return (
+    <div data-extension-panel={props.extensionId} data-view-param={props.viewParam}>
+      <iframe title={`${props.extensionId} ${props.viewParam}`} />
+    </div>
+  )
 }
 
 describe('App — extension:focus-view', () => {
-  afterEach(() => {
-    for (const panel of document.querySelectorAll('[data-extension-panel]')) panel.remove()
-  })
-
   it('focuses the frame of the extension view that asked for focus', () => {
-    const wanted = mountExtensionFrame('terminator.foundry', 'main')
-    mountExtensionFrame('terminator.notepad', 'main')
-    render(<App />)
+    render(
+      <>
+        <ExtensionFrame extensionId="terminator.foundry" viewParam="main" />
+        <ExtensionFrame extensionId="terminator.notepad" viewParam="main" />
+        <App />
+      </>
+    )
     act(() =>
       main.events.bridge.emit('extension:focus-view', {
         extensionId: 'terminator.foundry',
         viewParam: 'main',
       })
     )
-    expect(document.activeElement).toBe(wanted)
+    expect(screen.getByTitle('terminator.foundry main').matches(':focus')).toBe(true)
   })
+})
 
+describe('App — extension:focus-view with no frame', () => {
   it('does nothing when that view has no frame on screen', () => {
-    mountExtensionFrame('terminator.notepad', 'main')
-    render(<App />)
-    const focusedBefore = document.activeElement
+    render(
+      <>
+        <ExtensionFrame extensionId="terminator.notepad" viewParam="main" />
+        <App />
+      </>
+    )
+    expect(document.body.matches(':focus-within')).toBe(false)
     act(() =>
       main.events.bridge.emit('extension:focus-view', {
         extensionId: 'terminator.foundry',
         viewParam: 'main',
       })
     )
-    expect(document.activeElement).toBe(focusedBefore)
+    expect(document.body.matches(':focus-within')).toBe(false)
   })
 })
 

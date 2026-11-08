@@ -361,7 +361,7 @@ describe('every gate rule can be rendered', () => {
     await screen.findByText(ruleInWords(rule))
     // The stripe as well as the icon: a missing tone is a silent `undefined`
     // in the class list rather than a throw, so it needs its own assertion.
-    expect(document.querySelector('.fdry-gate')?.className).toMatch(/\bis-(p0|warn|info|ok)\b/)
+    expect(screen.getAllByRole('listitem')[0].className).toMatch(/\bis-(p0|warn|info|ok)\b/)
   })
 })
 
@@ -445,9 +445,9 @@ function severalSignalsAndArrivalsTests() {
   it('renders more than one signal, in the order the channel ranked them', async () => {
     mount({ signals: [highSignal(), lowSignal()] })
     await screen.findByText('test-foo flakes on main')
-    const titles = Array.from(document.querySelectorAll('.fdry-signal')).map(
-      (el) => el.querySelector('b')?.textContent
-    )
+    const titles = screen
+      .getAllByText(/^(test-foo flakes on main|many issues opened against auth)$/)
+      .map((title) => title.textContent)
     expect(titles).toEqual(['test-foo flakes on main', 'many issues opened against auth'])
   })
 

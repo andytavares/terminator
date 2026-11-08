@@ -419,7 +419,11 @@ function Reading({ text, className, expandLabel }: ReadingProps) {
   }, [expanded, text])
   return (
     <>
-      <div ref={readingRef} className={readingClass(className, expanded, overflows)}>
+      <div
+        ref={readingRef}
+        className={readingClass(className, expanded, overflows)}
+        data-testid="reading"
+      >
         <RichContent>{text}</RichContent>
       </div>
       {(expanded || overflows) && (

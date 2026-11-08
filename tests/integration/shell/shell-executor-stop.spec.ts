@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { execShell } from '../../../src/main/shell/shell-executor'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
-import { expectProcessGone, isProcessAlive, recordedPid } from '../../support/processes'
+import { expectProcessGone, recordedPid } from '../../support/processes'
 
 // A git or gh command running at quit ends with the app, with what it started (macOS's git
 // shim started an xcodebuild that outlived it, run 38382115775). The stand-in gh records a sleep's pid.
@@ -77,7 +77,8 @@ describe('stopRunningCommands and a helper a command detached', () => {
     const helper = await recordedPid(helperPid)
     try {
       await stopRunningCommands()
-      expect(isProcessAlive(grandchild)).toBe(false)
+      // As above, the grandchild's death lands a moment after stop settles.
+      await expectProcessGone(grandchild)
     } finally {
       // Out of the group's reach by design; it holds the output open until it goes.
       process.kill(helper, 'SIGKILL')

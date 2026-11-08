@@ -122,7 +122,11 @@ export function SubtaskRow(props: SubtaskRowProps): React.JSX.Element {
   const edit = useSubtaskActions(props.subtask, props.onRefresh)
   const done = props.subtask.status === 'done'
   return (
-    <div className={`daily-log__subtask${modifier(done, 'daily-log__subtask--done')}`}>
+    <div
+      role="group"
+      aria-label={props.subtask.text}
+      className={`daily-log__subtask${modifier(done, 'daily-log__subtask--done')}`}
+    >
       <SubtaskMarker subtask={props.subtask} onRefresh={props.onRefresh} edit={edit} />
       {edit.editing ? (
         <SubtaskEditor edit={edit} />

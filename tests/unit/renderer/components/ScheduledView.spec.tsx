@@ -86,7 +86,7 @@ const shown = async () => {
   render(<ScheduledView />)
   await act(async () => {})
 }
-const rowOf = (prompt: string) => screen.getByText(prompt).closest('tr') as HTMLElement
+const rowOf = (prompt: string) => screen.getByRole('row', { name: (name) => name.includes(prompt) })
 const openMenu = (user: UserEvent, prompt: string) =>
   user.click(screen.getByRole('button', { name: `Actions for ${prompt}` }))
 const menuItems = () =>
@@ -306,9 +306,8 @@ describe('ScheduledView — dragging a run to an agent tab', () => {
   it('carries the session of a run that is open, without editing the run', async () => {
     live('working')
     await shown()
-    const lastRun = within(rowOf('Triage the inbox')).getByText('Running').closest('[draggable]')!
     const dataTransfer = { setData: vi.fn(), effectAllowed: '' }
-    fireEvent.dragStart(lastRun, { dataTransfer })
+    fireEvent.dragStart(within(rowOf('Triage the inbox')).getByText('Running'), { dataTransfer })
     expect(dataTransfer.setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 'run-1')
     expect(dataTransfer.effectAllowed).toBe('copy')
     expect(useStartWorkStore.getState().open).toBe(false)
@@ -316,6 +315,8 @@ describe('ScheduledView — dragging a run to an agent tab', () => {
 
   it('offers nothing to drag for a run with no open session', async () => {
     await shown()
-    expect(rowOf('Triage the inbox').querySelector('[draggable="true"]')).toBeNull()
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(rowOf('Triage the inbox'), { dataTransfer })
+    expect(dataTransfer.setData).not.toHaveBeenCalledWith(SESSION_DRAG_TYPE, expect.anything())
   })
 })

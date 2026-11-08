@@ -225,6 +225,13 @@ function SplitComments(props: Omit<SplitSideProps, 'expanded'>) {
   )
 }
 
+/** The split divider is a vertical separator a person drags to resize the two sides. */
+const RESIZE_HANDLE = {
+  role: 'separator',
+  'aria-orientation': 'vertical',
+  'aria-label': 'Resize split',
+} as const
+
 /** One flex row per line pair, then a comment row with the same classes, so the two align. */
 function SplitPair(props: SplitPairProps) {
   const { ctx, left, right, expanded } = props
@@ -236,13 +243,13 @@ function SplitPair(props: SplitPairProps) {
     <>
       <div className="diff-split-tables">
         <SplitCodeTable ctx={ctx} line={left} side="LEFT" expanded={expanded} />
-        <div className="diff-split-resize-handle" onMouseDown={divider} />
+        <div className="diff-split-resize-handle" {...RESIZE_HANDLE} onMouseDown={divider} />
         <SplitCodeTable ctx={ctx} line={right} side="RIGHT" expanded={expanded} />
       </div>
       {hasComments && (
         <div className="diff-split-tables">
           <SplitComments ctx={ctx} line={left} side="LEFT" />
-          <div className="diff-split-resize-handle" onMouseDown={divider} />
+          <div className="diff-split-resize-handle" {...RESIZE_HANDLE} onMouseDown={divider} />
           <SplitComments ctx={ctx} line={right} side="RIGHT" />
         </div>
       )}
@@ -356,14 +363,26 @@ function ExpanderContent(props: { ctx: PaneContext; gapKey: string; hidden: numb
   return <ExpandButtons {...props} />
 }
 
+const GAP_LABEL = 'Unchanged lines'
+
 function GapExpander(props: { ctx: PaneContext; gapKey: string; hidden: number | null }) {
   const { ctx, gapKey, hidden } = props
   const content = <ExpanderContent ctx={ctx} gapKey={gapKey} hidden={hidden} />
-  if (ctx.mode !== 'unified') return <div className="diff-gap-row">{content}</div>
+  if (ctx.mode !== 'unified') {
+    return (
+      <div className="diff-gap-row" role="group" aria-label={GAP_LABEL}>
+        {content}
+      </div>
+    )
+  }
   return (
     <UnifiedRowsTable ctx={ctx}>
       <tr className="diff-gap-row">
-        <td colSpan={5}>{content}</td>
+        <td colSpan={5}>
+          <span role="group" aria-label={GAP_LABEL}>
+            {content}
+          </span>
+        </td>
       </tr>
     </UnifiedRowsTable>
   )

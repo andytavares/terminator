@@ -173,7 +173,7 @@ describe('MoveSessionDialog — the branch the session is in', () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     expect(screen.getByText('current')).toBeTruthy()
     // The current project button should be disabled
-    const btn = screen.getByText('Proj One').closest('button')!
+    const btn = screen.getByRole('button', { name: /Proj One/ })
     expect(btn).toHaveProperty('disabled', true)
   })
 

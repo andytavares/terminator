@@ -207,6 +207,35 @@ describe('an order the operator holds', () => {
   })
 })
 
+describe('a turn whose data root changes before it ends', () => {
+  it('writes what its end leads to under the root it started with, and nothing under the new one', async () => {
+    const startedUnder = dataDir
+    let release = (): void => undefined
+    const held = new Promise<void>((resolve) => (release = resolve))
+    theRunner.start.mockImplementation(
+      scriptedTurns(() => ({
+        dataDir: startedUnder,
+        writes: { architect: () => ({ note: 'tightened' }) },
+        heldTurn: { phase: 'architect', release: held },
+      })) as never
+    )
+    // A small one-lane plan: its end skips the red team and goes straight to the hand-off.
+    await convergeFromTheArchitect(
+      readyDraft(repo, {
+        risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+      })
+    )
+    dataDir = path.join(temporaryDirectory('fdry-forge-moved'), 'records')
+    release()
+    await untilToastShown(host, 'Make it red is ready to hand off.')
+
+    expect(await ledgerActions(startedUnder)).toEqual(
+      expect.arrayContaining(['order.redrafted', 'review.skipped'])
+    )
+    expect(fs.existsSync(dataDir)).toBe(false)
+  })
+})
+
 describe('the very first draft', () => {
   it('has the scout read the repository beside the architect, and keeps what it found', async () => {
     writes = {

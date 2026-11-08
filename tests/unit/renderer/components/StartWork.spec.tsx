@@ -198,7 +198,7 @@ const useRepoFolder = (user: UserEvent) =>
 /** Puts the cursor in the field the person types in, checks it is there, and presses `keys`. */
 const pressInBox = async (user: UserEvent, keys: string) => {
   await user.click(searchBox())
-  expect(document.activeElement).toBe(searchBox())
+  expect(searchBox().matches(':focus')).toBe(true)
   await user.keyboard(keys)
 }
 /** Replaces what a date or time field holds, as the person does by typing over it. */
@@ -236,7 +236,7 @@ describe('StartWork — my tickets', () => {
 
   it('shows each ticket with its title and its state chip', async () => {
     await open()
-    const row = screen.getByText('TAV-33').closest('[role="option"]') as HTMLElement
+    const row = screen.getByRole('option', { name: /TAV-33/ })
     expect(within(row).getByText('Retry rate-limited GitHub searches')).toBeTruthy()
     expect(within(row).getByText('started')).toBeTruthy()
   })
@@ -261,7 +261,7 @@ describe('StartWork — my tickets', () => {
 describe('StartWork — opening and closing', () => {
   it('puts the cursor in the search box when it opens', async () => {
     await open()
-    expect(document.activeElement).toBe(searchBox())
+    expect(searchBox().matches(':focus')).toBe(true)
   })
 
   it('closes on Escape', async () => {
@@ -298,12 +298,12 @@ describe('StartWork — run it as, with the arrow keys', () => {
     const runAs = () =>
       within(choices).getByRole('radio', { checked: true }).getAttribute('aria-label')
     act(() => first.focus())
-    expect(document.activeElement).toBe(first)
+    expect(first.matches(':focus')).toBe(true)
     expect(runAs()).toBe('Claude Code in an agent tab')
 
     await user.keyboard('{ArrowDown}')
     expect(runAs()).toBe('Claude in a terminal')
-    expect(document.activeElement).toBe(second)
+    expect(second.matches(':focus')).toBe(true)
 
     await user.keyboard('{ArrowUp}')
     expect(runAs()).toBe('Claude Code in an agent tab')
@@ -618,7 +618,7 @@ describe('StartWork — scratch and branch tabs', () => {
     const user = userEvent.setup()
     const onClose = await open()
     await goToTab(user, 'Scratch terminal')
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Scratch terminal' }))
+    expect(screen.getByRole('tab', { name: 'Scratch terminal' }).matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     await waitFor(() => expect(launched.scratch).toHaveBeenCalledTimes(1))
     expect(onClose).toHaveBeenCalled()
@@ -718,7 +718,7 @@ describe('StartWork — workspace picker, the list', () => {
     const user = userEvent.setup()
     const onClose = await open()
     await user.click(pickerButton())
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Filter workspaces' }))
+    expect(screen.getByRole('textbox', { name: 'Filter workspaces' }).matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Workspace' })).toBeNull())
     expect(screen.getByRole('dialog', { name: 'Start work' })).toBeTruthy()
@@ -746,7 +746,7 @@ describe('StartWork — workspace picker, filtering', () => {
     await open()
     await user.click(pickerButton())
     const filter = screen.getByRole('textbox', { name: 'Filter workspaces' })
-    expect(document.activeElement).toBe(filter)
+    expect(filter.matches(':focus')).toBe(true)
     await user.keyboard('{ArrowDown}{Enter}')
     expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: atlas')
     expect(launched.createFromDraft).not.toHaveBeenCalled()

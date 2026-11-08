@@ -1,7 +1,7 @@
 import { createChangeBus } from '../../helpers/change-bus.js'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FactorySite } from '../../../src/components/factory/FactorySite.js'
 import type { FactoryOrderRow } from '../../../src/components/factory/FactorySite.js'
@@ -130,7 +130,7 @@ function theCardsTests() {
       { id: 'WO-2', title: 'Newer', status: 'running', createdAt: '2026-10-07T00:00:00.000Z' },
     ])
     await screen.findByText('Older')
-    const cards = Array.from(document.querySelectorAll('.fdry-hall-card'))
+    const cards = screen.getAllByRole('listitem')
     expect(cards.map((c) => c.textContent)).toEqual([
       expect.stringContaining('Newer'),
       expect.stringContaining('Older'),
@@ -178,13 +178,13 @@ function completedOrdersTests() {
     const completed = screen.getByRole('region', { name: 'Completed' })
     expect(active.textContent).toContain('Building')
     expect(active.textContent).not.toContain('Shipped')
-    const finished = Array.from(completed.querySelectorAll('.fdry-hall-card'))
+    const finished = within(completed).getAllByRole('listitem')
     expect(finished.map((c) => c.textContent)).toEqual([
       expect.stringContaining('Shipped late'),
       expect.stringContaining('Shipped early'),
     ])
     expect(finished.every((c) => c.classList.contains('is-done'))).toBe(true)
-    expect(active.querySelector('.fdry-hall-card.is-done')).toBeNull()
+    expect(within(active).getByRole('listitem').classList.contains('is-done')).toBe(false)
   })
 }
 
@@ -200,11 +200,12 @@ function documentLinkTests() {
         createdAt: '2026-10-01T00:00:00.000Z',
       },
     ] as FactoryOrderRow[])
-    const link = await screen.findByRole('link', { name: 'redesign.md' })
+    await screen.findByRole('link', { name: 'redesign.md' })
 
-    const card = link.closest('.fdry-hall-card')
-    expect(card?.classList.contains('is-done')).toBe(true)
-    expect(card?.contains(screen.getByRole('button', { name: /Overview redesign/ }))).toBe(true)
+    const card = screen.getByRole('listitem')
+    expect(card.classList.contains('is-done')).toBe(true)
+    expect(within(card).getByRole('link', { name: 'redesign.md' })).toBeTruthy()
+    expect(within(card).getByRole('button', { name: /Overview redesign/ })).toBeTruthy()
   })
 }
 
@@ -263,9 +264,8 @@ function beaconsTests() {
       },
     ])
     await screen.findByText('Halted')
-    expect(
-      screen.getByRole('button', { name: /Halted/ }).querySelector('.fdry-hall-card-beacon')
-    ).not.toBeNull()
+    const card = screen.getByRole('button', { name: /Halted/ })
+    expect(within(card).getByRole('img', { name: 'Needs you' })).toBeTruthy()
   })
 }
 
@@ -306,8 +306,7 @@ function theRefineryTrackTests() {
       },
     ])
     await screen.findByLabelText('Refinery')
-    const track = screen.getByLabelText('Refinery').querySelector('.fdry-refinery-track')
-    expect(track?.textContent).toBe('First2 shared filesSecond')
+    expect(screen.getByLabelText('Refinery').textContent).toBe('RefineryFirst2 shared filesSecond')
   })
 }
 

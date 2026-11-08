@@ -27,17 +27,17 @@ afterEach(() => {
 describe('QuickCreateOverlay', () => {
   it('renders title input and editor container', () => {
     useNotesStore.setState({ showQuickCreate: true })
-    const { container } = render(<QuickCreateOverlay />)
+    render(<QuickCreateOverlay />)
     expect(screen.getByPlaceholderText(/title/i)).toBeTruthy()
     // Body is now a CodeMirror editor (NoteEditor), not a textarea
-    expect(container.querySelector('.notepad-quick-create__body')).toBeTruthy()
+    expect(screen.getByTestId('editor')).toBeTruthy()
   })
 
   it('Esc key closes the overlay via store', async () => {
     const user = userEvent.setup()
     useNotesStore.setState({ showQuickCreate: true })
     render(<QuickCreateOverlay />)
-    expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
+    expect(screen.getByPlaceholderText('Title').matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(useNotesStore.getState().showQuickCreate).toBe(false)
   })
@@ -57,7 +57,7 @@ describe('QuickCreateOverlay focus', () => {
   it('puts focus in the title as it opens', () => {
     useNotesStore.setState({ showQuickCreate: true })
     render(<QuickCreateOverlay />)
-    expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
+    expect(screen.getByPlaceholderText('Title').matches(':focus')).toBe(true)
   })
 
   // A late focus() would take the keyboard back from whatever the user went to since,
@@ -70,7 +70,7 @@ describe('QuickCreateOverlay focus', () => {
     document.body.appendChild(elsewhere)
     elsewhere.focus()
     vi.advanceTimersByTime(1000)
-    expect(document.activeElement).toBe(elsewhere)
+    expect(elsewhere.matches(':focus')).toBe(true)
     elsewhere.remove()
   })
 })
@@ -86,13 +86,13 @@ describe('QuickCreateOverlay kind', () => {
   it('moves to the next kind with the arrow keys, and drops the note body for it', async () => {
     const user = userEvent.setup()
     useNotesStore.setState({ showQuickCreate: true })
-    const { container } = render(<QuickCreateOverlay />)
+    render(<QuickCreateOverlay />)
     const note = screen.getByRole('radio', { name: 'Note' })
     await user.click(note)
-    expect(document.activeElement).toBe(note)
+    expect(note.matches(':focus')).toBe(true)
     await user.keyboard('{ArrowRight}')
     expect(screen.getByRole('radio', { name: 'Diagram' }).getAttribute('aria-checked')).toBe('true')
-    expect(container.querySelector('.notepad-quick-create__body')).toBeNull()
+    expect(screen.queryByTestId('editor')).toBeNull()
   })
 })
 

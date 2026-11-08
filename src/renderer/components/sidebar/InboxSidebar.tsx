@@ -159,7 +159,7 @@ interface CardProps {
 function InboxCard({ thread, now, pinned, settled = false }: CardProps): React.JSX.Element {
   const lane = thread.lanes[0]
   return (
-    <li className={`inbox-card${pinned ? ' inbox-card--pinned' : ''}`}>
+    <li className={`inbox-card${pinned ? ' inbox-card--pinned' : ''}`} aria-label={thread.title}>
       <button
         type="button"
         className="inbox-card__open"

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { Forge } from '../../src/components/Forge.js'
@@ -109,8 +109,8 @@ describe('the Forge puts its open questions on the Plan step', () => {
   it('is inside the Plan step, not a band above every step', async () => {
     mountForge(QUESTIONS)
     await openPlan()
-    const group = (await screen.findByText('Needs your answer')).closest('.fdry-group')
-    expect(group?.closest('.fdry-wizard'), 'the group is inside the steps').not.toBeNull()
+    const step = await screen.findByRole('region', { name: 'The plan and how it is proven' })
+    expect(within(step).getByText('Needs your answer')).toBeTruthy()
   })
 
   it('takes no room at all when nothing is being asked', async () => {
@@ -177,7 +177,7 @@ function needsYouBlockingFindingsTests() {
     })
     await openRedTeam()
     await screen.findByText('Needs your decision')
-    const group = screen.getByText('Needs your decision').closest('.fdry-group') as HTMLElement
+    const group = screen.getByRole('group', { name: /^Needs your decision/ })
     expect(within(group).getByText('the change would leave the outcome false')).toBeTruthy()
     expect(within(group).getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
   })
@@ -257,14 +257,12 @@ function mountFloor(pending: unknown[]) {
 
 describe('the Floor puts a held tool call above the run graph', () => {
   it('comes before the lanes rather than under all of them', async () => {
-    const { container } = mountFloor([ASK])
-    await screen.findByText('Waiting on you — 1')
-    const band = container.querySelector('.fdry-needs-you')
-    const lane = container.querySelector('.fdry-lane')
-    expect(lane, 'no lane rendered, so the ordering assertion proves nothing').not.toBeNull()
-    expect(
-      (band?.compareDocumentPosition(lane as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    mountFloor([ASK])
+    const band = await screen.findByRole('region', { name: 'Waiting on you — 1' })
+    const lane = screen.getByRole('group', { name: 'lane 1' })
+    expect(band.compareDocumentPosition(lane) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    )
   })
 })
 
@@ -299,9 +297,10 @@ describe('the tab strip says how much is waiting', () => {
   // The queue above the Forge and the Forge's own questions share one screen,
   // so they share one count.
   it('counts the queue and the Forge together, on the Forge', async () => {
-    const { container } = mountApp({ inbox: 3, forge: 2 })
-    await waitFor(() => expect(container.querySelectorAll('.fdry-tab-count')).toHaveLength(1))
-    expect(container.querySelector('.fdry-tab-count')?.textContent).toBe('5')
+    mountApp({ inbox: 3, forge: 2 })
+    const forge = await screen.findByRole('tab', { name: 'Forge, 5 waiting on you' })
+    expect(forge.textContent).toBe('Forge5')
+    expect(screen.getAllByRole('tab', { name: /waiting on you/ })).toEqual([forge])
   })
 
   it('says what the number means, rather than reading out a bare digit', async () => {
@@ -310,9 +309,10 @@ describe('the tab strip says how much is waiting', () => {
   })
 
   it('shows no badge at all when nothing is waiting', async () => {
-    const { container } = mountApp({ inbox: 0, forge: 0 })
-    await screen.findByRole('tab', { name: 'Forge' })
-    expect(container.querySelectorAll('.fdry-tab-count')).toHaveLength(0)
+    mountApp({ inbox: 0, forge: 0 })
+    const forge = await screen.findByRole('tab', { name: 'Forge' })
+    expect(forge.textContent).toBe('Forge')
+    expect(screen.queryAllByRole('tab', { name: /waiting on you/ })).toEqual([])
   })
 
   it('never puts a count on the Ledger, which holds nothing for anybody', async () => {

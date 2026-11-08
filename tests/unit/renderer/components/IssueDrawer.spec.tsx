@@ -89,10 +89,8 @@ describe('IssueDrawer — the issue', () => {
 
   it('renders the description as markdown, not as markup', async () => {
     const { container } = await setupSettled()
-    // Scoped to the rendered body: the drawer's own title is also an h2.
-    const body = container.querySelector('.issue-markdown') as Element
-    expect(body.querySelector('h2')?.textContent).toBe('Summary')
-    expect(body.querySelector('strong')?.textContent).toBe('three')
+    expect(screen.getByRole('heading', { level: 2, name: 'Summary' })).toBeTruthy()
+    expect(screen.getByText('three').tagName).toBe('STRONG')
     expect(container.textContent).not.toContain('##')
   })
 
@@ -104,7 +102,7 @@ describe('IssueDrawer — the issue', () => {
         ],
       }),
     })
-    expect(document.querySelector('.issue-drawer__comment code')?.textContent).toBe('npm test')
+    expect(screen.getByText('npm test').tagName).toBe('CODE')
   })
 })
 
@@ -118,8 +116,8 @@ describe('IssueDrawer — the issue — fetches nothing a description names, and
         description: '![pixel](https://evil.example/p.png) <b>raw</b> [docs](https://e.example/d)',
       }),
     })
-    const body = container.querySelector('.issue-markdown') as Element
-    expect(body.querySelector('img, [src], b')).toBeNull()
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(container.innerHTML).not.toMatch(/\ssrc=|<b>/)
     await user.click(screen.getByRole('link', { name: 'docs' }))
     expect(openExternal).toHaveBeenCalledWith('https://e.example/d')
   })
@@ -145,7 +143,7 @@ describe('IssueDrawer — the issue — fetches nothing a description names, and
 describe('IssueDrawer — the issue — renders nothing for a project with no link', () => {
   it('renders nothing for a project with no link', async () => {
     const { container } = await setupSettled({ link: null })
-    expect(container.querySelector('.issue-drawer')).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 })
 
@@ -256,8 +254,8 @@ describe('IssueDrawer — agent context (FR-023)', () => {
 
   it('does not warn while there is room', async () => {
     setup()
-    await screen.findByText('2,143 / 10,000')
-    expect(document.querySelector('.issue-drawer__counter--warn')).toBeNull()
+    const counter = await screen.findByText('2,143 / 10,000')
+    expect(counter.classList.contains('issue-drawer__counter--warn')).toBe(false)
   })
 
   it('says when the context was shortened', async () => {

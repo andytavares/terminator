@@ -34,7 +34,8 @@ function connection(over: Partial<TrackerConnection> = {}): TrackerConnection {
 }
 
 /** The section is busy while it reads the connections from main. */
-const loadState = () => screen.getByText('Integrations').parentElement!.getAttribute('aria-busy')
+const loadState = () =>
+  screen.getByRole('region', { name: 'Integrations' }).getAttribute('aria-busy')
 
 async function renderWith(connections: TrackerConnection[]) {
   api.status.mockResolvedValue({ connections })

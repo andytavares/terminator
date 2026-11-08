@@ -69,6 +69,21 @@ function AskBand({
   )
 }
 
+type DiffEntry = Extract<ToolEntry['output'][number], { kind: 'diff' }>
+
+/** One file's change, open, named by its path for assistive tech as the summary shows it. */
+function DiffOutput({ diff, cwd }: { diff: DiffEntry; cwd: string }): React.JSX.Element {
+  const path = relativeTo(cwd, diff.path)
+  return (
+    <details className="agent-tool__output" aria-label={path} open>
+      <summary>
+        <span className="agent-tool__summary">{path}</span>
+      </summary>
+      <DiffView hunks={[{ header: '', lines: diffLinesOf(diff) }]} />
+    </details>
+  )
+}
+
 function ToolCall({ tool, cwd }: { tool: ToolEntry; cwd: string }): React.JSX.Element {
   return (
     <div className="agent-tool">
@@ -79,12 +94,7 @@ function ToolCall({ tool, cwd }: { tool: ToolEntry; cwd: string }): React.JSX.El
       </div>
       {tool.output.map((out, i) =>
         out.kind === 'diff' ? (
-          <details key={i} className="agent-tool__output" open>
-            <summary>
-              <span className="agent-tool__summary">{relativeTo(cwd, out.path)}</span>
-            </summary>
-            <DiffView hunks={[{ header: '', lines: diffLinesOf(out) }]} />
-          </details>
+          <DiffOutput key={i} diff={out} cwd={cwd} />
         ) : (
           <details key={i} className="agent-tool__output">
             <summary>Output</summary>

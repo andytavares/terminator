@@ -29,7 +29,6 @@ function mockReject(message: string) {
 }
 
 import {
-  isGitRepo,
   getGitRoot,
   getCurrentBranch,
   listBranches,
@@ -44,20 +43,6 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks()
-})
-
-// ─── isGitRepo ────────────────────────────────────────────────────────────────
-
-describe('isGitRepo', () => {
-  it('returns true when rev-parse succeeds', async () => {
-    mockResolve('.git')
-    expect(await isGitRepo('/repo')).toBe(true)
-  })
-
-  it('returns false when rev-parse fails', async () => {
-    mockReject('not a git repository')
-    expect(await isGitRepo('/not-a-repo')).toBe(false)
-  })
 })
 
 // ─── getGitRoot ───────────────────────────────────────────────────────────────

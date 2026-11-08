@@ -78,7 +78,7 @@ function openingTests() {
     expect(await within(log).findByText('reading tokens')).toBeTruthy()
     expect(within(log).getByText('approve · looks right')).toBeTruthy()
     expect(within(log).getByText('lint.log · 2026-10-12')).toBeTruthy()
-    expect(document.activeElement).toBe(log)
+    expect(log.matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('region', { name: 'Run log' })).toBeNull()
   })

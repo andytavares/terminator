@@ -377,6 +377,7 @@ export function ReviewDiffPane(props: Props) {
       <PaneHeader pane={pane} props={props} />
       <div
         className="review-diff-scroll"
+        data-testid="review-diff-scroll"
         ref={scrollRef}
         onClick={pane.ctx.drag.clearSelectionOnBackgroundClick}
       >

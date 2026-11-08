@@ -114,11 +114,9 @@ describe('FullFileList — toggles chapter collapsed state when header is clicke
   })
 
   it('marks active file with active class', () => {
-    const { container } = render(<FullFileList {...defaultProps} currentFilePath="src/foo.ts" />)
-    const activeRow = container.querySelector('.full-file-row--active')
-    expect(activeRow).toBeTruthy()
-    expect(activeRow?.getAttribute('aria-current')).toBe('true')
-    expect(container.querySelectorAll('[aria-current]')).toHaveLength(1)
+    render(<FullFileList {...defaultProps} currentFilePath="src/foo.ts" />)
+    expect(screen.getByTitle('src/foo.ts').getAttribute('aria-current')).toBe('true')
+    expect(screen.getAllByRole('button', { current: true })).toHaveLength(1)
   })
 })
 

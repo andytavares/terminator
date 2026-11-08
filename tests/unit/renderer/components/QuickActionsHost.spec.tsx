@@ -122,7 +122,7 @@ async function search(user: UserEvent, label: string): Promise<void> {
 async function runFound(label: string): Promise<void> {
   const user = userEvent.setup()
   await search(user, label)
-  expect(document.activeElement).toBe(screen.getByRole('combobox'))
+  expect(screen.getByRole('combobox').matches(':focus')).toBe(true)
   await user.keyboard('{Enter}')
 }
 

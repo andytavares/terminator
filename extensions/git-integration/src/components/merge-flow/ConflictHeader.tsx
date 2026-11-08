@@ -60,7 +60,12 @@ function BlockDots(props: { file: MergeFile | undefined; activeBlock: number }) 
   return (
     <div className="conflict-header__dots">
       {props.file?.blocks.map((block, i) => (
-        <span key={block.blockId} className={dotClass(block.isResolved, i === props.activeBlock)} />
+        <span
+          key={block.blockId}
+          role="img"
+          aria-label={`Conflict ${i + 1} ${choose(block.isResolved, 'resolved', 'unresolved')}`}
+          className={dotClass(block.isResolved, i === props.activeBlock)}
+        />
       ))}
     </div>
   )

@@ -23,8 +23,7 @@ function withSubtasks(status: IndexedTask['status'] = 'open') {
   })
 }
 
-const subtask = (text: string) =>
-  screen.getByText(text).closest('.daily-log__subtask') as HTMLElement
+const subtask = (text: string) => screen.getByRole('group', { name: text })
 
 const SESSIONS = [
   { sessionId: 'sess-aaaaaaaa1', projectId: 'pr1', tabTitle: 'zsh' },
@@ -306,7 +305,7 @@ function jumpTestsPart2() {
     installTerminal().mockRejectedValueOnce(new Error('down'))
     renderDailyLog(task('t1', 'Write', { terminatorLinks: ['gone'] }))
     await user.click(buttonNamed('Jump to linked terminal'))
-    await eventually(() => expect(document.querySelector('.daily-log__link-picker')).not.toBeNull())
+    expect(await screen.findByRole('combobox')).toBeTruthy()
     expect(bridge.calls('task-vault:navigate-to-terminal')).toEqual([])
   })
 

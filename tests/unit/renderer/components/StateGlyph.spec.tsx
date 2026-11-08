@@ -13,13 +13,13 @@ describe('StateGlyph', () => {
   it('says a guessed ask is inferred, and draws it with a dashed outline', () => {
     render(<StateGlyph state="needs-you" inferred />)
     const glyph = screen.getByRole('img', { name: 'Needs you, inferred' })
-    expect(glyph.querySelector('[stroke-dasharray]')).not.toBeNull()
+    expect(glyph.innerHTML).toContain('stroke-dasharray=')
   })
 
   it('draws every state with its own shape, so none depends on colour alone', () => {
     const shapes = TASK_STATES.map((state) => {
-      const { container, unmount } = render(<StateGlyph state={state} />)
-      const markup = container.querySelector('svg')?.innerHTML
+      const { unmount } = render(<StateGlyph state={state} />)
+      const markup = screen.getByRole('img').innerHTML
       unmount()
       return markup
     })

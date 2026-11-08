@@ -105,17 +105,8 @@ function mountForgeOver(
   return onStarted
 }
 
-/** A part of the Forge, once the order has loaded and drawn it. */
-function part(selector: string): Promise<HTMLElement> {
-  return waitFor(() => {
-    const found = document.querySelector<HTMLElement>(selector)
-    if (found === null) throw new Error(`nothing matches ${selector} yet`)
-    return found
-  })
-}
-
-const strip = () => part('.fdry-strip')
-const header = () => part('.fdry-wiz-head')
+const strip = () => screen.findByRole('group', { name: 'Forge status' })
+const header = () => screen.findByRole('banner')
 
 describe('watching the architect at work', () => {
   it('goes to its terminal from the strip and from the header', async () => {
@@ -179,10 +170,8 @@ describe('a refused turn, from the row that failed', () => {
     mountForgeOver(compilableOrder(), { extra: { intake: REFUSED } })
     await openForgeStep('Hand off')
     await screen.findByText('These rows describe the order as it stood before the refused turn.')
-    const rows = document.querySelector('.fdry-checks') as HTMLElement
-    await user.click(
-      within(rows).getByRole('button', { name: 'Tell the architect what was wrong' })
-    )
+    const row = screen.getByRole('group', { name: 'Nobody is changing the plan' })
+    await user.click(within(row).getByRole('button', { name: 'Tell the architect what was wrong' }))
     const reason = expect.stringContaining('The reason: it named a status.')
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:order.converge')).toEqual([
@@ -237,7 +226,7 @@ describe('the moves out of an agent Claude could not start', () => {
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:order.converge')).toEqual([{ id: 'WO-1' }])
     )
-    expect(document.querySelector('.fdry-problem')).toBeNull()
+    expect(screen.queryByText('Claude did not say why.')).toBeNull()
   })
 
   it("copies Claude's reason from Copy the error", async () => {

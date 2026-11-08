@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { ReviewHeader, type ReviewHeaderProps } from '../../src/components/pr-review/ReviewHeader'
 import type { StatusCheck } from '../../src/schemas/pr-review.schema'
@@ -162,7 +162,7 @@ describe('ReviewHeader (continued)', () => {
     it('draws one segment per chapter, named by the viewed total', () => {
       render(<ReviewHeader {...baseProps({ viewedCount: 3, totalFiles: 12 })} />)
       const segments = screen.getByRole('progressbar', { name: 'Files viewed' })
-      expect(segments.querySelectorAll('i')).toHaveLength(2)
+      expect(within(segments).getAllByTestId('progress-segment')).toHaveLength(2)
       expect(segments.getAttribute('aria-valuemin')).toBe('0')
       expect(segments.getAttribute('aria-valuemax')).toBe('12')
       expect(segments.getAttribute('aria-valuenow')).toBe('3')
@@ -170,9 +170,9 @@ describe('ReviewHeader (continued)', () => {
 
     it('sizes each segment by its file count and fills the viewed share', () => {
       render(<ReviewHeader {...baseProps()} />)
-      const [first, second] = screen
-        .getByRole('progressbar', { name: 'Files viewed' })
-        .querySelectorAll('i')
+      const [first, second] = within(
+        screen.getByRole('progressbar', { name: 'Files viewed' })
+      ).getAllByTestId('progress-segment')
       expect(first.style.flexGrow).toBe('6')
       expect(first.style.getPropertyValue('--filled')).toBe('33.33333333333333%')
       expect(second.style.flexGrow).toBe('4')

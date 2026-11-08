@@ -129,7 +129,7 @@ describe('Dialog — focus', () => {
         </>
       ),
     })
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Name' }))
+    expect(screen.getByRole('textbox', { name: 'Name' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -274,7 +274,7 @@ describe('nested surfaces', () => {
     render(<DialogInADialog onOuter={onOuter} onInner={onInner} />)
     await user.click(screen.getByRole('button', { name: /Open inner/ }))
     await user.click(screen.getByRole('button', { name: 'Ok' }))
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Ok' }))
+    expect(screen.getByRole('button', { name: 'Ok' }).matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(onInner).toHaveBeenCalledTimes(1)
     expect(onOuter).not.toHaveBeenCalled()

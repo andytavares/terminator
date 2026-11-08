@@ -78,9 +78,9 @@ function settingsPasswordWithholdTests() {
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     const field = await screen.findByPlaceholderText('New password')
     await user.click(field)
-    expect(document.activeElement).toBe(field)
+    expect(field.matches(':focus')).toBe(true)
     await user.tab()
-    expect(document.activeElement).not.toBe(field)
+    expect(field.matches(':focus')).toBe(false)
     expect(invoke).not.toHaveBeenCalledWith('remote:update-password', expect.anything())
   })
 

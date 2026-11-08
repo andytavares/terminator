@@ -62,7 +62,7 @@ function BriefHeading({ meta, action }: { meta: React.ReactNode; action?: React.
   return (
     <div className="brief-card__head">
       <h2 className="brief-card__title">
-        <Sparkles className="brief-card__icon" aria-hidden="true" />
+        <Sparkles className="brief-card__icon" aria-hidden="true" data-testid="brief-icon" />
         Brief
       </h2>
       <span className="brief-card__meta">{meta}</span>
@@ -74,7 +74,7 @@ function BriefHeading({ meta, action }: { meta: React.ReactNode; action?: React.
 function BriefIdle({ subject, summary }: Props) {
   return (
     <div className="brief-idle">
-      <Sparkles className="brief-card__icon" aria-hidden="true" />
+      <Sparkles className="brief-card__icon" aria-hidden="true" data-testid="brief-icon" />
       <span className="brief-idle__text">Summarize the {subject.kind} with the review agent</span>
       <Button size="sm" onClick={() => summary.requestSummary(subject)}>
         Summarize
@@ -85,7 +85,7 @@ function BriefIdle({ subject, summary }: Props) {
 
 function BriefBusy({ subject }: { subject: SummarySubject }) {
   return (
-    <div className="brief-card" aria-busy="true">
+    <div className="brief-card" role="status" aria-busy="true">
       <BriefHeading meta={`reading the ${subject.kind}…`} />
       <div className="brief-skeleton">
         <span className="pr-visually-hidden">Summarizing</span>
@@ -123,7 +123,11 @@ function BriefError({ subject, summary }: Props) {
   const reason = (summary.error ?? '').replace(/\.$/, '')
   return (
     <div className="brief-error" role="alert">
-      <TriangleAlert className="brief-error__icon" aria-hidden="true" />
+      <TriangleAlert
+        className="brief-error__icon"
+        aria-hidden="true"
+        data-testid="brief-error-icon"
+      />
       <div>
         <p>The review agent could not summarize this: {reason}.</p>
         <Button size="sm" onClick={() => summary.requestSummary(subject)}>

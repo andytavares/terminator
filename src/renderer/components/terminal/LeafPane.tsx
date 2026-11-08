@@ -69,6 +69,26 @@ function PaneBody({
   return <div ref={containerRef} className="leaf-pane__container" />
 }
 
+function PaneTitleBar(props: {
+  tabTitle: string
+  onClose: (e: React.MouseEvent) => void
+}): React.JSX.Element {
+  return (
+    <div className="leaf-pane__titlebar">
+      <span className="leaf-pane__title">{props.tabTitle}</span>
+      <button
+        type="button"
+        className="leaf-pane__close"
+        aria-label={`Close ${props.tabTitle}`}
+        title="Close this pane"
+        onClick={props.onClose}
+      >
+        <X aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
 export function LeafPane({ sessionId, projectId }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const isFocused = useSessionStore((s) => s.getFocusedSession(projectId) === sessionId)
@@ -79,22 +99,14 @@ export function LeafPane({ sessionId, projectId }: Props): React.JSX.Element {
   return (
     <div
       className={`leaf-pane${isFocused ? ' leaf-pane--focused' : ''}`}
+      role="group"
+      aria-label={tabTitle}
+      aria-current={isFocused || undefined}
       onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="leaf-pane__titlebar">
-        <span className="leaf-pane__title">{tabTitle}</span>
-        <button
-          type="button"
-          className="leaf-pane__close"
-          aria-label={`Close ${tabTitle}`}
-          title="Close this pane"
-          onClick={handleClose}
-        >
-          <X aria-hidden="true" />
-        </button>
-      </div>
+      <PaneTitleBar tabTitle={tabTitle} onClose={handleClose} />
       <PaneBody sessionId={sessionId} containerRef={containerRef} />
     </div>
   )

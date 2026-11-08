@@ -55,7 +55,7 @@ interface CellProps {
 function CellBody({ tone, icon: Icon, label, detail }: Omit<CellProps, 'children'>) {
   return (
     <>
-      <Icon aria-hidden className="rs-icon" data-tone={tone} />
+      <Icon aria-hidden className="rs-icon" data-tone={tone} data-testid="readiness-icon" />
       <span className="rs-label">{label}</span>
       <span className="rs-detail">{detail}</span>
     </>

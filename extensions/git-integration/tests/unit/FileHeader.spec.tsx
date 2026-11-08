@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import {
   FileHeader,
   type FileHeaderProps,
@@ -71,10 +72,10 @@ describe('FileHeader', () => {
 describe('FileHeader — Why this file', () => {
   it.each(['low', 'medium'] as const)(
     'opens the explanation from the second line for %s risk',
-    (level) => {
+    async (level) => {
       const onShowRisk = vi.fn()
       renderFileHeader(changedFileAt(level, null), { onShowRisk })
-      screen.getByRole('button', { name: 'Why this file' }).click()
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Why this file' }))
       expect(onShowRisk).toHaveBeenCalledTimes(1)
     }
   )

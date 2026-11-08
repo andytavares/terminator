@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { GateCard } from '../../src/components/GateCard.js'
@@ -128,9 +128,12 @@ const budget = () =>
 
 function gateCardTheReasonTests() {
   it('shows why as markdown, so a list is a list', async () => {
-    const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
+    render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     await open()
-    const items = Array.from(container.querySelectorAll('.fdry-md li')).map((li) => li.textContent)
+    const [why] = screen.getAllByRole('list')
+    const items = within(why)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent)
     expect(items).toEqual(['src/main/auth/session.ts', 'src/main/auth/token.ts'])
   })
 

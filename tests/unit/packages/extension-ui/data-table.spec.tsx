@@ -103,7 +103,7 @@ describe('DataTable — rows', () => {
     expect(fig.tabIndex).toBe(0)
     expect(fig.getAttribute('aria-selected')).toBe('true')
     await user.click(fig)
-    expect(document.activeElement).toBe(fig)
+    expect(fig.matches(':focus')).toBe(true)
     await user.keyboard('{Enter} a')
     expect(onRowClick).toHaveBeenCalledTimes(3)
     expect(onRowClick).toHaveBeenCalledWith({ name: 'Fig', count: 3 })
@@ -135,7 +135,7 @@ describe('ShareBar', () => {
 
 describe('ShareBar — sizes', () => {
   it('sizes each part by its part of the total and leaves out zero parts', () => {
-    const { container } = render(
+    render(
       <ShareBar
         label="x"
         shares={[
@@ -145,16 +145,15 @@ describe('ShareBar — sizes', () => {
         ]}
       />
     )
-    const widths = Array.from(container.querySelectorAll<HTMLElement>('span > span')).map(
-      (part) => part.style.width
-    )
-    expect(widths).toEqual(['75%', '25%'])
+    expect(screen.getByTitle('Click 3').style.width).toBe('75%')
+    expect(screen.getByTitle('Palette 1').style.width).toBe('25%')
+    expect(screen.queryByTitle('Menu 0')).toBeNull()
   })
 
   it('draws nothing when nothing was counted', () => {
     const { container } = render(
       <ShareBar label="x" shares={[{ label: 'Click', value: 0, tone: 'accent' }]} />
     )
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 })

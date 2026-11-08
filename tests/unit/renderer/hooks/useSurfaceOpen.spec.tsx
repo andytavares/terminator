@@ -1,5 +1,5 @@
 import React from 'react'
-import { afterEach, describe, it, expect } from 'vitest'
+import { describe, it, expect, onTestFinished } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { useSurfaceOpen } from '../../../../src/renderer/hooks/useSurfaceOpen'
 import { eventually } from '../../../support/eventually'
@@ -12,12 +12,9 @@ function openDialog(): HTMLDialogElement {
   const dialog = document.createElement('dialog')
   document.body.appendChild(dialog)
   act(() => dialog.showModal())
+  onTestFinished(() => dialog.remove())
   return dialog
 }
-
-afterEach(() => {
-  document.querySelectorAll('dialog').forEach((dialog) => dialog.remove())
-})
 
 describe('useSurfaceOpen', () => {
   it('tells every pane when a modal dialog opens and when it closes', async () => {

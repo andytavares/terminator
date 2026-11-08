@@ -3,6 +3,7 @@ import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable } from './invoke-table.js'
 import {
   isGitRepo,
+  workTreeRoot,
   getGitRoot,
   getCurrentBranch,
   listBranches,
@@ -41,6 +42,8 @@ const repositoryChannels: ChannelSpec[] = [
     invalid: { isRepo: false },
     run: ({ path }) =>
       loggedWhenUnanswered('git:is-repo', path, async () => {
+        const root = await workTreeRoot(path)
+        if (root) return { isRepo: true, root }
         if (!(await isGitRepo(path))) return { isRepo: false }
         return { isRepo: true, root: await getGitRoot(path) }
       }),

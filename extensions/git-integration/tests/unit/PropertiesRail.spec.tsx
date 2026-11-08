@@ -107,8 +107,14 @@ describe('PropertiesRail — flat icons', () => {
 
   it("draws every signal icon in its row's text colour, a neutral one at 60%", () => {
     render(<PropertiesRail pr={buildPr()} />)
-    const icons = [...document.querySelectorAll('.pr-rail-signal-icon')]
-    const neutral = icons.filter((icon) => icon.closest('.pr-rail-signal--neutral'))
+    const rows = screen
+      .getAllByRole('listitem')
+      .filter((row) => row.classList.contains('pr-rail-signal'))
+    const iconOf = (row: HTMLElement) => within(row).getByTestId('signal-icon')
+    const icons = rows.map(iconOf)
+    const neutral = rows
+      .filter((row) => row.classList.contains('pr-rail-signal--neutral'))
+      .map(iconOf)
     expect(icons.length).toBeGreaterThan(neutral.length)
     expect(neutral.length).toBeGreaterThan(0)
     expect(icons.filter((icon) => !inheritsTextColour(icon))).toEqual([])

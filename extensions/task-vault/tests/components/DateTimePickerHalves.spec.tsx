@@ -20,10 +20,11 @@ function renderOpen(props: Partial<DateTimePickerProps> & Pick<DateTimePickerPro
   return { onChange, ...utils }
 }
 
-const shownMonthLabel = () => document.querySelector('.dtp__cal-month-label')?.textContent
-const trigger = () => document.querySelector('.dtp__trigger') as HTMLElement
-const popover = () => document.querySelector('.dtp__popover')
-const calendarHeader = () => within(document.querySelector('.dtp__cal-header') as HTMLElement)
+const trigger = (open = false) => screen.getByRole('button', { expanded: open })
+const popover = () => screen.queryByRole('group', { name: /^Pick/ })
+const calendar = () => within(screen.getByRole('group', { name: 'Calendar' }))
+const halfPressed = (half: 'AM' | 'PM') =>
+  screen.getByRole('button', { name: half }).getAttribute('aria-pressed')
 
 describe('DateTimePicker halves and shortcuts', halvesTests)
 describe('DateTimePicker months and closing', monthsTests)
@@ -52,10 +53,11 @@ function halvesHalvesTests() {
   it('switches halves without a change when no time is set, starting on the current half', async () => {
     const user = userEvent.setup()
     const { onChange } = renderOpen({ mode: 'time' })
-    expect(document.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('PM')
+    expect(halfPressed('PM')).toBe('true')
     await user.click(screen.getByRole('button', { name: 'AM' }))
     expect(onChange).not.toHaveBeenCalled()
-    expect(document.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('AM')
+    expect(halfPressed('AM')).toBe('true')
+    expect(halfPressed('PM')).toBe('false')
   })
 }
 
@@ -112,22 +114,22 @@ function monthsMonthsTests() {
   it('wraps the year forward from December', async () => {
     const user = userEvent.setup()
     renderOpen({ mode: 'date' })
-    expect(shownMonthLabel()).toBe('December 2026')
-    await user.click(calendarHeader().getByRole('button', { name: 'Next month' }))
-    expect(shownMonthLabel()).toBe('January 2027')
+    expect(screen.getByText('December 2026')).toBeTruthy()
+    await user.click(calendar().getByRole('button', { name: 'Next month' }))
+    expect(screen.getByText('January 2027')).toBeTruthy()
   })
 
   it('wraps the year back from January', async () => {
     const user = userEvent.setup()
     renderOpen({ mode: 'date', value: '2027-01-10' })
-    await user.click(calendarHeader().getByRole('button', { name: 'Previous month' }))
-    expect(shownMonthLabel()).toBe('December 2026')
+    await user.click(calendar().getByRole('button', { name: 'Previous month' }))
+    expect(screen.getByText('December 2026')).toBeTruthy()
   })
 
   it('re-anchors the calendar when the value changes from outside', () => {
     const { rerender, onChange } = renderOpen({ mode: 'date' })
     rerender(<DateTimePicker mode="date" value="2025-03-04" onChange={onChange} defaultOpen />)
-    expect(shownMonthLabel()).toBe('March 2025')
+    expect(screen.getByText('March 2025')).toBeTruthy()
   })
 }
 
@@ -144,7 +146,7 @@ function monthsClosingTests() {
     render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     await user.click(trigger())
     expect(popover()).not.toBeNull()
-    await user.click(trigger())
+    await user.click(trigger(true))
     expect(popover()).toBeNull()
   })
 
@@ -152,7 +154,7 @@ function monthsClosingTests() {
     const user = userEvent.setup()
     render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     await user.click(trigger())
-    expect(popover()?.contains(document.activeElement)).toBe(true)
+    expect(popover()?.matches(':focus-within')).toBe(true)
     await user.keyboard('{Escape}')
     expect(popover()).toBeNull()
   })

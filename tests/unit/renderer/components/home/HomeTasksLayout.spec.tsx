@@ -109,7 +109,7 @@ const home = () => screen.getByRole('region', { name: 'Home' })
 /** Presses `key` with the Home screen focused, as its shortcuts need. */
 async function pressOnHome(user: ReturnType<typeof userEvent.setup>, key: string): Promise<void> {
   home().focus()
-  expect(document.activeElement).toBe(home())
+  expect(home().matches(':focus')).toBe(true)
   await user.keyboard(key)
 }
 
@@ -257,7 +257,7 @@ describe('Home — the plan sheet', () => {
     const sheet = await screen.findByRole('dialog', { name: 'Plan today' })
     expect(within(sheet).getByText(/Today's focus/i)).toBeTruthy()
     within(sheet).getAllByRole('button')[0].focus()
-    expect(sheet.contains(document.activeElement)).toBe(true)
+    expect(sheet.matches(':focus-within')).toBe(true)
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Plan today' })).toBeNull())
   })

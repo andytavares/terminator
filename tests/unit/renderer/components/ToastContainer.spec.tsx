@@ -21,7 +21,7 @@ afterEach(() => {
 describe('ToastContainer', () => {
   it('draws nothing when there is nothing to say', () => {
     const { container } = render(<ToastContainer />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('announces each message politely, with its tone', () => {

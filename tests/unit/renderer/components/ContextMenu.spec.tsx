@@ -38,12 +38,15 @@ describe('ContextMenu', () => {
 
   it('marks danger items with the danger modifier', () => {
     render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
-    expect(document.querySelectorAll('.ctx-menu__item--danger')).toHaveLength(1)
+    const danger = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.className.includes('ctx-menu__item--danger'))
+    expect(danger).toEqual([false, false, true])
   })
 
   it('renders a separator before an item that asks for one', () => {
     render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
-    expect(document.querySelectorAll('.ctx-menu__separator')).toHaveLength(1)
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
   })
 })
 
@@ -55,9 +58,9 @@ describe('ContextMenu — never clipped by what holds it', () => {
         <ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />
       </div>
     )
-    const menu = document.querySelector('.ctx-menu') as HTMLElement
+    const menu = screen.getByRole('menu', { name: 'Actions' })
     expect(container.contains(menu)).toBe(false)
-    expect(menu.closest('body > div')?.parentElement).toBe(document.body)
+    expect(document.body.contains(menu)).toBe(true)
   })
 })
 
@@ -85,7 +88,7 @@ describe('ContextMenu — an item changed while open', () => {
     measure.mockReturnValue({ ...menuBox(800, 100), right: 1100, width: 300 })
     const longer = [...items, { label: 'Open AUTH-1234 in Linear', onSelect: vi.fn() }]
     rerender(<ContextMenu x={800} y={100} items={longer} onDismiss={onDismiss} />)
-    const menu = document.querySelector('.ctx-menu') as HTMLElement
+    const menu = screen.getByRole('menu', { name: 'Actions' })
     expect(menu.style.marginLeft).toBe('-84px')
   })
 })
@@ -101,7 +104,7 @@ describe('ContextMenu — keys stay in the menu', () => {
     )
     const rename = screen.getByRole('menuitem', { name: 'Rename' })
     rename.focus()
-    expect(document.activeElement).toBe(rename)
+    expect(rename.matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(rowKeyDown).not.toHaveBeenCalled()
   })
@@ -110,9 +113,9 @@ describe('ContextMenu — keys stay in the menu', () => {
 describe('ContextMenu — moving', () => {
   it('reopens, rather than stays, when it moves to a new point', () => {
     const { rerender } = render(<ContextMenu x={12} y={34} items={items} onDismiss={onDismiss} />)
-    const first = document.querySelector('.ctx-menu')
+    const first = screen.getByRole('menu', { name: 'Actions' })
     rerender(<ContextMenu x={56} y={78} items={items} onDismiss={onDismiss} />)
-    const moved = document.querySelector('.ctx-menu') as HTMLElement
+    const moved = screen.getByRole('menu', { name: 'Actions' })
     expect(moved).not.toBe(first)
     expect(moved.style.left).toBe('56px')
     expect(onDismiss).not.toHaveBeenCalled()

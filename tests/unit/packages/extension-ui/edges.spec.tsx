@@ -53,12 +53,12 @@ describe('IconButton edges — reports the unpressed state of a toggle', () => {
 
 describe('Popover edges', () => {
   it('takes an extra class without losing its own', () => {
-    const { container } = render(
+    render(
       <Popover label="Pick" className="tv-picker" onDismiss={() => {}}>
         <button type="button">One</button>
       </Popover>
     )
-    const el = container.querySelector('.tmui-popover')!
+    const el = screen.getByRole('group', { name: 'Pick' })
     expect(el.className).toContain('tv-picker')
   })
 
@@ -70,7 +70,7 @@ describe('Popover edges', () => {
         <button type="button">One</button>
       </Popover>
     )
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'One' }))
+    expect(screen.getByRole('button', { name: 'One' }).matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(onDismiss).not.toHaveBeenCalled()
   })

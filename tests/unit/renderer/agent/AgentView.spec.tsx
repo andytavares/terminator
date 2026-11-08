@@ -175,9 +175,9 @@ describe('AgentView tool calls', () => {
     })
     expect(screen.getByText('Edit file')).toBeTruthy()
     expect(screen.getByText('src/a.ts', { selector: '.agent-tool__summary' })).toBeTruthy()
-    const added = document.querySelector('.diff-line--add')
-    expect(added?.textContent).toContain('new line')
-    expect(added?.closest('details')?.open).toBe(true)
+    const diff = screen.getByRole('group', { name: 'src/a.ts' }) as HTMLDetailsElement
+    expect(diff.open).toBe(true)
+    expect(within(within(diff).getByRole('row', { name: /new line/ })).getByText('+')).toBeTruthy()
   })
 })
 
@@ -340,17 +340,17 @@ async function reply(body: string): Promise<HTMLElement> {
 describe('AgentView rich replies', () => {
   it('renders an agent reply as Markdown and keeps the user message plain', async () => {
     const log = await reply('## Plan\n\n- one\n- two\n\n| Name | Value |\n| --- | --- |\n| a | 1 |')
-    expect(log.querySelector('h2')?.textContent).toBe('Plan')
-    expect(log.querySelectorAll('li')).toHaveLength(2)
-    expect(log.querySelectorAll('tbody td')).toHaveLength(2)
+    expect(within(log).getByRole('heading', { level: 2, name: 'Plan' })).toBeTruthy()
+    expect(within(log).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(log).getAllByRole('cell')).toHaveLength(2)
     expect(within(log).getByText('# not a heading')).toBeTruthy()
-    expect(log.querySelector('h1')).toBeNull()
+    expect(within(log).queryByRole('heading', { level: 1 })).toBeNull()
   })
 
   it('opens a link through the shell, not the view', async () => {
     const log = await reply('[docs](https://example.com/docs)')
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
-    log.querySelector('a')!.dispatchEvent(event)
+    within(log).getByRole('link', { name: 'docs' }).dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
     expect(shell.openExternal).toHaveBeenCalledWith('https://example.com/docs')
   })
@@ -368,9 +368,9 @@ describe('AgentView raw HTML in replies', () => {
         '<iframe src="https://x.example"></iframe>',
       ].join('\n\n')
     )
-    expect((await within(log).findByText('Logs')).closest('details')).not.toBeNull()
-    expect(log.querySelector('table td')?.textContent).toBe('cell')
-    expect(log.querySelector('script, iframe, img')).toBeNull()
+    expect((await within(log).findByText('Logs')).tagName).toBe('SUMMARY')
+    expect(within(log).getByRole('cell').textContent).toBe('cell')
+    expect(log.innerHTML).not.toMatch(/<(script|iframe|img)\b/)
     expect(log.innerHTML).not.toContain('javascript:')
     expect(log.innerHTML).not.toContain('onerror')
     expect(log.textContent).not.toContain('__pwned')
@@ -393,7 +393,7 @@ describe('AgentView mermaid diagrams', () => {
     const log = await reply('```mermaid\nnot a diagram\n```')
     expect(await within(log).findByText(/diagram could not be drawn/i)).toBeTruthy()
     expect(within(log).getByText(/Parse error on line 1/)).toBeTruthy()
-    expect(log.querySelector('pre code')?.textContent).toBe('not a diagram')
+    expect(within(log).getByText('not a diagram').tagName).toBe('CODE')
   })
 })
 
@@ -446,14 +446,14 @@ describe('AgentView find', () => {
     const user = await openFind()
     await user.type(find(), 'alpha')
     expect(screen.getByText('1 of 3')).toBeTruthy()
-    expect(document.querySelectorAll('mark.agent-find__match')).toHaveLength(3)
+    expect(screen.getAllByRole('mark')).toHaveLength(3)
     await user.keyboard('{Enter}')
     expect(screen.getByText('2 of 3')).toBeTruthy()
     await user.keyboard('{Shift>}{Enter}{/Shift}')
     expect(screen.getByText('1 of 3')).toBeTruthy()
     await user.keyboard('{Escape}')
     expect(screen.queryByLabelText('Find in the transcript')).toBeNull()
-    expect(document.querySelector('mark')).toBeNull()
+    expect(screen.queryByRole('mark')).toBeNull()
     expect(recordUse).toHaveBeenCalledWith('core.agent.find', 'shortcut')
   })
 
@@ -560,7 +560,7 @@ describe('AgentView sent message with attached context', () => {
   it('shows only the typed text, with the attached items as chips under it', async () => {
     await mountView()
     const log = screen.getByRole('log')
-    expect(log.querySelector('.agent-message--user')?.textContent).toBe('Use the same backoff')
+    expect(within(log).getByText('Use the same backoff')).toBeTruthy()
     expect(log.textContent).not.toContain('<citations>')
     expect(within(log).getByText('Fix the login test')).toBeTruthy()
     expect(within(log).queryByRole('button', { name: /Remove/ })).toBeNull()

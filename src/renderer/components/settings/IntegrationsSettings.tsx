@@ -320,7 +320,7 @@ export function IntegrationsSettings(): React.JSX.Element {
   }, [loadConnections, subscribe])
 
   return (
-    <div className="settings-section" aria-busy={loading}>
+    <div className="settings-section" role="region" aria-label="Integrations" aria-busy={loading}>
       <h3 className="settings-section__title">
         <Link2 className="integrations__title-icon" />
         Integrations

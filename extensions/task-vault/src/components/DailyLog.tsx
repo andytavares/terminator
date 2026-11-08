@@ -329,7 +329,12 @@ function TasksHeading({ parts }: { parts: DayParts }): React.JSX.Element {
         )}
       </div>
       {total > 0 && (
-        <div className="daily-log__progress-bar">
+        <div
+          className="daily-log__progress-bar"
+          role="progressbar"
+          aria-label="Tasks done"
+          aria-valuenow={(done / total) * 100}
+        >
           <div className={fill} style={{ width: `${(done / total) * 100}%` }} />
         </div>
       )}
@@ -371,7 +376,7 @@ function TodayTasks({ parts, list }: PartsProps): React.JSX.Element {
         <TaskWithSubtasks key={task.id} task={task} list={list} draggable />
       ))}
       {parts.terminal.length > 0 && parts.active.length > 0 && (
-        <div className="daily-log__done-divider" />
+        <div className="daily-log__done-divider" role="separator" />
       )}
       {parts.terminal.map((task) => (
         <TaskWithSubtasks key={task.id} task={task} list={list} />

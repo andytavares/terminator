@@ -44,6 +44,10 @@ beforeEach(() => {
   onClose = vi.fn()
 })
 
+/** The rows (options) that show `label`, in the order the panel lists them. */
+const rowsWith = (label: string): HTMLElement[] =>
+  screen.getAllByRole('option').filter((row) => within(row).queryByText(label) !== null)
+
 function renderPanel(overrides: Partial<React.ComponentProps<typeof QuickActions>> = {}) {
   const actions = makeActions()
   const push = actions.find((a) => a.id === 'git.push')!
@@ -88,10 +92,8 @@ describe('QuickActions — top level', () => {
 
   it('shows a pin glyph on a pinned row', () => {
     renderPanel()
-    const pushRow = screen.getByText('Push').closest('.qa-row')!
-    expect(pushRow.querySelector('.qa-pin-indicator')).toBeTruthy()
-    const splitRow = screen.getByText('Split right').closest('.qa-row')!
-    expect(splitRow.querySelector('.qa-pin-indicator')).toBeNull()
+    expect(within(rowsWith('Push')[0]).getByRole('img', { name: 'Pinned' })).toBeTruthy()
+    expect(within(rowsWith('Split right')[0]).queryByRole('img', { name: 'Pinned' })).toBeNull()
   })
 })
 
@@ -272,7 +274,8 @@ describe('QuickActions — rows with no mnemonic', () => {
     // single letter ("T…"), and the shortcut inherited the 1fr column meant
     // for the label. Every row must render three grid children regardless.
     renderPanel()
-    const row = screen.getByText('Toggle log window').closest('.qa-row')!
+    const [row] = rowsWith('Toggle log window')
+    // eslint-disable-next-line testing-library/no-node-access -- the claim is the row's three grid cells; layout has no query
     expect(row.children).toHaveLength(3)
   })
 })
@@ -288,11 +291,11 @@ describe('QuickActions — focus', () => {
     const outside = document.createElement('button')
     document.body.appendChild(outside)
     outside.focus()
-    expect(document.activeElement).toBe(outside)
+    expect(outside.matches(':focus')).toBe(true)
 
-    const { container } = renderPanel()
-    const panel = container.querySelector('.qa-panel')!
-    expect(panel.contains(document.activeElement)).toBe(true)
+    renderPanel()
+    const panel = screen.getByRole('dialog', { name: 'Quick actions' })
+    expect(panel.matches(':focus-within')).toBe(true)
 
     outside.remove()
   })
@@ -376,9 +379,9 @@ describe('QuickActions — pointer', () => {
   it('opens a group, and runs an action, with the pointer', async () => {
     const user = userEvent.setup()
     renderPanel()
-    await user.click(screen.getByText('Git').closest('.qa-row')!)
-    await user.hover(screen.getByText('Push').closest('.qa-row')!)
-    await user.click(screen.getByText('Push').closest('.qa-row')!)
+    await user.click(rowsWith('Git')[0])
+    await user.hover(rowsWith('Push')[0])
+    await user.click(rowsWith('Push')[0])
     expect(ranActionIds()).toEqual(['git.push'])
   })
 
@@ -429,16 +432,15 @@ describe('QuickActions — rows from a group it does not list', () => {
 
   it('labels a pinned row by its own letter when its group is gone, with its description', () => {
     renderPanel({ pinned: [orphan], recent: [] })
-    const row = screen.getByText('Orphan').closest('.qa-row')!
-    expect(row.querySelector('.qa-key')!.textContent).toBe('o')
-    expect(row.querySelector('.qa-row__group')).toBeNull()
+    const [row] = rowsWith('Orphan')
+    expect(within(row).getByText('o')).toBeTruthy()
+    expect(within(row).queryByText(/ ·$/)).toBeNull()
     expect(screen.getByText('From an extension that left')).toBeTruthy()
   })
 
   it('labels a pinned Go action by its own letter', () => {
     const home = makeActions().find((a) => a.id === 'top.home')!
     renderPanel({ pinned: [home], recent: [] })
-    const rows = screen.getAllByText('Home').map((el) => el.closest('.qa-row')!)
-    expect(rows[0].querySelector('.qa-key')!.textContent).toBe('h')
+    expect(within(rowsWith('Home')[0]).getByText('h')).toBeTruthy()
   })
 })

@@ -90,11 +90,7 @@ describe('ErrorBoundary — uses theme tokens for ALL fallback colors — no har
     // Scan every element in the fallback subtree, not just the root container —
     // the message text and recovery button previously kept hardcoded hex that
     // rendered as dark-theme colors under [data-theme="light"].
-    const all = container.querySelectorAll<HTMLElement>('*')
-    expect(all.length).toBeGreaterThan(0)
-    for (const el of all) {
-      const style = el.getAttribute('style') ?? ''
-      expect(style).not.toMatch(/#[0-9a-fA-F]{3,6}\b/)
-    }
+    expect(container.innerHTML).toContain('style="')
+    expect(container.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{3,6}\b/)
   })
 })

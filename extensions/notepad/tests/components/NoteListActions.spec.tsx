@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, createEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, createEvent, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installNotepadBridge, listItem, eventually } from './helpers/note-surface'
 import type { DiagramListItem, Folder, NoteListItem } from '../../src/db/types'
@@ -68,9 +68,9 @@ describe('NoteList ordering', () => {
       diagrams: [diagram('d1', 'Flow', { sortOrder: 0, updatedAt: '2026-02-01' })],
     })
     render(<NoteList />)
-    const titles = [...document.querySelectorAll('.notepad-note-row__title')].map(
-      (el) => el.textContent
-    )
+    const isRowTitle = (_: string, element: Element | null) =>
+      /^(New|Flow|Old)$/.test(element?.textContent ?? '')
+    const titles = screen.getAllByText(isRowTitle).map((el) => el.textContent)
     expect(titles).toEqual(['New', 'Flow', 'Old'])
   })
 })
@@ -164,8 +164,8 @@ function noteListFoldersSectionsTests() {
   it('groups items under their folder, and collapses a folder', async () => {
     const user = userEvent.setup()
     render(<NoteList />)
-    const work = screen.getByText('Work').closest('.notepad-folder-section')!
-    expect(work.textContent).toContain('Filed')
+    const work = screen.getByRole('group', { name: 'Work' })
+    expect(within(work).getByText('Filed')).toBeDefined()
     expect(screen.getByText('Empty')).toBeTruthy()
     await user.click(screen.getByLabelText('Collapse Work'))
     expect(screen.queryByText('Filed')).toBeNull()
@@ -177,7 +177,7 @@ function noteListFoldersRenamingDeletingTests() {
   it('renames a folder from its context menu', async () => {
     const user = userEvent.setup()
     render(<NoteList />)
-    await openRowMenu(user, screen.getByText('Work').closest('.notepad-folder-header')!)
+    await openRowMenu(user, screen.getByRole('button', { name: 'Collapse Work' }))
     await user.click(screen.getByText('Rename'))
     const input = screen.getByDisplayValue('Work')
     await user.clear(input)
@@ -192,7 +192,7 @@ function noteListFoldersRenamingDeletingTests() {
   it('deletes a folder once confirmed', async () => {
     const user = userEvent.setup()
     render(<NoteList />)
-    await openRowMenu(user, screen.getByText('Home').closest('.notepad-folder-header')!)
+    await openRowMenu(user, screen.getByRole('button', { name: 'Collapse Home' }))
     await user.click(screen.getByText('Delete folder'))
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     await eventually(() =>
@@ -361,7 +361,9 @@ function noteListDragDropDroppingAmongFolderTests() {
 function noteListDragDropDroppingHeaderTests() {
   it('moves an item into a folder dropped on its header', async () => {
     render(<NoteList />)
-    const header = screen.getByText('Work').closest('.notepad-folder-header')!
+    const header = within(screen.getByRole('group', { name: 'Work' })).getByTestId(
+      'notepad-folder-header'
+    )
     drag('dragStart', rowTitled('Second'))
     drag('dragOver', header)
     expect(header.className).toContain('notepad-folder-header--drop-target')
@@ -377,7 +379,7 @@ function noteListDragDropDroppingHeaderTests() {
 function noteListDragDropOutFoldersTests() {
   it('takes an item out of its folder when dropped on the list itself', async () => {
     render(<NoteList />)
-    const list = document.querySelector('.notepad-note-list__notes')!
+    const list = screen.getByTestId('notepad-note-list-drop-zone')
     drag('dragStart', rowTitled('Filed'))
     drag('dragOver', list)
     drag('drop', list)

@@ -142,8 +142,7 @@ describe('UsageScreen — summary', () => {
     render(<UsageScreen />)
     await shown()
     const card = (question: string): string =>
-      screen.getByText(question, { selector: '.tmui-metric-card__question' }).closest('div')!
-        .parentElement!.textContent ?? ''
+      screen.getByRole('group', { name: question }).textContent ?? ''
     expect(card('Features used')).toMatch(/4 of 6.*Core 2 of 3 · Extensions 2 of 3/)
     expect(card('Not used')).toMatch(/^Not used in 30 days1/)
     expect(card('Never used')).toMatch(/^Never used since added1/)

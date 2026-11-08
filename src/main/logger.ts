@@ -12,9 +12,7 @@ let logPath = ''
 
 function getStream(): WriteStream {
   if (stream) return stream
-  // A run that must read only its own lines (the Foundry canary) names its own folder.
-  const dir = process.env.TERMINATOR_LOG_DIR || app.getPath('logs')
-  logPath = join(dir, 'terminator.log')
+  logPath = join(app.getPath('logs'), 'terminator.log')
   rotatIfNeeded(logPath)
   const opened = createWriteStream(logPath, { flags: 'a' })
   // A stream reports a failed open or write as an event, which try/catch never sees: unheard,

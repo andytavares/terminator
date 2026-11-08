@@ -38,9 +38,9 @@ beforeEach(() => {
 describe('KeepBothModal', () => {
   it('defaults to mine-first order', () => {
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
-    const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
-    expect(previewEl?.textContent).toContain('const x = 1')
-    const text = previewEl?.textContent ?? ''
+    const previewEl = screen.getByRole('group', { name: 'Merged result preview' })
+    expect(previewEl.textContent).toContain('const x = 1')
+    const text = previewEl.textContent ?? ''
     expect(text.indexOf('const x = 1')).toBeLessThan(text.indexOf('const y = 2'))
   })
 
@@ -48,8 +48,8 @@ describe('KeepBothModal', () => {
     const user = userEvent.setup()
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
     await user.click(screen.getByRole('radio', { name: /Theirs first/i }))
-    const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
-    const text = previewEl?.textContent ?? ''
+    const previewEl = screen.getByRole('group', { name: 'Merged result preview' })
+    const text = previewEl.textContent ?? ''
     expect(text.indexOf('const y = 2')).toBeLessThan(text.indexOf('const x = 1'))
   })
 })
@@ -60,8 +60,8 @@ describe('KeepBothModal — Mine first toggle restores original order', () => {
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
     await user.click(screen.getByRole('radio', { name: /Theirs first/i }))
     await user.click(screen.getByRole('radio', { name: /Mine first/i }))
-    const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
-    const text = previewEl?.textContent ?? ''
+    const previewEl = screen.getByRole('group', { name: 'Merged result preview' })
+    const text = previewEl.textContent ?? ''
     expect(text.indexOf('const x = 1')).toBeLessThan(text.indexOf('const y = 2'))
   })
 

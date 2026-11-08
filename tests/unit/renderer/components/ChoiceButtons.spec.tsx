@@ -54,7 +54,7 @@ describe('ChoiceButtons — does not bubble Enter to a tile that would open on i
     )
     const yes = screen.getByRole('button', { name: '1. Yes' })
     yes.focus()
-    expect(document.activeElement).toBe(yes)
+    expect(yes.matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(tileKey).not.toHaveBeenCalled()
   })

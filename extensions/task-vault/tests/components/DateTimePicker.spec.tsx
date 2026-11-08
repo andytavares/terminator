@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('react-dom', async (importOriginal) => {
@@ -26,9 +26,11 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const trigger = () => document.querySelector('.dtp__trigger') as HTMLElement
-const monthLabel = () => document.querySelector('.dtp__cal-month-label')?.textContent
-const chipLabels = () => Array.from(document.querySelectorAll('.dtp__chip'), (c) => c.textContent)
+const trigger = (open = false) => screen.getByRole('button', { expanded: open })
+const popover = () => screen.getByRole('group', { name: /^Pick/ })
+const buttonsIn = (group: string) =>
+  within(screen.getByRole('group', { name: group })).getAllByRole('button')
+const chipLabels = () => buttonsIn('Shortcuts').map((chip) => chip.textContent)
 
 describe('DateTimePicker — trigger display', dateTimePickerTriggerDisplayTests)
 
@@ -37,14 +39,14 @@ describe('DateTimePicker — open / close', () => {
     const user = userEvent.setup()
     render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     await user.click(trigger())
-    expect(monthLabel()).toBe('June 2026')
+    expect(screen.getByText('June 2026')).toBeTruthy()
   })
 
   it('closes the popover when trigger is clicked again', async () => {
     const user = userEvent.setup()
     render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     await user.click(trigger())
-    await user.click(trigger())
+    await user.click(trigger(true))
     expect(screen.queryByText('June 2026')).toBeNull()
   })
 
@@ -52,7 +54,7 @@ describe('DateTimePicker — open / close', () => {
     const user = userEvent.setup()
     render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     await user.click(trigger())
-    expect(document.querySelector('.dtp__popover')?.contains(document.activeElement)).toBe(true)
+    expect(popover().matches(':focus-within')).toBe(true)
     await user.keyboard('{Escape}')
     expect(screen.queryByText('June 2026')).toBeNull()
   })
@@ -69,38 +71,32 @@ function dateTimePickerTriggerDisplayTests() {
 
 function dateTimePickerTriggerDisplayPlaceholdersTests() {
   it('renders placeholder when value is empty (date mode)', () => {
-    const { container } = render(
-      <DateTimePicker mode="date" value="" onChange={vi.fn()} placeholder="Pick a date" />
-    )
-    expect(container.querySelector('.dtp__trigger-label')?.textContent).toBe('Pick a date')
+    render(<DateTimePicker mode="date" value="" onChange={vi.fn()} placeholder="Pick a date" />)
+    expect(trigger().textContent).toBe('Pick a date')
   })
 
   it('renders placeholder when value is empty (time mode)', () => {
-    const { container } = render(
-      <DateTimePicker mode="time" value="" onChange={vi.fn()} placeholder="Pick a time" />
-    )
-    expect(container.querySelector('.dtp__trigger-label')?.textContent).toBe('Pick a time')
+    render(<DateTimePicker mode="time" value="" onChange={vi.fn()} placeholder="Pick a time" />)
+    expect(trigger().textContent).toBe('Pick a time')
   })
 }
 
 function dateTimePickerTriggerDisplayValuesTests() {
   it('renders formatted date when value is provided', () => {
-    const { container } = render(
-      <DateTimePicker mode="date" value="2026-06-13" onChange={vi.fn()} />
-    )
-    const label = container.querySelector('.dtp__trigger-label')?.textContent ?? ''
+    render(<DateTimePicker mode="date" value="2026-06-13" onChange={vi.fn()} />)
+    const label = trigger().textContent
     expect(label).toContain('Jun')
     expect(label).toContain('2026')
   })
 
   it('renders 12h formatted time when value is provided', () => {
-    const { container } = render(<DateTimePicker mode="time" value="14:30" onChange={vi.fn()} />)
-    expect(container.querySelector('.dtp__trigger-label')?.textContent).toContain('2:30 PM')
+    render(<DateTimePicker mode="time" value="14:30" onChange={vi.fn()} />)
+    expect(trigger().textContent).toContain('2:30 PM')
   })
 
   it('renders AM time correctly', () => {
-    const { container } = render(<DateTimePicker mode="time" value="09:15" onChange={vi.fn()} />)
-    expect(container.querySelector('.dtp__trigger-label')?.textContent).toContain('9:15 AM')
+    render(<DateTimePicker mode="time" value="09:15" onChange={vi.fn()} />)
+    expect(trigger().textContent).toContain('9:15 AM')
   })
 }
 
@@ -141,20 +137,18 @@ function dateTimePickerDateModeCalendarNavigationTests() {
     const user = userEvent.setup()
     render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     await user.click(trigger())
-    expect(monthLabel()).toBe('June 2026')
+    expect(screen.getByText('June 2026')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Previous month' }))
-    expect(monthLabel()).toBe('May 2026')
+    expect(screen.getByText('May 2026')).toBeTruthy()
   })
 }
 
 function dateTimePickerDateModeCalendarDaysTests() {
   it('shows selected day with selected class', async () => {
     const user = userEvent.setup()
-    const { container } = render(
-      <DateTimePicker mode="date" value="2026-06-13" onChange={vi.fn()} />
-    )
+    render(<DateTimePicker mode="date" value="2026-06-13" onChange={vi.fn()} />)
     await user.click(trigger())
-    expect(container.querySelector('.dtp__cal-day--selected')?.textContent).toBe('13')
+    expect(screen.getByRole('button', { pressed: true, name: '13' })).toBeTruthy()
   })
 
   it('calls onChange when a calendar day is clicked', async () => {
@@ -209,9 +203,9 @@ function dateTimePickerTimeMode12hAMSlotsTests() {
 function dateTimePickerTimeMode12hAMSlotsHalvesTests() {
   it('renders time slots in 12h format', async () => {
     const user = userEvent.setup()
-    const { container } = render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
+    render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
     await user.click(trigger())
-    const slots = container.querySelectorAll('.dtp__time-slot')
+    const slots = buttonsIn('Times')
     expect(slots.length).toBe(48) // 48 slots per half (AM or PM)
     // First AM slot is 12:00 AM → displays as "12:00"
     expect(slots[0]?.textContent).toBe('12:00')
@@ -219,12 +213,12 @@ function dateTimePickerTimeMode12hAMSlotsHalvesTests() {
 
   it('switches to PM slots when PM is clicked', async () => {
     const user = userEvent.setup()
-    const { container } = render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
+    render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
     await user.click(trigger())
     await user.click(screen.getByRole('button', { name: 'PM' }))
     // First PM slot is 12:00 (noon)
-    expect(container.querySelector('.dtp__time-slot')?.textContent).toBe('12:00')
-    expect(container.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('PM')
+    expect(buttonsIn('Times')[0].textContent).toBe('12:00')
+    expect(screen.getByRole('button', { name: 'PM' }).getAttribute('aria-pressed')).toBe('true')
   })
 }
 
@@ -252,24 +246,24 @@ function dateTimePickerTimeMode12hAMSelectionTests() {
 
   it('shows selected time slot with selected class', async () => {
     const user = userEvent.setup()
-    const { container } = render(<DateTimePicker mode="time" value="14:30" onChange={vi.fn()} />)
+    render(<DateTimePicker mode="time" value="14:30" onChange={vi.fn()} />)
     await user.click(trigger())
     // 14:30 is PM, displayed as "2:30"
-    expect(container.querySelector('.dtp__time-slot--selected')?.textContent).toBe('2:30')
+    expect(screen.getByRole('button', { pressed: true, name: '2:30' })).toBeTruthy()
   })
 
   it('defaults to PM half when selected time is PM', async () => {
     const user = userEvent.setup()
-    const { container } = render(<DateTimePicker mode="time" value="15:00" onChange={vi.fn()} />)
+    render(<DateTimePicker mode="time" value="15:00" onChange={vi.fn()} />)
     await user.click(trigger())
-    expect(container.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('PM')
+    expect(screen.getByRole('button', { name: 'PM' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('applies time-only compact class to popover', async () => {
     const user = userEvent.setup()
-    const { container } = render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
+    render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
     await user.click(trigger())
-    expect(container.querySelector('.dtp__popover')?.className).toContain('dtp__popover--time-only')
+    expect(popover().className).toContain('dtp__popover--time-only')
   })
 }
 

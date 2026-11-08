@@ -85,6 +85,7 @@ async function mountView(): Promise<void> {
   await act(async () => {})
 }
 
+// eslint-disable-next-line testing-library/no-node-access -- a Range needs the text node itself, which no query returns
 const textOf = (message: string): Node => screen.getByText(message).firstChild!
 
 /** Selects from `start` in one text node to `end` in another, as a drag would. */
@@ -170,7 +171,7 @@ describe('Cite — saving a comment', () => {
     expect(attached().citations).toEqual([
       { entryIndex: 1, quote: QUOTE, comment: 'Also retry on 429' },
     ])
-    expect(document.activeElement).toBe(screen.getByLabelText('Message the agent'))
+    expect(screen.getByLabelText('Message the agent').matches(':focus')).toBe(true)
     expect(recordUse).toHaveBeenCalledWith('core.agent.cite', 'click')
     expect(agents.prompt).not.toHaveBeenCalled()
   })

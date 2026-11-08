@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ViewMenu } from '../../src/components/pr-review/ViewMenu'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
@@ -73,11 +73,11 @@ describe('ViewMenu', () => {
 describe('ViewMenu — says comments are hidden in the button name, not as separate text', () => {
   it('says comments are hidden in the button name, not as separate text', () => {
     useReviewUiStore.getState().setCommentVisibility('hidden')
-    const { container } = render(<ViewMenu />)
+    render(<ViewMenu />)
     expect(screen.queryByText('Comments hidden')).toBeNull()
     const button = screen.getByRole('button', { name: 'View · comments hidden' })
     expect(button.getAttribute('title')).toBe('View · comments hidden')
-    expect(container.querySelector('.vm-dot')).toBeTruthy()
+    expect(within(button).getByTestId('vm-dot')).toBeTruthy()
   })
 
   it.each([

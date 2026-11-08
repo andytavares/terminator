@@ -60,7 +60,7 @@ describe('NotificationPanel', () => {
 
   it('renders nothing when panelOpen is false', () => {
     const { container } = render(<NotificationPanel />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('renders the panel, a named region beside the app, when panelOpen is true', () => {
@@ -97,6 +97,7 @@ describe('NotificationPanel — closing', () => {
 
   it.each([
     ['the close button', (user: User) => user.click(screen.getByTitle('Close'))],
+    // eslint-disable-next-line testing-library/no-node-access -- the backdrop is a bare div with no role, label or text
     ['a backdrop click', (user: User) => user.click(document.querySelector('.notif-backdrop')!)],
     ['Escape', (user: User) => user.keyboard('{Escape}')],
   ])('closes the panel on %s', async (_case, close) => {
@@ -178,11 +179,15 @@ describe('NotificationPanel — draws each type as its own shape', () => {
       panelOpen: true,
       unreadCount: 4,
     })
-    const { container } = render(<NotificationPanel />)
-    const shapes = [...container.querySelectorAll('.notif-item__type-icon')].map((icon) =>
-      icon.getAttribute('class')
-    )
-    expect(shapes).toHaveLength(4)
+    render(<NotificationPanel />)
+    const icons = screen.getAllByRole('img', { name: /^(Info|Success|Warning|Error)$/ })
+    expect(icons.map((icon) => icon.getAttribute('aria-label'))).toEqual([
+      'Info',
+      'Success',
+      'Warning',
+      'Error',
+    ])
+    const shapes = icons.map((icon) => icon.getAttribute('class'))
     expect(new Set(shapes).size).toBe(4)
   })
 })

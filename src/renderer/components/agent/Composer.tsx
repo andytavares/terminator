@@ -415,6 +415,8 @@ function ContextDropZone(props: { sessionId: string; children: React.ReactNode }
   return (
     <div
       className={`agent-composer${dropping ? ' agent-composer--drop' : ''}`}
+      role="group"
+      aria-label="Message composer"
       data-context-drop={props.sessionId}
       {...handlers}
     >

@@ -25,7 +25,7 @@ export function NoteOutline({ onSelect, onClose }: NoteOutlineProps): React.JSX.
   const headings = useMemo(() => parseOutline(bodyDraft), [bodyDraft])
 
   return (
-    <div className="notepad-outline">
+    <div className="notepad-outline" role="navigation" aria-label="Outline">
       <div className="notepad-outline__header">
         <span className="notepad-outline__title">Outline</span>
         <span className="notepad-outline__count">{headings.length}</span>

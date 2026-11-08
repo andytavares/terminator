@@ -61,8 +61,8 @@ describe('ConflictHub', () => {
     ]
     mockStoreState = { session: makeSession(files), setActiveFile: mockSetActiveFile }
     render(<ConflictHub onSelectFile={vi.fn()} />)
-    const totalStat = screen.getByText('Total conflicts').parentElement
-    expect(totalStat?.textContent).toBe('3Total conflicts')
+    const totalStat = screen.getByRole('group', { name: 'Total conflicts' })
+    expect(totalStat.textContent).toBe('3Total conflicts')
   })
 
   it('lists each conflicted file', () => {
@@ -111,7 +111,7 @@ describe('ConflictHub — renders null when session is null', () => {
   it('renders null when session is null', () => {
     mockStoreState = { session: null, setActiveFile: mockSetActiveFile }
     const { container } = render(<ConflictHub onSelectFile={vi.fn()} />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('calls onExit when exit button is clicked', async () => {

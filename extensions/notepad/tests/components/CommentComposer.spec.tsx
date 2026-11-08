@@ -88,7 +88,7 @@ function commentComposerCancellingTests() {
     const onClose = vi.fn()
     render(<CommentComposer anchor={baseAnchor} onClose={onClose} onCreated={vi.fn()} />)
     await user.click(screen.getByRole('textbox'))
-    expect(document.activeElement).toBe(screen.getByRole('textbox'))
+    expect(screen.getByRole('textbox').matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })

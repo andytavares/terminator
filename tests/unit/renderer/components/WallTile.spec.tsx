@@ -86,7 +86,7 @@ describe('WallTile — opening the terminal', () => {
     await user.click(screen.getByRole('button', { name: 'Open claude' }))
     await user.click(screen.getByTestId('preview-s1'))
     act(() => screen.getByRole('article').focus())
-    expect(document.activeElement).toBe(screen.getByRole('article'))
+    expect(screen.getByRole('article').matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(props.onOpen).toHaveBeenCalledTimes(3)
     expect(recordUse.mock.calls).toEqual(Array(3).fill(['core.overview.open-tile']))
@@ -230,8 +230,8 @@ describe('WallTile — ends the session from its tile without opening it', () =>
 describe('WallTile — what does not open it', () => {
   it('ignores a click on the footer itself', async () => {
     const user = userEvent.setup()
-    const { container } = render(<WallTile {...props} />)
-    await user.click(container.querySelector('.wall-tile__foot')!)
+    render(<WallTile {...props} metrics={{ pid: 1, cpuPercent: 12.5, rssBytes: 512 * 1024 }} />)
+    await user.click(screen.getByText('12.5% 512 KB'))
     expect(props.onOpen).not.toHaveBeenCalled()
   })
 
@@ -239,7 +239,7 @@ describe('WallTile — what does not open it', () => {
     const user = userEvent.setup()
     render(<WallTile {...props} />)
     act(() => screen.getByRole('article').focus())
-    expect(document.activeElement).toBe(screen.getByRole('article'))
+    expect(screen.getByRole('article').matches(':focus')).toBe(true)
     await user.keyboard(' ')
     expect(props.onOpen).not.toHaveBeenCalled()
   })

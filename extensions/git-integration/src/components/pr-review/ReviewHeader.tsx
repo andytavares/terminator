@@ -149,6 +149,7 @@ function ChapterSegments(props: {
       {props.chapters.map((chapter) => (
         <i
           key={chapter.id}
+          data-testid="progress-segment"
           style={
             {
               flexGrow: chapter.fileCount,

@@ -141,6 +141,6 @@ describe('CompletionScreen — shows error toast and stays on screen if commit f
     const { container } = render(
       <CompletionScreen repoRoot="/repo" onBack={vi.fn()} onExit={vi.fn()} />
     )
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 })

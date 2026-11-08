@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PrDialog } from '../../src/components/PrDialog'
 import { githubAPI } from '../../src/api/github'
@@ -40,19 +40,19 @@ async function previewOf(template: string): Promise<HTMLElement> {
   )
   await waitFor(() =>
     expect(
-      (screen.getByPlaceholderText(/Describe your changes/) as HTMLTextAreaElement).value
+      (screen.getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement).value
     ).toBe(template)
   )
   await user.click(screen.getByRole('tab', { name: 'Preview' }))
-  return document.querySelector('.pr-dialog__preview') as HTMLElement
+  return screen.getByRole('tabpanel', { name: 'Preview' })
 }
 
 describe('PrDialog template preview', () => {
   it('renders the template as Markdown', async () => {
     const preview = await previewOf('## Summary\n\n- first\n- second\n')
 
-    expect(preview.querySelector('h2')?.textContent).toBe('Summary')
-    expect(preview.querySelectorAll('li')).toHaveLength(2)
+    expect(within(preview).getByRole('heading', { level: 2 }).textContent).toBe('Summary')
+    expect(within(preview).getAllByRole('listitem')).toHaveLength(2)
   })
 
   it('never puts script or event-handler markup from the template into the page', async () => {
@@ -60,9 +60,11 @@ describe('PrDialog template preview', () => {
       '## Notes\n\n<img src="x" onerror="alert(1)">\n\n<script>alert(2)</script>\n\n[go](javascript:alert(3))'
     )
 
-    await waitFor(() => expect(preview.querySelector('h2')?.textContent).toBe('Notes'))
-    expect(preview.querySelector('script')).toBeNull()
-    expect(preview.querySelector('[onerror]')).toBeNull()
+    await waitFor(() =>
+      expect(within(preview).getByRole('heading', { level: 2 }).textContent).toBe('Notes')
+    )
+    expect(preview.innerHTML).not.toContain('<script')
+    expect(preview.innerHTML).not.toContain('onerror')
     expect(preview.innerHTML).not.toContain('javascript:')
   })
 })
@@ -82,7 +84,7 @@ async function createWith(prCreate: () => ReturnType<typeof githubAPI.prCreate>)
       onCreated={vi.fn()}
     />
   )
-  await user.type(screen.getByPlaceholderText('Pull request title'), 'Add x')
+  await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Add x')
   await user.click(screen.getByRole('button', { name: /^Create (Draft )?PR$/ }))
 }
 
@@ -97,5 +99,28 @@ describe('PrDialog usage', () => {
     await waitFor(() =>
       expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('pr-create', { failed: true })
     )
+  })
+})
+
+describe('PrDialog fields', () => {
+  it('names the title, description and base branch fields by their labels', async () => {
+    mockReadFile.mockResolvedValue({ content: '' })
+    render(
+      <PrDialog
+        repoRoot="/repo"
+        branch="feature/x"
+        hasStagedChanges={false}
+        existingPr={null}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveProperty(
+      'placeholder',
+      'Pull request title'
+    )
+    expect(screen.getByRole('textbox', { name: 'Description' }).tagName).toBe('TEXTAREA')
+    expect(screen.getByRole('listbox', { name: 'Base branch' }).tagName).toBe('SELECT')
   })
 })

@@ -70,7 +70,7 @@ describe('closing the plan reader', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     render(<PlanReader order={order} onClose={onClose} />)
-    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    expect(screen.getByRole('dialog').matches(':focus-within')).toBe(true)
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
   })

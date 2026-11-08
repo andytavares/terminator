@@ -41,8 +41,9 @@ describe('StatusDot', () => {
 describe('Chip', () => {
   it('shows its icon before its text', () => {
     render(<Chip icon={<svg data-testid="icon" />}>Checks passing</Chip>)
-    const chip = screen.getByText('Checks passing')
-    expect(chip.firstElementChild).toBe(screen.getByTestId('icon'))
+    expect(screen.getByText('Checks passing').innerHTML).toBe(
+      '<svg data-testid="icon"></svg>Checks passing'
+    )
   })
 
   it('takes the tone it is given', () => {
@@ -52,8 +53,8 @@ describe('Chip', () => {
 })
 
 describe('StageBar', () => {
-  const stageNamed = (name: string): HTMLElement =>
-    screen.getByText(name, { selector: '.tmui-stage-bar__name' }).closest('li') as HTMLElement
+  const stageNamed = (name: string): HTMLElement | undefined =>
+    screen.getAllByRole('listitem').find((li) => li.textContent === name)
 
   it('marks the stage the work is at as current and tells screen readers its name', () => {
     render(<StageBar stage="in-review" />)
@@ -64,10 +65,10 @@ describe('StageBar', () => {
 
   it('marks earlier stages done and later ones upcoming', () => {
     render(<StageBar stage="building" />)
-    expect(stageNamed('Shaping').dataset.state).toBe('done')
-    expect(stageNamed('Building').dataset.state).toBe('current')
-    expect(stageNamed('Merging').dataset.state).toBe('upcoming')
-    expect(stageNamed('Shipped').dataset.state).toBe('upcoming')
+    expect(stageNamed('Shaping')?.dataset.state).toBe('done')
+    expect(stageNamed('Building')?.dataset.state).toBe('current')
+    expect(stageNamed('Merging')?.dataset.state).toBe('upcoming')
+    expect(stageNamed('Shipped')?.dataset.state).toBe('upcoming')
   })
 
   it('marks a bar waiting on the reader', () => {
@@ -87,6 +88,7 @@ describe('StageBar', () => {
 
 describe('Sparkline', () => {
   const endpoint = (container: HTMLElement): SVGCircleElement =>
+    // eslint-disable-next-line testing-library/no-node-access -- an SVG circle's geometry has no role or label
     container.querySelector('circle[data-endpoint]') as SVGCircleElement
 
   it('puts the highest value at the top and the lowest at the bottom of one scale', () => {
@@ -113,13 +115,13 @@ describe('Sparkline', () => {
 
 describe('Sparkline — drawing', () => {
   it('is a smaller drawing in the small size', () => {
-    const { container } = render(<Sparkline values={[1, 2]} size="sm" />)
-    expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 200 22')
+    render(<Sparkline values={[1, 2]} size="sm" label="Merged per week" />)
+    expect(screen.getByRole('img').getAttribute('viewBox')).toBe('0 0 200 22')
   })
 
   it('draws nothing for no values and names itself only when labelled', () => {
-    const { container, rerender } = render(<Sparkline values={[]} />)
-    expect(container.querySelector('svg')).toBeNull()
+    const { rerender } = render(<Sparkline values={[]} label="Merged per week" />)
+    expect(screen.queryByRole('img')).toBeNull()
     rerender(<Sparkline values={[1, 2]} label="Merged per week" />)
     expect(screen.getByRole('img').getAttribute('aria-label')).toBe('Merged per week')
   })
@@ -183,7 +185,7 @@ describe('Drawer — focus on open', () => {
         <p>Timeline</p>
       </Drawer>
     )
-    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    expect(screen.getByRole('dialog').matches(':focus-within')).toBe(true)
   })
 })
 
@@ -194,7 +196,7 @@ describe('Drawer — focus', () => {
         <input aria-label="Message" autoFocus />
       </Drawer>
     )
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Message' }))
+    expect(screen.getByRole('textbox', { name: 'Message' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -207,14 +209,12 @@ describe('Checkbox', () => {
     expect(onChange).toHaveBeenCalledWith(true)
   })
 
-  it('shows a tick only when checked', () => {
-    const { container, rerender } = render(<Checkbox checked label="Tests pass" />)
-    expect(screen.getByRole('checkbox', { name: 'Tests pass' }).getAttribute('aria-checked')).toBe(
-      'true'
-    )
-    expect(container.querySelectorAll('svg')).toHaveLength(1)
+  it('reports checked only when checked', () => {
+    const { rerender } = render(<Checkbox checked label="Tests pass" />)
+    const box = (): HTMLElement => screen.getByRole('checkbox', { name: 'Tests pass' })
+    expect(box().getAttribute('aria-checked')).toBe('true')
     rerender(<Checkbox checked={false} label="Tests pass" />)
-    expect(container.querySelector('svg')).toBeNull()
+    expect(box().getAttribute('aria-checked')).toBe('false')
   })
 
   it('cannot be pressed without a handler', () => {

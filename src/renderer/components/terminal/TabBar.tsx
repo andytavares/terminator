@@ -278,6 +278,7 @@ function SessionTabs(props: SessionTabsProps): React.JSX.Element {
   const dropOf = dropSessionTab(props.projectId, all, sessions)
   return (
     <div
+      role="tablist"
       className={`tab-bar tab-bar--sessions${sessions.length > SCROLL_AFTER ? ' tab-bar--scrollable' : ''}`}
     >
       <ScopeLabel projectId={props.projectId} />
@@ -330,6 +331,9 @@ function SessionTab(props: SessionTabProps): React.JSX.Element {
   }
   return (
     <div
+      role="tab"
+      aria-selected={isActive}
+      aria-label={session.tabTitle}
       data-session-tab={session.id}
       onPointerDown={(e) => !isRenaming && beginTabDrag(e, session.id, props.onDrop)}
       className={useSessionTabClass(session.id, isActive)}
@@ -357,7 +361,7 @@ export function TabStateIcon({ session }: { session: TerminalSession }): React.J
   const status = statusPresentationForState(state)
   const Icon = STATUS_ICON[status.icon]
   return (
-    <span className="tab-bar__state" aria-label={status.label}>
+    <span className="tab-bar__state" role="img" aria-label={status.label}>
       <Icon aria-hidden="true" data-state={state} />
     </span>
   )

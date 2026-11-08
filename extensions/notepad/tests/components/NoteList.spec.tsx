@@ -247,9 +247,9 @@ function noteListContextMenuClosingTests() {
     const user = userEvent.setup()
     render(<NoteList />)
     await user.pointer({ keys: '[MouseRight]', target: screen.getByText('First Note') })
-    expect(document.querySelector('.notepad-context-menu')).not.toBeNull()
+    expect(screen.getByRole('menu', { name: 'Item actions' })).toBeDefined()
     await user.keyboard('{Escape}')
-    expect(document.querySelector('.notepad-context-menu')).toBeNull()
+    expect(screen.queryByRole('menu', { name: 'Item actions' })).toBeNull()
   })
 }
 
@@ -276,14 +276,14 @@ function noteListEditDialogOpeningSavingTests() {
   it('is a modal dialog named for what it edits, with the title field focused', async () => {
     const dialog = await openEditDialog(userEvent.setup())
     expect(dialog.tagName).toBe('DIALOG')
-    expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
+    expect(screen.getByPlaceholderText('Title').matches(':focus')).toBe(true)
   })
 
   it('saves the new title when Enter is pressed in the title field', async () => {
     const user = userEvent.setup()
     await openEditDialog(user)
     const title = screen.getByPlaceholderText('Title')
-    expect(document.activeElement).toBe(title)
+    expect(title.matches(':focus')).toBe(true)
     await user.clear(title)
     await user.type(title, 'Renamed{Enter}')
     expect(mockInvoke).toHaveBeenCalledWith(
@@ -298,7 +298,7 @@ function noteListEditDialogTitleDerivingTests() {
   it('leaves the title deriving from the body when only the tags change', async () => {
     const user = userEvent.setup()
     await openEditDialog(user)
-    expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
+    expect(screen.getByPlaceholderText('Title').matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(mockInvoke).toHaveBeenCalledWith(
       'terminator.notepad:notes.autosave',
@@ -320,7 +320,7 @@ function noteListEditDialogKeyboardTests() {
   })
 }
 
-const draggedRow = (title: string) => screen.getByText(title).closest('button') as HTMLElement
+const draggedRow = (title: string) => screen.getByRole('button', { name: new RegExp(`^${title}`) })
 
 /** Drags the first note onto the second; `over` says whether it passes over the row first. */
 async function dragFirstOntoSecond(over: boolean): Promise<void> {

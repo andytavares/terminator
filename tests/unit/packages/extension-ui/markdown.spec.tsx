@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Markdown } from '../../../../packages/extension-ui/src/Markdown'
 
@@ -21,9 +21,9 @@ describe('Markdown before its HTML renderer has loaded', () => {
     ).container
     expect(el.textContent).not.toContain('<details>')
     expect(el.textContent).not.toContain('alert(1)')
-    expect(el.querySelector('script')).toBeNull()
-    await waitFor(() => expect(el.querySelector('details > summary')?.textContent).toBe('Logs'))
-    expect(el.querySelector('script')).toBeNull()
+    expect(el.innerHTML).not.toContain('<script')
+    await waitFor(() => expect(within(el).getByText('Logs').tagName).toBe('SUMMARY'))
+    expect(el.innerHTML).not.toContain('<script')
   })
 })
 
@@ -31,7 +31,7 @@ describe('Markdown before its HTML renderer has loaded', () => {
 function setUpMarkdownRawHTML(): void {
   beforeAll(async () => {
     const el = renderBody('<sub>x</sub>')
-    await waitFor(() => expect(el.querySelector('sub')).not.toBeNull())
+    await waitFor(() => expect(within(el).getByText('x').tagName).toBe('SUB'))
   })
 
   beforeEach(() => {
@@ -44,31 +44,31 @@ describe('Markdown raw HTML', () => {
 
   it('renders <details>/<summary> as a disclosure, not tag text', () => {
     const el = renderBody('<details><summary>Logs</summary>body</details>')
-    expect(el.querySelector('details > summary')?.textContent).toBe('Logs')
-    expect(el.querySelector('details')?.textContent).toContain('body')
+    const disclosure = within(el).getByRole('group')
+    expect(within(disclosure).getByText('Logs').tagName).toBe('SUMMARY')
+    expect(disclosure.textContent).toContain('body')
     expect(el.textContent).not.toContain('<details>')
     expect(el.textContent).not.toContain('<summary>')
   })
 
   it('renders <br> as a line break', () => {
     const el = renderBody('a<br>b')
-    expect(el.querySelector('br')).not.toBeNull()
+    expect(el.innerHTML).toContain('<br>')
     expect(el.textContent).toBe('ab')
   })
 
   it('renders <sub> as an element', () => {
     const el = renderBody('<sub>x</sub>')
-    expect(el.querySelector('sub')?.textContent).toBe('x')
+    expect(within(el).getByText('x').tagName).toBe('SUB')
     expect(el.textContent).not.toContain('<sub>')
   })
 
   it('links a GFM footnote reference to its definition', () => {
     const el = renderBody('text[^1]\n\n[^1]: note')
-    const ref = el.querySelector('sup > a')
-    const href = ref?.getAttribute('href') ?? ''
-    expect(href.startsWith('#')).toBe(true)
-    const target = el.querySelector(`[id="${href.slice(1)}"]`)
-    expect(target?.textContent).toContain('note')
+    const href = within(el).getByRole('link', { name: '1' }).getAttribute('href') ?? ''
+    const note = within(el).getByRole('listitem')
+    expect(href).toBe(`#${note.id}`)
+    expect(note.textContent).toContain('note')
     expect(href).not.toContain('user-content-user-content-')
   })
 })
@@ -78,8 +78,15 @@ describe('Markdown raw HTML — leaves a fenced block as plain code when no code
 
   it('leaves a fenced block as plain code when no code renderer is given', () => {
     const el = renderBody('```js\nconst a = 1\n```')
-    expect(el.querySelector('pre > code.language-js')?.textContent).toBe('const a = 1\n')
+    const code = within(el).getByText('const a = 1')
+    expect(code.tagName).toBe('CODE')
+    expect(code.className).toBe('language-js')
+    expect(code.textContent).toBe('const a = 1\n')
   })
+})
+
+describe('Markdown raw HTML — a code renderer', () => {
+  setUpMarkdownRawHTML()
 
   it('hands a fenced block and its language to the code renderer', () => {
     const renderCode = vi.fn((code: string, language: string) => (
@@ -91,7 +98,7 @@ describe('Markdown raw HTML — leaves a fenced block as plain code when no code
       </Markdown>
     ).container
     expect(renderCode).toHaveBeenCalledWith('const a = 1', 'js')
-    expect(el.querySelector('b[data-language="js"]')?.textContent).toBe('const a = 1')
+    expect(within(el).getByText('const a = 1').getAttribute('data-language')).toBe('js')
   })
 
   it('keeps inline code out of the code renderer', () => {
@@ -102,7 +109,7 @@ describe('Markdown raw HTML — leaves a fenced block as plain code when no code
       </Markdown>
     ).container
     expect(renderCode).not.toHaveBeenCalled()
-    expect(el.querySelector('code')?.textContent).toBe('npm ci')
+    expect(within(el).getByText('npm ci').tagName).toBe('CODE')
   })
 })
 
@@ -118,9 +125,7 @@ describe('Markdown raw HTML — sanitising', () => {
         'after',
       ].join('\n\n')
     )
-    expect(el.querySelector('script')).toBeNull()
-    expect(el.querySelector('iframe')).toBeNull()
-    expect(el.querySelector('style')).toBeNull()
+    expect(el.innerHTML).not.toMatch(/<(script|iframe|style)\b/i)
     expect(el.textContent).not.toContain('alert(1)')
     expect(el.textContent).not.toContain('display:none')
     expect(el.textContent).toContain('after')
@@ -128,12 +133,8 @@ describe('Markdown raw HTML — sanitising', () => {
 
   it('strips on* handlers from an allowed element', () => {
     const el = renderBody('<img src="https://example.com/a.png" onerror="alert(1)">')
-    const img = el.querySelector('img')
-    expect(img?.getAttribute('src')).toBe('https://example.com/a.png')
-    const handlers = Array.from(el.querySelectorAll('*')).flatMap((node) =>
-      Array.from(node.attributes).filter((a) => a.name.toLowerCase().startsWith('on'))
-    )
-    expect(handlers).toEqual([])
+    expect(within(el).getByRole('img').getAttribute('src')).toBe('https://example.com/a.png')
+    expect(el.innerHTML).not.toMatch(/\son\w+=/i)
   })
 })
 
@@ -142,26 +143,20 @@ describe('Markdown raw HTML — sanitising — removes javascript: hrefs', () =>
 
   it('removes javascript: hrefs', () => {
     const el = renderBody('<a href="javascript:alert(1)">click</a>')
-    const hrefs = Array.from(el.querySelectorAll('[href]')).map((n) => n.getAttribute('href'))
-    expect(hrefs.some((h) => h?.toLowerCase().includes('javascript:'))).toBe(false)
+    expect(el.innerHTML.toLowerCase()).not.toContain('javascript:')
   })
 
   it('prefixes every id and name so a body cannot clobber document members', () => {
     const el = renderBody(
       '<img name="createElement" src="https://example.com/a.png">\n\n<div id="getElementById">x</div>\n\ntext[^1]\n\n[^1]: note'
     )
-    document.body.appendChild(el)
-    const values = [
-      ...Array.from(el.querySelectorAll('[name]')).map((n) => n.getAttribute('name')),
-      ...Array.from(el.querySelectorAll('[id]')).map((n) => n.getAttribute('id')),
-    ]
+    const values = [...el.innerHTML.matchAll(/\s(?:id|name)="([^"]*)"/g)].map((match) => match[1])
     expect(values).toContain('user-content-createElement')
     expect(values).toContain('user-content-getElementById')
     expect(values.every((v) => v?.startsWith('user-content-'))).toBe(true)
     expect(values.some((v) => v?.startsWith('user-content-user-content-'))).toBe(false)
-    expect(typeof document.createElement).toBe('function')
-    expect(typeof document.getElementById).toBe('function')
-    el.remove()
+    expect(document).toHaveProperty('createElement', expect.any(Function))
+    expect(document).toHaveProperty('getElementById', expect.any(Function))
   })
 })
 
@@ -170,14 +165,15 @@ describe('Markdown raw HTML — sanitising — points an in-page HTML anchor at 
 
   it('points an in-page HTML anchor at the prefixed id', () => {
     const el = renderBody('<a href="#notes">jump</a>\n\n<h3 id="notes">Notes</h3>')
-    const href = el.querySelector('a')?.getAttribute('href') ?? ''
-    expect(href).toBe('#user-content-notes')
-    expect(el.querySelector(`[id="${href.slice(1)}"]`)?.textContent).toBe('Notes')
+    expect(within(el).getByRole('link', { name: 'jump' }).getAttribute('href')).toBe(
+      '#user-content-notes'
+    )
+    expect(within(el).getByRole('heading', { name: 'Notes' }).id).toBe('user-content-notes')
   })
 
   it('opens an HTML <a href="https://…"> through onOpenLink', () => {
     const el = renderBody('<a href="https://example.com/pr">PR</a>')
-    const link = el.querySelector('a')!
+    const link = within(el).getByRole('link', { name: 'PR' })
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
     link.dispatchEvent(event)
     expect(onOpenLink).toHaveBeenCalledWith('https://example.com/pr')
@@ -187,7 +183,7 @@ describe('Markdown raw HTML — sanitising — points an in-page HTML anchor at 
 
 const renderedLink = (body: string) => {
   const { container } = render(<Markdown onOpenLink={onOpenLink}>{body}</Markdown>)
-  return container.querySelector('a')!
+  return within(container).getByRole('link')
 }
 
 const clickAnchor = (anchor: Element) => {
@@ -261,19 +257,23 @@ describe('Markdown links to other schemes', () => {
   beforeEach(() => onOpenLink.mockClear())
 
   it('opens a mailto address through onOpenLink', () => {
-    const event = clickAnchor(renderBody('[mail](mailto:team@example.com)').querySelector('a')!)
+    const event = clickAnchor(
+      within(renderBody('[mail](mailto:team@example.com)')).getByText('mail')
+    )
     expect(onOpenLink).toHaveBeenCalledWith('mailto:team@example.com')
     expect(event.defaultPrevented).toBe(true)
   })
 
   it('keeps a link with no destination from reloading the view', () => {
-    const event = clickAnchor(renderBody('[empty]()').querySelector('a')!)
+    const event = clickAnchor(within(renderBody('[empty]()')).getByText('empty'))
     expect(event.defaultPrevented).toBe(true)
     expect(onOpenLink).not.toHaveBeenCalled()
   })
 
   it('leaves a javascript: link inert', () => {
-    const anchor = renderBody('[click me](javascript:window.__pwned=3)').querySelector('a')!
+    const anchor = within(renderBody('[click me](javascript:window.__pwned=3)')).getByText(
+      'click me'
+    )
     expect(clickAnchor(anchor).defaultPrevented).toBe(true)
     expect(anchor.getAttribute('href') ?? '').not.toContain('javascript:')
     expect(onOpenLink).not.toHaveBeenCalled()
@@ -293,13 +293,13 @@ function renderUntrusted(body: string) {
 describe('Markdown that fetches nothing', () => {
   it('drops a Markdown image instead of loading it', () => {
     const el = renderUntrusted('![tracker](https://evil.example/pixel.png)')
-    expect(el.querySelector('img')).toBeNull()
+    expect(el.innerHTML).not.toContain('<img')
     expect(el.innerHTML).not.toContain('evil.example')
   })
 
   it('renders no raw HTML and no src attribute, even once the HTML renderer has loaded', async () => {
     const warm = renderBody('<sub>warm</sub>')
-    await waitFor(() => expect(warm.querySelector('sub')).not.toBeNull())
+    await waitFor(() => expect(within(warm).getByText('warm').tagName).toBe('SUB'))
     const el = renderUntrusted(
       [
         '<div id="injected"><b>bold</b></div>',
@@ -309,48 +309,51 @@ describe('Markdown that fetches nothing', () => {
         '![a](https://x.example/a.png)',
       ].join('\n\n')
     )
-    expect(el.querySelector('[id$="injected"]')).toBeNull()
-    expect(el.querySelector('b')).toBeNull()
-    expect(el.querySelector('script')).toBeNull()
+    expect(el.innerHTML).not.toContain('injected')
+    expect(el.innerHTML).not.toMatch(/<(b|script)\b/i)
     expect(el.textContent).not.toContain('alert(1)')
-    expect(el.querySelectorAll('[src]')).toHaveLength(0)
+    expect(el.innerHTML).not.toContain(' src=')
   })
 })
 
+const EVERY_BLOCK = [
+  '# One',
+  '- outer\n  - inner',
+  '1. first\n2. second',
+  '| Name | Value |\n| --- | --- |\n| a | 1 |',
+  '- [x] done\n- [ ] todo',
+  '> quoted',
+  '~~gone~~ **bold** _italic_',
+  '```html\n<script>window.__pwned = 4</script>\n```',
+]
+
 describe('Markdown that fetches nothing — still renders headings, lists, tables, task lists, quotes and code', () => {
   it('still renders headings, lists, tables, task lists, quotes and code', () => {
-    const el = renderUntrusted(
-      [
-        '# One',
-        '- outer\n  - inner',
-        '1. first\n2. second',
-        '| Name | Value |\n| --- | --- |\n| a | 1 |',
-        '- [x] done\n- [ ] todo',
-        '> quoted',
-        '~~gone~~ **bold** _italic_',
-        '```html\n<script>window.__pwned = 4</script>\n```',
-      ].join('\n\n')
-    )
-    expect(el.querySelector('h1')?.textContent).toBe('One')
-    expect(el.querySelectorAll('ul ul li')).toHaveLength(1)
-    expect(el.querySelectorAll('ol li')).toHaveLength(2)
-    expect(el.querySelectorAll('tbody td')).toHaveLength(2)
-    const boxes = el.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
-    expect(Array.from(boxes).map((box) => [box.checked, box.disabled])).toEqual([
+    const el = renderUntrusted(EVERY_BLOCK.join('\n\n'))
+    const view = within(el)
+    expect(view.getByRole('heading', { level: 1 }).textContent).toBe('One')
+    expect(within(view.getByText('outer')).getAllByRole('listitem')).toHaveLength(1)
+    const ordered = view.getAllByRole('list').filter((list) => list.tagName === 'OL')
+    expect(within(ordered[0]).getAllByRole('listitem')).toHaveLength(2)
+    expect(view.getAllByRole('cell')).toHaveLength(2)
+    const boxes = view.getAllByRole<HTMLInputElement>('checkbox')
+    expect(boxes.map((box) => [box.checked, box.disabled])).toEqual([
       [true, true],
       [false, true],
     ])
-    expect(el.querySelector('blockquote')?.textContent?.trim()).toBe('quoted')
-    expect(el.querySelector('del')?.textContent).toBe('gone')
-    expect(el.querySelector('pre code')?.textContent).toContain('window.__pwned = 4')
-    expect(el.querySelector('script')).toBeNull()
+    expect(view.getByRole('blockquote').textContent?.trim()).toBe('quoted')
+    expect(view.getByRole('deletion').textContent).toBe('gone')
+    expect(view.getByText(/window.__pwned = 4/).tagName).toBe('CODE')
+    expect(el.innerHTML).not.toContain('<script')
   })
 })
 
 describe('Markdown that fetches nothing — still opens a link through onOpenLink', () => {
   it('still opens a link through onOpenLink', () => {
     onOpenLink.mockClear()
-    const anchor = renderUntrusted('[docs](https://example.com/docs)').querySelector('a')!
+    const anchor = within(renderUntrusted('[docs](https://example.com/docs)')).getByRole('link', {
+      name: 'docs',
+    })
     anchor.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     expect(onOpenLink).toHaveBeenCalledWith('https://example.com/docs')
   })
@@ -373,12 +376,14 @@ describe('inline Markdown', () => {
     const el = renderInlineMarkdown(
       'Hide **done** in `Orders.tsx`, *not* [grey](https://e.example)'
     )
-    expect(el.querySelector('strong')?.textContent).toBe('done')
-    expect(el.querySelector('code')?.textContent).toBe('Orders.tsx')
-    expect(el.querySelector('em')?.textContent).toBe('not')
-    expect(el.querySelector('a')?.getAttribute('href')).toBe('https://e.example')
-    expect(el.querySelector('button > span.tmui-markdown')).not.toBeNull()
-    expect(el.querySelector('p, ul, ol, li, pre, div, h1, h2, blockquote, table')).toBeNull()
+    expect(within(el).getByText('done').tagName).toBe('STRONG')
+    expect(within(el).getByText('Orders.tsx').tagName).toBe('CODE')
+    expect(within(el).getByText('not').tagName).toBe('EM')
+    expect(within(el).getByRole('link', { name: 'grey' }).getAttribute('href')).toBe(
+      'https://e.example'
+    )
+    expect(within(el).getByRole('button').innerHTML).toMatch(/^<span class="tmui-markdown/)
+    expect(el.innerHTML).not.toMatch(/<(p|ul|ol|li|pre|div|h1|h2|blockquote|table)[\s>]/)
   })
 
   it('keeps the words of a block it does not draw', () => {
@@ -389,8 +394,8 @@ describe('inline Markdown', () => {
 
   it('shows no image', () => {
     expect(
-      renderInlineMarkdown('see ![pixel](https://evil.example/p.png)').querySelector('img')
-    ).toBeNull()
+      renderInlineMarkdown('see ![pixel](https://evil.example/p.png)').innerHTML
+    ).not.toContain('<img')
   })
 })
 
@@ -409,9 +414,9 @@ describe('offline Markdown', () => {
         ].join('\n\n')}
       </Markdown>
     ).container
-    expect(el.querySelector('details > summary')?.textContent).toBe('Logs')
-    expect(el.querySelector('img')).toBeNull()
-    expect(el.querySelectorAll('[src]')).toHaveLength(0)
+    expect(within(within(el).getByRole('group')).getByText('Logs').tagName).toBe('SUMMARY')
+    expect(el.innerHTML).not.toContain('<img')
+    expect(el.innerHTML).not.toContain(' src=')
     expect(el.innerHTML).not.toContain('x.example')
   })
 })
@@ -423,22 +428,20 @@ describe('Markdown raw HTML — inline SVG', () => {
     const el = renderBody(
       '<svg viewBox="0 0 100 50" width="100" height="50"><rect x="0" y="10" width="40" height="40" fill="teal"></rect><text x="2" y="8">Q1</text></svg>'
     )
-    const rect = el.querySelector('svg rect')
-    expect(el.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 100 50')
-    expect(rect?.getAttribute('height')).toBe('40')
-    expect(rect?.getAttribute('fill')).toBe('teal')
-    expect(el.querySelector('svg text')?.textContent).toBe('Q1')
+    expect(el.innerHTML).toContain('<svg viewBox="0 0 100 50"')
+    expect(el.innerHTML).toContain('<rect x="0" y="10" width="40" height="40" fill="teal">')
+    expect(within(el).getByText('Q1').tagName).toBe('text')
   })
 
   it('drops scripts, handlers, javascript: links, foreign objects and styles from an SVG', () => {
     const el = renderBody(
       '<svg onload="alert(1)" style="x"><script>alert(2)</script><a href="javascript:alert(3)"><circle r="4"></circle></a><foreignObject><div>html</div></foreignObject><use href="#x"></use></svg>'
     )
-    expect(el.querySelector('svg')).not.toBeNull()
-    expect(el.querySelector('svg script, svg foreignObject, svg use')).toBeNull()
+    expect(el.innerHTML).toContain('<svg')
+    expect(el.innerHTML).not.toMatch(/<(script|foreignObject|use)[\s>]/i)
     expect(el.innerHTML).not.toContain('javascript:')
-    expect(el.querySelector('svg')?.getAttribute('onload')).toBeNull()
-    expect(el.querySelector('svg')?.getAttribute('style')).toBeNull()
+    expect(el.innerHTML).not.toContain('onload')
+    expect(el.innerHTML).not.toContain('style=')
     expect(el.textContent).not.toContain('alert')
   })
 })
@@ -451,10 +454,9 @@ describe('Markdown — an HTML title is never kept', () => {
       </Markdown>
     )
     // The HTML plugins load lazily: until the SVG exists, the body is still plain text.
-    await waitFor(() => expect(view.container.querySelector('svg')).not.toBeNull())
+    await waitFor(() => expect(view.container.innerHTML).toContain('<svg'))
     // React moves a title outside an SVG into document.head, so look at the whole document.
-    const titles = [...document.querySelectorAll('title')].map((t) => t.textContent)
-    expect(titles).not.toContain('Hijack')
+    expect(document.documentElement.innerHTML).not.toContain('<title>Hijack')
   })
 })
 

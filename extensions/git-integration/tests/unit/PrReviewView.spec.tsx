@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, beforeAll, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { usePrReviewStore, type PrReviewStore } from '../../src/stores/pr-review.store'
 import { githubAPI } from '../../src/api/github'
@@ -397,7 +397,8 @@ describe('PrReviewView (continued) — large-PR warning — progress bar does no
     )
     // Only the one displayed file counts, however many viewed paths the store holds.
     const segments = screen.getByRole('progressbar', { name: 'Files viewed' })
-    expect(segments.querySelector('i')?.style.getPropertyValue('--filled')).toBe('100%')
+    const [segment] = within(segments).getAllByTestId('progress-segment')
+    expect(segment.style.getPropertyValue('--filled')).toBe('100%')
   })
 })
 

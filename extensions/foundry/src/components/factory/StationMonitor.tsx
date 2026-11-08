@@ -220,16 +220,30 @@ function MonitorScreen(props: ScreenProps) {
         <div className="fdry-crt__meta">
           {metaLine(node, { status, automatic: facts !== null })}
         </div>
-        {alert === null ? null : <div className="fdry-crt__alert">{alert}</div>}
-        {attachProblem === null ? null : (
-          <div className="fdry-crt__alert fdry-problem">{attachProblem}</div>
-        )}
+        <AlertLines alert={alert} attachProblem={attachProblem} />
         <div className="fdry-crt__rule" aria-hidden="true">
           {'-'.repeat(80)}
         </div>
         {facts !== null ? <DecidedLog facts={facts} /> : <TranscriptLog {...props} />}
       </div>
     </div>
+  )
+}
+
+function AlertLines({ alert, attachProblem }: Pick<ScreenProps, 'alert' | 'attachProblem'>) {
+  return (
+    <>
+      {alert === null ? null : (
+        <div className="fdry-crt__alert" role="alert">
+          {alert}
+        </div>
+      )}
+      {attachProblem === null ? null : (
+        <div className="fdry-crt__alert fdry-problem" role="alert">
+          {attachProblem}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -279,7 +293,7 @@ function LogTail({ status }: { readonly status: MonitorStatus }) {
   return (
     <>
       {'\n'}
-      <span className="fdry-crt__cursor" />
+      <span className="fdry-crt__cursor" data-testid="crt-cursor" />
     </>
   )
 }

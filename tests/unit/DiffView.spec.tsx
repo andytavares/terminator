@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import React from 'react'
@@ -17,21 +17,33 @@ const HUNKS: DiffViewHunk[] = [
   },
 ]
 
+/** The text of each cell of each table row, top to bottom. */
+function rowTexts(): (string | null)[][] {
+  return screen.getAllByRole('row').map((row) =>
+    within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent)
+  )
+}
+
 describe('DiffView', () => {
   it('renders add, remove and context rows with their line numbers', () => {
-    const { container } = render(<DiffView hunks={HUNKS} />)
-    expect(container.querySelectorAll('tr.diff-line--context')).toHaveLength(1)
-    expect(container.querySelector('tr.diff-line--remove .diff-line__old-num')?.textContent).toBe(
-      '2'
-    )
-    expect(container.querySelector('tr.diff-line--add .diff-line__new-num')?.textContent).toBe('2')
-    expect(container.querySelector('.diff-hunk-header')?.textContent).toBe('@@ -1,3 +1,3 @@')
+    render(<DiffView hunks={HUNKS} />)
+    expect(rowTexts()).toEqual([
+      ['@@ -1,3 +1,3 @@'],
+      ['1', '1', ' ', 'const a = 1'],
+      ['2', '', '-', 'const b = 2'],
+      ['', '2', '+', 'const b = 3'],
+    ])
   })
 
   it('renders each side of a split change on one row', () => {
-    const { container } = render(<DiffView hunks={HUNKS} layout="split" />)
-    expect(container.querySelector('.diff-table--split')).toBeTruthy()
-    expect(container.querySelectorAll('tr.diff-line')).toHaveLength(2)
+    render(<DiffView hunks={HUNKS} layout="split" />)
+    expect(rowTexts()).toEqual([
+      ['@@ -1,3 +1,3 @@'],
+      ['1', 'const a = 1', '', '1', 'const a = 1'],
+      ['2', 'const b = 2', '', '2', 'const b = 3'],
+    ])
   })
 })
 
@@ -50,17 +62,14 @@ describe('DiffView highlighting', () => {
         ],
       },
     ]
-    const { container } = render(<DiffView hunks={hostile} />)
-    expect(container.querySelector('script')).toBeNull()
-    expect(container.querySelector('.diff-line__content')?.textContent).toBe(
-      '<script>alert(1)</script>'
-    )
+    render(<DiffView hunks={hostile} />)
+    expect(screen.getByText('<script>alert(1)</script>').tagName).toBe('PRE')
   })
 
   it('draws each line through the given toHtml', () => {
-    const toHtml = (code: string) => `<span class="hljs-keyword">${code.length}</span>`
-    const { container } = render(<DiffView hunks={HUNKS} toHtml={toHtml} />)
-    expect(container.querySelector('.hljs-keyword')).toBeTruthy()
+    const toHtml = (code: string) => `<b>${code.length}</b>`
+    render(<DiffView hunks={HUNKS} toHtml={toHtml} />)
+    expect(screen.getAllByText('11').map((node) => node.tagName)).toEqual(['B', 'B', 'B'])
   })
 })
 

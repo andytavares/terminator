@@ -86,7 +86,7 @@ describe('ConflictHeader', () => {
 
 describe('ConflictHeader — progress dots', () => {
   it('renders one dot per block and marks only the resolved block', () => {
-    const { container } = render(
+    render(
       <ConflictHeader
         session={baseSession}
         onBack={vi.fn()}
@@ -98,10 +98,10 @@ describe('ConflictHeader — progress dots', () => {
         canNext={true}
       />
     )
-    const dots = Array.from(container.querySelectorAll('.conflict-header__dot'))
-    expect(dots.map((dot) => dot.classList.contains('conflict-header__dot--resolved'))).toEqual([
-      false,
-      true,
+    const dots = screen.getAllByRole('img', { name: /^Conflict \d/ })
+    expect(dots.map((dot) => dot.getAttribute('aria-label'))).toEqual([
+      'Conflict 1 unresolved',
+      'Conflict 2 resolved',
     ])
   })
 })
@@ -165,7 +165,7 @@ describe('ConflictHeader — Undo button state', () => {
         canNext={false}
       />
     )
-    const undoBtn = screen.getByText(/Undo/i).closest('button') as HTMLButtonElement
+    const undoBtn = screen.getByRole<HTMLButtonElement>('button', { name: 'Undo last decision' })
     expect(undoBtn.disabled).toBe(disabled)
   })
 })

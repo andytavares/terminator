@@ -67,7 +67,9 @@ describe('ReviewFooter — one primary action', () => {
     'renders exactly one primary button (last file %s, last chapter %s)',
     (isLastFile, isLastChapter, name) => {
       renderFooter({ isLastFile, isLastChapter })
-      const primary = document.querySelectorAll('.tmui-button--primary')
+      const primary = screen
+        .getAllByRole('button')
+        .filter((button) => button.classList.contains('tmui-button--primary'))
       expect(primary).toHaveLength(1)
       expect(screen.getByRole('button', { name })).toBe(primary[0])
     }
@@ -77,8 +79,7 @@ describe('ReviewFooter — one primary action', () => {
 describe('ReviewFooter — narrow width', () => {
   it('keeps the short label readable to assistive technology, since the long one is display:none there', () => {
     renderFooter()
-    const short = document.querySelector('.rf-short')
-    expect(short?.hasAttribute('aria-hidden')).toBe(false)
+    expect(screen.getByText('Next').hasAttribute('aria-hidden')).toBe(false)
     expect(screen.getByRole('button', { name: /Next/ })).toBeTruthy()
   })
 

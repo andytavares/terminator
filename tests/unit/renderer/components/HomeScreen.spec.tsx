@@ -219,7 +219,7 @@ describe('HomeScreen — dismissing an ask', () => {
       ],
     })
     render(<HomeScreen />)
-    expect(home().contains(document.activeElement)).toBe(true)
+    expect(home().matches(':focus-within')).toBe(true)
     await user.keyboard('e')
     expect(askRows()).toHaveLength(1)
     expect(screen.queryByText('Review requested')).toBeNull()
@@ -232,7 +232,7 @@ describe('HomeScreen — dismissing an ask', () => {
       asks: [homeFeedAsk({ id: 'r1' }), homeFeedAsk({ id: 'r2', title: 'Other' })],
     })
     render(<HomeScreen />)
-    expect(home().contains(document.activeElement)).toBe(true)
+    expect(home().matches(':focus-within')).toBe(true)
     await user.keyboard('h')
     await user.click(screen.getByRole('menuitem', { name: 'Tomorrow' }))
     expect(askRows()).toHaveLength(1)
@@ -245,7 +245,7 @@ describe('HomeScreen — answering in place', () => {
     const user = userEvent.setup()
     state.facts = [asking()]
     render(<HomeScreen />)
-    expect(home().contains(document.activeElement)).toBe(true)
+    expect(home().matches(':focus-within')).toBe(true)
     await user.keyboard('{Enter}')
     expect(screen.getByLabelText('Terminal excerpt').textContent).toContain('❯ 1. Yes')
     const reply = screen.getByRole('textbox', { name: 'Reply in your own words' })
@@ -257,7 +257,7 @@ describe('HomeScreen — answering in place', () => {
     const user = userEvent.setup()
     state.facts = [asking()]
     render(<HomeScreen />)
-    expect(home().contains(document.activeElement)).toBe(true)
+    expect(home().matches(':focus-within')).toBe(true)
     await user.keyboard('{Enter}')
     await user.keyboard('{Escape}')
     expect(screen.queryByLabelText('Terminal excerpt')).toBeNull()
@@ -301,9 +301,10 @@ describe('HomeScreen — keys', () => {
       ],
     })
     render(<HomeScreen />)
-    const selectedRowIndex = () => askRows().findIndex((row) => row.querySelector('[aria-current]'))
+    const selectedRowIndex = () =>
+      askRows().findIndex((row) => within(row).queryByRole('generic', { current: true }))
     expect(selectedRowIndex()).toBe(0)
-    expect(home().contains(document.activeElement)).toBe(true)
+    expect(home().matches(':focus-within')).toBe(true)
     await user.keyboard('j')
     expect(selectedRowIndex()).toBe(1)
     await user.keyboard('k')
@@ -323,9 +324,9 @@ describe('HomeScreen — keys — search', () => {
   it('moves focus to the search field on Command K', async () => {
     const user = userEvent.setup()
     render(<HomeScreen />)
-    expect(home().contains(document.activeElement)).toBe(true)
+    expect(home().matches(':focus-within')).toBe(true)
     await user.keyboard('{Meta>}k{/Meta}')
-    expect(document.activeElement).toBe(screen.getByRole('searchbox', { name: 'Search work' }))
+    expect(screen.getByRole('searchbox', { name: 'Search work' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -399,7 +400,7 @@ describe('HomeScreen — Desk and Insights', () => {
     expect(screen.getByText('Insights window')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Start work/ })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Your move' })).toBeNull()
-    expect(home().contains(document.activeElement)).toBe(true)
+    expect(home().matches(':focus-within')).toBe(true)
     await user.keyboard('g')
     await user.keyboard('d')
     expect(screen.queryByText('Insights view')).toBeNull()
@@ -414,7 +415,7 @@ describe('HomeScreen — Scheduled', () => {
     await user.click(screen.getByRole('radio', { name: 'Scheduled' }))
     expect(await screen.findByText('Scheduled view')).toBeTruthy()
     expect(screen.queryByRole('searchbox', { name: 'Search work' })).toBeNull()
-    expect(home().contains(document.activeElement)).toBe(true)
+    expect(home().matches(':focus-within')).toBe(true)
     await user.keyboard('g')
     await user.keyboard('d')
     expect(screen.queryByText('Scheduled view')).toBeNull()
@@ -559,13 +560,13 @@ describe('focus when Home mounts', () => {
   it('takes focus from a plain button, so its keys work at once', () => {
     focusedOutside({})
     render(<HomeScreen />)
-    expect(document.activeElement).toBe(home())
+    expect(home().matches(':focus')).toBe(true)
   })
 
   it('leaves focus on a menu button', () => {
     const trigger = focusedOutside({ 'aria-haspopup': 'menu' })
     render(<HomeScreen />)
-    expect(document.activeElement).toBe(trigger)
+    expect(trigger.matches(':focus')).toBe(true)
   })
 })
 
@@ -581,6 +582,6 @@ describe('focus when Home mounts inside a popover', () => {
     surface.append(item)
     item.focus()
     render(<HomeScreen />)
-    expect(document.activeElement).toBe(item)
+    expect(item.matches(':focus')).toBe(true)
   })
 })

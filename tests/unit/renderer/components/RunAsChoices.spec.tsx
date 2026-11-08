@@ -25,12 +25,12 @@ describe('RunAsChoices keyboard', () => {
     const user = userEvent.setup()
     render(<Harness />)
     await user.tab()
-    expect(document.activeElement).toBe(screen.getByRole('radio', { name: options[0].label }))
+    expect(screen.getByRole('radio', { name: options[0].label }).matches(':focus')).toBe(true)
 
     await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('radio', { name: 'Terminal only', checked: true })).toBe(
-      document.activeElement
-    )
+    expect(
+      screen.getByRole('radio', { name: 'Terminal only', checked: true }).matches(':focus')
+    ).toBe(true)
 
     await user.keyboard('{ArrowUp}')
     expect(screen.getByRole('radio', { name: options[0].label, checked: true })).toBeTruthy()

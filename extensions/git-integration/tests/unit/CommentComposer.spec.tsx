@@ -78,16 +78,20 @@ describe('CommentComposer (new comment) — calls onCancel when Cancel is clicke
 
   it('disables the submit button when body is empty', () => {
     render(<CommentComposer {...newCommentProps} />)
-    const commentBtn = screen.getByText('Add to pending review')
-    expect(commentBtn.closest('button')?.disabled).toBe(true)
+    const commentBtn = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Add to pending review',
+    })
+    expect(commentBtn.disabled).toBe(true)
   })
 
   it('enables the submit button when body has content', async () => {
     const user = userEvent.setup()
     render(<CommentComposer {...newCommentProps} />)
     await user.type(screen.getByRole('textbox'), 'LGTM')
-    const commentBtn = screen.getByText('Add to pending review')
-    expect(commentBtn.closest('button')?.disabled).toBe(false)
+    const commentBtn = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Add to pending review',
+    })
+    expect(commentBtn.disabled).toBe(false)
   })
 
   it('shows the "sent when you submit your review" note', () => {

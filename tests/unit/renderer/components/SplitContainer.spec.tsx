@@ -30,7 +30,7 @@ function renderDraggable(
   onRatioChange: (splitId: string, ratio: number) => void,
   splitId = 'split-1'
 ): HTMLElement {
-  const { container } = render(
+  render(
     <SplitContainer
       splitId={splitId}
       direction={direction}
@@ -40,10 +40,10 @@ function renderDraggable(
       {[<div key="a">A</div>, <div key="b">B</div>]}
     </SplitContainer>
   )
-  const outerContainer = container.querySelector('.split-container') as HTMLElement
-  outerContainer.getBoundingClientRect = () =>
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
     DOMRect.fromRect({ x: 0, y: 0, width: 400, height: 200 })
-  return container.querySelector('.split-container__divider') as HTMLElement
+  )
+  return screen.getByRole('separator')
 }
 
 /** Presses the left button on the divider at x 200, y 50, moves to `to`, and lets go. */
@@ -65,19 +65,21 @@ describe('SplitContainer', () => {
   })
 
   it.each(['vertical', 'horizontal'] as const)(
-    'marks a %s split and its divider with the direction',
+    'marks the divider of a %s split with its orientation',
     (direction) => {
-      const { container } = renderSplit(direction, 0.5)
-      expect(container.querySelector(`.split-container--${direction}`)).toBeTruthy()
-      expect(container.querySelector(`.split-container__divider--${direction}`)).toBeTruthy()
+      renderSplit(direction, 0.5)
+      expect(screen.getByRole('separator').getAttribute('aria-orientation')).toBe(direction)
     }
   )
 
   it('gives the first child the ratio and the second child the rest', () => {
-    const { container } = renderSplit('vertical', 0.3)
-    const children = container.querySelectorAll('.split-container__child')
-    expect(parseFloat((children[0] as HTMLElement).style.flex)).toBeCloseTo(0.3)
-    expect(parseFloat((children[1] as HTMLElement).style.flex)).toBeCloseTo(0.7)
+    renderSplit('vertical', 0.3)
+    const [first, second] = [screen.getByTestId('first'), screen.getByTestId('second')].map(
+      // eslint-disable-next-line testing-library/no-node-access -- the flex share is layout on the wrapper; no accessible query exposes it
+      (child) => child.parentElement as HTMLElement
+    )
+    expect(parseFloat(first.style.flex)).toBeCloseTo(0.3)
+    expect(parseFloat(second.style.flex)).toBeCloseTo(0.7)
   })
 })
 

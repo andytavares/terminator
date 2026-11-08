@@ -66,7 +66,8 @@ describe('OverviewSummary — summarizing a description', () => {
 
     expect(screen.getByText('Brief')).toBeTruthy()
     expect(screen.getByText('reading the description…')).toBeTruthy()
-    expect(screen.getByText('Summarizing').closest('[aria-busy="true"]')).toBeTruthy()
+    expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true')
+    expect(screen.getByRole('status').textContent).toContain('Summarizing')
     expect(mockSummarize).toHaveBeenCalledWith({
       repoRoot: '/repo',
       prNumber: 42,
@@ -170,8 +171,7 @@ describe('OverviewSummary — flat icons', () => {
 
   it('draws the Brief icon in its text colour', () => {
     renderDescription('Adds X.')
-    const icon = document.querySelector('.brief-card__icon') as Element
-    expect(inheritsTextColour(icon)).toBe(true)
+    expect(inheritsTextColour(screen.getByTestId('brief-icon'))).toBe(true)
   })
 
   it('draws the error icon in its text colour', async () => {
@@ -180,6 +180,6 @@ describe('OverviewSummary — flat icons', () => {
     renderDescription('Adds X.')
     await user.click(screen.getByRole('button', { name: 'Summarize' }))
     await screen.findByRole('alert')
-    expect(inheritsTextColour(document.querySelector('.brief-error__icon') as Element)).toBe(true)
+    expect(inheritsTextColour(screen.getByTestId('brief-error-icon'))).toBe(true)
   })
 })

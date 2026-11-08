@@ -126,7 +126,7 @@ describe('IssuePicker — dismissing the list', () => {
     const behind = vi.fn()
     render(<div onKeyDown={behind} />)
     await openList(user)
-    expect(document.activeElement).toBe(screen.getByPlaceholderText('Search, or type an issue key'))
+    expect(screen.getByPlaceholderText('Search, or type an issue key').matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(screen.queryByText('TAV-42')).toBeNull()
     expect(behind).not.toHaveBeenCalled()
@@ -137,7 +137,7 @@ describe('IssuePicker — dismissing the list', () => {
     const behind = vi.fn()
     const { container } = render(<div onKeyDown={behind} />)
     await openList(user)
-    expect(document.activeElement).toBe(screen.getByPlaceholderText('Search, or type an issue key'))
+    expect(screen.getByPlaceholderText('Search, or type an issue key').matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     container.firstChild?.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })

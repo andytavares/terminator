@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, indexedProject } from './helpers/bridge'
 import { SmartTaskInput, invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
@@ -54,7 +54,10 @@ async function renderSmartInput(initial = '') {
 }
 
 const optionTexts = () =>
-  Array.from(document.querySelectorAll('.smart-input__option')).map((b) => b.textContent)
+  within(screen.getByRole('group', { name: 'Suggestions' }))
+    .getAllByRole('button')
+    .map((option) => option.textContent)
+const selectedOption = () => screen.getByRole('button', { current: true }).textContent
 
 describe('SmartTaskInput suggestions', suggestionTests)
 describe('SmartTaskInput choosing', optionChoosingTests)
@@ -124,7 +127,7 @@ function optionInsertingTests() {
     await user.type(input, '@la', { initialSelectionStart: 5, initialSelectionEnd: 5 })
     await user.click(screen.getByText('Launch Plan'))
     await eventually(() => expect(input.value).toBe('Call @Launch-Plan tomorrow'))
-    expect(document.querySelector('.smart-input__dropdown')).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Suggestions' })).toBeNull()
     expect(spies.changes.at(-1)).toBe('Call @Launch-Plan tomorrow')
   })
 }
@@ -169,11 +172,9 @@ function keyboardChoosingTests() {
     const { user, input } = await renderSmartInput()
     await user.type(input, '@')
     await user.keyboard('{ArrowDown}{ArrowDown}{ArrowUp}')
-    expect(document.querySelector('.smart-input__option--selected')?.textContent).toBe(
-      '@Launch Plan'
-    )
+    expect(selectedOption()).toBe('@Launch Plan')
     await user.hover(screen.getByText('Garden'))
-    expect(document.querySelector('.smart-input__option--selected')?.textContent).toBe('@Garden')
+    expect(selectedOption()).toBe('@Garden')
   })
 
   it('inserts the selected suggestion on Enter', async () => {
@@ -205,7 +206,7 @@ function keyboardEscapeTests() {
     const { user, input, spies } = await renderSmartInput()
     await user.type(input, '@')
     await user.keyboard('{Escape}')
-    expect(document.querySelector('.smart-input__dropdown')).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Suggestions' })).toBeNull()
     expect(spies.onCancel).not.toHaveBeenCalled()
     await user.keyboard('{Escape}')
     expect(spies.onCancel).toHaveBeenCalledTimes(1)
@@ -225,7 +226,7 @@ function keyboardEnterTests() {
     await user.type(input, 'x +zzz')
     await user.keyboard('{Enter}')
     expect(spies.onSubmit).not.toHaveBeenCalled()
-    expect(document.querySelector('.smart-input__dropdown')).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Suggestions' })).toBeNull()
   })
 
   it('submits on Enter once no tag is open, and counts the task created', async () => {
@@ -254,7 +255,7 @@ function dateTests() {
     const twoDigitsOf = (n: number) => String(n).padStart(2, '0')
     const today = `${d.getFullYear()}-${twoDigitsOf(d.getMonth() + 1)}-${twoDigitsOf(d.getDate())}`
     await eventually(() => expect(input.value).toBe(`Pay due:${today} `))
-    expect(document.querySelector('.smart-input__dropdown')).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Suggestions' })).toBeNull()
   })
 
   it('removes the due: trigger when the date is cleared', async () => {

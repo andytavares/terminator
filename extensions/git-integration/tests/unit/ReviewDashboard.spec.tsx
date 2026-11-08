@@ -151,12 +151,15 @@ beforeEach(() => {
   useReviewUiStore.setState({ dashboardSort: 'newest' })
 })
 
+/** Matches the one element whose whole text, across its child elements, is `text`. */
+const wholeText = (text: string) => (_: string, node: Element | null) => node?.textContent === text
+
 describe('ReviewDashboard', () => {
   it('says how old a pull request is in short form on the second line', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     const row = await screen.findByTestId('row-210')
-    expect(row.querySelector('.rd-ti small')!.textContent).toContain('alice · 3d')
+    expect(within(row).getByTestId('pr-meta').textContent).toContain('alice · 3d')
   })
 
   it.each([
@@ -177,9 +180,9 @@ describe('ReviewDashboard', () => {
 
   it('does not repeat the needs-you count in the top bar', async () => {
     mockInvoke({ prs: [pr210, pr212], login: 'andytavares', fetchedAt: new Date().toISOString() })
-    const { container } = render(<ReviewDashboard />)
+    render(<ReviewDashboard />)
     await screen.findByTestId('row-210')
-    expect(container.querySelector('.rd-bar')!.textContent).not.toMatch(/need you/)
+    expect(screen.getByTestId('dashboard-bar').textContent).not.toMatch(/need you/)
   })
 })
 
@@ -219,9 +222,9 @@ describe('ReviewDashboard — shows 50+ on the tab and heading of a capped secti
     render(<ReviewDashboard />)
     await screen.findByTestId('row-210')
     expect(within(screen.getByRole('tablist')).getByText('50+')).toBeTruthy()
-    const team = screen.getByText('REQUESTED OF YOUR TEAM').parentElement!
+    const team = screen.getByRole('region', { name: 'REQUESTED OF YOUR TEAM' })
     expect(within(team).getByText('50+')).toBeTruthy()
-    const requested = screen.getByText('REQUESTED OF YOU').parentElement!
+    const requested = screen.getByRole('region', { name: 'REQUESTED OF YOU' })
     expect(within(requested).queryByText('50+')).toBeNull()
   })
 })
@@ -232,15 +235,14 @@ describe('ReviewDashboard — repository name on the second line', () => {
     mockInvoke({ prs: [pr210, other], login: 'a', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     const row = await screen.findByTestId('row-400')
-    expect(row.querySelector('.rd-ti small')!.textContent!.startsWith('api')).toBe(true)
-    expect(row.querySelector('.rd-repo')).toBeNull()
+    expect(within(row).getByTestId('pr-meta').textContent!.startsWith('api')).toBe(true)
   })
 
   it('leaves the repository name out when only one repository shows', async () => {
     mockInvoke({ prs: [pr210], login: 'a', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     const single = await screen.findByTestId('row-210')
-    expect(single.querySelector('.rd-ti small')!.textContent).not.toContain('terminator')
+    expect(within(single).getByTestId('pr-meta').textContent).not.toContain('terminator')
   })
 
   it('shows high risk in words and nothing for medium risk', async () => {
@@ -321,10 +323,10 @@ describe('ReviewDashboard — names each tab with its count, read apart from the
     await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
     const needs = screen.getByRole('tab', { name: /Needs you/ })
     needs.focus()
-    expect(document.activeElement).toBe(needs)
+    expect(needs.matches(':focus')).toBe(true)
     await user.keyboard('{ArrowRight}')
     const mine = screen.getByRole('tab', { name: /My PRs/ })
-    expect(document.activeElement).toBe(mine)
+    expect(mine.matches(':focus')).toBe(true)
     expect(mine.getAttribute('aria-selected')).toBe('true')
     const panel = screen.getByRole('tabpanel')
     expect(panel.getAttribute('aria-labelledby')).toBe(mine.id)
@@ -365,9 +367,7 @@ describe('ReviewDashboard — omits an empty group', () => {
     await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
     await user.click(await screen.findByRole('tab', { name: /My PRs/ }))
     await screen.findByText('YOUR OPEN PRS')
-    expect(screen.getByText('+1,385').closest('.rd-size')!.textContent).toBe(
-      '+1,385 −246 · 109 files'
-    )
+    expect(screen.getByText(wholeText('+1,385 −246 · 109 files'))).toBeTruthy()
     expect(screen.getByText('changes requested')).toBeTruthy()
   })
 })

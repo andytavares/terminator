@@ -23,7 +23,7 @@ interface ScratchSectionProps {
 export function ScratchSection(props: ScratchSectionProps): JSX.Element {
   const { scratch, sessions, workItems, now } = props
   return (
-    <div className="unified-sidebar__scratch">
+    <div className="unified-sidebar__scratch" role="group" aria-label="Scratch">
       <ScratchHead count={scratch.length} onNewScratch={props.onNewScratch} />
       {scratch.map((session) => (
         <BranchRow

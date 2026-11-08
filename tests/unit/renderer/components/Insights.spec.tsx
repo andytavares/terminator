@@ -91,8 +91,7 @@ beforeEach(() => {
   seedFeed([merged, firstPass])
 })
 
-const card = (question: string): HTMLElement =>
-  screen.getByText(question, { exact: false }).closest('.tmui-metric-card') as HTMLElement
+const card = (question: string): HTMLElement => screen.getByRole('group', { name: question })
 
 /** Insights is busy until its first reads from main have answered. */
 const insightsRead = () =>

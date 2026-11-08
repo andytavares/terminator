@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RepoHeader } from '../../../../src/renderer/components/sidebar/RepoHeader'
 import type { RepoGroup } from '../../../../src/renderer/sidebar/branch-rows'
@@ -32,6 +32,7 @@ const renderHeader = (patch: Partial<RepoGroup> = {}, props: Record<string, unkn
  * the first question it has to answer. It is not one of the facts this budget
  * is counting.
  */
+/* eslint-disable testing-library/no-node-access -- FR-027 counts drawn elements, a layout claim no query can see */
 const restingElements = (container: HTMLElement): number =>
   [...container.querySelector('.repo-header')!.children].filter(
     (c) =>
@@ -39,28 +40,31 @@ const restingElements = (container: HTMLElement): number =>
       !c.classList.contains('repo-header__swatch') &&
       !c.classList.contains('repo-header__chevron')
   ).length
+/* eslint-enable testing-library/no-node-access */
+
+/** The header row itself, apart from the buttons inside it. */
+const header = (): HTMLElement => screen.getByRole('button', { name: /^terminator/ })
+
+/** The repo name, which carries the path tooltip. */
+const repoName = (): HTMLElement => screen.getByText('terminator')
 
 describe('RepoHeader', () => {
   it('names the repo in the human face and counts its branches', () => {
-    const { container } = renderHeader()
-    expect(container.querySelector('.repo-header__name')!.textContent).toBe('terminator')
-    expect(container.querySelector('.repo-header__count')!.textContent).toBe('4')
+    renderHeader()
+    expect(repoName()).toBeTruthy()
+    expect(screen.getByText('4')).toBeTruthy()
   })
 
   // FR-030. The path is available, and drawn nowhere.
   it('offers the folder path as the name tooltip rather than drawing it', () => {
-    const { container } = renderHeader()
-    expect(container.querySelector('.repo-header__name')!.getAttribute('title')).toBe(
-      '/repos/terminator'
-    )
-    expect(container.querySelector('.repo-header')!.textContent).not.toContain('/repos/terminator')
+    renderHeader()
+    expect(repoName().getAttribute('title')).toBe('/repos/terminator')
+    expect(header().textContent).not.toContain('/repos/terminator')
   })
 
   it('prefers the abbreviated path when it is given one', () => {
-    const { container } = renderHeader({}, { pathLabel: '~/repos/terminator' })
-    expect(container.querySelector('.repo-header__name')!.getAttribute('title')).toBe(
-      '~/repos/terminator'
-    )
+    renderHeader({}, { pathLabel: '~/repos/terminator' })
+    expect(repoName().getAttribute('title')).toBe('~/repos/terminator')
   })
 
   /**
@@ -69,24 +73,23 @@ describe('RepoHeader', () => {
    * scoped to the name it appears where the thing it describes is.
    */
   it('does not put the tooltip on the whole row', () => {
-    const { container } = renderHeader({}, { pathLabel: '~/repos/terminator' })
-    expect(container.querySelector('.repo-header')!.getAttribute('title')).toBeNull()
+    renderHeader({}, { pathLabel: '~/repos/terminator' })
+    expect(header().getAttribute('title')).toBeNull()
   })
 })
 
 describe('RepoHeader — carries the repo colour as a swatch, not as the name colour', () => {
   // FR-043. The colour is a swatch; the name is ordinary text.
   it('carries the repo colour as a swatch, not as the name colour', () => {
-    const { container } = renderHeader()
-    const header = container.querySelector<HTMLElement>('.repo-header')!
-    expect(header.style.getPropertyValue('--ws-color')).toBe('#5c6bc0')
-    expect(container.querySelector('.repo-header__swatch')).toBeTruthy()
-    expect(container.querySelector<HTMLElement>('.repo-header__name')!.style.color).toBe('')
+    renderHeader()
+    expect(header().style.getPropertyValue('--ws-color')).toBe('#5c6bc0')
+    expect(screen.getByTestId('repo-swatch')).toBeTruthy()
+    expect(repoName().style.color).toBe('')
   })
 
   it('draws no swatch for a group with no colour', () => {
-    const { container } = renderHeader({ color: '' })
-    expect(container.querySelector('.repo-header__swatch')).toBeNull()
+    renderHeader({ color: '' })
+    expect(screen.queryByTestId('repo-swatch')).toBeNull()
   })
 
   // FR-027.
@@ -100,24 +103,23 @@ describe('RepoHeader — carries the repo colour as a swatch, not as the name co
 
   // FR-004. Collapsing a repo must not hide the one thing you needed to see.
   it('signals a waiting branch only while collapsed', () => {
-    const { container: open } = renderHeader({ needsYou: true })
-    expect(open.querySelector('.repo-header__needs-you')).toBeNull()
-    const { container: shut } = renderHeader({ needsYou: true }, { collapsed: true })
-    expect(shut.querySelector('.repo-header__needs-you')).toBeTruthy()
+    const open = renderHeader({ needsYou: true })
+    expect(screen.queryByRole('img', { name: /waiting/i })).toBeNull()
+    open.unmount()
+    renderHeader({ needsYou: true }, { collapsed: true })
+    expect(screen.getByRole('img', { name: /waiting/i })).toBeTruthy()
   })
 })
 
 describe('RepoHeader — stays quiet when collapsed with nothing waiting', () => {
   it('stays quiet when collapsed with nothing waiting', () => {
-    const { container } = renderHeader({ needsYou: false }, { collapsed: true })
-    expect(container.querySelector('.repo-header__needs-you')).toBeNull()
+    renderHeader({ needsYou: false }, { collapsed: true })
+    expect(screen.queryByRole('img', { name: /waiting/i })).toBeNull()
   })
 
   it('names the waiting signal for a reader', () => {
-    const { container } = renderHeader({ needsYou: true }, { collapsed: true })
-    expect(container.querySelector('.repo-header__needs-you')!.getAttribute('aria-label')).toMatch(
-      /waiting/i
-    )
+    renderHeader({ needsYou: true }, { collapsed: true })
+    expect(screen.getByRole('img', { name: 'A branch here is waiting on you' })).toBeTruthy()
   })
 })
 
@@ -125,14 +127,14 @@ describe('RepoHeader — interaction', () => {
   it('collapses on click', async () => {
     const user = userEvent.setup()
     const onToggleCollapse = vi.fn()
-    const { container } = renderHeader({}, { onToggleCollapse })
-    await user.click(container.querySelector('.repo-header')!)
+    renderHeader({}, { onToggleCollapse })
+    await user.click(header())
     expect(onToggleCollapse).toHaveBeenCalled()
   })
 
   it('reports its expanded state', () => {
-    const { container } = renderHeader({}, { collapsed: true })
-    expect(container.querySelector('.repo-header')!.getAttribute('aria-expanded')).toBe('false')
+    renderHeader({}, { collapsed: true })
+    expect(header().getAttribute('aria-expanded')).toBe('false')
   })
 
   // FR-005. Creating a branch moved here from an always-visible row.
@@ -163,14 +165,14 @@ describe('RepoHeader — interaction — hosts registered repo actions', () => {
   })
 
   it('marks the active repo action', () => {
-    const { container } = renderHeader(
+    renderHeader(
       {},
       {
         workspaceTabs: [{ id: 'git', label: 'Git', component: () => null }],
         activeWorkspaceTabId: 'git',
       }
     )
-    expect(container.querySelector('.repo-header__action--on')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Git' }).getAttribute('aria-pressed')).toBe('true')
   })
 })
 
@@ -179,20 +181,20 @@ describe('RepoHeader — interaction — edits and removes from the context menu
     const user = userEvent.setup()
     const onEdit = vi.fn()
     const onRemove = vi.fn()
-    const { container } = renderHeader({}, { onEdit, onRemove })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
+    renderHeader({}, { onEdit, onRemove })
+    await user.pointer({ keys: '[MouseRight]', target: header() })
     await user.click(screen.getByText('Edit workspace'))
     expect(onEdit).toHaveBeenCalled()
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
+    await user.pointer({ keys: '[MouseRight]', target: header() })
     await user.click(screen.getByText('Remove workspace'))
     expect(onRemove).toHaveBeenCalled()
   })
 
   it('opens no menu when there is nothing to put in it', async () => {
     const user = userEvent.setup()
-    const { container } = renderHeader()
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
-    expect(document.querySelector('.ctx-menu')).toBeNull()
+    renderHeader()
+    await user.pointer({ keys: '[MouseRight]', target: header() })
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 })
 
@@ -205,9 +207,9 @@ describe('RepoHeader — hover reveals without moving anything (FR-031)', () => 
   it('keeps the branch count drawn alongside the controls, however many there are', () => {
     // A fixed reservation meant four controls overflowed leftward and painted
     // over the count. The count must survive any number of repo actions.
-    const { container } = renderHeader({}, { workspaceTabs: tabs, onAddBranch: vi.fn() })
-    expect(container.querySelector('.repo-header__count')!.textContent).toBe('4')
-    expect(container.querySelectorAll('.repo-header__action')).toHaveLength(3)
+    renderHeader({}, { workspaceTabs: tabs, onAddBranch: vi.fn() })
+    expect(screen.getByText('4')).toBeTruthy()
+    expect(within(header()).getAllByRole('button')).toHaveLength(3)
   })
 
   it('puts the count last, so every count in the sidebar shares one column', () => {
@@ -217,6 +219,7 @@ describe('RepoHeader — hover reveals without moving anything (FR-031)', () => 
     // slack now and the count is flush against the row's right padding,
     // matching the branch rows and the scratch row.
     const { container } = renderHeader({}, { workspaceTabs: tabs, onAddBranch: vi.fn() })
+    // eslint-disable-next-line testing-library/no-node-access -- the claim is the order of drawn elements; layout has no query
     const kids = [...container.querySelector('.repo-header')!.children].map((c) => c.className)
     expect(kids.indexOf('repo-header__count')).toBeGreaterThan(kids.indexOf('repo-header__hover'))
     expect(kids[kids.length - 1]).toBe('repo-header__count')
@@ -226,17 +229,17 @@ describe('RepoHeader — hover reveals without moving anything (FR-031)', () => 
     // It used to live inside the hover group, so at rest there was nothing on
     // screen saying whether a repo was collapsed.
     const { container } = renderHeader()
+    // eslint-disable-next-line testing-library/no-node-access -- the claim is the order of drawn elements; layout has no query
     const kids = [...container.querySelector('.repo-header')!.children].map((c) => c.className)
     expect(kids[0]).toBe('repo-header__chevron')
-    expect(container.querySelector('.repo-header__chevron')).toBeTruthy()
   })
 })
 
 describe('RepoHeader — open in editor', () => {
   it('offers the action named after the editor that will run', async () => {
     const user = userEvent.setup()
-    const { container } = renderHeader({}, { onOpenInEditor: vi.fn(), editorName: 'Cursor' })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
+    renderHeader({}, { onOpenInEditor: vi.fn(), editorName: 'Cursor' })
+    await user.pointer({ keys: '[MouseRight]', target: header() })
     expect(screen.getByText('Open in Cursor')).toBeTruthy()
   })
 
@@ -244,8 +247,8 @@ describe('RepoHeader — open in editor', () => {
     const user = userEvent.setup()
     const onOpenInEditor = vi.fn()
     const onToggleCollapse = vi.fn()
-    const { container } = renderHeader({}, { onOpenInEditor, onToggleCollapse })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
+    renderHeader({}, { onOpenInEditor, onToggleCollapse })
+    await user.pointer({ keys: '[MouseRight]', target: header() })
     await user.click(screen.getByText('Open in editor'))
     expect(onOpenInEditor).toHaveBeenCalled()
     expect(onToggleCollapse).not.toHaveBeenCalled()
@@ -253,15 +256,15 @@ describe('RepoHeader — open in editor', () => {
 
   it('opens a menu for it even when nothing else would', async () => {
     const user = userEvent.setup()
-    const { container } = renderHeader({}, { onOpenInEditor: vi.fn() })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
-    expect(document.querySelector('.ctx-menu')).toBeTruthy()
+    renderHeader({}, { onOpenInEditor: vi.fn() })
+    await user.pointer({ keys: '[MouseRight]', target: header() })
+    expect(screen.getByRole('menu')).toBeTruthy()
   })
 
   it('offers nothing when there is no way to open an editor', async () => {
     const user = userEvent.setup()
-    const { container } = renderHeader({}, { onEdit: vi.fn() })
-    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
+    renderHeader({}, { onEdit: vi.fn() })
+    await user.pointer({ keys: '[MouseRight]', target: header() })
     expect(screen.queryByText(/Open in/)).toBeNull()
   })
 })
@@ -270,10 +273,10 @@ describe('RepoHeader — keyboard, drop target and a pathless repo', () => {
   it.each(['{Enter}', ' '])('collapses on %s, and ignores other keys', async (key) => {
     const user = userEvent.setup()
     const onToggleCollapse = vi.fn()
-    const { container } = renderHeader({}, { onToggleCollapse })
-    const header = container.querySelector<HTMLElement>('.repo-header')!
-    header.focus()
-    expect(document.activeElement).toBe(header)
+    renderHeader({}, { onToggleCollapse })
+    const row = header()
+    row.focus()
+    expect(row.matches(':focus')).toBe(true)
     await user.keyboard('a')
     expect(onToggleCollapse).not.toHaveBeenCalled()
     await user.keyboard(key)
@@ -281,12 +284,12 @@ describe('RepoHeader — keyboard, drop target and a pathless repo', () => {
   })
 
   it('marks itself while a dragged repo is over it', () => {
-    const { container } = renderHeader({}, { dragOver: true })
-    expect(container.querySelector('.repo-header--dnd-over')).toBeTruthy()
+    renderHeader({}, { dragOver: true })
+    expect(header().className).toContain('repo-header--dnd-over')
   })
 
   it('puts no tooltip on the name of a repo with no folder', () => {
-    const { container } = renderHeader({ folderPath: '' })
-    expect(container.querySelector('.repo-header__name')!.hasAttribute('title')).toBe(false)
+    renderHeader({ folderPath: '' })
+    expect(repoName().hasAttribute('title')).toBe(false)
   })
 })

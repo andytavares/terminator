@@ -209,7 +209,7 @@ function detailClosingTests() {
     const user = userEvent.setup()
     await renderVaultView()
     act(() => void dailyLogProps().onSelectTask('t2'))
-    await user.click(document.querySelector('.tv-detail-panel__backdrop')!)
+    await user.click(screen.getByTestId('detail-backdrop'))
     expect(screen.queryByTestId('detail')).toBeNull()
   })
 }
@@ -341,7 +341,7 @@ function dataToolsTests() {
 }
 
 const jsonFile = (text: string) => new File([text], 'vault.json', { type: 'application/json' })
-const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement
+const fileInput = () => screen.getByLabelText<HTMLInputElement>('Vault JSON file')
 
 function importTests() {
   it('imports a chosen JSON file and reports the count', async () => {

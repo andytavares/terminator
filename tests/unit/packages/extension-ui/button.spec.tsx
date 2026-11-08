@@ -70,6 +70,7 @@ describe('Button — marks the small size for the stylesheet', () => {
   it('draws an icon before the label, hidden from assistive technology and sized by CSS', () => {
     render(<Button icon={Check}>Done</Button>)
     const button = screen.getByRole('button', { name: 'Done' })
+    // eslint-disable-next-line testing-library/no-node-access -- the icon is aria-hidden, so no role or label finds it; that is what this test checks
     const icon = button.querySelector('svg')
     expect(icon?.getAttribute('aria-hidden')).toBe('true')
     expect(icon?.getAttribute('class')).toContain('tmui-button__icon')

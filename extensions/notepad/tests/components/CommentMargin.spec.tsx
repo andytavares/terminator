@@ -72,8 +72,8 @@ function commentMarginTests() {
 
 function commentMarginHeaderEmptyStateTests() {
   it('shows hint when no comments', () => {
-    const { container } = render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    expect(container.querySelector('.notepad-comment-margin--empty')).toBeTruthy()
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    expect(screen.getByText('Select text and click + to add a comment')).toBeDefined()
   })
 
   it('shows open count badge when there are open comments', () => {
@@ -103,11 +103,11 @@ function commentMarginCommentCardsTests() {
     expect(screen.getByText('Andrew')).toBeDefined()
   })
 
-  it('shows orphaned comment with orphaned class', () => {
+  it('lists an orphaned comment under the Orphaned heading', () => {
     useCommentsStore.setState({ comments: [orphanedComment], loading: false })
-    const { container } = render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    expect(container.querySelector('.notepad-comment--orphaned')).toBeTruthy()
-    expect(container.querySelector('.notepad-comment-orphaned-section')).toBeTruthy()
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    expect(screen.getByText('Orphaned (1)')).toBeDefined()
+    expect(screen.getByText(orphanedComment.body)).toBeDefined()
   })
 }
 

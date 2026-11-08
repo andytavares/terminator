@@ -93,38 +93,44 @@ async function groupByTask(): Promise<void> {
   await user.click(screen.getByRole('menuitemradio', { name: 'Task' }))
 }
 
-const rowNames = (c: HTMLElement) =>
-  Array.from(c.querySelectorAll('.branch-row__name')).map((r) => r.textContent)
+/** A branch row is a button named "<branch> — <state>"; the Filter menu button's name can hold a dash too. */
+const branchRows = () =>
+  screen.queryAllByRole('button', {
+    name: (label, element) => label.includes(' — ') && !element.hasAttribute('aria-haspopup'),
+  })
+
+const rowNames = () => branchRows().map((row) => row.getAttribute('aria-label')!.split(' — ')[0])
+
+/** A group header's text is its name, then its branch count; a disclosure or menu button has a label. */
+const headerNames = () =>
+  screen
+    .queryAllByRole('button', {
+      name: (_, element) =>
+        element.hasAttribute('aria-expanded') && !element.hasAttribute('aria-label'),
+    })
+    .map((header) => header.textContent!.replace(/\d+$/, ''))
 
 describe('UnifiedSidebar — grouped by task', () => {
   it('shows the task with its three lanes, then the other branches under "Not in a task"', async () => {
-    const { container } = renderSidebar()
+    renderSidebar()
     await groupByTask()
     expect(screen.getByText('Login rework')).toBeTruthy()
     expect(screen.getByText('Not in a task')).toBeTruthy()
-    expect(rowNames(container)).toEqual([
-      'Backend · login',
-      'Frontend · login',
-      'Docs · login',
-      'main',
-    ])
+    expect(rowNames()).toEqual(['Backend · login', 'Frontend · login', 'Docs · login', 'main'])
   })
 
   it('draws no repo header for a repo whose only branch is in the task', async () => {
-    const { container } = renderSidebar()
+    renderSidebar()
     await groupByTask()
-    const headers = Array.from(container.querySelectorAll('.repo-header__name')).map(
-      (h) => h.textContent
-    )
-    expect(headers).toEqual(['Login rework', 'Backend'])
+    expect(headerNames()).toEqual(['Login rework', 'Backend'])
   })
 })
 
 describe('UnifiedSidebar — grouped by task — the default', () => {
   it('leaves the default grouping by repo, with no task row', () => {
-    const { container } = renderSidebar()
+    renderSidebar()
     expect(screen.queryByText('Login rework')).toBeNull()
-    expect(rowNames(container)).toEqual(['main', 'login', 'login', 'login'])
+    expect(rowNames()).toEqual(['main', 'login', 'login', 'login'])
   })
 
   it('remembers the choice across a reload', async () => {
@@ -139,15 +145,15 @@ describe('UnifiedSidebar — grouped by task — the default', () => {
 describe('UnifiedSidebar — Add to task…', () => {
   it('is on a branch row’s menu and names that branch’s repo and branch', async () => {
     const user = userEvent.setup()
-    const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.branch-row')[0])
+    renderSidebar()
+    fireEvent.contextMenu(branchRows()[0])
     await user.click(screen.getByText('Add to task…'))
     expect(useAddToTaskStore.getState().lane).toEqual({ repoRoot: '/b', branch: 'main' })
   })
 })
 
 describe('UnifiedSidebar — grouped by task — the task’s state', () => {
-  const header = () => screen.getByText('Login rework').closest('.repo-header') as HTMLElement
+  const header = () => screen.getByRole('button', { name: /Login rework/ })
 
   it('draws the task’s state glyph on its header', async () => {
     renderSidebar()

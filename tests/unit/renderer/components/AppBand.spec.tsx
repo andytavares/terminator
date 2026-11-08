@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { isInaccessible, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 
@@ -37,15 +37,14 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
   })
 
   it('hides the icon from assistive technology — the label carries it', () => {
-    const { container } = renderBand()
-    const hidden = [...container.querySelectorAll('.app-band__icon')].map((icon) =>
-      icon.getAttribute('aria-hidden')
-    )
-    expect(hidden).toEqual(['true', 'true', 'true'])
+    renderBand()
+    expect(isInaccessible(screen.getByTestId('i-overview'))).toBe(true)
+    expect(isInaccessible(screen.getByTestId('i-notes'))).toBe(true)
   })
 
   it('draws the puzzle glyph when a contribution supplies no icon', () => {
     renderBand()
+    // eslint-disable-next-line testing-library/no-node-access -- the glyph is an aria-hidden SVG with no role, name or test id
     const icon = screen.getByRole('button', { name: 'Task Vault' }).querySelector('svg')
     expect(icon?.classList.contains('lucide-puzzle')).toBe(true)
   })
@@ -66,24 +65,23 @@ describe('AppBand — selection', () => {
   })
 
   it('omits a global tab that asked to be hidden', () => {
-    const { container } = renderBand({
+    renderBand({
       globalTabs: [...globalTabs, { id: 'secret', label: 'Secret', component: noop, hidden: true }],
     })
-    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(3)
+    expect(screen.getAllByRole('button')).toHaveLength(3)
     expect(screen.queryByText('Secret')).toBeNull()
   })
 
   it('renders nothing at all when nothing is contributed', () => {
     const { container } = renderBand({ globalTabs: [] })
-    expect(container.querySelector('.app-band')).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 })
 
 describe('AppBand — quick actions', () => {
   it('renders the band for this entry alone', () => {
     const onOpenQuickActions = vi.fn()
-    const { container } = renderBand({ globalTabs: [], onOpenQuickActions })
-    expect(container.querySelector('.app-band')).toBeTruthy()
+    renderBand({ globalTabs: [], onOpenQuickActions })
     expect(screen.getByRole('button', { name: 'Quick actions (⌘P)' })).toBeTruthy()
   })
 
@@ -103,6 +101,7 @@ describe('AppBand — quick actions', () => {
 
   it('draws the icon with no inline colour', () => {
     renderBand({ onOpenQuickActions: vi.fn() })
+    // eslint-disable-next-line testing-library/no-node-access -- the glyph is an aria-hidden SVG with no role, name or test id
     const icon = screen.getByRole('button', { name: 'Quick actions (⌘P)' }).querySelector('svg')!
     expect(icon.getAttribute('style')).toBeNull()
   })
@@ -128,7 +127,6 @@ describe('AppBand — a tab badge', () => {
     renderBand({
       globalTabs: [{ id: 'core.home', label: 'Home', component: noop, badge: 0, badgeLabel: 'x' }],
     })
-    const entry = screen.getByRole('button', { name: 'Home' })
-    expect(entry.querySelector('.app-band__badge')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Home' }).textContent).toBe('')
   })
 })

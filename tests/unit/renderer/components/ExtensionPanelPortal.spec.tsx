@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, act, fireEvent } from '@testing-library/react'
+import { render, act, fireEvent, screen } from '@testing-library/react'
 
 import { FRAME_PORT_MESSAGE } from '../../../../src/shared/frame-wire'
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal.js'
@@ -101,9 +101,9 @@ describe('ExtensionPanelPortal — desktop src and spinner', () => {
 
   it('shows a spinner until the frame loads', () => {
     const { container } = renderPortal()
-    expect(container.querySelector('[data-testid="extension-loading"]')).toBeTruthy()
+    expect(screen.getByRole('status', { name: 'Loading extension' })).toBeTruthy()
     loadFrame(container)
-    expect(container.querySelector('[data-testid="extension-loading"]')).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Loading extension' })).toBeNull()
   })
 })
 

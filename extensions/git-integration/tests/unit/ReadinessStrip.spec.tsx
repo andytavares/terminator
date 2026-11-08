@@ -2,7 +2,7 @@ import React from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ReadinessStrip } from '../../src/components/pr-review/ReadinessStrip'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
@@ -58,9 +58,8 @@ describe('ReadinessStrip checks without a failure', () => {
 
   it('does not tone skipped-only checks as passing', () => {
     renderStrip({ statusChecks: [{ name: 'deploy', state: 'skipped' }] })
-    const cell = screen.getByRole('button', { name: /^Checks/ }).closest('.rs-cell')
-    expect(cell?.className).toContain('rs-cell--quiet')
-    expect(cell?.className).not.toContain('rs-cell--ok')
+    const checks = screen.getByRole('button', { name: /^Checks/ })
+    expect(within(checks).getByTestId('readiness-icon').getAttribute('data-tone')).toBe('quiet')
   })
 
   it('reports pending checks', () => {
@@ -179,7 +178,7 @@ describe('ReadinessStrip — status and flat icons', () => {
 
   it("draws every icon in its cell's text colour, the quiet one at 60%", () => {
     renderStrip({ statusChecks: [], requestedReviewers: ['dee'], mergeStateStatus: 'unknown' })
-    const icons = [...document.querySelectorAll('.rs-icon')]
+    const icons = screen.getAllByTestId('readiness-icon')
     expect(icons.map((icon) => icon.getAttribute('data-tone'))).toEqual(['quiet', 'wait', 'quiet'])
     expect(icons.filter((icon) => !inheritsTextColour(icon))).toEqual([])
     expect(icons.map((icon) => getComputedStyle(icon).opacity)).toEqual(['0.6', '', '0.6'])
@@ -187,11 +186,12 @@ describe('ReadinessStrip — status and flat icons', () => {
 
   it('keeps the failing cell tinted with a red label, and its icon flat', () => {
     renderStrip({ statusChecks: [{ name: 'CI', state: 'fail' }], mergeStateStatus: 'clean' })
-    const icon = document.querySelector('.rs-cell--bad .rs-icon') as Element
-    const cell = icon.closest('.rs-cell') as Element
+    const checks = screen.getByRole('button', { name: /^Checks/ })
+    const icon = within(checks).getByTestId('readiness-icon')
+    expect(icon.getAttribute('data-tone')).toBe('bad')
     expect(inheritsTextColour(icon)).toBe(true)
     const danger = getComputedStyle(document.documentElement).getPropertyValue('--tm-danger')
-    expect(getComputedStyle(cell.querySelector('.rs-label') as Element).color).toBe(danger.trim())
+    expect(getComputedStyle(within(checks).getByText('Checks')).color).toBe(danger.trim())
     expect(declared('.rs-cell--bad')).toContain('background: color-mix(in srgb, var(--tm-danger)')
   })
 })

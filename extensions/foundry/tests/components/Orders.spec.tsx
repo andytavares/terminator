@@ -79,12 +79,12 @@ function standingsTests() {
   })
 
   it('marks the rows whose move is yours, and only those', async () => {
-    const { container } = mount([
+    mount([
       row({ id: 'WO-1', standing: standing({ turn: 'you', label: 'halted' }) }),
       row({ id: 'WO-2', title: 'Second', standing: standing({ turn: 'foundry' }) }),
     ])
-    await screen.findByText('halted')
-    expect(container.querySelectorAll('.fdry-order-state.is-waiting')).toHaveLength(1)
+    expect((await screen.findByText('halted')).className).toContain('is-waiting')
+    expect(screen.getByText('being shaped').className).not.toContain('is-waiting')
   })
 }
 
@@ -112,8 +112,8 @@ describe('the New work order quick action', () => {
   it('leaves the idea box alone until asked', async () => {
     mount([], { focusIdeaSignal: 0 })
     await screen.findByLabelText('Describe what you want built or fixed')
-    expect(document.activeElement).not.toBe(
-      screen.getByLabelText('Describe what you want built or fixed')
+    expect(screen.getByLabelText('Describe what you want built or fixed').matches(':focus')).toBe(
+      false
     )
   })
 
@@ -128,8 +128,8 @@ describe('the New work order quick action', () => {
     rerender(<Orders repoRoot="/repos/app" focusIdeaSignal={1} />)
 
     await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByLabelText('Describe what you want built or fixed')
+      expect(screen.getByLabelText('Describe what you want built or fixed').matches(':focus')).toBe(
+        true
       )
     )
   })
@@ -352,7 +352,7 @@ function linksTests() {
 
 function ciTests() {
   it('shows a spinner and the CI wording while CI is watching', async () => {
-    const { container } = mount([
+    mount([
       row({
         status: 'running',
         standing: standing({ label: 'building', kind: 'running' }),
@@ -362,8 +362,8 @@ function ciTests() {
     const pill = await screen.findByRole('status')
     expect(within(pill).getByText(/First run · up to 2 fixes/)).toBeTruthy()
     expect(within(pill).getByText(/1 of 3 checks done/)).toBeTruthy()
-    expect(pill.querySelector('.fdry-spin')).not.toBeNull()
-    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
+    expect(pill.innerHTML).toContain('fdry-spin')
+    expect(screen.getAllByRole('status')).toHaveLength(1)
   })
 
   it('shows the standing, not a spinner, once CI has passed', async () => {

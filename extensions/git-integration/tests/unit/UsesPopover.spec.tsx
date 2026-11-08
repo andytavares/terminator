@@ -12,7 +12,7 @@ const USES: Use[] = [
 describe('UsesPopover', () => {
   it('renders nothing when uses is empty', () => {
     const { container } = render(<UsesPopover uses={[]} onPeekDefinition={vi.fn()} />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('shows the count and unread total, with the full text in the title', () => {

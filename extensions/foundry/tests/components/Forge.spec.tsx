@@ -181,8 +181,8 @@ async function findHandOffButton(): Promise<HTMLElement> {
   return within(await screen.findByRole('contentinfo')).findByRole('button', { name: /Hand off/ })
 }
 function queryHandOffButton(): HTMLElement | null {
-  const f = document.querySelector('.fdry-foot')
-  return f === null ? null : within(f as HTMLElement).queryByRole('button', { name: /Hand off/ })
+  const f = screen.queryByRole('contentinfo')
+  return f === null ? null : within(f).queryByRole('button', { name: /Hand off/ })
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -484,7 +484,7 @@ function shapesItCannotRunTests() {
   it('will not let one it cannot run be chosen', async () => {
     mountForStart()
     await openForgeStep('Shape')
-    const speckit = screen.getByText('Speckit').closest('button') as HTMLElement
+    const speckit = screen.getByRole('button', { name: /^Speckit/ })
     expect(isUnavailable(speckit)).toBe(true)
     expect(reasonFor(speckit)).toContain('no SpecKit skills')
   })
@@ -495,7 +495,7 @@ function forgeChoosingTests() {
     const user = userEvent.setup()
     mountForStart()
     await openForgeStep('Shape')
-    await user.click(screen.getByText('Direct').closest('button') as HTMLElement)
+    await user.click(screen.getByRole('button', { name: /^Direct/ }))
     await openForgeStep('Hand off')
     await user.click(handOffButton())
     await waitFor(() =>
@@ -774,21 +774,19 @@ function aStruckAssumptionTests() {
     await screen.findByText(/sessions are stored in Redis/)
 
     // Striking one goes through `turn`, which is what carries the redraw list.
-    await user.click(
-      screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
-    )
+    await user.click(screen.getByRole('button', { name: /sessions are stored in Redis/ }))
     await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'Acceptance criteria' }).closest('section')?.className
-      ).toContain('is-redrawn')
+      expect(screen.getByRole('region', { name: 'Acceptance criteria' }).className).toContain(
+        'is-redrawn'
+      )
     )
     // The redrawn-field dot on the step list is gone under the redesign: the
     // rail only carries readiness()'s own state/word for each step, nothing
     // about what moved on a previous turn. Only the field named in `changed`
     // is marked — "assumptions" was not, so it stays unmarked.
-    expect(
-      screen.getByRole('heading', { name: 'Assumptions' }).closest('section')?.className
-    ).not.toContain('is-redrawn')
+    expect(screen.getByRole('region', { name: 'Assumptions' }).className).not.toContain(
+      'is-redrawn'
+    )
   })
 }
 
@@ -840,9 +838,7 @@ function findingMovesTests() {
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    const card = screen
-      .getByText('the outcome restates the problem')
-      .closest('.fdry-fnd') as HTMLElement
+    const card = screen.getByRole('group', { name: 'the outcome restates the problem' })
     expect(within(card).getByRole('group', { name: 'Choose one' })).toBeTruthy()
     expect(within(card).getAllByRole('radio')).toHaveLength(3)
     expect(within(card).queryByRole('textbox')).toBeNull()
@@ -1103,7 +1099,7 @@ async function decideFinding(
   decision: { move: RegExp; field: RegExp; value: string }
 ) {
   const user = userEvent.setup()
-  const card = screen.getByText(text).closest('.fdry-fnd') as HTMLElement
+  const card = screen.getByRole('group', { name: text })
   await user.click(within(card).getByRole('radio', { name: decision.move }))
   await user.type(within(card).getByLabelText(decision.field), decision.value)
 }
@@ -1152,7 +1148,7 @@ function sendUnavailableUntilDecidedTests() {
     const send = () => screen.getByRole('button', { name: /^Send( \d)? decisions?$/ })
     expect(isUnavailable(send())).toBe(true)
 
-    const findingOne = screen.getByText('finding one').closest('.fdry-fnd') as HTMLElement
+    const findingOne = screen.getByRole('group', { name: 'finding one' })
     await user.click(within(findingOne).getByRole('radio', { name: /^Ask the architect/ }))
     expect(isUnavailable(send())).toBe(false)
   })
@@ -1246,7 +1242,10 @@ function oneSentenceFindingsTests() {
     withText([open('The order excludes nothing.')])
     await openForgeStep('Red team')
     expect(screen.getByText('The order excludes nothing.')).toBeTruthy()
-    expect(document.querySelector('.fdry-fnd details')).toBeNull()
+    const card = screen.getByRole('group', { name: 'The order excludes nothing.' })
+    expect(within(card).getAllByRole('group')).toEqual([
+      within(card).getByRole('group', { name: 'Choose one' }),
+    ])
   })
 
   it('drops a finding’s detail paragraph, keeping only its first sentence', async () => {
@@ -1273,8 +1272,7 @@ function whatClearedItTests() {
       },
     ])
     await openForgeStep('Red team')
-    const resolved = document.querySelector('.fdry-group--resolved') as HTMLElement
-    expect(resolved).toBeTruthy()
+    const resolved = screen.getByRole('group', { name: /^Resolved/ })
     expect(within(resolved).getByText(/The handler filters after a fixed/)).toBeTruthy()
     expect(within(resolved).getByText('architect: AC-1 now pages past 50 tickets')).toBeTruthy()
   })
@@ -1689,7 +1687,9 @@ function proofAndTheEscapeTests() {
     // The heading it lands on is the one the acceptance list sits under, on the
     // step that list is on.
     await screen.findByRole('heading', { name: 'Acceptance criteria' })
-    expect(document.activeElement?.id).toBe('fdry-acceptance')
+    expect(screen.getByRole('heading', { name: 'Acceptance criteria' }).matches(':focus')).toBe(
+      true
+    )
   })
 }
 
@@ -1762,7 +1762,7 @@ function forgeOpenQuestionsTests() {
     })
     await openForgeStep('Hand off')
     await user.click(screen.getByRole('button', { name: 'Answer them' }))
-    await waitFor(() => expect(document.activeElement?.id).toBe('fdry-questions-h'))
+    await waitFor(() => expect(screen.getByText('Needs your answer').matches(':focus')).toBe(true))
     const plan = within(stepList()).getByRole('button', { name: /^Plan/ })
     expect(plan.getAttribute('aria-current')).toBe('step')
   })
@@ -1919,7 +1919,7 @@ function movingBetweenStepsTests() {
     mountStates({})
     await screen.findByRole('heading', { name: 'What is being asked' })
     await openForgeStep('Red team')
-    expect(document.activeElement?.textContent).toBe('Red team findings')
+    expect(screen.getByRole('heading', { name: 'Red team findings' }).matches(':focus')).toBe(true)
   })
 }
 
@@ -2100,7 +2100,7 @@ describe('findings grouped by who acts on them', () => {
     expect(screen.getByText('Notes, nothing to do')).toBeTruthy()
     expect(screen.getByText('note one')).toBeTruthy()
     expect(screen.getByText('Needs your decision')).toBeTruthy()
-    const finding = screen.getByText('blocking one').closest('.fdry-fnd') as HTMLElement
+    const finding = screen.getByRole('group', { name: 'blocking one' })
     expect(within(finding).getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
     expect(within(finding).getByRole('radio', { name: /^Fix it my way/ })).toBeTruthy()
     expect(within(finding).getByRole('radio', { name: /^Accept it/ })).toBeTruthy()

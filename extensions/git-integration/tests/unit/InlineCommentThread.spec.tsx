@@ -60,9 +60,9 @@ describe('InlineCommentThread', () => {
   })
 
   it('renders the comment time as a machine-readable time element', () => {
-    const { container } = render(<InlineCommentThread thread={makeThread()} />)
-    const time = container.querySelector('time')
-    expect(time?.getAttribute('datetime')).toBe('2024-01-15T10:00:00.000Z')
+    render(<InlineCommentThread thread={makeThread()} />)
+    const time = screen.getByRole('time')
+    expect(time.getAttribute('datetime')).toBe('2024-01-15T10:00:00.000Z')
   })
 
   it('renders comment body', () => {

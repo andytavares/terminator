@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
@@ -802,9 +802,13 @@ describe('CreateProjectDialog — git could not say whether the folder is a repo
   })
 })
 
-/** The branch picker's items, in order, with the current-branch tick stripped. */
+/** The branch picker's branches, in order, with the current-branch tick stripped and the
+ * "+ New branch…" choice above them left out. */
 const listedBranches = (): string[] =>
-  [...document.querySelectorAll('.branch-select__item-name')].map((el) => el.textContent ?? '')
+  within(screen.getByRole('group', { name: 'Branches' }))
+    .getAllByRole('button')
+    .map((el) => (el.textContent ?? '').replace('✓', ''))
+    .filter((name) => name !== '+ New branch…')
 
 describe('CreateProjectDialog — the branch list', () => {
   it.each([

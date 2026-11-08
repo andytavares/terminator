@@ -167,11 +167,11 @@ describe("Today's focus — unticking", () => {
 
 describe('This week — what is shown', () => {
   it('hides the tiles whose measure nobody published, and the heat strip', async () => {
-    const { container } = render(<TodayRail />)
+    render(<TodayRail />)
     expect(await screen.findByText('Agent hours')).toBeTruthy()
     expect(screen.queryByText('Merged')).toBeNull()
     expect(screen.queryByText('Your review wait')).toBeNull()
-    expect(container.querySelector('.desk-heat')).toBeNull()
+    expect(screen.queryByTestId('heat-strip')).toBeNull()
     expect(screen.getByText('across 14 sessions')).toBeTruthy()
     expect(screen.getByText('21')).toBeTruthy()
     expect(screen.getByText('6 min')).toBeTruthy()
@@ -186,12 +186,14 @@ describe('This week — what is shown', () => {
         homeMeasure('contributions-days', { series: [0, 1, 2, 3, 4, 9, -2] }),
       ],
     })
-    const { container } = render(<TodayRail />)
+    render(<TodayRail />)
     expect(await screen.findByText('2 more')).toBeTruthy()
     expect(screen.getByText('9')).toBeTruthy()
     expect(screen.getByText('3 h 10')).toBeTruthy()
-    expect(container.querySelectorAll('.desk-heat i')).toHaveLength(7)
-    expect(container.querySelector('.desk-heat__4')).not.toBeNull()
+    // The strip is drawn for the eye only (aria-hidden), so its cells are read from the markup.
+    const strip = screen.getByTestId('heat-strip').innerHTML
+    expect(strip.match(/<i /g)).toHaveLength(7)
+    expect(strip).toContain('desk-heat__4')
   })
 })
 

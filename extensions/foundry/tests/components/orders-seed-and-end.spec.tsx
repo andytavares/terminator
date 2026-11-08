@@ -98,7 +98,9 @@ function pickingTests() {
     await pickTicket({ 'foundry:order.create': () => ({ error: 'no' }) })
     await screen.findByText('no')
     expect(screen.getByText('Todo')).toBeTruthy()
-    expect(document.querySelectorAll('.fdry-ticket-status')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /TAV-16/ }).textContent).toBe(
+      'TAV-16Group the Ledger'
+    )
   })
 }
 
@@ -111,7 +113,7 @@ function searchingTests() {
     const search = screen.getByLabelText('Search your tickets')
     await user.type(search, 'ledger')
     expect(payloadsSentOn(invoke, 'foundry:issues.mine')).toEqual([{ term: '' }])
-    expect(search).toBe(document.activeElement)
+    expect(search.matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     await user.click(screen.getByRole('button', { name: 'Find' }))
     await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:issues.mine')).toHaveLength(3))

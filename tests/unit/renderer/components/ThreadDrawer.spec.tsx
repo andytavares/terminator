@@ -95,7 +95,7 @@ describe('ThreadDrawer terminal section — the keyboard', () => {
     openDrawerFor([fact({ ...OPEN_SESSION })], 'linear:TAV-20')
     render(<ThreadDrawer />)
     terminalBox().focus()
-    expect(document.activeElement).toBe(terminalBox())
+    expect(terminalBox().matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(spies.open.mock.calls.map(([id]) => id)).toContain('s9')
   })

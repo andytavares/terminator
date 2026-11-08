@@ -275,7 +275,8 @@ describe('QuickActionsSettings — actions without a key, and scopes with nothin
     mockStore([askClaude])
     render(<QuickActionsSettings scope="global" />)
     expect(screen.getByText('Focused agent session')).toBeTruthy()
-    expect(document.querySelector('.qa-settings-list__key')!.textContent).toBe('')
+    // With no key, the row's text opens on the action's label.
+    expect(screen.getByRole('listitem').textContent?.startsWith(askClaude.label)).toBe(true)
   })
 
   it('edits a keyless action with an empty Key field, and keeps it keyless', async () => {
@@ -286,7 +287,8 @@ describe('QuickActionsSettings — actions without a key, and scopes with nothin
     expect((screen.getByLabelText('Key') as HTMLInputElement).value).toBe('')
     await user.click(screen.getByText('Save'))
     await waitFor(() => expect(updateGlobal).toHaveBeenCalledTimes(1))
-    expect(document.querySelector('.qa-settings-list__key')!.textContent).toBe('')
+    // With no key, the row's text opens on the action's label.
+    expect(screen.getByRole('listitem').textContent?.startsWith(askClaude.label)).toBe(true)
     expect(savedGlobal()).toEqual([{ ...askClaude, mnemonic: undefined }])
   })
 })

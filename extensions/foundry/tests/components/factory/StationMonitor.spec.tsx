@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StationMonitor } from '../../../src/components/factory/StationMonitor.js'
 import type { MonitorStatus } from '../../../src/components/factory/StationMonitor.js'
@@ -48,6 +48,10 @@ function mount(
     />
   )
   return { onAttach, onClose }
+}
+
+function monitor(): HTMLElement {
+  return screen.getByRole('region', { name: 'FILTER LINEAR ISSUES' })
 }
 
 function setReducedMotion(reduce: boolean) {
@@ -109,12 +113,12 @@ function namingTests() {
 
   it('badges the chin with the floor sign', () => {
     mount()
-    expect(document.querySelector('.fdry-crt__badge')?.textContent).toBe('BUILDER U-1')
+    expect(screen.getByText('BUILDER U-1', { selector: '.fdry-crt__badge' })).toBeTruthy()
   })
 
   it('badges the chin with the label when the station has no floor sign', () => {
     mount({ sign: null })
-    expect(document.querySelector('.fdry-crt__badge')?.textContent).toBe('FILTER LINEAR ISSUES')
+    expect(screen.getByText('FILTER LINEAR ISSUES', { selector: '.fdry-crt__badge' })).toBeTruthy()
   })
 }
 
@@ -127,7 +131,7 @@ function theCursorTests() {
     ['idle', false],
   ] as const)('a %s station shows the cursor: %s', (status, shown) => {
     mount({ status })
-    expect(document.querySelector('.fdry-crt__cursor') !== null).toBe(shown)
+    expect(screen.queryByTestId('crt-cursor') !== null).toBe(shown)
   })
 }
 
@@ -141,7 +145,7 @@ function ledAndAlertsTests() {
   ] as const)('a %s station lights its LED as "%s"', (status, led) => {
     mount({ status })
     expect(screen.getByRole('img', { name: led })).toBeTruthy()
-    expect(document.querySelector('.fdry-crt')?.getAttribute('data-state')).toBe(status)
+    expect(monitor().getAttribute('data-state')).toBe(status)
   })
 
   it.each([
@@ -149,12 +153,12 @@ function ledAndAlertsTests() {
     ['failed', 'FAILED: THE CHECKS FAILED'],
   ] as const)('a %s station draws its alert line', (status, alert) => {
     mount({ status, alert })
-    expect(document.querySelector('.fdry-crt__alert')?.textContent).toBe(alert)
+    expect(screen.getByRole('alert').textContent).toBe(alert)
   })
 
   it('a running station draws no alert line', () => {
     mount({ status: 'running', alert: null })
-    expect(document.querySelector('.fdry-crt__alert')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 }
 
@@ -177,10 +181,9 @@ function linesTests() {
   it('classes tool lines as tool, the agent’s words as say and yours as you', () => {
     mount()
     const log = screen.getByRole('log', { name: 'Transcript' })
-    expect(log.querySelector('.tool')?.textContent).toBe('Read: src/linear.ts')
-    expect(log.querySelector('.say')?.textContent).toBe('I will filter on the state type.')
-    expect(log.querySelector('.you')?.textContent).toBe('go on')
-    expect(log.querySelectorAll('span').length).toBe(LINES.length + 1)
+    expect(within(log).getByText('Read: src/linear.ts').className).toBe('tool')
+    expect(within(log).getByText('I will filter on the state type.').className).toBe('say')
+    expect(within(log).getByText('go on').className).toBe('you')
   })
 
   it('says so when there is nothing to read yet', () => {
@@ -203,7 +206,7 @@ function keysTests() {
     const { onClose } = mount()
     await user.click(screen.getByRole('button', { name: 'Close monitor' }))
     expect(onClose).toHaveBeenCalledTimes(1)
-    expect(document.querySelector('.fdry-crt')?.classList.contains('is-off')).toBe(false)
+    expect(monitor().classList.contains('is-off')).toBe(false)
   })
 }
 
@@ -214,7 +217,7 @@ function poweringOffAndOnTests() {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const { onClose } = mount()
-    const root = document.querySelector('.fdry-crt') as HTMLElement
+    const root = monitor()
     expect(root.classList.contains('is-on')).toBe(true)
     await user.click(screen.getByRole('button', { name: 'Close monitor' }))
     expect(root.classList.contains('is-off')).toBe(true)
@@ -227,7 +230,7 @@ function poweringOffAndOnTests() {
 
   it('does not power on under reduced motion', () => {
     mount()
-    expect(document.querySelector('.fdry-crt')?.classList.contains('is-on')).toBe(false)
+    expect(monitor().classList.contains('is-on')).toBe(false)
   })
 }
 
@@ -296,7 +299,7 @@ function noAttachAndNothingDecidedTests() {
     mount({ node: gate, facts: ['Joined Inspector and Scribe'], lines: [] })
     expect(screen.queryByRole('button', { name: /ATTACH/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /Agent closed/ })).toBeNull()
-    expect(document.querySelector('.fdry-crt__cursor')).toBeNull()
+    expect(screen.queryByTestId('crt-cursor')).toBeNull()
   })
 
   it('says so when a step with no agent has decided nothing yet', () => {

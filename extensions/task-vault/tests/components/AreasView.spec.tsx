@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
@@ -117,18 +117,15 @@ function listShowsEachAreaTests() {
   it('shows each area with its counts, progress and first three projects', async () => {
     render(<AreasView />)
     await screen.findByText('Work')
-    const card = screen.getByText('Work').closest('.areas-view__card') as HTMLElement
+    const card = screen.getByRole('button', { name: /^Work/ })
     expect(card.textContent).toContain('1/ 4 tasks')
     expect(card.textContent).toContain('· 4 projects')
-    expect((card.querySelector('.areas-view__card-progress-fill') as HTMLElement).style.width).toBe(
-      '75%'
-    )
-    expect(card.querySelectorAll('.areas-view__card-project-chip')).toHaveLength(4)
+    const progress = (area: HTMLElement) => within(area).getByRole('progressbar')
+    expect(progress(card).getAttribute('aria-valuenow')).toBe('75')
+    expect(within(card).getAllByText(/^@/)).toHaveLength(3)
     expect(card.textContent).toContain('+1')
-    const home = screen.getByText('Home').closest('.areas-view__card') as HTMLElement
-    expect((home.querySelector('.areas-view__card-progress-fill') as HTMLElement).style.width).toBe(
-      '0%'
-    )
+    const home = screen.getByRole('button', { name: /^Home/ })
+    expect(progress(home).getAttribute('aria-valuenow')).toBe('0')
   })
 
   it('says there are no areas when the list is empty', async () => {
@@ -190,9 +187,9 @@ function listOpensAnAreaTests() {
   it('opens a focused card with Enter', async () => {
     const user = userEvent.setup()
     render(<AreasView />)
-    const card = (await screen.findByText('Work')).closest('[role="button"]') as HTMLElement
+    const card = await screen.findByRole('button', { name: /^Work/ })
     act(() => card.focus())
-    expect(document.activeElement).toBe(card)
+    expect(card.matches(':focus')).toBe(true)
     await user.keyboard('{Enter}')
     expect(await screen.findByText('Plan sprint')).toBeTruthy()
   })
@@ -244,7 +241,7 @@ function createClosesTheFormTests() {
 
   it('closes the create form with Escape', async () => {
     const { user, input } = await openCreateForm()
-    expect(document.activeElement).toBe(input)
+    expect(input.matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(screen.queryByPlaceholderText(/Area name/)).toBeNull()
   })

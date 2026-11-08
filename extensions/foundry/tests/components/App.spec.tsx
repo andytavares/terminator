@@ -442,8 +442,8 @@ function theForgeBroughtForwardTests() {
       expect(screen.getByRole('tab', { name: 'Forge' }).getAttribute('aria-selected')).toBe('true')
     )
     await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByLabelText('Describe what you want built or fixed')
+      expect(screen.getByLabelText('Describe what you want built or fixed').matches(':focus')).toBe(
+        true
       )
     )
   })
@@ -474,8 +474,8 @@ function anEarlierRequestTests() {
       expect(screen.getByRole('tab', { name: 'Forge' }).getAttribute('aria-selected')).toBe('true')
     )
     await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByLabelText('Describe what you want built or fixed')
+      expect(screen.getByLabelText('Describe what you want built or fixed').matches(':focus')).toBe(
+        true
       )
     )
   })

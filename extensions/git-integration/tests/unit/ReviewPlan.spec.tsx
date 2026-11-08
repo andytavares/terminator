@@ -58,10 +58,11 @@ describe('ReviewPlan', () => {
 describe('ReviewPlan rows and headings', () => {
   it('describes each row by its risk, file count and minutes', () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
-    const row = screen.getByRole('button', { name: /Start here: Panel layout/ })
-    expect(row.getAttribute('aria-describedby')).toBeTruthy()
-    const described = document.getElementById(row.getAttribute('aria-describedby') ?? '')
-    expect(described?.textContent).toBe('Low risk, 5 files, 8 min')
+    const row = screen.getByRole('button', {
+      name: /Start here: Panel layout/,
+      description: 'Low risk, 5 files, 8 min',
+    })
+    expect(row).toBeTruthy()
   })
 
   it('titles the plan with a level 2 heading', () => {
@@ -71,7 +72,7 @@ describe('ReviewPlan rows and headings', () => {
 
   it('renders nothing without chapters', () => {
     const { container } = render(<ReviewPlan chapters={[]} onStartAt={() => {}} />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('totals the minutes across chapters in the heading line', () => {

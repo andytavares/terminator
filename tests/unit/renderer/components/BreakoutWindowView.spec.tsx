@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, render, cleanup } from '@testing-library/react'
+import { act, render, cleanup, within } from '@testing-library/react'
 import { BreakoutWindows } from '../../../../src/renderer/components/terminal/BreakoutWindowView'
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
@@ -40,9 +40,15 @@ function pointerAt(target: EventTarget, type: string, at: { x: number; y: number
   })
 }
 
+/** The window's tab. The child document has no window to compute styles with, so the query
+ * skips the accessibility-tree check (`hidden: true`). */
+function tabIn(child: Window): HTMLElement {
+  return within(child.document.body).getByRole('tab', { hidden: true })
+}
+
 /** Drags the window's tab from its header to `to`, a point on the screen. */
 function dragTabTo(child: Window, to: { x: number; y: number }): void {
-  const tab = child.document.querySelector<HTMLElement>('[role="tab"]')!
+  const tab = tabIn(child)
   child.document.elementFromPoint = () => null
   tab.setPointerCapture = vi.fn()
   pointerAt(tab, 'pointerdown', { x: 1500, y: 20 })
@@ -83,12 +89,10 @@ describe('BreakoutWindows', () => {
     const child = fakeChildWindow()
     render(<BreakoutWindows />)
     act(() => useBreakoutStore.getState().add('s1', child))
-    const tab = child.document.querySelector('[role="tab"]')
-    expect(tab?.getAttribute('aria-label')).toBe('build, in its own window')
-    expect(tab?.textContent).toContain('build')
-    expect(child.document.querySelector('.breakout-window__place')?.textContent).toBe(
-      'Terminator · feat/breakout'
-    )
+    const tab = tabIn(child)
+    expect(tab.getAttribute('aria-label')).toBe('build, in its own window')
+    expect(tab.textContent).toContain('build')
+    expect(within(child.document.body).getByText('Terminator · feat/breakout')).toBeTruthy()
   })
 })
 

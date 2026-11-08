@@ -184,6 +184,7 @@ function diagramViewCommentsPlacingTests() {
     const user = userEvent.setup()
     await openDiagram()
     await user.click(screen.getByRole('button', { name: /comment/i }))
+    // eslint-disable-next-line testing-library/no-node-access -- a transparent click overlay on the canvas: no role, name or text
     const intercept = document.querySelector('.diagram-view__comment-intercept')!
     await user.pointer({
       keys: '[MouseLeft]',

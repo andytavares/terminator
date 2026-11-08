@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { Ledger } from '../../src/components/Ledger.js'
@@ -468,14 +468,9 @@ describe('the skills in force', () => {
   })
 })
 
-function tileValue(label: string): string | null {
-  const tiles = document.querySelectorAll('.tmui-metric-card')
-  for (const tile of Array.from(tiles)) {
-    if (within(tile as HTMLElement).queryByText(label) !== null) {
-      return tile.querySelector('.tmui-metric-card__value')?.textContent ?? null
-    }
-  }
-  return null
+/** A tile's value: its text after the question that names it. */
+function tileValue(label: string): string | undefined {
+  return screen.getByRole('group', { name: label }).textContent?.slice(label.length)
 }
 
 describe('the Factory view (FR: the factory’s numbers)', () => {
@@ -502,9 +497,9 @@ function ledgerSwitchingTests() {
     expect(tileValue('Median lead time')).toBe('1 h 20 min')
     expect(tileValue('First-pass yield')).toBe('50%')
 
-    const row = screen.getByText('Ship the thing').closest('tr')
-    expect(row?.textContent).toContain('✓')
-    expect(row?.textContent).toContain('1 h 20 min')
+    const row = screen.getByRole('row', { name: /Ship the thing/ })
+    expect(row.textContent).toContain('✓')
+    expect(row.textContent).toContain('1 h 20 min')
   })
 }
 
@@ -525,8 +520,8 @@ function nullNumbersTests() {
 
     expect(tileValue('Median lead time')).toBe('—')
     expect(tileValue('First-pass yield')).toBe('—')
-    const row = screen.getByText('Ship the thing').closest('tr')
-    expect(row?.textContent).toContain('—')
+    const row = screen.getByRole('row', { name: /Ship the thing/ })
+    expect(row.textContent).toContain('—')
   })
 }
 

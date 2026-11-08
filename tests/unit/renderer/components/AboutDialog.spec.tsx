@@ -76,8 +76,8 @@ describe('AboutDialog — extension versions', () => {
       extensions: [extension('Foundry', '0.1.4'), extension('Notepad', '0.1.0')],
     })
     render(<AboutDialog onClose={vi.fn()} />)
-    expect((await screen.findByText('Foundry')).nextElementSibling!.textContent).toBe('v0.1.4')
-    expect(screen.getByText('Notepad').nextElementSibling!.textContent).toBe('v0.1.0')
+    expect((await screen.findByRole('definition', { name: 'Foundry' })).textContent).toBe('v0.1.4')
+    expect(screen.getByRole('definition', { name: 'Notepad' }).textContent).toBe('v0.1.0')
   })
 
   it('shows no extensions section when the list cannot be read', async () => {
@@ -102,7 +102,7 @@ describe('AboutDialog — calls onClose when Escape is pressed', () => {
     mockGetInfo.mockReturnValue(new Promise(() => {}))
     render(<AboutDialog onClose={vi.fn()} />)
     const values = ['Electron', 'Node', 'Chrome', 'Platform'].map(
-      (label) => screen.getByText(label).nextElementSibling!.textContent
+      (label) => screen.getByRole('definition', { name: label }).textContent
     )
     expect(values).toEqual(['—', '—', '—', '—'])
   })
@@ -115,7 +115,7 @@ describe('AboutDialog — keeps the placeholders when the app info cannot be rea
     // The database row settles from its own call; by then the rejection has too.
     await screen.findByText('OK')
     expect(screen.getByText('v—')).toBeTruthy()
-    expect(screen.getByText('Electron').nextElementSibling!.textContent).toBe('—')
+    expect(screen.getByRole('definition', { name: 'Electron' }).textContent).toBe('—')
   })
 
   it('shows DB error with message when health returns ok:false', async () => {

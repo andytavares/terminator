@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { GroupedCheckList, StatusChecksBar } from '../../src/components/pr-review/StatusChecksBar'
 import type { StatusCheck } from '../../src/schemas/pr-review.schema'
@@ -20,7 +20,7 @@ const pending: StatusCheck[] = [{ name: 'build / test', state: 'pending' }]
 describe('StatusChecksBar', () => {
   it('renders nothing when checks array is empty', () => {
     const { container } = render(<StatusChecksBar checks={[]} />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('shows passing summary when all checks pass', () => {
@@ -89,8 +89,8 @@ describe('StatusChecksBar — one icon per check state', () => {
     render(<StatusChecksBar checks={mixed} />)
     await user.click(screen.getByRole('button'))
     const icons = screen.getAllByRole('listitem').map((item) => {
-      const icon = item.querySelector('.pr-checks-icon')!
-      return [icon.getAttribute('title'), icon.querySelector('svg')!.getAttribute('class')]
+      const icon = within(item).getByTitle(/^(pass|fail|pending|skipped|unknown)$/)
+      return [icon.getAttribute('title'), icon.innerHTML]
     })
     expect(icons).toEqual([
       ['pass', expect.stringContaining('lucide-check')],
@@ -179,9 +179,10 @@ const mixedChecks: StatusCheck[] = [
 ]
 
 function namesIn(group: string): string[] {
-  const heading = screen.getByRole('heading', { name: group })
-  const list = heading.parentElement!.querySelector('ul')!
-  return Array.from(list.querySelectorAll('li')).map((item) => item.textContent ?? '')
+  const section = screen.getByRole('region', { name: group })
+  return within(section)
+    .getAllByRole('listitem')
+    .map((item) => item.textContent ?? '')
 }
 
 describe('GroupedCheckList', () => {
