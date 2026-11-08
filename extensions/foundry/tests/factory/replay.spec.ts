@@ -6,7 +6,7 @@ import type { Timeline } from '../../src/factory/replay.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { pullRequestChecks } from '../helpers/hall-views.js'
 
 /** An order folder holding a short recorded run: a quiet lead-in, then two steps with tool calls. */

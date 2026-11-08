@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { makeTempDir } from '../support/temp-dir'
+import { makeTempDir } from '../../packages/test-support/src/temp-dir'
 
 let dir = ''
 
@@ -45,7 +45,7 @@ function scrubbedGitEnv(): NodeJS.ProcessEnv {
 }
 
 // `git fetch` starts a detached `git maintenance run` that keeps writing after it returns, so an
-// afterEach deleting the directory failed with ENOTEMPTY on a busy machine. tests/setup.ts turns it
+// afterEach deleting the directory failed with ENOTEMPTY on a busy machine. packages/test-support/setup.ts turns it
 // off, for specs that scrub GIT_* from git's environment too.
 describe('git run by the test suite', () => {
   useRemovedDir()

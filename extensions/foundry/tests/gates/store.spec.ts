@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import { orderDir } from '../../src/data-root.js'
 import { askOnce, createGateStore, raiseUnlessDecided } from '../../src/gates/store.js'
 import { decide, raiseGate } from '../../src/gates/rules.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 let root: string
 

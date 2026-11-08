@@ -10,8 +10,8 @@ import {
 } from '../../src/factory/timeline-store.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { eventually } from '../../../../tests/support/eventually'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 function node(id: string, over: Partial<RunNode> = {}): RunNode {
   return {

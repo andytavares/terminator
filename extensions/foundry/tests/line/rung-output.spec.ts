@@ -15,7 +15,7 @@ import {
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Role } from '../../src/recipe/parse.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // A read-only rung has a product — context, findings, a plan it disagrees
 // with — and before this it had nowhere to put it. These are the tests for the

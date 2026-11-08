@@ -6,7 +6,7 @@ import { ChapterNav } from '../../src/components/pr-review/ChapterNav'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { Chapter } from '../../src/schemas/pr-review.schema'
 import { changedFile } from './support/pr-review-file'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 type PrReviewState = ReturnType<typeof usePrReviewStore.getState>
 

@@ -25,8 +25,8 @@ import { dispatchChannel, type AgentsAPI } from '@terminator/extension-sdk'
 import { registerReviewAgentHandlers, type ReviewAgentDeps } from '../../src/ipc/review-agent.ipc'
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
-import { eventually } from '../../../../tests/support/eventually'
-import { partialFake } from '../../../../tests/support/fakes'
+import { eventually } from '../../../../packages/test-support/src/eventually'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 type RunReview = NonNullable<ReviewAgentDeps['runReview']>
 type RunSummary = NonNullable<ReviewAgentDeps['runSummary']>

@@ -13,7 +13,7 @@ import type { NodeState, RunGraph } from '../../src/line/run-graph.js'
 import { diffObservation } from '../../src/factory/events.js'
 import type { Observation, FactoryEvent } from '../../src/factory/events.js'
 import { readTranscript } from '../../src/runtime/transcript-tailer.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // direct() turns a batch of FactoryEvents into a new World: it never moves
 // anyone for a reason that is not one of those events, and coalescing is

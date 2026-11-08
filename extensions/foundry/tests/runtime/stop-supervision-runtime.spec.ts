@@ -10,13 +10,13 @@ const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { runtime } from '../../src/runtime/runtime-state.js'
 import {
   startSupervisionRuntime,
   stopSupervisionRuntime,
 } from '../../src/runtime/supervision-runtime.js'
-import { isPending, unfinishedWork } from '../../../../tests/support/pending'
+import { isPending, unfinishedWork } from '../../../../packages/test-support/src/pending'
 import { theRunner } from '../helpers/supervision-mocks.js'
 
 const work = vi.hoisted(() => ({

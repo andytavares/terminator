@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type RegisterChannel } from '@terminator/extension-sdk'
 import { hashPassword, verifyPassword } from '../../src/server/password-hash'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // Hoisted mocks must be declared before module imports
 const mockCreateRemoteServer = vi.hoisted(() => vi.fn())

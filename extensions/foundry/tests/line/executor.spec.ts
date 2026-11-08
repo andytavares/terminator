@@ -18,8 +18,8 @@ import { createRoleRegistry } from '../../src/line/roles.js'
 import { makeVerdict, SelfVerificationError } from '../../src/verify/verdict.js'
 import { decide, raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { eventually } from '../../../../tests/support/eventually'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // The executor is where the scheduler, the roles and a session finally meet.
 // Each of those was testable alone and none of them did anything on its own,

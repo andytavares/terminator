@@ -2,7 +2,7 @@
    Replaces the bundled `atom-one-dark` theme, whose colors were fixed for a
    dark background and failed WCAG AA once rendered on the light theme (and,
    for comments, even on the dark theme) — see
-   tests/unit/renderer/diff-syntax-contrast.spec.ts. Colors come from the
+   packages/core-renderer/tests/unit/renderer/diff-syntax-contrast.spec.ts. Colors come from the
    --tm-syntax-* design tokens, which are verified against both the plain
    code background and the diff-added/removed line tints, in both themes. */
 

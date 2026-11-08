@@ -1,9 +1,9 @@
 import { vi } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import type { Comment, NoteListItem } from '../../../src/db/types'
-import { installExtensionBridge } from '../../../../../tests/support/extension-bridge'
+import { installExtensionBridge } from '../../../../../packages/test-support/src/extension-bridge'
 
-export { eventually } from '../../../../../tests/support/extension-bridge'
+export { eventually } from '../../../../../packages/test-support/src/extension-bridge'
 
 /** The extension bridge as Notepad's views see it: unanswered channels list nothing. */
 export function installNotepadBridge() {

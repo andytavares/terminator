@@ -3,7 +3,7 @@ import { once } from 'node:events'
 import { chmodSync, writeFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { makeTempDir } from '../../support/temp-dir'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 
 // With no stub GitHub running, fixtures/bin/gh answers nothing. It never hands a call to a
 // real gh further along PATH: that made Home pull the developer's own pull requests (ADR 123).

@@ -79,7 +79,7 @@ calls the others in the order of their effects, because effects run in that
 order. Split a spec `describe` longer than 30 lines into describes by topic.
 Pass more than three values as one named object where that is the natural
 shape. A spec never casts with `as unknown as`: `partialFake`
-(`tests/support/fakes.ts`) stands in for an object faked in part. Check a split drawing or
+(`packages/test-support/src/fakes.ts`) stands in for an object faked in part. Check a split drawing or
 layout against what it did before, call for call, and
 not only against its specs.
 
@@ -133,15 +133,15 @@ This extension is fully isolated. The core application knows nothing about it.
 - Call core IPC through `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,…}` for **core-owned channels only**.
 - Call its own IPC through `window.electronAPI.extensionBridge.invoke('foundry:…')`.
 - Register IPC channels through `reg` in `src/ipc/register.ts`, each a `ChannelSpec` with the zod schema of its payload (`foundryChannel` in `src/ipc/channel.ts`; ADR 096). The schema sits beside the module that answers the channel. The host parses the payload before `run` sees it, and `run` takes the parsed type. Never parse or cast a payload by hand. `tests/channel-schemas.spec.ts` checks that every registered channel has a schema. A test of the rules of one schema is the concern of zod, not of this repository.
-- Use `api.shell.exec` for `git` and `gh`. These are the only two commands that the core allowlist admits (`src/main/shell/shell-executor.ts`). The default timeout of the core is 10 seconds, so a call that can take longer passes `timeoutMs` (`git commit` 300 s, rebase and push 120 s). A result with `timedOut` set is a failure that says it timed out.
+- Use `api.shell.exec` for `git` and `gh`. These are the only two commands that the core allowlist admits (`packages/core-main/src/shell/shell-executor.ts`). The default timeout of the core is 10 seconds, so a call that can take longer passes `timeoutMs` (`git commit` 300 s, rebase and push 120 s). A result with `timedOut` set is a failure that says it timed out.
 - Run each `api.shell.exec` inside a root that the core allows (ADR 102, ADR 103): a workspace folder, a project worktree, the `api.paths.globalStorage` of Foundry, or `terminator.foundry.dataDir`, which `manifest.json` declares in `contributes.shellRoots`. Every records root that `src/workspace-root.ts` resolves, and every lane worktree under it, is inside one of those. Any other folder rejects with `CwdOutOfScopeError` and runs nothing.
 
 Verification commands (`npm test`, `pytest`, …) do **not** run through `api.shell.exec` and do **not** run as hidden child processes. Each runs in a terminal tab of its own in the checkout of the lane (`SupervisedRunner.runCommand`), so its output is visible. Its verdict is the exit status of that tab. No agent runs it and nothing reads back a transcript. The script of the command is the process of the tab (`api.pty.runInTerminal`). Nothing is typed into a shell, and the exit code is the one that node-pty reports. The tab starts as `$SHELL -i -l -c "exec $SHELL <script>"`, so the startup files of the user (`.zshrc`, `.bash_profile`) are read as they are for a typed command. What they export (`JAVA_HOME`, `GOPATH`, nvm) reaches the check. `exec` makes the script, not that shell, the process whose exit is reported. A command that a signal ended, or whose tab was closed before it finished, has no exit code. `runCommand` returns `null` and the check reports "not measured" (rule 2), never a pass.
 
 ### What this extension MUST NOT do
 
-- **Never** modify `src/main/preload.ts`.
-- **Never** put a `foundry:*` channel in `src/shared/electron-api/manifest.ts`.
+- **Never** modify `packages/core-main/src/preload.ts`.
+- **Never** put a `foundry:*` channel in `packages/core-shared/src/electron-api/manifest.ts`.
 - **Never** add extension-only npm dependencies to the **root** `package.json`. Put them in `extensions/foundry/package.json`.
 - **Never** import from another extension.
 - **Never** hardcode the extension id (`terminator.foundry`) in core application files.
@@ -162,10 +162,10 @@ Declare dependencies in `extensions/foundry/package.json` only, at the one versi
 
 Extension specs live in `tests/`, and the root `vitest.config.ts` matches them. Note that `vi.mock` cannot intercept a module that esbuild has inlined. Any spec that calls `activate()` must import `../../src/index.ts`, not the bundle. `tests/helpers/foundry-host.ts` activates Foundry over a host with real files, real `git` and a `gh` that the spec answers for. `tests/helpers/line-run.ts` adds an agreed order and agents that do its work. Reuse them instead of writing another host. A spec that drives `activate` mocks the supervised runner and the control server with `tests/helpers/supervision-mocks.ts`. The rest of `tests/helpers/` holds what specs used to copy: order parts, Forge turns, ledger reads, bridge calls, hall views. Add to it instead of writing a second copy in a spec.
 
-Get the temporary directory of a spec from `temporaryDirectory` in `tests/helpers/foundry-host.ts` (or `makeTempDir` from the root `tests/support/temp-dir.ts`). The root `tests/setup.ts` removes it when the spec file ends, passed or failed. Never call `mkdtempSync` in `os.tmpdir()` directly: the CI unit job fails a run that leaves anything in the temporary directory (`scripts/check-temp-leaks.mjs`). `tests/live/` runs without `tests/setup.ts` and removes its own directories.
+Get the temporary directory of a spec from `temporaryDirectory` in `tests/helpers/foundry-host.ts` (or `makeTempDir` from the root `packages/test-support/src/temp-dir.ts`). The root `packages/test-support/setup.ts` removes it when the spec file ends, passed or failed. Never call `mkdtempSync` in `os.tmpdir()` directly: the CI unit job fails a run that leaves anything in the temporary directory (`scripts/check-temp-leaks.mjs`). `tests/live/` runs without `packages/test-support/setup.ts` and removes its own directories.
 
 ## Typecheck
 
-`npm run typecheck` checks the core, both packages and every extension. `scripts/typecheck.mjs` runs `tsc -p extensions/foundry/tsconfig.json`, which extends `tsconfig.extension.json`, for `src/`. Then it runs `tsc -p extensions/foundry/tsconfig.test.json` for the specs under `tests/`. Vitest strips types, so a spec that no longer matches the type it builds runs green. Examples are an order that lacks a field the schema now fills in, and a mock whose arguments are untyped. Only the second check catches them. The root `npx tsc --noEmit` checks nothing: the root `tsconfig.json` is `files: []` with project references. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either, because both strip types.
+`npm run typecheck` checks the core, both packages and every extension. Its `typecheck` script (`package.json`) runs `tsc -p tsconfig.json`, which extends `tsconfig.extension.json`, for `src/`. Then it runs `tsc -p tsconfig.test.json` for the specs under `tests/`. Vitest strips types, so a spec that no longer matches the type it builds runs green. Examples are an order that lacks a field the schema now fills in, and a mock whose arguments are untyped. Only the second check catches them. The root `npx tsc --noEmit` checks nothing: the root `tsconfig.json` is `files: []` with project references. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either, because both strip types.
 
 A type error that the typecheck would catch otherwise ships through a green build, clean lint and passing unit tests, and blanks every Foundry surface at runtime. An example is a `Record` keyed by a union that lacks a member.

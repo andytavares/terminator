@@ -1,0 +1,245 @@
+import React, { useState } from 'react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Tab, TabList, TabPanel, Tabs, TabsRoot, type TabItem } from '../../src/Tabs'
+
+const TABS: TabItem[] = [
+  { id: 'files', label: 'Files', panel: <p>File list</p> },
+  { id: 'checks', label: 'Checks', panel: <p>Check list</p> },
+  { id: 'notes', label: 'Notes', panel: <p>Note list</p>, disabled: true },
+  { id: 'history', label: 'History', panel: <p>Commit history</p> },
+]
+
+function TabsHarness({ initial = 'files' }: { initial?: string }): React.JSX.Element {
+  const [selectedId, setSelectedId] = useState(initial)
+  return (
+    <Tabs
+      label="Pull request sections"
+      tabs={TABS}
+      selectedId={selectedId}
+      onSelect={setSelectedId}
+    />
+  )
+}
+
+const tabNamed = (name: string) => screen.getByRole('tab', { name })
+
+describe('Tabs', () => {
+  it('names the tab list', () => {
+    render(<TabsHarness />)
+    expect(screen.getByRole('tablist').getAttribute('aria-label')).toBe('Pull request sections')
+  })
+
+  it('selects one tab and shows only its panel', () => {
+    render(<TabsHarness />)
+    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
+    expect(tabNamed('Checks').getAttribute('aria-selected')).toBe('false')
+    expect(screen.getByRole('tabpanel').textContent).toBe('File list')
+  })
+})
+
+describe('Tabs — keys and clicks it does not act on', () => {
+  it('leaves other keys to the browser', () => {
+    render(<TabsHarness />)
+    const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true })
+    tabNamed('Files').dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('does not select a disabled tab by click', async () => {
+    const user = userEvent.setup()
+    render(<TabsHarness />)
+    await user.click(tabNamed('Notes'))
+    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
+  })
+})
+
+describe('Tabs with a rich label', () => {
+  it('takes its accessible name from accessibleName when the label is markup', () => {
+    render(
+      <Tabs
+        label="Dashboard sections"
+        tabs={[
+          {
+            id: 'needs',
+            label: (
+              <>
+                Needs you<span>3</span>
+              </>
+            ),
+            accessibleName: 'Needs you, 3',
+            panel: <p>Rows</p>,
+          },
+        ]}
+        selectedId="needs"
+        onSelect={() => {}}
+      />
+    )
+    expect(tabNamed('Needs you, 3').textContent).toBe('Needs you3')
+  })
+})
+
+function PartsHarness({
+  initial = 'needs',
+  orientation,
+  withPanels = true,
+}: {
+  initial?: string
+  orientation?: 'horizontal' | 'vertical'
+  withPanels?: boolean
+}): React.JSX.Element {
+  const [selectedId, setSelectedId] = useState(initial)
+  return (
+    <TabsRoot selectedId={selectedId} onSelect={setSelectedId}>
+      <div role="toolbar" aria-label="Reviews toolbar">
+        <HarnessTabList orientation={orientation} />
+        <button type="button">Refresh</button>
+      </div>
+      <p>Loading reviews…</p>
+      {withPanels && (
+        <>
+          <TabPanel id="needs">Needs rows</TabPanel>
+          <TabPanel id="mine">Mine rows</TabPanel>
+          <TabPanel id="involved">Involved rows</TabPanel>
+        </>
+      )}
+    </TabsRoot>
+  )
+}
+
+function HarnessTabList({ orientation }: { orientation?: 'horizontal' | 'vertical' }) {
+  return (
+    <TabList label="Dashboard sections" orientation={orientation}>
+      <Tab id="needs" accessibleName="Needs you, 3">
+        Needs you<span>3</span>
+      </Tab>
+      <Tab id="mine">My PRs</Tab>
+      <Tab id="later" disabled>
+        Later
+      </Tab>
+      <Tab id="involved">Involved</Tab>
+    </TabList>
+  )
+}
+
+describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel', () => {
+  it('lets the list share a row with other controls and the panel sit elsewhere', () => {
+    render(<PartsHarness />)
+    const toolbar = screen.getByRole('toolbar')
+    expect(within(toolbar).getByRole('tablist').getAttribute('aria-label')).toBe(
+      'Dashboard sections'
+    )
+    expect(within(toolbar).queryByRole('tabpanel')).toBeNull()
+    expect(screen.getByRole('tabpanel').textContent).toBe('Needs rows')
+  })
+
+  it('names a tab with markup inside by its accessibleName', () => {
+    render(<PartsHarness />)
+    expect(tabNamed('Needs you, 3').getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('ties the selected tab and its panel both ways', () => {
+    render(<PartsHarness />)
+    const panel = screen.getByRole('tabpanel')
+    expect(tabNamed('Needs you, 3').getAttribute('aria-controls')).toBe(panel.id)
+    expect(panel.getAttribute('aria-labelledby')).toBe(tabNamed('Needs you, 3').id)
+  })
+})
+
+describe('Tabs parts — aria-controls', () => {
+  it('points aria-controls only at a panel that is in the document', () => {
+    render(<PartsHarness />)
+    const controlled = screen
+      .getAllByRole('tab')
+      .map((element) => element.getAttribute('aria-controls'))
+      .filter((id): id is string => id !== null)
+    expect(controlled.length).toBeGreaterThan(0)
+    const panelIds = screen.getAllByRole('tabpanel', { hidden: true }).map((panel) => panel.id)
+    expect(controlled.filter((id) => !panelIds.includes(id))).toEqual([])
+    expect(tabNamed('My PRs').hasAttribute('aria-controls')).toBe(false)
+  })
+})
+
+describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — leaves aria-controls off when the caller renders no panel', () => {
+  it('leaves aria-controls off when the caller renders no panel', () => {
+    render(<PartsHarness withPanels={false} />)
+    expect(tabNamed('Needs you, 3').hasAttribute('aria-controls')).toBe(false)
+  })
+
+  it('moves the panel with the selection on click', async () => {
+    const user = userEvent.setup()
+    render(<PartsHarness />)
+    await user.click(tabNamed('My PRs'))
+    expect(screen.getByRole('tabpanel').textContent).toBe('Mine rows')
+    expect(tabNamed('My PRs').getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel').id)
+  })
+
+  it('keeps one roving tab stop on the selected tab', () => {
+    render(<PartsHarness initial="mine" />)
+    expect(screen.getAllByRole('tab').map((element) => element.tabIndex)).toEqual([-1, 0, -1, -1])
+  })
+
+  it('moves focus and selection with Left and Right, skipping disabled tabs and wrapping', async () => {
+    const user = userEvent.setup()
+    render(<PartsHarness initial="mine" />)
+    await user.tab()
+    expect(tabNamed('My PRs').matches(':focus')).toBe(true)
+    await user.keyboard('{ArrowRight}')
+    expect(tabNamed('Involved').matches(':focus')).toBe(true)
+    expect(tabNamed('Involved').getAttribute('aria-selected')).toBe('true')
+    await user.keyboard('{ArrowRight}')
+    expect(tabNamed('Needs you, 3').matches(':focus')).toBe(true)
+    await user.keyboard('{ArrowLeft}')
+    expect(tabNamed('Involved').getAttribute('aria-selected')).toBe('true')
+  })
+})
+
+describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — jumps to the ends with Home and End', () => {
+  it('jumps to the ends with Home and End', async () => {
+    const user = userEvent.setup()
+    render(<PartsHarness initial="mine" />)
+    await user.tab()
+    expect(tabNamed('My PRs').matches(':focus')).toBe(true)
+    await user.keyboard('{End}')
+    expect(tabNamed('Involved').matches(':focus')).toBe(true)
+    await user.keyboard('{Home}')
+    expect(tabNamed('Needs you, 3').matches(':focus')).toBe(true)
+  })
+
+  it('uses Up and Down, not Left and Right, in a vertical list', async () => {
+    const user = userEvent.setup()
+    render(<PartsHarness orientation="vertical" />)
+    expect(screen.getByRole('tablist').getAttribute('aria-orientation')).toBe('vertical')
+    await user.tab()
+    expect(tabNamed('Needs you, 3').matches(':focus')).toBe(true)
+    await user.keyboard('{ArrowRight}')
+    expect(tabNamed('Needs you, 3').getAttribute('aria-selected')).toBe('true')
+    await user.keyboard('{ArrowDown}')
+    expect(tabNamed('My PRs').matches(':focus')).toBe(true)
+    await user.keyboard('{ArrowUp}')
+    expect(tabNamed('Needs you, 3').getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('refuses a Tab outside a TabsRoot, which would have nothing to select', () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(() => render(<Tab id="lost">Lost</Tab>)).toThrow(/TabsRoot/)
+    quiet.mockRestore()
+  })
+})
+
+describe('Tabs with nothing selected', () => {
+  it('keeps the first tab reachable by keyboard', () => {
+    render(<TabsHarness initial="" />)
+    expect(tabNamed('Files').getAttribute('tabindex')).toBe('0')
+    expect(tabNamed('Checks').getAttribute('tabindex')).toBe('-1')
+  })
+  it('moves the stop to a tab once it is selected', async () => {
+    const user = userEvent.setup()
+    render(<TabsHarness initial="" />)
+    await user.click(tabNamed('Checks'))
+    expect(tabNamed('Checks').getAttribute('tabindex')).toBe('0')
+    expect(tabNamed('Files').getAttribute('tabindex')).toBe('-1')
+  })
+})

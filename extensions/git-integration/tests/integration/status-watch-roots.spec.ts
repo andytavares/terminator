@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { statusWatchRoots } from '../../src/git/git-service'
 import { bindRealShell } from '../unit/support/shell'
 import { GIT_FREE_ENV, runGitIn } from '../unit/support/git-repo'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 function repositoryWithOnePackage(): string {
   const repo = join(makeTempDir('watch-roots-'), 'repo')

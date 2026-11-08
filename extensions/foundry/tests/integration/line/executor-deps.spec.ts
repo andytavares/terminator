@@ -40,7 +40,7 @@ import type { WorkOrder } from '../../../src/order/schema.js'
 import type { LadderStep } from '../../../src/verify/ladder.js'
 import type { ExecutorDeps } from '../../../src/line/executor.js'
 import { ledgerActions, orderLedger } from '../../helpers/order-ledger.js'
-import { eventually } from '../../../../../tests/support/eventually'
+import { eventually } from '../../../../../packages/test-support/src/eventually'
 
 let root: string
 let repo: string

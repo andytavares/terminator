@@ -1,12 +1,12 @@
 import { HOME_MEASURES } from '@terminator/extension-sdk'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { ExtensionAPI, HomeFeed } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { createHomePublisher, HOME_REFRESH_MS, MERGED_REFRESH_MS } from '../../src/home/publisher'
 import { buildContributionCalendar } from '../../src/review/contribution-calendar'
 import { dashboardPrFixture } from './support/dashboard-pr'
 import { bindShellToAnswers } from './support/shell'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // The pull request watch keeps its state in an electron-store; this one keeps it in memory.
 const savedStores = vi.hoisted(() => new Map<string, unknown>())

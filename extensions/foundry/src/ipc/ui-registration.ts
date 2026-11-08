@@ -9,7 +9,7 @@ import type { ForgeChannels } from './forge-channels.js'
 import { disposables, reg } from './register.js'
 import { inBackground } from '../background.js'
 
-// Core passes a command its arguments only when it declares them (src/main/extensions/api.ts).
+// Core passes a command its arguments only when it declares them (packages/core-main/src/extensions/api.ts).
 const NewOrderArgs = z
   .object({
     tracker: z.string().optional(),
@@ -70,7 +70,7 @@ export function registerCommands(api: ExtensionAPI, forge: Pick<ForgeChannels, '
       { id: 'new-order', label: 'New work order…', category: 'Foundry', mnemonic: 'n' },
       () => openNewOrder(api)
     ),
-    // Start work's "Foundry order": a command with args is no quick action (src/main/extensions/api.ts).
+    // Start work's "Foundry order": a command with args is no quick action (packages/core-main/src/extensions/api.ts).
     api.commands.register(
       { id: 'start-order', label: 'Start a work order', category: 'Foundry', args: NewOrderArgs },
       (_context, args?: unknown) => {

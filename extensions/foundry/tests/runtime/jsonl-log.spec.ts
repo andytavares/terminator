@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { rmSync, readFileSync, appendFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createJsonlLog } from '../../src/runtime/jsonl-log.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // Backs the two growing logs — stall firings and the feed (research.md R9).
 // Append-only, so a torn final line from an interrupted write is expected and

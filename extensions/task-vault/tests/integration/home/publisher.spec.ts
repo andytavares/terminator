@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ExtensionAPI, ExtensionDB, HomeFeed } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 import { createVaultDb, seedTask, selectTaskRow } from '../../support/vault-db'
 import { startHomePublisher } from '../../../src/home/publisher'
 

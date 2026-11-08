@@ -100,7 +100,7 @@ async function markdownListIndent(): Promise<number> {
   const sheet = (path: string) => readFileSync(join(ROOT, path), 'utf8')
   await page.setContent(
     `<!doctype html><html><head><style>${sheet('packages/extension-ui/src/extension-ui.css')}</style>
-     <style>${sheet('src/renderer/styles.css')}</style></head>
+     <style>${sheet('packages/core-renderer/src/styles.css')}</style></head>
      <body><div class="tmui-markdown"><ul><li id="item">Changes to the design system</li></ul></div>
      </body></html>`
   )

@@ -4,7 +4,7 @@ import { render, cleanup } from '@testing-library/react'
 import { HallScene } from '../../../src/components/factory/HallScene.js'
 import type { HallMap, HallProp } from '../../../src/factory/layout.js'
 import type { Crew } from '../../../src/factory/sim.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 import { idleWorld } from '../../helpers/hall-views.js'
 
 // What HallScene.spec.tsx leaves out: the light a working station gives off —

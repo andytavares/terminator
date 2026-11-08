@@ -18,8 +18,8 @@ const T0 = '2026-09-28T13:00:00.000Z'
 const T1 = '2026-09-28T13:05:49.000Z'
 const T2 = '2026-09-28T13:06:19.000Z'
 
-const SPEC_PATH = 'tests/unit/integrations/providers/linear.provider.spec.ts'
-const UNIT_PATH = 'src/main/integrations/providers/linear.provider.ts'
+const SPEC_PATH = 'packages/core-main/tests/unit/integrations/providers/linear.provider.spec.ts'
+const UNIT_PATH = 'packages/core-main/src/integrations/providers/linear.provider.ts'
 
 const clock = (iso: string): string => iso
 

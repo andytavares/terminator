@@ -5,9 +5,10 @@
   // main, renderer and shared alike, so this starts from the renderer config
   // (DOM, JSX, `@shared/*`) and adds Node and Vitest's globals. Extensions and
   // packages type-check their own sources.
-  "extends": "./tsconfig.renderer.json",
+  "extends": "./packages/core-renderer/tsconfig.json",
   "compilerOptions": {
     "composite": false,
+    "rootDir": ".",
     "target": "ES2022",
     // Temporal: two unit specs import Task Vault's backend, which uses it (ADR
     // 108). Vitest has it behind a flag; Playwright does not, so not in tests/e2e.
@@ -22,9 +23,12 @@
     "tests/integration/**/*",
     "tests/e2e/**/*",
     "tests/live/**/*",
-    "tests/support/**/*",
-    "tests/setup.ts",
-    "tests/global-setup.ts",
-    "src/renderer/electron-api.d.ts"
+    "packages/core-*/tests/**/*",
+    "packages/extension-ui/tests/**/*",
+    "packages/test-support/src/**/*",
+    "packages/test-support/tests/**/*",
+    "packages/test-support/setup.ts",
+    "packages/test-support/global-setup.ts",
+    "packages/core-renderer/src/electron-api.d.ts"
   ]
 }

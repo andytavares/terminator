@@ -10,7 +10,7 @@ import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { expect, vi, type Mock } from 'vitest'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 import {
   dispatchChannel,
   type ChannelSpec,
@@ -20,8 +20,8 @@ import {
 } from '@terminator/extension-sdk'
 
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
-import { partialFake } from '../../../../tests/support/fakes'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 /** The runner's surface every Foundry module reaches, as `vi.fn`s a spec can drive. */
 export function fakeRunner() {
@@ -170,7 +170,7 @@ function hostCommands(commands: HostParts['commands']): ExtensionAPI['commands']
         contribution: { id: string; args?: { parse: (args: unknown) => unknown } },
         handler: (context?: unknown, args?: unknown) => void
       ) => {
-        // As core runs it (src/main/extensions/api.ts): args reach only a command that declares them.
+        // As core runs it (packages/core-main/src/extensions/api.ts): args reach only a command that declares them.
         const { args: schema } = contribution
         commands.set(contribution.id, (context, args) =>
           schema ? handler(context, schema.parse(args)) : handler(context)

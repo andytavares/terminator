@@ -15,9 +15,9 @@ import {
 } from '../../src/line/worktree.js'
 import type { CheckoutDeps, Checkout } from '../../src/line/worktree.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 import { calls, order } from '../helpers/checkout-order.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // Somewhere for a lane's work to happen, cut from the lane's own repository
 // and living under the data root — never inside the repository, which is the

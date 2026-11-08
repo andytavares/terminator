@@ -4,7 +4,10 @@
   "private": true,
   "description": "Foundry — a software factory for Terminator",
   "scripts": {
-    "build:renderer": "vite build --config vite.renderer.config.mts"
+    "build:renderer": "vite build --config vite.renderer.config.mts",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-foundry-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-foundry-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run extensions/foundry/"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.5",

@@ -10,7 +10,7 @@ vi.mock('../../src/stores/git.store', () => ({
 import { useGitStore } from '../../src/stores/git.store'
 import { StagingArea } from '../../src/components/StagingArea'
 import type { GitFileStatus, GitStatus } from '../../src/schemas/git.schema'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 type GitState = ReturnType<typeof useGitStore.getState>
 type Status = GitFileStatus['status']

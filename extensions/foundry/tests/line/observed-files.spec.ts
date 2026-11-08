@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import { readObservedFiles, writeObservedFiles } from '../../src/line/observed-files.js'
 import { computeQueueEntries } from '../../src/line/refinery-entries.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 import { runningOrder } from '../helpers/order-parts.js'
 
 let root: string

@@ -16,7 +16,7 @@ vi.mock('../../src/stores/git.store', () => ({
 }))
 
 const mockSetActiveProjectTab = vi.fn()
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
+vi.mock('../../../../packages/core-renderer/src/extensions/registry', () => ({
   useExtensionRegistry: () => ({ setActiveProjectTab: mockSetActiveProjectTab }),
 }))
 
@@ -50,7 +50,7 @@ vi.mock('../../src/api/merge-flow', () => ({
 
 const mockCreateProject = vi.fn()
 const mockSetActiveProject = vi.fn()
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
+vi.mock('../../../../packages/core-renderer/src/stores/workspace.store', () => ({
   useWorkspaceStore: () => ({
     activeWorkspaceId: 'ws-1',
     createProject: mockCreateProject,
@@ -58,7 +58,7 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   }),
 }))
 
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
+vi.mock('../../../../packages/core-renderer/src/stores/toast.store', () => ({
   useToastStore: () => ({ addToast: vi.fn() }),
 }))
 

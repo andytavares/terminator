@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FullConfig } from '@playwright/test'
-import { forgetGitHookEnvironment } from '../support/git-hook-env'
+import { forgetGitHookEnvironment } from '../../packages/test-support/src/git-hook-env'
 
 // One directory holds every profile this whole run creates, across every
 // worker. Playwright forks workers from this same process, so an env var set
@@ -17,7 +17,7 @@ export default function globalSetup(_config: FullConfig): void {
   const root = join(tmpdir(), `terminator-e2e-run-${process.pid}`)
   mkdirSync(root, { recursive: true })
   process.env.TERMINATOR_E2E_RUN_ROOT = root
-  // As tests/setup.ts does for Vitest: git-ai's trace2 target writes into a spec's temporary
+  // As packages/test-support/setup.ts does for Vitest: git-ai's trace2 target writes into a spec's temporary
   // repository for seconds after git returns, so deleting it fails with ENOTEMPTY.
   process.env.GIT_TRACE2_EVENT = '0'
 }

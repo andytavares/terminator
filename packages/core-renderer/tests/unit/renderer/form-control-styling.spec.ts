@@ -1,0 +1,262 @@
+import { describe, it, expect } from 'vitest'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { EXTENSION_BASE_CSS } from '../../../../extension-ui/src/extension-base-css'
+
+// Every checkbox AND radio in the app must be the themed control, not the OS
+// widget. `accent-color` alone is not enough — it tints the fill and leaves a
+// white box around it, which is what several of these files used to do.
+
+const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8')
+const STYLES = read('../../../src/styles.css')
+// The controls are the design system's: the core imports this file and every
+// extension view gets it in the injected base sheet.
+const CONTROLS = read('../../../../extension-ui/src/controls.css')
+const INDEX = read('../../../src/index.tsx')
+const BOX = "input[type='checkbox'],\ninput[type='radio']"
+const TOKENS = read('../../../../extension-ui/src/tokens.css')
+
+function ruleBody(css: string, selector: string): string {
+  const start = css.indexOf(`${selector} {`)
+  if (start === -1) throw new Error(`selector not found: ${selector}`)
+  return css.slice(start, css.indexOf('}', start))
+}
+
+describe('checkbox styling', () => {
+  it('is loaded by the core renderer from the design system', () => {
+    expect(INDEX).toContain("import '@terminator/extension-ui/controls.css'")
+    expect(STYLES).not.toContain("input[type='checkbox']")
+  })
+
+  it('replaces the native widget rather than tinting it', () => {
+    const base = ruleBody(CONTROLS, BOX)
+    expect(base).toMatch(/appearance:\s*none/)
+    expect(base).toMatch(/-webkit-appearance:\s*none/)
+  })
+
+  it('uses theme tokens for its surface and border, never a hard-coded colour', () => {
+    const base = ruleBody(CONTROLS, BOX)
+    expect(base).toMatch(/background:\s*var\(--tm-bg-input\)/)
+    expect(base).toMatch(/border:\s*1px solid var\(--tm-border-control\)/)
+  })
+
+  it('fills with the accent when checked', () => {
+    expect(CONTROLS).toMatch(
+      /input\[type='checkbox'\]:checked,\s*\n?\s*input\[type='checkbox'\]:indeterminate,[^{]*\{[^}]*background:\s*var\(--tm-accent\)/
+    )
+  })
+
+  it('draws the tick in CSS, never as a unicode glyph', () => {
+    const tick = ruleBody(CONTROLS, "input[type='checkbox']:checked::after")
+    expect(tick).toMatch(/border:\s*solid var\(--tm-on-accent\)/)
+    expect(tick).toMatch(/transform:\s*rotate\(45deg\)/)
+    for (const glyph of ['✓', '✔', '☑', '×']) {
+      expect(CONTROLS).not.toContain(glyph)
+    }
+  })
+})
+
+describe('checkbox styling — has a visible keyboard focus ring', () => {
+  it('has a visible keyboard focus ring', () => {
+    expect(
+      ruleBody(CONTROLS, "input[type='checkbox']:focus-visible,\ninput[type='radio']:focus-visible")
+    ).toMatch(/outline:\s*2px/)
+  })
+
+  it('renders an indeterminate state as a bar, not an empty box', () => {
+    expect(ruleBody(CONTROLS, "input[type='checkbox']:indeterminate::after")).toMatch(
+      /background:\s*var\(--tm-on-accent\)/
+    )
+  })
+
+  it('defines --tm-on-accent in both themes, since the accent fill is the same colour in each', () => {
+    const dark = TOKENS.slice(TOKENS.indexOf(':root {'), TOKENS.indexOf("[data-theme='light'] {"))
+    const light = TOKENS.slice(TOKENS.indexOf("[data-theme='light'] {"))
+    expect(dark).toMatch(/--tm-on-accent:\s*#ffffff/)
+    expect(light).toMatch(/--tm-on-accent:\s*#ffffff/)
+  })
+})
+
+describe('extension checkbox styling', () => {
+  // Extension UIs are isolated WebContentsViews and inherit none of the host's
+  // CSS, so the same replacement has to travel with the injected base sheet.
+  it('uses the published --tm-* tokens, not the host variable names', () => {
+    const rules = EXTENSION_BASE_CSS.slice(EXTENSION_BASE_CSS.indexOf("input[type='checkbox']"))
+    expect(rules).toMatch(/var\(--tm-bg-input\)/)
+    expect(rules).toMatch(/var\(--tm-accent\)/)
+    expect(rules).not.toMatch(/var\(--(?!tm-)/)
+  })
+})
+
+describe('radio styling', () => {
+  it('is the same box as the checkbox, but circular', () => {
+    expect(CONTROLS).toMatch(/\}\n\ninput\[type='radio'\] \{[^}]*border-radius:\s*50%/)
+  })
+
+  it('fills with the accent when checked', () => {
+    expect(ruleBody(CONTROLS, "input[type='radio']:checked")).toMatch(
+      /background:\s*var\(--tm-accent\)/
+    )
+  })
+
+  it('marks the checked state with a dot, not a glyph', () => {
+    const dot = ruleBody(CONTROLS, "input[type='radio']:checked::after")
+    expect(dot).toMatch(/content:\s*''/)
+    expect(dot).toMatch(/border-radius:\s*50%/)
+    expect(dot).toMatch(/background:\s*var\(--tm-on-accent\)/)
+  })
+})
+
+describe('radio styling — centres the dot — asserted arithmetically, so resizing the box cannot break it silently', () => {
+  it('centres the dot — asserted arithmetically, so resizing the box cannot break it silently', () => {
+    const base = ruleBody(CONTROLS, BOX)
+    const dot = ruleBody(CONTROLS, "input[type='radio']:checked::after")
+    const px = (body: string, prop: string) => {
+      const m = new RegExp(`${prop}:\\s*(\\d+)px`).exec(body)
+      if (!m) throw new Error(`${prop} not found`)
+      return Number(m[1])
+    }
+    const boxW = px(base, 'width')
+    const borderW = px(base, 'border')
+    const dotW = px(dot, 'width')
+    const left = px(dot, 'left')
+    // The pseudo-element offsets from the padding box, which is inset by the border.
+    expect(2 * left + dotW).toBe(boxW - 2 * borderW)
+    expect(px(dot, 'top')).toBe(left)
+  })
+
+  it('has a visible keyboard focus ring and a disabled state', () => {
+    expect(CONTROLS).toMatch(/input\[type='radio'\]:focus-visible \{[^}]*outline:\s*2px/)
+    expect(CONTROLS).toMatch(/input\[type='radio'\]:disabled \{[^}]*opacity/)
+  })
+
+  it('immunises both controls against a container form reset', () => {
+    expect(ruleBody(CONTROLS, BOX)).toMatch(/padding:\s*0/)
+  })
+})
+
+// ── Repo-wide guards ────────────────────────────────────────────────
+//
+// The audit that prompted this work found three competing ways of styling the
+// same control: a real replacement, a glyph-tick replacement, and cosmetic
+// `accent-color`. These guards are what stop that recurring. They report
+// offenders as file:line so a failure is actionable.
+
+const REPO = fileURLToPath(new URL('../../../../../', import.meta.url))
+
+function sourceRoots(): string[] {
+  const roots = [
+    'core-main/src',
+    'core-renderer/src',
+    'core-renderer/extension-frame',
+    'core-renderer-remote/src',
+    'core-shared/src',
+  ].map((dir) => join(REPO, 'packages', dir))
+  for (const ext of readdirSync(join(REPO, 'extensions'), { withFileTypes: true })) {
+    if (ext.isDirectory()) roots.push(join(REPO, 'extensions', ext.name, 'src'))
+  }
+  return roots.filter((r) => existsSync(r))
+}
+
+function filesUnder(roots: string[], exts: string[]): string[] {
+  const out: string[] = []
+  for (const root of roots) {
+    for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue
+      if (!exts.some((e) => entry.name.endsWith(e))) continue
+      const dir = entry.parentPath
+      if (/(^|\/)(dist|node_modules|coverage)(\/|$)/.test(dir)) continue
+      out.push(join(dir, entry.name))
+    }
+  }
+  return out
+}
+
+const rel = (p: string) => p.slice(REPO.length)
+const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
+
+function offenders(files: string[], test: (line: string) => boolean): string[] {
+  const hits: string[] = []
+  for (const file of files) {
+    stripComments(readFileSync(file, 'utf8'))
+      .split('\n')
+      .forEach((line, i) => {
+        if (test(line)) hits.push(`${rel(file)}:${i + 1}`)
+      })
+  }
+  return hits
+}
+
+/** Split a stylesheet into `[selector, body]` pairs. */
+function rules(css: string): Array<[string, string]> {
+  const out: Array<[string, string]> = []
+  const re = /([^{}]+)\{([^{}]*)\}/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(stripComments(css)))) out.push([m[1].trim(), m[2]])
+  return out
+}
+
+const cssFiles = filesUnder(sourceRoots(), ['.css'])
+
+const tsFiles = filesUnder(sourceRoots(), ['.ts', '.tsx'])
+
+describe('no form control may drift back to a native or half-styled widget', () => {
+  it('finds stylesheets to check, so a broken glob cannot make these vacuous', () => {
+    expect(cssFiles.length).toBeGreaterThan(10)
+    expect(tsFiles.length).toBeGreaterThan(50)
+  })
+
+  it('uses accent-color nowhere — it tints the fill and leaves the chrome native', () => {
+    expect(offenders(cssFiles, (l) => /(^|[^-\w])accent-color\s*:/.test(l))).toEqual([])
+  })
+
+  it('draws no tick or cross as a glyph on a form control (Principle XII)', () => {
+    const bad: string[] = []
+    for (const file of cssFiles) {
+      for (const [selector, body] of rules(readFileSync(file, 'utf8'))) {
+        if (!/checkbox|radio|input\[type=/i.test(selector)) continue
+        if (/content:\s*['"][^'"]*[✓✔☑✗×][^'"]*['"]/.test(body))
+          bad.push(`${rel(file)} — ${selector}`)
+      }
+    }
+    expect(bad).toEqual([])
+  })
+})
+
+describe('no form control may drift back to a native or half-styled widget — declares no box property on a control rule too weak to win', () => {
+  it('declares no box property on a control rule too weak to win', () => {
+    // A bare `.thing-checkbox { width: … }` loses to the (0,1,1) base rule, so
+    // it is a lie in the source. Raise the selector or drop the declaration.
+    //
+    // Classes named "checkbox" that are not inputs at all — icon buttons that
+    // merely look like one — are exempt, listed so each is a conscious call.
+    const notAnInput = ['.daily-log__task-checkbox', '.start-work__radio']
+    const bad: string[] = []
+    for (const file of cssFiles) {
+      for (const [selector, body] of rules(readFileSync(file, 'utf8'))) {
+        if (!/checkbox|radio/i.test(selector)) continue
+        // A rule that names the type — or explicitly excludes it — is strong
+        // enough (or is not a control rule at all).
+        if (/input\[type=/.test(selector) || /:not\(\s*\[type=/.test(selector)) continue
+        if (notAnInput.some((c) => selector.includes(c))) continue
+        const props = ['width', 'height', 'margin', 'border-radius', 'background']
+        const found = props.filter((p) => new RegExp(`(^|;|\\s)${p}\\s*:`).test(body))
+        if (found.length > 0) bad.push(`${rel(file)} — ${selector} sets ${found.join(', ')}`)
+      }
+    }
+    expect(bad).toEqual([])
+  })
+
+  it('sets accentColor inline only where it is not a form control', () => {
+    // Equality, not absence: a new occurrence fails, and removing one forces a
+    // conscious edit here. Both allowed uses pass a colour as data, not style.
+    const withInline = tsFiles.filter((f) => /accentColor/.test(readFileSync(f, 'utf8'))).map(rel)
+    expect(withInline.sort()).toEqual([
+      // passes the workspace colour to a pop-out window as a URL param
+      'extensions/git-integration/src/review-command.ts',
+      // reads that param and paints a 3px accent bar
+      'packages/core-renderer/src/ExtensionWindowView.tsx',
+    ])
+  })
+})

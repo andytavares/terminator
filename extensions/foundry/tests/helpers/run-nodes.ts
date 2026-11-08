@@ -3,7 +3,7 @@
  * agent step that has not started, with whatever the spec needs to differ.
  */
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 /** A waiting agent node whose step is its own id, with no unit, lane or history. */
 export function agentNode(id: string, over: Partial<RunNode> = {}): RunNode {

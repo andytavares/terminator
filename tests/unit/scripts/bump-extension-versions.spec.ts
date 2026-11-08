@@ -21,6 +21,8 @@ describe('changedExtensions', () => {
   })
 
   it('ignores files outside an extension folder', () => {
-    expect(changedExtensions(EXTENSIONS, ['extensions/CLAUDE.md', 'src/main/index.ts'])).toEqual([])
+    expect(
+      changedExtensions(EXTENSIONS, ['extensions/CLAUDE.md', 'packages/core-main/src/index.ts'])
+    ).toEqual([])
   })
 })

@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { availableSensors, resolveSensor } from '../../src/recipe/resolve.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // A sensor resolves on the same three rungs as a recipe, role or rule: the
 // operator's data root, the target repository's `.foundry/sensors`, then the

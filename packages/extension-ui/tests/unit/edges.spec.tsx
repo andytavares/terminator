@@ -1,0 +1,105 @@
+import React from 'react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { FileText } from 'lucide-react'
+import { IconButton } from '../../src/IconButton'
+import { Popover } from '../../src/Popover'
+import { Toast } from '../../src/Toast'
+
+// The paths the happy-path specs do not reach: empty surfaces, absent optional
+// props, timers that do and do not fire, and an opener that is gone by the time
+// focus should return to it.
+
+describe('IconButton edges', () => {
+  it('takes an extra class without losing its own', () => {
+    render(
+      <IconButton icon={FileText} label="List view" className="tv-toggle" onClick={() => {}} />
+    )
+    const button = screen.getByRole('button', { name: 'List view' })
+    expect(button.className).toContain('tmui-icon-button')
+    expect(button.className).toContain('tv-toggle')
+  })
+
+  it('omits aria-pressed entirely when it is not a toggle', () => {
+    render(<IconButton icon={FileText} label="Close" onClick={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Close' }).hasAttribute('aria-pressed')).toBe(false)
+  })
+
+  it('keeps the label as the name and shows a longer description as the tooltip', () => {
+    render(
+      <IconButton
+        icon={FileText}
+        label="Mute run-1"
+        description="Stop this run interrupting, without hiding what it does"
+        onClick={() => {}}
+      />
+    )
+    const button = screen.getByRole('button', { name: 'Mute run-1' })
+    expect(button.getAttribute('title')).toBe(
+      'Stop this run interrupting, without hiding what it does'
+    )
+  })
+})
+
+describe('IconButton edges — reports the unpressed state of a toggle', () => {
+  it('reports the unpressed state of a toggle', () => {
+    render(<IconButton icon={FileText} label="List view" pressed={false} onClick={() => {}} />)
+    expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
+      'false'
+    )
+  })
+})
+
+describe('Popover edges', () => {
+  it('takes an extra class without losing its own', () => {
+    render(
+      <Popover label="Pick" className="tv-picker" onDismiss={() => {}}>
+        <button type="button">One</button>
+      </Popover>
+    )
+    const el = screen.getByRole('group', { name: 'Pick' })
+    expect(el.className).toContain('tv-picker')
+  })
+
+  it('ignores keys other than Escape', async () => {
+    const user = userEvent.setup()
+    const onDismiss = vi.fn()
+    render(
+      <Popover label="Pick" onDismiss={onDismiss}>
+        <button type="button">One</button>
+      </Popover>
+    )
+    expect(screen.getByRole('button', { name: 'One' }).matches(':focus')).toBe(true)
+    await user.keyboard('{Enter}')
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+})
+
+describe('Popover edges — leaves the outer surface alone when Escape reaches a nested one', () => {
+  it('leaves the outer surface alone when Escape reaches a nested one', async () => {
+    const user = userEvent.setup()
+    const onOuter = vi.fn()
+    const onInner = vi.fn()
+    render(
+      <>
+        <Popover label="Outer" onDismiss={onOuter}>
+          <button type="button">Outer</button>
+        </Popover>
+        <Popover label="Inner" onDismiss={onInner}>
+          <button type="button">Inner</button>
+        </Popover>
+      </>
+    )
+    await user.keyboard('{Escape}')
+    expect(onInner).toHaveBeenCalledTimes(1)
+    expect(onOuter).not.toHaveBeenCalled()
+  })
+})
+
+describe('Toast edges', () => {
+  it('defaults to info when no tone is given', () => {
+    render(<Toast message="Saved" onDismiss={() => {}} />)
+    expect(screen.getByRole('status').getAttribute('data-tone')).toBe('info')
+  })
+})

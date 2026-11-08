@@ -4,7 +4,10 @@
   "private": true,
   "description": "Remote Control extension for Terminator — embedded HTTP server + ngrok tunnel",
   "scripts": {
-    "build:renderer": "vite build --config vite.renderer.config.mts"
+    "build:renderer": "vite build --config vite.renderer.config.mts",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-remote-control-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-remote-control-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run extensions/remote-control/"
   },
   "dependencies": {
     "@fastify/static": "10.1.7",

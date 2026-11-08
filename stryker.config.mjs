@@ -8,7 +8,7 @@ export default {
     'extensions/foundry/src/gates/autonomy.ts',
     'extensions/foundry/src/ledger/curator.ts',
     'extensions/foundry/src/verify/ladder.ts',
-    'src/shared/session-records/retention.ts',
+    'packages/core-shared/src/session-records/retention.ts',
     'extensions/git-integration/src/github/pr-review-service.ts',
   ],
   coverageAnalysis: 'perTest',

@@ -8,7 +8,7 @@ import {
   orderDir,
   ensureWritable,
 } from '../src/data-root.js'
-import { makeTempDir } from '../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 
 // Where Foundry writes is one setting with two behaviours (FR-074), and it is
 // resolved once so that two writers can never disagree about it — a real hazard

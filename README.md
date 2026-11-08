@@ -252,7 +252,7 @@ docs/
 - **Main process** owns the windows, terminal processes (`node-pty`), the core's settings files and the app database, and answers IPC.
 - **Extension host**, an Electron `utilityProcess`, runs every extension backend, so extension work never shares the event loop that relays terminal output.
 - **Renderers** (`contextIsolation: true`, `nodeIntegration: false`): the main window runs React + xterm.js and calls `window.electronAPI.*` (exposed by `preload.ts`); each extension view is its own `WebContentsView`.
-- **Shared layer** (`src/shared/`) declares `window.electronAPI` once and holds the zod schemas every IPC payload is parsed with.
+- **Shared layer** (`packages/core-shared/src/`) declares `window.electronAPI` once and holds the zod schemas every IPC payload is parsed with.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full breakdown.
 
@@ -264,7 +264,7 @@ An extension is a directory under `extensions/` with a `manifest.json`, a backen
 npm run create-extension -- my-extension
 ```
 
-The built-in extensions in `extensions/` are the working examples, and `tests/fixtures/sample-extension/` is a minimal one. See [docs/EXTENSION-DEVELOPMENT.md](docs/EXTENSION-DEVELOPMENT.md) for the full guide.
+The built-in extensions in `extensions/` are the working examples, and `packages/test-support/fixtures/sample-extension/` is a minimal one. See [docs/EXTENSION-DEVELOPMENT.md](docs/EXTENSION-DEVELOPMENT.md) for the full guide.
 
 ## Key Design Decisions
 

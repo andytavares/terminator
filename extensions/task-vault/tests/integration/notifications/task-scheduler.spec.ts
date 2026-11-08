@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { isPending, unfinishedWork } from '../../../../../tests/support/pending'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { isPending, unfinishedWork } from '../../../../../packages/test-support/src/pending'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 import { createVaultDb, seedTask, selectTaskRow } from '../../support/vault-db'
 import {
   setSchedulerTick,

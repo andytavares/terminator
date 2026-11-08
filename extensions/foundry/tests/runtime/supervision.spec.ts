@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { rmSync } from 'node:fs'
 import { createSupervision, type Supervision } from '../../src/runtime/supervision.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // What is running, what it changed, what needs looking at, and what must not
 // start yet. Assembled as one thing here because the closed branch's worst bugs

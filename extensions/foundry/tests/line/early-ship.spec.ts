@@ -6,8 +6,8 @@ import type { CiOutcome } from '../../src/line/ship-tail.js'
 import type { LadderOutcome } from '../../src/verify/ladder.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { RiskAssessment, WorkOrder } from '../../src/order/schema.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { eventually } from '../../../../tests/support/eventually'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // The draft opens before the final check, and the check runs while CI does —
 // except where the operator decides before anything reaches the remote.

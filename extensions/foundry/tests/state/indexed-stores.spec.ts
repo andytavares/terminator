@@ -9,8 +9,8 @@ import { readRunGraph, writeRunGraph } from '../../src/ipc/run-channels.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { partialFake } from '../../../../tests/support/fakes'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { emptyRunGraph } from '../helpers/run-nodes.js'
 
 // The store modules and the index together, on real files: what a write left

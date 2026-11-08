@@ -14,7 +14,7 @@ import {
 } from '../../../src/line/worktree.js'
 import type { CheckoutDeps } from '../../../src/line/worktree.js'
 import type { WorkOrder } from '../../../src/order/schema.js'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
 import { calls, order } from '../../helpers/checkout-order.js'
 
 // A lane's checkout cut from a real repository by real git.

@@ -4,8 +4,8 @@ import { join, dirname } from 'node:path'
 import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
 import { transcriptPathFor } from '../../src/runtime/claude-launch.js'
 import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { partialFake } from '../../../../tests/support/fakes'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { scriptOf } from '../helpers/command-script.js'
 import type {
   AgentPermissionAsk,
@@ -16,7 +16,7 @@ import type {
   ExtensionAPI,
   StartAgentInput,
 } from '@terminator/extension-sdk'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // The agent runs over ACP, in a tab of the card's worktree project, and every permission ask
 // waits for Foundry's policy or a person. What is asserted here is what the operator ends up

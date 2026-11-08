@@ -1,6 +1,6 @@
 /**
  * ExtensionAPI — the object passed to `activate(api)` in your extension's backend entry.
- * The core implements exactly this declaration (`src/main/extensions/api.ts`).
+ * The core implements exactly this declaration (`packages/core-main/src/extensions/api.ts`).
  *
  * Since 4.0.0 a backend runs in the extension host, a separate process (ADR 094), and every
  * member crosses a MessagePort: a value the core holds is returned as a promise or kept in a

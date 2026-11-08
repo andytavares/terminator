@@ -9,7 +9,7 @@ import { projectRemover } from '../../../src/line/order-project.js'
 import { checkoutPath } from '../../../src/line/worktree.js'
 import { draftOrder } from '../../../src/order/draft.js'
 import type { WorkOrder } from '../../../src/order/schema.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 import { realGit, seededRepository, temporaryDirectory } from '../../helpers/foundry-host.js'
 
 // Commands run on a fresh checkout of the base branch for the operator's Prove (ADR 137).

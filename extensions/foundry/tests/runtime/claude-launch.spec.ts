@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { homedir } from 'os'
 import { transcriptPathFor, resumableIn } from '../../src/runtime/claude-launch.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // A conversation is filed under the directory it ran in. One begun elsewhere —
 // an architect that ran on the repository root before ADR-061 — cannot be

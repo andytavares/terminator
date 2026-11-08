@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { signalDots, type MeasuredFile } from '../../src/review/pr-signals'
 import type { FileMetrics, PrReviewDetail } from '../../src/schemas/pr-review.schema'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 function dotsFor(metrics: Partial<FileMetrics>) {
   const measured = partialFake<MeasuredFile>({

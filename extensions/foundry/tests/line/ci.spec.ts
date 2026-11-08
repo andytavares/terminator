@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { watchChecks, failedLogs } from '../../src/line/ci.js'
 import type { Check } from '../../src/line/ci.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 // gh pr checks exits 0 even while pending; a PR with no checks reported
 // exits 1 with a fixed message. Both are read here, never inferred.

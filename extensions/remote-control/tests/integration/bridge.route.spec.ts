@@ -7,7 +7,7 @@ import { WebSocket } from 'ws'
 import { WsTicketStore } from '../../src/server/ws-ticket-store'
 import { HEARTBEAT_INTERVAL_MS } from '../../src/server/heartbeat'
 import { ConnectedDeviceRegistry } from '../../src/server/connected-devices'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 type BridgeIpc = ExtensionAPI['ipc']
 

@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { baseBranchOfRepo } from '../../../src/forge/base-branch.js'
 import { seedOrder } from '../../../src/forge/intake-source.js'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
 
 // A repository's base branch is whatever it is on, not a name Foundry assumes:
 // `master` repositories and branches cut from other branches are both ordinary.

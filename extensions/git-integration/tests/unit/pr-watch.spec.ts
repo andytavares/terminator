@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { createPrWatch, type WatchStore } from '../../src/home/pr-watch-runner'
 import { tailLines, type PrWatchReads, type PrWatchState } from '../../src/home/pr-watch'
 import { dashboardPrFixture } from './support/dashboard-pr'

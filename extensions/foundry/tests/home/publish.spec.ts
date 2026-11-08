@@ -1,7 +1,7 @@
 import { HOME_MEASURES } from '@terminator/extension-sdk'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 import { fakeHost } from '../helpers/foundry-host.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
@@ -10,7 +10,7 @@ import { createDeciding, createStandingSources } from '../../src/ipc/standing.js
 import { gateStoreAt, orderStoreAt } from '../../src/state/live-index.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { runningOrder } from '../helpers/order-parts.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 

@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { makeTempDir } from '../../support/temp-dir'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 
 // Run from inside a git hook, every spec inherited the hook's GIT_DIR and GIT_INDEX_FILE, so a
 // fixture's `git init`, `git config` and `git commit` wrote into the real repository: user.name=Test

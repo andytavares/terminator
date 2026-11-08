@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import type { ExtensionAPI, GithubAPI, ShellExecResult } from '@terminator/extension-sdk'
 import { bindShell } from '../../../src/shell/run-git'
-import { createGithubApi } from '../../../../../src/main/github/github-api'
+import { createGithubApi } from '../../../../../packages/core-main/src/github/github-api'
 
 // The extension's commands run through the core's shell.exec. These stand-ins
 // let a spec keep stubbing a promisified execFile `(cmd, args, opts, cb)`, or

@@ -13,7 +13,7 @@ import { propose } from '../../src/ledger/curator.js'
 import { resolveRule } from '../../src/recipe/resolve.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // A rule the operator accepted is in force from the next run, carries the
 // entries it was derived from, and can be taken away again.

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { ChannelSpec, ExtensionAPI } from '@terminator/extension-sdk'
 import { registerWorktreesHandlers, type CleanupDeps } from '../../src/ipc/worktrees.ipc'
 import type { CleanupSettings } from '../../src/git/cleanup-plan'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { bindShellToAnswers } from './support/shell'
 
 const RULES_OFF: CleanupSettings = {

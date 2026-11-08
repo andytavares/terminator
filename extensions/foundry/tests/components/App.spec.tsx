@@ -6,7 +6,7 @@ import { App } from '../../src/renderer/App.js'
 import '../helpers/app-views.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { timesInvoked } from '../helpers/bridge-calls.js'
 import { stubOffScreenObserver } from '../helpers/off-screen-observer.js'
 

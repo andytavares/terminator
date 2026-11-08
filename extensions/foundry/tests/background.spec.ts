@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { inBackground, settleBackground } from '../src/background.js'
-import { isPending, unfinishedWork } from '../../../tests/support/pending'
+import { isPending, unfinishedWork } from '../../../packages/test-support/src/pending'
 
 // Work the extension starts and no caller awaits (a run, the next Forge turn, a ledger line)
 // keeps writing records until it ends; a spec's folder going must wait for that.

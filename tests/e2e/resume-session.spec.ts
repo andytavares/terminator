@@ -44,7 +44,7 @@ function reportConversation(
   mkdirSync(dir, { recursive: true })
   const target = join(dir, `${terminalSessionId}.json`)
   // Written aside and renamed into place, as the hook does
-  // (src/main/agents/agent-session-hook.ts): the watcher consumes a report as
+  // (packages/core-main/src/agents/agent-session-hook.ts): the watcher consumes a report as
   // soon as its name appears, and one written in place could be read empty.
   const { conversationId, transcriptPath } = report
   writeFileSync(

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { ExtensionAPI, SettingScope } from '@terminator/extension-sdk'
 import { gitSettings } from '../../src/git-settings'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 /** The settings reader over stored values as the settings page writes them: `ownValues` by
  *  workspace folder, read for a repository there, else `stored`. */

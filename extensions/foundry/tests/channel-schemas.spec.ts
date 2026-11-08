@@ -3,7 +3,7 @@
  * rather than from its source.
  */
 import { freshFoundryStorage, idleHome } from './helpers/foundry-host.js'
-import { partialFake } from '../../../tests/support/fakes'
+import { partialFake } from '../../../packages/test-support/src/fakes'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'

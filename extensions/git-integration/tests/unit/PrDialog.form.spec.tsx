@@ -4,9 +4,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PrDialog } from '../../src/components/PrDialog'
 import type { PullRequest } from '../../src/schemas/git.schema'
-import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
-import { installElectronApi } from '../../../../tests/support/electron-api'
-import { pressOutside } from '../../../../tests/support/modal'
+import type { ElectronAPI } from '../../../../packages/core-shared/src/electron-api/api-type'
+import { installElectronApi } from '../../../../packages/test-support/src/electron-api'
+import { pressOutside } from '../../../../packages/test-support/src/modal'
 
 const mockShellExec = vi.fn<ElectronAPI['shell']['exec']>()
 const mockListBranches = vi.fn<ElectronAPI['git']['listBranches']>()

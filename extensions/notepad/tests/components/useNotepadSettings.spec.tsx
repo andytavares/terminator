@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { notepadSettingsFrom } from '../../src/notepad-settings'
 import { useNotepadSettings, useNotepadSettingsStore } from '../../src/stores/settings.store'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 const getSettingsValues = vi.fn()
 const changeListeners = new Set<() => void>()

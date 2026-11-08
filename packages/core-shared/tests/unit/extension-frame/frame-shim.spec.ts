@@ -1,0 +1,417 @@
+// @vitest-environment happy-dom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { FRAME_PORT_MESSAGE, type FrameReply } from '../../../src/frame-wire'
+import type { FrameElectronAPI } from '../../../src/electron-api/api-type'
+
+/** window.electronAPI as the frame shim builds it (a different surface than
+ * the app renderer's ElectronAPI global). */
+function frameApi(): FrameElectronAPI {
+  return (window as unknown as { electronAPI: FrameElectronAPI }).electronAPI
+}
+
+interface FakePort {
+  posted: unknown[]
+  onmessage: ((event: { data: FrameReply }) => void) | null
+  start: () => void
+  close: () => void
+  postMessage: (message: unknown) => void
+}
+
+const SHIM_PATH = '../../../../core-renderer/extension-frame/frame-shim'
+
+function deliverPort(port: MessagePort, source: unknown = window.parent) {
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      data: { type: FRAME_PORT_MESSAGE },
+      ports: [port],
+      source: source as MessageEventSource,
+    })
+  )
+}
+
+async function loadShimInFrame(): Promise<{ port: FakePort }> {
+  vi.resetModules()
+  const port = fakeFramePort()
+  // happy-dom has window.top === window by default; pretend this is a frame.
+  vi.stubGlobal('top', {})
+  // happy-dom reports "X11; Darwin arm64"; a real mac reads "MacIntel".
+  vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+  await import(SHIM_PATH)
+  return { port }
+}
+
+beforeEach(() => {
+  Reflect.deleteProperty(window, 'electronAPI')
+  document.documentElement.removeAttribute('data-theme')
+  document.documentElement.removeAttribute('data-escape-gesture')
+  document.documentElement.style.height = ''
+  document.body.style.height = ''
+  document.body.innerHTML = ''
+})
+
+afterEach(() => {
+  vi.resetModules()
+})
+
+describe('frame-shim outside a frame', () => {
+  it('does nothing at the top level of a window', async () => {
+    vi.resetModules()
+    const hadShimHolder = '__frameShim' in window
+    await import(SHIM_PATH)
+    expect('electronAPI' in window).toBe(false)
+    expect('__frameShim' in window).toBe(hadShimHolder)
+  })
+})
+
+describe('frame-shim port handshake', () => {
+  it('ignores a message from a source other than the parent window', async () => {
+    const { port } = await loadShimInFrame()
+    deliverPort(port as unknown as MessagePort, {})
+    expect(port.start).not.toHaveBeenCalled()
+  })
+
+  it('ignores a message from the parent without the port', async () => {
+    const { port } = await loadShimInFrame()
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: FRAME_PORT_MESSAGE },
+        ports: [],
+        source: window.parent,
+      })
+    )
+    expect(port.start).not.toHaveBeenCalled()
+  })
+
+  it('adopts the port the parent posts', async () => {
+    const { port } = await loadShimInFrame()
+    deliverPort(port as unknown as MessagePort)
+    expect(port.start).toHaveBeenCalled()
+  })
+})
+
+async function connectedFrame() {
+  const { port } = await loadShimInFrame()
+  deliverPort(port as unknown as MessagePort)
+  return { port, api: frameApi() }
+}
+
+function fakeFramePort(): FakePort {
+  return {
+    posted: [],
+    onmessage: null,
+    start: vi.fn(),
+    close: vi.fn(),
+    postMessage(message: unknown) {
+      this.posted.push(message)
+    },
+  }
+}
+
+describe('frame-shim transport queueing', () => {
+  it('delivers a request made before the port arrives once the port is adopted', async () => {
+    const { port } = await loadShimInFrame()
+    const pending = frameApi().workspace.list() as Promise<unknown>
+    frameApi().logger.write('info', 'test', 'queued')
+    expect(port.posted).toEqual([])
+    deliverPort(port as unknown as MessagePort)
+    expect(port.posted).toContainEqual({ type: 'invoke', id: 'f1', channel: 'workspace:list' })
+    expect(port.posted).toContainEqual({
+      type: 'send',
+      channel: 'log:write',
+      payload: { level: 'info', namespace: 'test', message: 'queued' },
+    })
+    port.onmessage?.({ data: { type: 'result', id: 'f1', result: ['ws1'] } })
+    await expect(pending).resolves.toEqual(['ws1'])
+  })
+})
+
+describe('frame-shim port replacement', () => {
+  it('a later port replaces an earlier one', async () => {
+    const { port } = await loadShimInFrame()
+    deliverPort(port as unknown as MessagePort)
+    const replacement = fakeFramePort()
+    deliverPort(replacement as unknown as MessagePort)
+    const pending = frameApi().workspace.list() as Promise<unknown>
+    expect(port.posted).toEqual([])
+    expect(replacement.posted).toContainEqual(
+      expect.objectContaining({ type: 'invoke', channel: 'workspace:list' })
+    )
+    replacement.onmessage?.({ data: { type: 'result', id: 'f1', result: ['ws1'] } })
+    await expect(pending).resolves.toEqual(['ws1'])
+  })
+})
+
+describe('frame-shim invoke replies', () => {
+  it('resolves an invoke with the result message that matches its id', async () => {
+    const { port, api } = await connectedFrame()
+    const pending = api.workspace.list() as Promise<unknown>
+    const request = port.posted[0] as { type: string; id: string; channel: string }
+    expect(request.type).toBe('invoke')
+    expect(request.channel).toBe('workspace:list')
+    port.onmessage?.({ data: { type: 'result', id: request.id, result: ['ws1'] } })
+    await expect(pending).resolves.toEqual(['ws1'])
+  })
+
+  it('rejects an invoke when the reply is an error', async () => {
+    const { port, api } = await connectedFrame()
+    const pending = api.workspace.list() as Promise<unknown>
+    const request = port.posted[0] as { id: string }
+    port.onmessage?.({ data: { type: 'error', id: request.id, error: 'boom' } })
+    await expect(pending).rejects.toThrow('boom')
+  })
+})
+
+describe('frame-shim pushed messages', () => {
+  it('delivers an event to the channel subscribers after one subscribe request', async () => {
+    const { port, api } = await connectedFrame()
+    const handler = vi.fn()
+    api.terminal.onProcessExit(handler)
+    expect(port.posted).toEqual([{ type: 'subscribe', channel: 'terminal:process-exit' }])
+    port.onmessage?.({
+      data: {
+        type: 'event',
+        channel: 'terminal:process-exit',
+        args: [{ sessionId: 's1', exitCode: 0 }],
+      },
+    })
+    expect(handler).toHaveBeenCalledWith('s1', 0)
+  })
+
+  it('applies a light theme by stamping data-theme and a dark theme by removing it', async () => {
+    const { port } = await connectedFrame()
+    port.onmessage?.({ data: { type: 'theme', theme: 'light' } })
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    port.onmessage?.({ data: { type: 'theme', theme: 'dark' } })
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+  })
+})
+
+function pressFrameKey(key: string, init: KeyboardEventInit = {}) {
+  // happy-dom targets a window-dispatched event at the window itself; the
+  // shim's guards read event.target, so dispatch at body like a page would.
+  document.body.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }))
+}
+
+describe('frame-shim keyboard gestures', () => {
+  it('posts request-exit on two quick Escape presses', async () => {
+    const { port } = await connectedFrame()
+    pressFrameKey('Escape')
+    pressFrameKey('Escape')
+    expect(port.posted).toContainEqual({ type: 'request-exit' })
+  })
+
+  it('does not post request-exit while a modal dialog is open in the frame', async () => {
+    const { port } = await connectedFrame()
+    const dialog = document.body.appendChild(document.createElement('dialog'))
+    dialog.showModal()
+    pressFrameKey('Escape')
+    pressFrameKey('Escape')
+    dialog.remove()
+    expect(port.posted).not.toContainEqual({ type: 'request-exit' })
+  })
+
+  it('posts request-exit again once the dialog has closed', async () => {
+    const { port } = await connectedFrame()
+    const dialog = document.body.appendChild(document.createElement('dialog'))
+    dialog.showModal()
+    dialog.close()
+    dialog.remove()
+    pressFrameKey('Escape')
+    pressFrameKey('Escape')
+    expect(port.posted).toContainEqual({ type: 'request-exit' })
+  })
+})
+
+describe('frame-shim Escape decisions', () => {
+  // The e2e specs read this to know a key was handled, and that it asked for no exit.
+  it('stamps the page with what each Escape decided: the first waits, the second exits', async () => {
+    await connectedFrame()
+    const decision = () => document.documentElement.getAttribute('data-escape-gesture')
+    pressFrameKey('Escape')
+    expect(decision()).toBe('pending')
+    pressFrameKey('Escape')
+    expect(decision()).toBe('exit')
+  })
+
+  // Escape twice while typing used to close the extension and take the draft with it.
+  it('does not post request-exit on two Escapes in a text field, and leaves the draft there', async () => {
+    const { port } = await connectedFrame()
+    const field = document.body.appendChild(document.createElement('textarea'))
+    field.value = 'UNSAVED DRAFT'
+    field.focus()
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(port.posted).not.toContainEqual({ type: 'request-exit' })
+    expect(document.documentElement.getAttribute('data-escape-gesture')).toBe('suppressed')
+    expect(field.value).toBe('UNSAVED DRAFT')
+  })
+
+  it('stamps an Escape a modal dialog holds as suppressed', async () => {
+    await connectedFrame()
+    const dialog = document.body.appendChild(document.createElement('dialog'))
+    dialog.showModal()
+    pressFrameKey('Escape')
+    dialog.remove()
+    expect(document.documentElement.getAttribute('data-escape-gesture')).toBe('suppressed')
+  })
+})
+
+/** Presses `key` on the frame's page and returns the event, to read whether it was swallowed. */
+function pressShortcut(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, cancelable: true, bubbles: true, ...init })
+  document.body.dispatchEvent(event)
+  return event
+}
+
+describe('frame-shim app shortcuts', () => {
+  it('posts quick-actions-open on Cmd+P and swallows the key', async () => {
+    const { port } = await connectedFrame()
+    expect(pressShortcut('p', { metaKey: true }).defaultPrevented).toBe(true)
+    expect(port.posted).toContainEqual({ type: 'quick-actions-open' })
+  })
+
+  it('posts settings-open on Cmd+, and swallows the key', async () => {
+    const { port } = await connectedFrame()
+    expect(pressShortcut(',', { metaKey: true }).defaultPrevented).toBe(true)
+    expect(port.posted).toContainEqual({ type: 'settings-open' })
+  })
+
+  it('leaves a comma typed without the modifier to the frame', async () => {
+    const { port } = await connectedFrame()
+    expect(pressShortcut(',').defaultPrevented).toBe(false)
+    expect(port.posted).not.toContainEqual({ type: 'settings-open' })
+  })
+})
+
+describe('frame-shim usage', () => {
+  it('posts electronAPI.usage.record as a usage message', async () => {
+    const { port } = await connectedFrame()
+    frameApi().usage.record('export', { failed: true })
+    expect(port.posted).toContainEqual({ type: 'usage', feature: 'export', failed: true })
+  })
+})
+
+/** Records what a fit=content shim observes and posts to its parent window. */
+function createFitContentSpies() {
+  const spies: {
+    resizeCallback: (() => void) | null
+    observed: Element[]
+    parentPosts: { message: unknown; origin: string }[]
+  } = { resizeCallback: null, observed: [], parentPosts: [] }
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        spies.resizeCallback = callback
+      }
+      observe(element: Element): void {
+        spies.observed.push(element)
+      }
+      disconnect(): void {}
+    }
+  )
+  vi.spyOn(window.parent, 'postMessage').mockImplementation((message, origin) => {
+    spies.parentPosts.push({ message, origin: String(origin) })
+  })
+  return spies
+}
+
+/** Loads the shim as if the frame's page were at `url`, embedded by the page at `referrer`. */
+async function loadShimAt(url: string, referrer = 'http://localhost:5173/home'): Promise<void> {
+  const realLocation = window.location
+  vi.stubGlobal('location', { ...realLocation, search: new URL(url).search })
+  vi.spyOn(document, 'referrer', 'get').mockReturnValue(referrer)
+  await loadShimInFrame()
+}
+
+/** Undoes what a fit=content shim set on the shared document, and the spies. */
+function resetFitContent(): void {
+  // loadShimAt set the referrer on the document itself; deleting it brings back happy-dom's own.
+  Reflect.deleteProperty(document, 'referrer')
+  document.documentElement.removeAttribute('style')
+  document.body.removeAttribute('style')
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+}
+
+describe('frame-shim fit=content height reporting', () => {
+  afterEach(resetFitContent)
+
+  it('observes the document and posts each height to the parent origin with fit=content', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content')
+    expect(spies.observed).toContain(document.documentElement)
+    spies.resizeCallback?.()
+    expect(spies.parentPosts).toEqual([
+      {
+        message: { type: 'terminator:frame-height', height: expect.any(Number) },
+        origin: 'http://localhost:5173',
+      },
+    ])
+  })
+})
+
+describe('frame-shim fit=content sizes the page to its content', () => {
+  afterEach(resetFitContent)
+
+  it('lets the page grow with its content, since the frame starts 0px tall', async () => {
+    createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content')
+    expect(document.documentElement.style.height).toBe('auto')
+    expect(document.body.style.height).toBe('auto')
+  })
+
+  it('reports the page shrinking, which the frame-sized scrollHeight never would', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content')
+    vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(391)
+    vi.spyOn(document.documentElement, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 800, 0)
+    )
+    spies.resizeCallback?.()
+    expect(spies.parentPosts.at(-1)?.message).toEqual({
+      type: 'terminator:frame-height',
+      height: 0,
+    })
+  })
+
+  it('posts nothing without fit=content', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home')
+    expect(spies.observed).toEqual([])
+    expect(spies.parentPosts).toEqual([])
+    expect(document.documentElement.style.height).toBe('')
+  })
+})
+
+describe('frame-shim fit=content without a referrer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('still posts when the embedding page has no referrer, as a packaged app loaded from file://', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content', '')
+    spies.resizeCallback?.()
+    expect(spies.parentPosts).toEqual([
+      { message: { type: 'terminator:frame-height', height: expect.any(Number) }, origin: '*' },
+    ])
+  })
+})
+
+describe('frame-shim reports input to the window', () => {
+  afterEach(resetFitContent)
+
+  it('posts an activity message to the parent on a key press and a pointer press', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=main')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+    window.dispatchEvent(new Event('pointerdown'))
+    const activity = {
+      message: { type: 'terminator:frame-activity' },
+      origin: 'http://localhost:5173',
+    }
+    expect(spies.parentPosts).toEqual([activity, activity])
+  })
+})

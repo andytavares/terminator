@@ -3,7 +3,7 @@ import { rmSync, writeFileSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { join } from 'path'
 import { readDiffSummary, readChangedFiles } from '../../../src/runtime/diff-metrics.js'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
 
 function commitFile(repo: string, name: string, message: string): void {
   const sh = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' })

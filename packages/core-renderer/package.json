@@ -1,0 +1,17 @@
+{
+  "name": "@terminator/core-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The app window's renderer and the extension frame shim",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-renderer-tsconfig.tsbuildinfo -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run packages/core-renderer/"
+  },
+  "dependencies": {
+    "@terminator/core-shared": "1.0.0",
+    "@terminator/extension-sdk": "6.3.0",
+    "@terminator/extension-ui": "1.0.0"
+  }
+}

@@ -4,7 +4,7 @@ import * as path from 'node:path'
 
 import { createSignalStore } from '../../src/sensors/store'
 import type { Signal } from '../../src/sensors/types'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 function tempRoot(): string {
   return makeTempDir('foundry-signal-store-')

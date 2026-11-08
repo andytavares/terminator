@@ -15,7 +15,7 @@ import { GitFullView } from '../../extensions/git-integration/src/components/Git
 import { MergeFlowView } from '../../extensions/git-integration/src/components/merge-flow/MergeFlowView'
 import { usePrReviewStore } from '../../extensions/git-integration/src/stores/pr-review.store'
 import { useGitStore } from '../../extensions/git-integration/src/stores/git.store'
-import { electronApiOf } from '../support/electron-api'
+import { electronApiOf } from '../../packages/test-support/src/electron-api'
 
 const DAY = 86400000
 const ago = (days: number): string => new Date(Date.now() - days * DAY).toISOString()
@@ -71,19 +71,19 @@ const chapters = [
     estimatedMinutes: 12,
     status: 'in-progress' as const,
     files: [
-      contrastFile('src/main/session/session-store.ts', {
+      contrastFile('packages/core-main/src/session/session-store.ts', {
         level: 'high',
         tier: 0,
         additions: 120,
         deletions: 14,
       }),
-      contrastFile('src/main/session/session-records.ts', {
+      contrastFile('packages/core-main/src/session/session-records.ts', {
         level: 'medium',
         tier: 1,
         additions: 44,
         deletions: 6,
       }),
-      contrastFile('src/main/session/session-types.ts', {
+      contrastFile('packages/core-main/src/session/session-types.ts', {
         level: 'low',
         tier: 2,
         additions: 12,
@@ -97,13 +97,13 @@ const chapters = [
     estimatedMinutes: 9,
     status: 'not-started' as const,
     files: [
-      contrastFile('src/renderer/home/Ledger.tsx', {
+      contrastFile('packages/core-renderer/src/home/Ledger.tsx', {
         level: 'medium',
         tier: 1,
         additions: 80,
         deletions: 22,
       }),
-      contrastFile('src/renderer/home/Logbook.tsx', {
+      contrastFile('packages/core-renderer/src/home/Logbook.tsx', {
         level: 'low',
         tier: 2,
         additions: 31,
@@ -129,7 +129,7 @@ const prDetail = {
   readingOrder: [
     {
       step: 1,
-      path: 'src/main/session/session-store.ts',
+      path: 'packages/core-main/src/session/session-store.ts',
       symbol: 'SessionStore',
       reason: 'Defines the record every later file reads',
       uses: [],
@@ -142,16 +142,31 @@ const gitStatus = {
   hasConflicts: false,
   truncated: false,
   files: [
-    { path: 'src/main/index.ts', status: 'modified', staged: true, isBinary: false },
-    { path: 'src/main/session/session-store.ts', status: 'added', staged: true, isBinary: false },
-    { path: 'src/renderer/App.tsx', status: 'modified', staged: false, isBinary: false },
-    { path: 'src/renderer/old-home.tsx', status: 'deleted', staged: false, isBinary: false },
+    { path: 'packages/core-main/src/index.ts', status: 'modified', staged: true, isBinary: false },
+    {
+      path: 'packages/core-main/src/session/session-store.ts',
+      status: 'added',
+      staged: true,
+      isBinary: false,
+    },
+    {
+      path: 'packages/core-renderer/src/App.tsx',
+      status: 'modified',
+      staged: false,
+      isBinary: false,
+    },
+    {
+      path: 'packages/core-renderer/src/old-home.tsx',
+      status: 'deleted',
+      staged: false,
+      isBinary: false,
+    },
     { path: 'docs/notes.md', status: 'untracked', staged: false, isBinary: false },
   ],
 }
 
 const diff = {
-  path: 'src/renderer/App.tsx',
+  path: 'packages/core-renderer/src/App.tsx',
   isBinary: false,
   truncated: false,
   hunks: [
@@ -251,7 +266,7 @@ const conflictSession = {
   totalResolved: 2,
   files: [
     {
-      filePath: 'src/main/session/session-store.ts',
+      filePath: 'packages/core-main/src/session/session-store.ts',
       conflictCount: 4,
       resolvedCount: 0,
       blocks: [0, 1, 2, 3].map((i) => block(`s-${i}`, i, false)),
@@ -260,7 +275,7 @@ const conflictSession = {
       conflictDescription: 'Both sides changed how a record is keyed',
     },
     {
-      filePath: 'src/renderer/home/Ledger.tsx',
+      filePath: 'packages/core-renderer/src/home/Ledger.tsx',
       conflictCount: 1,
       resolvedCount: 0,
       blocks: [block('l-0', 0, false)],
@@ -337,9 +352,9 @@ window.electronAPI = electronApiOf({
 
 function PrRail(): React.JSX.Element {
   usePrReviewStore.setState({
-    viewedFiles: new Set(['src/main/session/session-types.ts', 'package-lock.json']),
+    viewedFiles: new Set(['packages/core-main/src/session/session-types.ts', 'package-lock.json']),
     currentChapterId: 'ch-1',
-    currentFilePath: 'src/main/session/session-records.ts',
+    currentFilePath: 'packages/core-main/src/session/session-records.ts',
   })
   return (
     <div className="pr-review-view" style={{ height: 640, width: 280 }}>
@@ -355,7 +370,7 @@ function PrRail(): React.JSX.Element {
             pr={prDetail as never}
             repoRoot={REPO}
             headSHA="abc1234"
-            currentFilePath="src/main/session/session-records.ts"
+            currentFilePath="packages/core-main/src/session/session-records.ts"
             onSelectFile={() => {}}
           />
         </aside>
@@ -366,8 +381,8 @@ function PrRail(): React.JSX.Element {
 
 function GitView(): React.JSX.Element {
   useGitStore.setState({
-    selectedFile: 'src/renderer/App.tsx',
-    diffCache: new Map([['src/renderer/App.tsx', diff as never]]),
+    selectedFile: 'packages/core-renderer/src/App.tsx',
+    diffCache: new Map([['packages/core-renderer/src/App.tsx', diff as never]]),
   })
   return (
     <div style={{ height: 640, width: 1000, display: 'flex' }}>

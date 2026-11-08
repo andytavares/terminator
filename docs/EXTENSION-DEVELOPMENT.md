@@ -2,7 +2,7 @@
 
 An extension adds a feature to Terminator without touching the core. It has two halves. The **backend** runs in the extension host process and talks to the core through the `ExtensionAPI` object. The optional **view** is a web page. The core shows it in an `<iframe>` in its own window. The core and an extension meet only through the Extension SDK (Constitution II, [ADR 094](adr/094-extensions-follow-the-vs-code-model.md)).
 
-The API is declared once, in `packages/extension-sdk/types/api.d.ts`. The core implements that declaration in `src/main/extensions/api.ts`. The compiler checks that the two agree. The SDK's current version is the `version` field of `packages/extension-sdk/package.json`. `packages/extension-sdk/CHANGELOG.md` lists the changes in each version and how to migrate.
+The API is declared once, in `packages/extension-sdk/types/api.d.ts`. The core implements that declaration in `packages/core-main/src/extensions/api.ts`. The compiler checks that the two agree. The SDK's current version is the `version` field of `packages/extension-sdk/package.json`. `packages/extension-sdk/CHANGELOG.md` lists the changes in each version and how to migrate.
 
 The five built-in extensions in `extensions/` (Foundry, git-integration, notepad, remote-control, task-vault) follow every rule in this guide. They are the working examples.
 
@@ -58,7 +58,7 @@ task-vault/
 
 ## The manifest
 
-`ExtensionManifestSchema` (`src/shared/schemas/extension.schema.ts`) validates `manifest.json` when the extension is registered. The host reads the file from disk at every start. A manifest change, such as a new `contributes` entry after a pull, shows after a restart. A manifest that no longer parses leaves the stored registration as it was.
+`ExtensionManifestSchema` (`packages/core-shared/src/schemas/extension.schema.ts`) validates `manifest.json` when the extension is registered. The host reads the file from disk at every start. A manifest change, such as a new `contributes` entry after a pull, shows after a restart. A manifest that no longer parses leaves the stored registration as it was.
 
 ```json
 {
@@ -89,7 +89,7 @@ task-vault/
 
 ### `contributes`
 
-Each surface shows the extension's view. The core passes the surface's `view` string as `?view=VALUE`, so one `index.html` serves every surface. `src/renderer/extensions/loader.ts` turns these entries into the core's tabs and panels. An extension cannot register a surface any other way.
+Each surface shows the extension's view. The core passes the surface's `view` string as `?view=VALUE`, so one `index.html` serves every surface. `packages/core-renderer/src/extensions/loader.ts` turns these entries into the core's tabs and panels. An extension cannot register a surface any other way.
 
 A page shows only the view that its `?view=` names. An `App.tsx` that routes between heavy views can therefore load each view with [`React.lazy`](https://react.dev/reference/react/lazy) behind a `Suspense` boundary. Vite then builds each view as its own chunk ([dynamic import](https://vite.dev/guide/features#dynamic-import)). A page loads only the view it shows. git-integration's `src/renderer/App.tsx` does this.
 
@@ -106,7 +106,7 @@ A page shows only the view that its `?view=` names. An `App.tsx` that routes bet
 | `startWorkOptions` | `[{ id, label, description, command }]`                          | A way to run work in Home's Start work launcher, after the agent tab, Claude in a terminal and Terminal only; `command` is one of your command ids. It receives `{ tracker, key, title, repoRoot }` for a ticket or `{ prompt, repoRoot }` for a prompt, so it must declare `args` (a command without `args` gets none) | —              |
 | `shellRoots`       | `[settingKey]`                                                   | Nowhere: directories `api.shell.exec` and `api.github` may run in (see [`api.shell`](#apishell))                                                                                                                                                                                                                        | —              |
 
-`icon` takes one of the names `iconFromName` knows (`src/renderer/extensions/icon-from-name.ts`), such as `puzzle`, `wrench`, `terminal`, `git-branch`, `database`, `list` or `calendar`.
+`icon` takes one of the names `iconFromName` knows (`packages/core-renderer/src/extensions/icon-from-name.ts`), such as `puzzle`, `wrench`, `terminal`, `git-branch`, `database`, `list` or `calendar`.
 
 **Shell roots.** Each entry of `shellRoots` is the key of one of your own settings. The key starts with your extension id. Register it with `settings.register` as a `folder` setting. Its current value becomes a directory where your git and gh can run. A key that does not start with your id makes the core refuse the manifest at load (`INVALID_MANIFEST`). A key that you do not register as a `folder` adds nothing ([ADR 102](adr/102-shell-exec-runs-in-declared-roots.md)). git-integration declares its review clone folder. Foundry declares its data directory:
 
@@ -114,7 +114,7 @@ A page shows only the view that its `?view=` names. An `App.tsx` that routes bet
 "contributes": { "shellRoots": ["terminator.foundry.dataDir"] }
 ```
 
-**Quick Actions letters.** The core reserves its own letters. When extensions contest a letter, load order decides. The loser gets the first free letter of its own label, and the app logs a warning (`allocateExtensionGroups`, `src/renderer/quick-actions/groups.ts`).
+**Quick Actions letters.** The core reserves its own letters. When extensions contest a letter, load order decides. The loser gets the first free letter of its own label, and the app logs a warning (`allocateExtensionGroups`, `packages/core-renderer/src/quick-actions/groups.ts`).
 
 ---
 
@@ -145,7 +145,7 @@ export function deactivate(): void {
 
 ### Where your backend runs
 
-Every backend runs in the **extension host**. The host is one Electron [`utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process) that all extensions share. `src/main/extensions/host/host-process.ts` starts it. It is never the main process. The API reaches the core over a `MessagePort`. This has these effects:
+Every backend runs in the **extension host**. The host is one Electron [`utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process) that all extensions share. `packages/core-main/src/extensions/host/host-process.ts` starts it. It is never the main process. The API reaches the core over a `MessagePort`. This has these effects:
 
 - A value that the core holds is a promise: `settings.isBranchExcluded`, `globalShortcut.register`, `pty.spawnSession` / `openTerminal` / `runInTerminal` / `getSession` / `setWorkspace` / `listSessions`, `workspace.addProject`, `ipc.isRemoteAccessible`, `dialog.*`, and every `issues` and `github` call.
 - `settings.get`, `workspace.list` / `listProjects` and `issues.supportsTransitions` / `supportsCreate` are synchronous. They read a snapshot that the core pushes on every change.
@@ -200,7 +200,7 @@ The workspace package versions shown are the versions in `packages/*/package.jso
 
 A view is an ordinary web page. The core loads it into an `<iframe>` in the main window ([ADR 114](adr/114-extension-views-are-frames-in-the-window.md)). The frame fills the area that the core reserves for the surface:
 
-- The URL is `ext://<extension id>/<manifest.renderer>?view=<view>&repoRoot=<path>`. The `ext://` protocol (`src/main/extensions/ext-protocol.ts`) serves only files inside the extension's directory. It sends `Cache-Control: no-store`.
+- The URL is `ext://<extension id>/<manifest.renderer>?view=<view>&repoRoot=<path>`. The `ext://` protocol (`packages/core-main/src/extensions/ext-protocol.ts`) serves only files inside the extension's directory. It sends `Cache-Control: no-store`.
 - The core injects a small script into the page's `<head>` (`ext://core/frame-shim.js`). The script gives the page `window.electronAPI` over a `MessagePort` to the core. `@terminator/extension-sdk/types/renderer` types it. The script runs before your own module script.
 - The core injects the design system's stylesheet (tokens, icon scale, control resets) the same way. It also stamps `data-theme` on `<html>`.
 - The core gives the frame its port only after the extension's backend has activated (`ExtensionHost.whenActivated`). The frame therefore never calls a channel that is not registered yet.
@@ -419,7 +419,7 @@ Every colour, space, radius, font and layer comes from the `--tm-*` tokens in `p
 - Fonts ship with the app. The `@terminator/extension-ui/fonts` import in your view entry bundles IBM Plex Sans and IBM Plex Mono beside your script. Without the import, your view uses the fonts of the machine.
 - Size lucide icons with the injected classes `tm-icon-sm` (12px), `tm-icon` (14px) and `tm-icon-lg` (16px). The `size` prop is a lint error in `extensions/*/src/**/*.tsx` (Constitution XII).
 - Checkboxes and radios are themed by the injected stylesheet. Do not restyle them; `accent-color` has no effect.
-- Diff and syntax colours (`--tm-diff-*`, `--tm-syntax-*`) clear WCAG AA against their backgrounds in both themes (`tests/unit/renderer/diff-syntax-contrast.spec.ts`).
+- Diff and syntax colours (`--tm-diff-*`, `--tm-syntax-*`) clear WCAG AA against their backgrounds in both themes (`packages/core-renderer/tests/unit/renderer/diff-syntax-contrast.spec.ts`).
 
 `docs/EXTENSION-STYLE.md` holds the house rules: vocabulary, sentence case, button voice, empty states, icons, colour and layering. ESLint enforces its vocabulary rules on `extensions/*/src/**/*.tsx`.
 
@@ -486,7 +486,7 @@ export function activate(api: ExtensionAPI): void {
 }
 ```
 
-A spec that hands `activate` a `globalStorage` creates it with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`. The root `tests/setup.ts` removes it when the spec file ends. CI fails a unit run that leaves any file in the temporary directory (`scripts/check-temp-leaks.mjs`).
+A spec that hands `activate` a `globalStorage` creates it with `makeTempDir(prefix)` from `packages/test-support/src/temp-dir.ts`. The root `packages/test-support/setup.ts` removes it when the spec file ends. CI fails a unit run that leaves any file in the temporary directory (`scripts/check-temp-leaks.mjs`).
 
 ### `api.dialog`
 
@@ -567,7 +567,7 @@ const project = await api.workspace.addProject({
 
 The core attaches an `issue` on a best-effort basis. If the core cannot write the link, `addProject` still returns the project. When `addProject` returns an existing project, the core attaches the issue to it.
 
-`deleteProject(projectId)` removes a project and tells the sidebar. It closes every terminal in the project (`src/main/terminal/project-sessions.ts`). Remove the project when you remove its worktree.
+`deleteProject(projectId)` removes a project and tells the sidebar. It closes every terminal in the project (`packages/core-main/src/terminal/project-sessions.ts`). Remove the project when you remove its worktree.
 
 ### `api.shell`
 
@@ -593,7 +593,7 @@ if (result.exitCode !== 0) {
 | `encoding: 'buffer'` | `stdout` and `stderr` come back as bytes                                                                                                        |
 | `onOutput`           | Each chunk of stdout and stderr as it arrives, in text mode                                                                                     |
 
-Output is never trimmed. The core runs the command in the main process (`src/main/shell/shell-executor.ts`). A command that cannot start reports its spawn error as `stderr`.
+Output is never trimmed. The core runs the command in the main process (`packages/core-main/src/shell/shell-executor.ts`). A command that cannot start reports its spawn error as `stderr`.
 
 **`cwd` must be inside one of your shell roots** ([ADR 102](adr/102-shell-exec-runs-in-declared-roots.md)). The core reads the roots on every call:
 
@@ -775,7 +775,7 @@ api.commands.register({ id: 'quick-create', label: 'New note', mnemonic: 'n' }, 
 
 `extensions/notepad/src/index.ts` (`notepad:quick-create`) and `extensions/task-vault/src/index.ts` (`task-vault:capture-to-inbox`) do this end to end. They use a pending flag that the view reads on mount, for a command that ran before the view existed.
 
-**`shortcut` binds nothing on its own.** The panel shows it beside the action. There is one exception. A manifest command with a `shortcut`, in an extension that contributes a `sidebarPanel`, toggles that panel when the operator presses the shortcut in the main window (`registerWebviewExtension`, `src/renderer/extensions/loader.ts`). To bind a key, use `api.nativeMenu.addViewMenuItem` with an `accelerator` (while Terminator is focused) or `api.globalShortcut.register` (from any app).
+**`shortcut` binds nothing on its own.** The panel shows it beside the action. There is one exception. A manifest command with a `shortcut`, in an extension that contributes a `sidebarPanel`, toggles that panel when the operator presses the shortcut in the main window (`registerWebviewExtension`, `packages/core-renderer/src/extensions/loader.ts`). To bind a key, use `api.nativeMenu.addViewMenuItem` with an `accelerator` (while Terminator is focused) or `api.globalShortcut.register` (from any app).
 
 ### `api.ipc`
 

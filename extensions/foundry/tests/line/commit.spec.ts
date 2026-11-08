@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { commitWorktree, committedSince } from '../../src/line/commit.js'
 import type { ShellExec } from '../../src/line/integrate.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 // A format step that writes leaves the checkout ahead of what CI will see, and
 // the push that follows is only honest when a commit was actually made.

@@ -9,7 +9,7 @@
 import * as fs from 'node:fs'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -17,7 +17,7 @@ import { checkoutPath } from '../../src/line/worktree.js'
 import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import { writeObservedFiles } from '../../src/line/observed-files.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { runningOrder } from '../helpers/order-parts.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))

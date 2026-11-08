@@ -4,10 +4,10 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { spawn as ptySpawn } from 'node-pty'
 import { createSupervisedRunner } from '../../../src/runtime/supervised-runner.js'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import { eventually } from '../../../../../tests/support/eventually'
+import { eventually } from '../../../../../packages/test-support/src/eventually'
 import { scriptOf } from '../../helpers/command-script.js'
 
 // The runner's command scripts, run in real shells and a real node-pty.

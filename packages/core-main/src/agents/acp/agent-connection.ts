@@ -1,0 +1,90 @@
+import { spawn, type ChildProcess } from 'node:child_process'
+import { Readable, Writable } from 'node:stream'
+import {
+  client as clientApp,
+  methods,
+  ndJsonStream,
+  type Stream,
+} from '@agentclientprotocol/sdk/unstable'
+import { loginShellPathReady } from '../../shell/login-shell-path.js'
+import type { AgentsSettings } from '../../../../core-shared/src/schemas/settings.schema.js'
+import { binaryOnPath, CLAUDE_AGENT_ID, resolveAgent } from './agent-registry.js'
+import type { AgentCalls, AgentClient, AgentServiceDeps } from './agent-service.js'
+
+const STDERR_LIMIT = 16 * 1024
+
+/** The last `limit` characters of `text`.
+ * @internal */
+export function keepTail(text: string, limit: number): string {
+  return text.length > limit ? text.slice(-limit) : text
+}
+
+/** A `connect` for the agent service: starts the agent's process and speaks ACP over its
+ * stdin and stdout. */
+export function createConnector(settings: () => AgentsSettings): AgentServiceDeps['connect'] {
+  return async ({ agentId, client }) => {
+    const launch = resolveAgent(settings(), agentId, await claudeFor(agentId))
+    if (!launch) throw new Error(`There is no agent named "${agentId}"`)
+    const child = spawn(launch.command, launch.args, {
+      env: launch.env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    child.stdin.on('error', () => undefined) // The exit event reports a process that is gone.
+    let stderr = ''
+    child.stderr.setEncoding('utf8')
+    child.stderr.on(
+      'data',
+      (chunk: string) => void (stderr = keepTail(stderr + chunk, STDERR_LIMIT))
+    )
+    const exited = exitOf(child)
+    const stream = ndJsonStream(
+      Writable.toWeb(child.stdin),
+      Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>
+    )
+    return {
+      agent: connectClient(client, stream),
+      onExit: (listener) => void exited.then(listener),
+      kill: () => void child.kill(),
+      stderrTail: () => stderr,
+    }
+  }
+}
+
+/** Speaks ACP over `stream` as the client: `client` answers the agent, the result calls it.
+ * @internal */
+export function connectClient(client: AgentClient, stream: Stream): AgentCalls {
+  const { agent, signal } = clientApp()
+    .onRequest(methods.client.session.requestPermission, ({ params }) =>
+      client.requestPermission(params)
+    )
+    .onNotification(methods.client.session.update, ({ params }) => client.sessionUpdate(params))
+    .connect(stream)
+  return {
+    initialize: (params) => agent.request(methods.agent.initialize, params),
+    newSession: (params) => agent.request(methods.agent.session.new, params),
+    loadSession: (params) => agent.request(methods.agent.session.load, params),
+    setSessionMode: (params) => agent.request(methods.agent.session.setMode, params),
+    setSessionConfigOption: (params) =>
+      agent.request(methods.agent.session.setConfigOption, params),
+    prompt: (params) => agent.request(methods.agent.session.prompt, params),
+    cancel: (params) => agent.notify(methods.agent.session.cancel, params),
+    request: (method, params) => agent.request(method, params),
+    signal,
+  }
+}
+
+/** The exit code, or null for a process that could not start. Listened to at once: a spawn
+ * error with no listener would throw in the main process. */
+function exitOf(child: ChildProcess): Promise<number | null> {
+  return new Promise((resolve) => {
+    child.once('exit', (exitCode) => resolve(exitCode))
+    child.once('error', () => resolve(null))
+  })
+}
+
+/** The user's own `claude` for the built-in agent, found once the login-shell PATH is known. */
+async function claudeFor(agentId: string): Promise<string | null> {
+  if (agentId !== CLAUDE_AGENT_ID) return null
+  await loginShellPathReady()
+  return binaryOnPath('claude')
+}

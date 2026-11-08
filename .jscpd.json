@@ -1,5 +1,5 @@
 {
-  "path": ["src", "packages", "extensions"],
+  "path": ["packages", "extensions"],
   "minLines": 6,
   "minTokens": 60,
   "ignore": ["**/*.spec.*", "**/tests/**", "**/stories/**"],

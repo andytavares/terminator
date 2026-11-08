@@ -12,7 +12,7 @@ import {
 } from '../../src/review/review-agent.js'
 import type { AgentScope } from '../../src/schemas/review-agent.schema.js'
 import { FINDING_SEVERITIES } from '../../src/schemas/review-agent.schema.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 type RunOnce = RunAgentReviewDeps['runOnce']
 type AgentReply = Awaited<ReturnType<RunOnce>>

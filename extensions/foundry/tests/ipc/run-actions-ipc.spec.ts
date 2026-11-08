@@ -15,14 +15,14 @@ import { freshFoundryStorage, idleHome } from '../helpers/foundry-host.js'
 const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { activate, deactivate } from '../../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 

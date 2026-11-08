@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { wrapDb } from '../../../../../src/main/db/index'
+import { wrapDb } from '../../../../../packages/core-main/src/db/index'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { registerLinksIpcHandlers } from '../../../src/ipc/links.ipc.js'
 import {

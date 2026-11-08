@@ -1,8 +1,8 @@
 import { vi } from 'vitest'
-import { installExtensionBridge } from '../../../../../tests/support/extension-bridge'
+import { installExtensionBridge } from '../../../../../packages/test-support/src/extension-bridge'
 import type { IndexedProject, IndexedTask } from '../../../src/vault/types'
 
-export { eventually } from '../../../../../tests/support/extension-bridge'
+export { eventually } from '../../../../../packages/test-support/src/extension-bridge'
 
 /** The extension bridge as task-vault's views see it: unanswered channels succeed. */
 export function installVaultBridge(extra: Record<string, unknown> = {}) {

@@ -5,7 +5,7 @@ import { createSignalStore } from '../../src/sensors/store.js'
 import type { SensorState } from '../../src/sensors/store.js'
 import type { SensorDef } from '../../src/sensors/types.js'
 import type { CollectDeps } from '../../src/sensors/collect.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 function tempRoot(): string {
   return makeTempDir('foundry-sensor-schedule-')

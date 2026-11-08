@@ -5,7 +5,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { forceParsing } from '@codemirror/language'
 import { GFM } from '@lezer/markdown'
 import { livePreviewPlugin } from '../../src/editor/livePreview'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // The live preview in a real EditorView: the widgets it draws, what they do when used, and how
 // focusing the editor turns on the raw markdown of the caret's line.

@@ -8,7 +8,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import type { OrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // WO-0909-6db, from the proposal on disk to the screen that had to say so.
 //

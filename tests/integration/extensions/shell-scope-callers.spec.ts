@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { chmodSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
-import { FakeBackendHost } from '../../support/fake-backend-host'
-import { makeTempDir } from '../../support/temp-dir'
+import { FakeBackendHost } from '../../../packages/test-support/src/fake-backend-host'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 import { gitStatusIn } from './status-command'
 
 // Every legitimate caller ADR-006's workspace-only rule would have refused, with its real cwd,
@@ -31,7 +31,7 @@ vi.mock('electron-store', () => ({
 }))
 
 const settings: Record<string, unknown> = {}
-vi.mock('../../../src/main/storage/extension-settings-store', () => ({
+vi.mock('../../../packages/core-main/src/storage/extension-settings-store', () => ({
   getExtensionSetting: (key: string) => settings[key],
   setExtensionSetting: (key: string, value: unknown) => {
     settings[key] = value
@@ -42,7 +42,7 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
 
 const workspaces: Array<{ id: string; name: string; folderPath: string }> = []
 const projects: Array<{ id: string; workspaceId: string; name: string; worktreePath?: string }> = []
-vi.mock('../../../src/main/storage/workspace-store', () => ({
+vi.mock('../../../packages/core-main/src/storage/workspace-store', () => ({
   listWorkspaces: () => workspaces,
   listProjects: (workspaceId: string) => projects.filter((p) => p.workspaceId === workspaceId),
 }))
@@ -69,7 +69,8 @@ function printingStandIn(bin: string, name: string): void {
 const ranIn = () => readFileSync(ran, 'utf8').trim().split('\n')
 
 async function builtIn(name: string, id: string): Promise<ExtensionAPI> {
-  const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+  const { ExtensionHost } =
+    await import('../../../packages/core-main/src/extensions/extension-host')
   const host = new ExtensionHost(new FakeBackendHost())
   host.setDeps({ paths: { app: directory('app'), userData } })
   await host.load(join(BUILT_IN, name))
@@ -98,7 +99,7 @@ afterEach(() => {
 
 describe('a project worktree under git.worktreeBaseDir, outside the workspace folder', () => {
   it('runs git in it once it is a project', async () => {
-    const { suggestWorktreePath } = await import('../../../src/main/git/git-service')
+    const { suggestWorktreePath } = await import('../../../packages/core-main/src/git/git-service')
     const repo = directory('code', 'widgets')
     const worktree = suggestWorktreePath(repo, 'feature/login', directory('worktrees'))
     mkdirSync(worktree)

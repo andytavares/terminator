@@ -1,0 +1,11 @@
+{
+  "name": "@terminator/test-support",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The sealed test environment, guards and fakes every spec uses",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run packages/test-support/"
+  }
+}

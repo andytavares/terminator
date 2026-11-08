@@ -15,7 +15,7 @@ import type { HallMap, HallProp } from '../../../src/factory/layout.js'
 import type { Check } from '../../../src/line/ci.js'
 import { createRecordingPaint } from './paint-fake.js'
 import type { PaintCall } from './paint-fake.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 // Every sign the hall draws is read, so every sign has to stay on its own
 // fixture: a digit that spills past its board lands on the wall beside it.

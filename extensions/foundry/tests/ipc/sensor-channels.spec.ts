@@ -11,7 +11,7 @@ import type { Signal } from '../../src/sensors/types.js'
 import type { SensorDef } from '../../src/sensors/types.js'
 import type { AvailableSensor } from '../../src/ipc/sensor-channels.js'
 import type { CollectDeps } from '../../src/sensors/collect.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 let root: string
 let repo: string

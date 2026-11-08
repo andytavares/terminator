@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { noteOn } from '../../src/line/run-context.js'
 import type { OrderStore } from '../../src/order/store.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 describe('a checkout that had to fall back', () => {
   it('says so in the order ledger', () => {

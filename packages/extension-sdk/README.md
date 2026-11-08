@@ -1,7 +1,7 @@
 # @terminator/extension-sdk
 
 The Extension API that every Terminator extension uses, and the helpers they share.
-`types/api.d.ts` declares the API. The core implements it in `src/main/extensions/api.ts`, and the
+`types/api.d.ts` declares the API. The core implements it in `packages/core-main/src/extensions/api.ts`, and the
 compiler checks that the two agree ([ADR 094](../../docs/adr/094-extensions-follow-the-vs-code-model.md)).
 The version is `6.0.0`. `CHANGELOG.md` lists the changes in each version and how to migrate.
 
@@ -38,7 +38,7 @@ version in this package's `package.json` ([Dependencies](../../docs/EXTENSION-DE
 ## Where a backend runs
 
 Since 4.0.0, every extension backend runs in the extension host: one Electron `utilityProcess`
-that `src/main/extensions/host/host-process.ts` starts and `src/main/extensions/host/entry.ts`
+that `packages/core-main/src/extensions/host/host-process.ts` starts and `packages/core-main/src/extensions/host/entry.ts`
 runs. The API crosses a `MessagePort`. A value the core holds is a promise or a snapshot that the core
 pushes. The host calls a callback by id. `electron` cannot be imported (use `api.paths`,
 `api.dialog` and `api.window`). See
@@ -69,7 +69,7 @@ my-extension/
 └── dist/index.html          the built view, named by manifest.renderer
 ```
 
-`manifest.json`, validated by `ExtensionManifestSchema` in `src/shared/schemas/extension.schema.ts`
+`manifest.json`, validated by `ExtensionManifestSchema` in `packages/core-shared/src/schemas/extension.schema.ts`
 ([The manifest](../../docs/EXTENSION-DEVELOPMENT.md#the-manifest)):
 
 ```json

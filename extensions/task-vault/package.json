@@ -4,7 +4,10 @@
   "private": true,
   "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by the shared SQLite database",
   "scripts": {
-    "build:renderer": "vite build --config vite.renderer.config.mts"
+    "build:renderer": "vite build --config vite.renderer.config.mts",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-task-vault-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-task-vault-tsconfig.view.tsbuildinfo -p tsconfig.view.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-task-vault-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run extensions/task-vault/"
   },
   "dependencies": {
     "@terminator/extension-sdk": "6.3.0",

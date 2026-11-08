@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { wrapDb } from '../../../../../src/main/db/index'
+import { wrapDb } from '../../../../../packages/core-main/src/db/index'
 import { applyTaskVaultSchema } from '../../../src/vault/db'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { seedArea, seedTask, selectTaskRow } from '../../support/vault-db'

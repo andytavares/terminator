@@ -1,0 +1,451 @@
+import { describe, it, expect, vi } from 'vitest'
+import { createLinearProvider } from '../../../../src/integrations/providers/linear.provider'
+import { TrackerError } from '../../../../src/integrations/tracker-error'
+import {
+  DONE_ISSUE,
+  FakeRatelimitedError,
+  VIEWER,
+  makeIssue,
+} from '../../../../../test-support/fixtures/integrations/linear/index'
+import type { StoredCredential } from '../../../../src/integrations/providers/provider'
+
+const CRED: StoredCredential = { tracker: 'linear', apiKey: 'lin_api_key' }
+
+function providerWith(client: Record<string, unknown>) {
+  return createLinearProvider(() => client as never)
+}
+
+describe('linear provider — verify', () => {
+  it('returns the account the key belongs to', async () => {
+    const provider = providerWith({ viewer: Promise.resolve(VIEWER) })
+    await expect(provider.verify(CRED)).resolves.toEqual({
+      name: 'Andrew',
+      email: 'andrew.tavares87@gmail.com',
+    })
+  })
+
+  it('raises auth-failed when the key is rejected', async () => {
+    const provider = providerWith({
+      get viewer() {
+        return Promise.reject(new Error('Authentication required, but no authentication provided'))
+      },
+    })
+    await expect(provider.verify(CRED)).rejects.toMatchObject({ kind: 'auth-failed' })
+  })
+})
+
+describe('linear provider — listMine', () => {
+  it('filters by assignee email and excludes completed/canceled states when one is configured', async () => {
+    const issues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
+    const provider = providerWith({ issues })
+    const result = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 25)
+
+    expect(issues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filter: {
+          state: { type: { nin: ['completed', 'canceled'] } },
+          assignee: { email: { eq: 'a@b.c' } },
+        },
+        first: 25,
+      })
+    )
+    expect(result[0]).toMatchObject({ tracker: 'linear', key: 'TAV-42' })
+  })
+
+  it("falls back to the viewer's own assigned issues when no email is configured, with state filter", async () => {
+    const assignedIssues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
+    const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER, assignedIssues }) })
+    const result = await provider.listMine(CRED, { kind: 'assignee', email: null }, 10)
+
+    expect(assignedIssues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filter: { state: { type: { nin: ['completed', 'canceled'] } } },
+        first: 10,
+      })
+    )
+    expect(result).toHaveLength(1)
+  })
+})
+
+describe('linear provider — listMine summaries', () => {
+  it('normalises state type and carries the tracker label through', async () => {
+    const provider = providerWith({ issues: vi.fn().mockResolvedValue({ nodes: [DONE_ISSUE] }) })
+    const [issue] = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
+    expect(issue.state).toEqual({ name: 'Done', type: 'completed' })
+  })
+
+  it("carries Linear's suggested branch name on the summary, for project prefill", async () => {
+    const provider = providerWith({ issues: vi.fn().mockResolvedValue({ nodes: [makeIssue()] }) })
+    const [issue] = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
+    expect(issue.branchName).toBe('andrew/tav-42-unify-linear')
+  })
+
+  it('reports a null branch name when the issue has none', async () => {
+    const provider = providerWith({
+      issues: vi.fn().mockResolvedValue({ nodes: [makeIssue({ branchName: null })] }),
+    })
+    const [issue] = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
+    expect(issue.branchName).toBeNull()
+  })
+})
+
+describe('linear provider — listMine relations and rate limits', () => {
+  it('resolves the assignee relation rather than leaving a promise', async () => {
+    const provider = providerWith({ issues: vi.fn().mockResolvedValue({ nodes: [makeIssue()] }) })
+    const [issue] = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
+    expect(issue.assignee).toEqual({ name: 'Andrew', email: 'andrew.tavares87@gmail.com' })
+  })
+
+  it('surfaces a rate limit as rate-limited carrying the stated wait', async () => {
+    const provider = providerWith({
+      issues: vi.fn().mockRejectedValue(new FakeRatelimitedError(45)),
+    })
+    await expect(
+      provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
+    ).rejects.toMatchObject({ kind: 'rate-limited', retryAfterMs: 45_000 })
+  })
+})
+
+describe('linear provider — search', () => {
+  it('uses full-text search without state filter, returning completed issues', async () => {
+    const searchIssues = vi.fn().mockResolvedValue({ nodes: [DONE_ISSUE, makeIssue()] })
+    const provider = providerWith({ searchIssues })
+    const result = await provider.search(CRED, 'sidebar', 15)
+
+    // The SDK takes the term first, then the other variables
+    // (LinearClient.searchIssues(term, variables)); search has no state filter.
+    expect(searchIssues).toHaveBeenCalledWith('sidebar', { first: 15 })
+    // Both completed and open issues are returned
+    expect(result).toHaveLength(2)
+    expect(result[0].state.type).toBe('completed')
+  })
+
+  it('returns an empty list when search answers with no connection', async () => {
+    const provider = providerWith({ searchIssues: vi.fn().mockResolvedValue(null) })
+    await expect(provider.search(CRED, 'sidebar', 15)).resolves.toEqual([])
+  })
+
+  it("lists the viewer's own issues when no assignee email is given", async () => {
+    const assignedIssues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
+    const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER, assignedIssues }) })
+    await expect(
+      provider.listMine(CRED, { kind: 'assignee', email: null }, 5)
+    ).resolves.toHaveLength(1)
+    expect(assignedIssues).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('linear provider — get', () => {
+  it('returns a full issue with markdown description, labels and comments', async () => {
+    const provider = providerWith({ issue: vi.fn().mockResolvedValue(makeIssue()) })
+    const issue = await provider.get(CRED, 'TAV-42')
+
+    expect(issue).toMatchObject({
+      tracker: 'linear',
+      id: '11111111-2222-3333-4444-555555555555',
+      key: 'TAV-42',
+      description: '## Summary\n\nLinear is reached from three places today.',
+      labels: ['Improvement'],
+      branchName: 'andrew/tav-42-unify-linear',
+      completed: false,
+    })
+    expect(issue?.comments[0]).toMatchObject({ author: 'andrew' })
+  })
+
+  it('marks an issue complete from its state type', async () => {
+    const provider = providerWith({ issue: vi.fn().mockResolvedValue(DONE_ISSUE) })
+    await expect(provider.get(CRED, 'TAV-38')).resolves.toMatchObject({ completed: true })
+  })
+
+  it('returns null rather than throwing when the issue is gone', async () => {
+    const provider = providerWith({
+      issue: vi.fn().mockRejectedValue(new TrackerError('not-found', 'Entity not found')),
+    })
+    await expect(provider.get(CRED, 'TAV-999')).resolves.toBeNull()
+  })
+})
+
+describe('linear provider — get bounds and defaults', () => {
+  it('bounds comments to the five most recent', async () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      body: `c${i}`,
+      createdAt: `2026-08-2${i}T00:00:00.000Z`,
+      user: Promise.resolve({ name: 'andrew' }),
+    }))
+    const provider = providerWith({
+      issue: vi
+        .fn()
+        .mockResolvedValue(makeIssue({ comments: () => Promise.resolve({ nodes: many }) })),
+    })
+    const issue = await provider.get(CRED, 'TAV-42')
+    expect(issue?.comments).toHaveLength(5)
+  })
+
+  it('never leaves description undefined', async () => {
+    const provider = providerWith({
+      issue: vi.fn().mockResolvedValue(makeIssue({ description: null })),
+    })
+    await expect(provider.get(CRED, 'TAV-42')).resolves.toMatchObject({ description: '' })
+  })
+})
+
+describe('linear provider — comment', () => {
+  it('addresses the issue by UUID, never by the human key', async () => {
+    const createComment = vi.fn().mockResolvedValue({ success: true })
+    const issue = vi.fn().mockResolvedValue(makeIssue())
+    const provider = providerWith({ issue, createComment })
+
+    await provider.comment(CRED, 'TAV-42', 'PR opened')
+
+    expect(issue).toHaveBeenCalledWith('TAV-42')
+    expect(createComment).toHaveBeenCalledWith({
+      issueId: '11111111-2222-3333-4444-555555555555',
+      body: 'PR opened',
+    })
+  })
+
+  it('rejects when the issue cannot be resolved — never silently succeeds', async () => {
+    const provider = providerWith({
+      issue: vi.fn().mockResolvedValue(null),
+      createComment: vi.fn(),
+    })
+    await expect(provider.comment(CRED, 'TAV-999', 'hi')).rejects.toMatchObject({
+      kind: 'not-found',
+    })
+  })
+
+  it('rejects when the tracker refuses the comment', async () => {
+    const provider = providerWith({
+      issue: vi.fn().mockResolvedValue(makeIssue()),
+      createComment: vi.fn().mockResolvedValue({ success: false }),
+    })
+    await expect(provider.comment(CRED, 'TAV-42', 'hi')).rejects.toBeInstanceOf(TrackerError)
+  })
+})
+
+describe('linear provider — credential guard', () => {
+  it('refuses a credential belonging to another tracker', async () => {
+    const provider = providerWith({})
+    await expect(provider.verify({ tracker: 'jira', apiKey: 'k' } as never)).rejects.toBeInstanceOf(
+      TrackerError
+    )
+  })
+})
+
+describe('linear provider — hostile and incomplete responses', () => {
+  it('survives an issue with no labels or comments accessors', async () => {
+    const bare = {
+      id: 'i1',
+      identifier: 'TAV-1',
+      title: 'Bare',
+      url: 'https://x/TAV-1',
+      state: Promise.resolve({ name: 'Todo', type: 'unstarted' }),
+      assignee: Promise.resolve(null),
+    }
+    const provider = providerWith({ issue: vi.fn().mockResolvedValue(bare) })
+    await expect(provider.get(CRED, 'TAV-1')).resolves.toMatchObject({
+      labels: [],
+      comments: [],
+      assignee: null,
+      branchName: null,
+    })
+  })
+})
+
+describe('linear provider — unknown states', () => {
+  it('falls back to backlog for a state type Linear adds later', async () => {
+    const provider = providerWith({
+      issue: vi
+        .fn()
+        .mockResolvedValue(
+          makeIssue({ state: Promise.resolve({ name: 'Triage', type: 'brand-new' }) })
+        ),
+    })
+    await expect(provider.get(CRED, 'TAV-42')).resolves.toMatchObject({
+      state: { name: 'Triage', type: 'backlog' },
+    })
+  })
+
+  it('names an unknown state rather than rendering undefined', async () => {
+    const provider = providerWith({
+      issue: vi.fn().mockResolvedValue(makeIssue({ state: Promise.resolve(null) as never })),
+    })
+    await expect(provider.get(CRED, 'TAV-42')).resolves.toMatchObject({
+      state: { name: 'Unknown', type: 'backlog' },
+    })
+  })
+})
+
+describe('linear provider — empty relations', () => {
+  it('handles a comment whose author relation is empty', async () => {
+    const provider = providerWith({
+      issue: vi.fn().mockResolvedValue(
+        makeIssue({
+          comments: () =>
+            Promise.resolve({
+              nodes: [
+                {
+                  body: 'orphan',
+                  createdAt: '2026-01-01T00:00:00.000Z',
+                  user: Promise.resolve(null),
+                },
+              ],
+            }),
+        })
+      ),
+    })
+    const issue = await provider.get(CRED, 'TAV-42')
+    expect(issue?.comments[0]).toMatchObject({ author: 'Unknown', body: 'orphan' })
+  })
+})
+
+describe('linear provider — empty connections', () => {
+  it('returns an empty list when a connection has no nodes', async () => {
+    const provider = providerWith({ issues: vi.fn().mockResolvedValue(null) })
+    await expect(
+      provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
+    ).resolves.toEqual([])
+  })
+
+  it('returns an empty list when the viewer has no assignedIssues accessor', async () => {
+    const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER }) })
+    await expect(provider.listMine(CRED, { kind: 'assignee', email: null }, 10)).resolves.toEqual(
+      []
+    )
+  })
+
+  it('returns null from get when the SDK yields nothing', async () => {
+    const provider = providerWith({ issue: vi.fn().mockResolvedValue(null) })
+    await expect(provider.get(CRED, 'TAV-42')).resolves.toBeNull()
+  })
+})
+
+describe('linear provider — error mapping', () => {
+  it.each([
+    ['Authentication required', 'auth-failed'],
+    ['Entity not found: Issue', 'not-found'],
+    ['fetch failed', 'unavailable'],
+    ['Rate limit exceeded', 'rate-limited'],
+    ['something else entirely', 'failed'],
+  ])('maps %s to %s', async (message, kind) => {
+    const provider = providerWith({
+      searchIssues: vi.fn().mockRejectedValue(new Error(message)),
+    })
+    await expect(provider.search(CRED, 'x', 5)).rejects.toMatchObject({ kind })
+  })
+
+  it.each([
+    ['AuthenticationError', 'auth-failed'],
+    ['FeatureNotAccessible', 'not-found'],
+    ['NetworkError', 'unavailable'],
+  ])('maps an SDK error typed %s to %s', async (type, kind) => {
+    const provider = providerWith({
+      searchIssues: vi.fn().mockRejectedValue(Object.assign(new Error('x'), { type })),
+    })
+    await expect(provider.search(CRED, 'x', 5)).rejects.toMatchObject({ kind })
+  })
+})
+
+describe('linear provider — error mapping without a wait or for get', () => {
+  it('rate-limits without a stated period still map, carrying no wait', async () => {
+    const provider = providerWith({
+      searchIssues: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('x'), { type: 'Ratelimited' })),
+    })
+    const error = await provider.search(CRED, 'x', 5).catch((e: unknown) => e)
+    expect(error).toMatchObject({ kind: 'rate-limited' })
+    // No period stated, so none is invented — the facade uses its own default.
+    expect((error as { retryAfterMs?: number }).retryAfterMs).toBeUndefined()
+  })
+
+  it('rethrows a get failure that is not not-found', async () => {
+    const provider = providerWith({
+      issue: vi.fn().mockRejectedValue(new Error('Rate limit exceeded')),
+    })
+    await expect(provider.get(CRED, 'TAV-42')).rejects.toMatchObject({ kind: 'rate-limited' })
+  })
+})
+
+function page(count: number, next: string | null, firstId = 0) {
+  return {
+    nodes: Array.from({ length: count }, (_, i) =>
+      makeIssue({ id: `id-${firstId + i}`, identifier: `TAV-${firstId + i}` })
+    ),
+    pageInfo: { hasNextPage: next !== null, endCursor: next },
+  }
+}
+
+describe('linear provider — listMine pages through every open issue', () => {
+  it('returns both pages, asking for the second after the first one cursor', async () => {
+    const issues = vi
+      .fn()
+      .mockResolvedValueOnce(page(2, 'cursor-1', 0))
+      .mockResolvedValueOnce(page(1, null, 2))
+    const provider = providerWith({ issues })
+    const result = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 250)
+
+    expect(result.map((issue) => issue.key)).toEqual(['TAV-0', 'TAV-1', 'TAV-2'])
+    expect(issues).toHaveBeenCalledTimes(2)
+    expect(issues.mock.calls[0][0]).not.toHaveProperty('after')
+    expect(issues.mock.calls[1][0]).toMatchObject({ after: 'cursor-1' })
+  })
+
+  it("pages the viewer's own assigned issues when no email is configured", async () => {
+    const assignedIssues = vi
+      .fn()
+      .mockResolvedValueOnce(page(2, 'cursor-1', 0))
+      .mockResolvedValueOnce(page(2, null, 2))
+    const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER, assignedIssues }) })
+    const result = await provider.listMine(CRED, { kind: 'assignee', email: null }, 250)
+
+    expect(result).toHaveLength(4)
+    expect(assignedIssues.mock.calls[1][0]).toMatchObject({ after: 'cursor-1' })
+  })
+})
+
+describe('linear provider — listMine caps and filter', () => {
+  it('stops at 250 issues however many more the tracker has', async () => {
+    const issues = vi.fn().mockImplementation(async ({ after }: { after?: string }) => {
+      const firstId = after === undefined ? 0 : Number(after)
+      return page(100, String(firstId + 100), firstId)
+    })
+    const provider = providerWith({ issues })
+    const result = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 1000)
+
+    expect(result).toHaveLength(250)
+    expect(issues).toHaveBeenCalledTimes(3)
+  })
+
+  it('stops at the limit a caller passes, and asks for no more than it needs', async () => {
+    const issues = vi.fn().mockResolvedValue(page(10, 'cursor-1'))
+    const provider = providerWith({ issues })
+    const result = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
+
+    expect(result).toHaveLength(10)
+    expect(issues).toHaveBeenCalledTimes(1)
+    expect(issues.mock.calls[0][0]).toMatchObject({ first: 10 })
+  })
+
+  it('keeps only open state types in the filter, so triage and backlog stay in', async () => {
+    const issues = vi.fn().mockResolvedValue(page(1, null))
+    await providerWith({ issues }).listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
+
+    const { nin } = issues.mock.calls[0][0].filter.state.type
+    expect(nin).toEqual(['completed', 'canceled'])
+    expect(nin).not.toContain('triage')
+    expect(nin).not.toContain('backlog')
+  })
+})
+
+describe('linear provider — search still finds closed issues', () => {
+  it('sends no state filter, and returns completed and canceled issues', async () => {
+    const searchIssues = vi
+      .fn()
+      .mockResolvedValue({ nodes: [DONE_ISSUE, makeIssue()], pageInfo: { hasNextPage: false } })
+    const result = await providerWith({ searchIssues }).search(CRED, 'old', 10)
+
+    expect(JSON.stringify(searchIssues.mock.calls[0])).not.toMatch(/completed|canceled|filter/)
+    expect(result[0].state.type).toBe('completed')
+  })
+})

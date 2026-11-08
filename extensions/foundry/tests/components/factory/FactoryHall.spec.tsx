@@ -1,5 +1,5 @@
 import { createChangeBus } from '../../helpers/change-bus.js'
-import { eventually } from '../../../../../tests/support/eventually'
+import { eventually } from '../../../../../packages/test-support/src/eventually'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'

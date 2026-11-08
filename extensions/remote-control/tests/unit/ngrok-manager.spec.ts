@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { isPending } from '../../../../tests/support/pending'
-import { eventually } from '../../../../tests/support/eventually'
+import { isPending } from '../../../../packages/test-support/src/pending'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 const mockSpawn = vi.fn()
 const mockExecSync = vi.fn()

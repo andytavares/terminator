@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { App } from '../../../src/renderer/App'
 import { useNotesStore } from '../../../src/stores/notes.store'
-import { installExtensionBridge } from '../../../../../tests/support/extension-bridge'
+import { installExtensionBridge } from '../../../../../packages/test-support/src/extension-bridge'
 
 vi.mock('../../../src/components/NotepadView', () => ({
   NotepadView: () => <div data-testid="notepad-view" />,

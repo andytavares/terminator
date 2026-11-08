@@ -5,7 +5,7 @@ import { profileKey, readProfile, writeProfile } from '../../src/profile/store.j
 import { emptyProfile } from '../../src/profile/schema.js'
 import { connectIndexes } from '../../src/state/live-index.js'
 import { temporaryDirectory } from '../helpers/foundry-host.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 function announcingApi() {

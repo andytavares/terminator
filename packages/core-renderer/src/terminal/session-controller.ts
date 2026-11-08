@@ -1,0 +1,248 @@
+import { useSessionStore, type NewSessionRequest } from '../stores/session.store'
+import { useWorkspaceStore } from '../stores/workspace.store'
+import { TerminalInstance } from '../components/terminal/TerminalSession'
+import { dispatchNotification } from '../lib/notifications'
+import { latestLineOf } from '../sidebar/screen'
+import { isFocusReport } from '../../../core-shared/src/agent-sessions/ask'
+import { parseChoicePrompt, samePrompt } from '../sidebar/choice-prompt'
+import type { PaneSplitDirection } from '../../../core-shared/src/types/index'
+
+// The single owner of "a live terminal tab": composes the store record, the
+// xterm instance, and the busy/bell/idle wiring. TerminalInstance is a pure
+// view object that emits activity events; only this module translates them
+// into store state and notifications.
+
+function handleBell(sessionId: string): void {
+  const sessionStore = useSessionStore.getState()
+  const session = sessionStore.sessions.get(sessionId)
+  if (!session) return
+  const isActiveSession = sessionStore.getActiveSessionForProject(session.projectId) === sessionId
+  const isActiveProject = useWorkspaceStore.getState().activeProjectId === session.projectId
+  if (isActiveSession && isActiveProject) return
+  sessionStore.incrementBellCount(sessionId)
+  dispatchNotification({
+    type: 'info',
+    title: 'Terminator',
+    message: `${session.tabTitle} needs attention`,
+    key: 'terminalBell',
+    sessionId,
+  })
+}
+
+/**
+ * onBusy fires on every PTY output chunk, so the activity stamp is throttled
+ * here rather than in the store — the store stays a plain reducer with no
+ * timing logic of its own.
+ */
+const ACTIVITY_STAMP_INTERVAL_MS = 1000
+const lastStampedAt = new Map<string, number>()
+
+// The needs-you read (latestLine/choicePrompt) settles at IDLE_DEBOUNCE_MS so
+// detection stays fast; the state icon itself waits this much longer so a
+// brief pause in output (total 1500 + 3500 = 5s quiet) doesn't flip it to
+// Idle and back.
+const WORKING_HOLD_MS = 3500
+const pendingIdle = new Map<string, ReturnType<typeof setTimeout>>()
+
+function clearPendingIdle(sessionId: string): void {
+  const timer = pendingIdle.get(sessionId)
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    pendingIdle.delete(sessionId)
+  }
+}
+
+/** A disposed terminal's throttle and pending idle, which nothing will read again. */
+function forgetTerminal(sessionId: string): void {
+  clearPendingIdle(sessionId)
+  lastStampedAt.delete(sessionId)
+}
+
+/** Returns whether it stamped, so a caller can do its own throttled work on the same beat. */
+function stampActivity(sessionId: string, force = false): boolean {
+  const at = Date.now()
+  const last = lastStampedAt.get(sessionId)
+  if (!force && last !== undefined && at - last < ACTIVITY_STAMP_INTERVAL_MS) return false
+  lastStampedAt.set(sessionId, at)
+  useSessionStore.getState().stampActivity(sessionId, at)
+  return true
+}
+
+function onBusy(sessionId: string, instance: TerminalInstance): void {
+  clearPendingIdle(sessionId)
+  const stamped = stampActivity(sessionId)
+  const store = useSessionStore.getState()
+  store.setSessionBusy(sessionId)
+  // Output moving means a question was answered or redrawn; the next
+  // settle reads it again. A session that never settles still gets its
+  // latest line refreshed, on the activity stamp's once-a-second beat.
+  const session = store.sessions.get(sessionId)
+  if (stamped || session?.choicePrompt !== undefined) {
+    store.setSessionScreen(sessionId, {
+      latestLine: latestLineOf(instance.readVisibleRows(), instance.cursorRow()),
+      choicePrompt: null,
+    })
+  }
+}
+
+function onInput(sessionId: string, data: string): void {
+  if (!isFocusReport(data)) useSessionStore.getState().clearInferredAsk(sessionId)
+}
+
+function onIdle(sessionId: string, instance: TerminalInstance): void {
+  // Unthrottled: idle is the end of a burst, and its timestamp is the one
+  // that decides how stale the session looks from here on.
+  stampActivity(sessionId, true)
+  // Read once per burst, when the screen has stopped moving, rather than
+  // per output chunk across every live terminal. Needs-you detection must
+  // not wait for the working-hold below.
+  const rows = instance.readVisibleRows()
+  useSessionStore.getState().setSessionScreen(sessionId, {
+    latestLine: latestLineOf(rows, instance.cursorRow()),
+    choicePrompt: parseChoicePrompt(rows),
+  })
+  clearPendingIdle(sessionId)
+  pendingIdle.set(
+    sessionId,
+    setTimeout(() => {
+      pendingIdle.delete(sessionId)
+      useSessionStore.getState().setSessionIdle(sessionId)
+    }, WORKING_HOLD_MS)
+  )
+}
+
+function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInstance {
+  const instance: TerminalInstance = new TerminalInstance(sessionId, scrollbackLimit, {
+    onBell: () => handleBell(sessionId),
+    onBusy: () => onBusy(sessionId, instance),
+    onInput: (data) => onInput(sessionId, data),
+    onIdle: () => onIdle(sessionId, instance),
+    onDispose: () => forgetTerminal(sessionId),
+  })
+  return instance
+}
+
+/**
+ * Says why a terminal never opened.
+ *
+ * As an error, which the notification system always delivers as a toast
+ * whatever the operator's settings say — the alternative here is a click that
+ * does nothing at all, which is not an improvement on a tab that dies.
+ */
+function reportStartFailure(error: unknown): void {
+  dispatchNotification({
+    type: 'error',
+    title: 'Could not open a terminal',
+    message: error instanceof Error ? error.message : String(error),
+    key: 'terminalStartFailed',
+  })
+}
+
+export async function createTerminalSession(request: NewSessionRequest): Promise<string> {
+  const store = useSessionStore.getState()
+  let sessionId: string
+  try {
+    sessionId = await store.createSession(request)
+  } catch (error) {
+    reportStartFailure(error)
+    throw error
+  }
+  const instance = buildInstance(sessionId, request.scrollbackLimit)
+  // Store the instance first, then activate — TerminalPane's effect fires after
+  // both updates land so getTerminalInstance() is guaranteed to return the instance.
+  store.setTerminalInstance(sessionId, instance)
+  if (request.background === true) return sessionId
+  store.setActiveSessionForProject(request.projectId, sessionId)
+  store.requestFocus(sessionId)
+  return sessionId
+}
+
+/**
+ * Takes over a terminal the main process already spawned.
+ *
+ * A supervised agent's terminal is created there, because that is where the
+ * session is started from. The store record alone is not a tab you can see:
+ * without an xterm instance nothing ever mounts, and the operator opens the
+ * project to find it empty — which is the invisible agent this runtime exists
+ * to have got rid of.
+ */
+export function adoptTerminalSession(adopted: {
+  sessionId: string
+  projectId: string
+  tabTitle: string
+  scrollbackLimit: number
+  surface?: 'terminal' | 'agent'
+  cwd?: string
+}): void {
+  const store = useSessionStore.getState()
+  if (store.sessions.has(adopted.sessionId)) return
+  store.adoptSession(adopted)
+  // An agent tab draws its transcript, not a terminal.
+  if (adopted.surface === 'agent') return
+  // `adoptSession` shows it when the project has nothing selected and keeps an
+  // existing selection, so a supervised run starting in the background does not
+  // take the operator away from the terminal they are reading.
+  store.setTerminalInstance(
+    adopted.sessionId,
+    buildInstance(adopted.sessionId, adopted.scrollbackLimit)
+  )
+}
+
+/** Where a new terminal opens, and how much of its output it keeps. */
+export interface TerminalPlace {
+  cwd: string
+  scrollbackLimit: number
+}
+
+export async function splitTerminalSession(
+  projectId: string,
+  direction: PaneSplitDirection,
+  { cwd, scrollbackLimit }: TerminalPlace
+): Promise<void> {
+  const store = useSessionStore.getState()
+  const focusedId =
+    store.getFocusedSession(projectId) ?? store.getActiveSessionForProject(projectId)
+  if (!focusedId) return
+
+  // Pin split panes to the root session (one level of nesting max).
+  const focusedSession = store.sessions.get(focusedId)
+  const parentSessionId = focusedSession?.parentSessionId ?? focusedId
+
+  // Rejects to the caller rather than reporting here: the split shortcut has
+  // its own notification key, and two toasts for one failure is noise.
+  const sessionId = await store.createSession({
+    projectId,
+    type: 'human',
+    title: '',
+    cwd,
+    scrollbackLimit,
+    parentSessionId,
+  })
+  const instance = buildInstance(sessionId, scrollbackLimit)
+  store.setTerminalInstance(sessionId, instance)
+  store.activateSplit(projectId, { targetId: focusedId, newId: sessionId, direction })
+}
+
+/**
+ * Answers a session's numbered prompt as if its number were typed.
+ *
+ * The screen is read again first: the prompt the button was drawn from may
+ * have been answered in the terminal, or replaced, since. Only the same options
+ * on screen now get the keypress; otherwise nothing is sent and the buttons go.
+ * A bare digit answers a Claude Code select prompt (verified live on 2.1.273).
+ */
+export function answerChoice(sessionId: string, number: number): boolean {
+  const store = useSessionStore.getState()
+  const session = store.sessions.get(sessionId)
+  const instance = store.getTerminalInstance(sessionId)
+  // An agent tab asks through the protocol; there is no screen to read.
+  if (session === undefined || instance === undefined || session.surface === 'agent') return false
+  const onScreen = parseChoicePrompt(instance.readVisibleRows())
+  const offered = onScreen?.options.some((o) => o.number === number) === true
+  if (!samePrompt(session.choicePrompt ?? null, onScreen) || !offered) {
+    store.setSessionScreen(sessionId, { latestLine: session.latestLine ?? '', choicePrompt: null })
+    return false
+  }
+  window.electronAPI.terminal.input(sessionId, String(number))
+  return true
+}

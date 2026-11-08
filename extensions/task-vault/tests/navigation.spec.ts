@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { openInVault, popPendingNavigation } from '../src/navigation.js'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import { partialFake } from '../../../tests/support/fakes'
+import { partialFake } from '../../../packages/test-support/src/fakes'
 
 // Three callers want to take you to a task — the calendar drawer, a due-task
 // notification, a blocked-task check-in — and until this only the first worked.

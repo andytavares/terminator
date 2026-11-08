@@ -4,7 +4,7 @@ import { join } from 'path'
 import { pushBranch } from '../../src/git/git-service.js'
 import { bindRealShell } from '../unit/support/shell'
 import { GIT_FREE_ENV } from '../unit/support/git-repo'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // No signing and no hooks from the developer's own git config: a signer made each commit slow.
 const git = (cwd: string, args: string[]) =>

@@ -3,19 +3,25 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentPermissionAsk } from '@terminator/extension-sdk'
-import { createAgentLog } from '../../src/main/agents/acp/agent-log'
-import { createConnector } from '../../src/main/agents/acp/agent-connection'
-import { createAgentService, type AgentService } from '../../src/main/agents/acp/agent-service'
-import { makeTempDir, removeTempDirs } from '../support/temp-dir'
+import { createAgentLog } from '../../packages/core-main/src/agents/acp/agent-log'
+import { createConnector } from '../../packages/core-main/src/agents/acp/agent-connection'
+import {
+  createAgentService,
+  type AgentService,
+} from '../../packages/core-main/src/agents/acp/agent-service'
+import { makeTempDir, removeTempDirs } from '../../packages/test-support/src/temp-dir'
 
 // The real Claude Code adapter and the user's own `claude`, signed in. Run with `npm run test:live`.
 // Costs a few cents: the model is haiku.
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
-vi.mock('../../src/main/logger', () => ({
+vi.mock('../../packages/core-main/src/logger', () => ({
   makeLogger: () => ({ error: console.error, warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }))
-vi.mock('../../src/main/agents/ask-watcher', () => ({ raiseAsk: vi.fn(), clearAsk: vi.fn() }))
+vi.mock('../../packages/core-main/src/agents/ask-watcher', () => ({
+  raiseAsk: vi.fn(),
+  clearAsk: vi.fn(),
+}))
 
 const META = { claudeCode: { options: { model: 'haiku' } } }
 

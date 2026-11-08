@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import {

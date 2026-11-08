@@ -1,0 +1,14 @@
+{
+  "name": "@terminator/core-renderer-remote",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The browser and mobile renderer that Remote Control serves",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run packages/core-renderer-remote/"
+  },
+  "dependencies": {
+    "@terminator/core-shared": "1.0.0"
+  }
+}

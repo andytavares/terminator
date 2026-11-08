@@ -12,7 +12,7 @@ import {
   useLoadPrQueue,
 } from '../../src/hooks/usePrReview'
 import type { Chapter, PrChangedFile, PrReviewDetail } from '../../src/schemas/pr-review.schema'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {

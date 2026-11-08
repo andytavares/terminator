@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 
 const mockAddToast = vi.fn()
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
+vi.mock('../../../../packages/core-renderer/src/stores/toast.store', () => ({
   useToastStore: () => ({ addToast: mockAddToast }),
 }))
 

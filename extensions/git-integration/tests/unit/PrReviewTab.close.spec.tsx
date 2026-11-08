@@ -6,7 +6,7 @@ import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore, sessionKey } from '../../src/stores/pr-review.store'
 import { ReviewSessionSchema } from '../../src/schemas/pr-review.schema'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 // What the main process does: it parses the session and replaces the stored one.
 const storedSessions = vi.hoisted(() => new Map<string, unknown>())

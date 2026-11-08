@@ -4,8 +4,8 @@ import { extensionFrame, findExtensionFrame } from './extension-page'
 import { expectCentredInWindow } from './modal-centre'
 
 // Working an extension from the keyboard (feature 036, ADR 114). The double-Escape exit and its
-// guards are unit tests: tests/unit/extension-frame/frame-shim.spec.ts and
-// tests/unit/shared/double-escape.spec.ts.
+// guards are unit tests: packages/core-shared/tests/unit/extension-frame/frame-shim.spec.ts and
+// packages/core-shared/tests/unit/shared/double-escape.spec.ts.
 
 let handle: AppHandle
 

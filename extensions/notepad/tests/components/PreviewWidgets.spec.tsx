@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import type { EditorView } from '@codemirror/view'
 import { TableWidget, AlertHeaderWidget } from '../../src/editor/livePreview'
 import { parseTable, ALERT_KINDS } from '../../src/editor/markdownTable'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 function makeView(docLength = 10_000) {
   const dispatch = vi.fn()

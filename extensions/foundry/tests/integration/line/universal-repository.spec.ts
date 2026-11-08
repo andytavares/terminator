@@ -20,7 +20,7 @@ import { createGateStore } from '../../../src/gates/store.js'
 import { orderStoreAt } from '../../../src/state/live-index.js'
 import type { WorkOrder } from '../../../src/order/schema.js'
 import type { GateRuleId } from '../../../src/gates/rules.js'
-import { eventually } from '../../../../../tests/support/eventually'
+import { eventually } from '../../../../../packages/test-support/src/eventually'
 
 vi.mock(
   '../../../src/runtime/supervised-runner.js',

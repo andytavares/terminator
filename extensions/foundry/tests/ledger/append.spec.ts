@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { appendEntry, readEntries } from '../../src/ledger/append.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // The ledger is the record of every decision, by whom or by what rule, and why
 // (FR-078). It is append-only: a reversal is a new entry, never a rewritten

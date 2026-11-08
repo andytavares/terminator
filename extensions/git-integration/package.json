@@ -4,7 +4,10 @@
   "private": true,
   "description": "Git & GitHub integration extension for Terminator",
   "scripts": {
-    "build:renderer": "vite build --config vite.renderer.config.mts"
+    "build:renderer": "vite build --config vite.renderer.config.mts",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-git-integration-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-git-integration-tsconfig.view.tsbuildinfo -p tsconfig.view.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-git-integration-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run extensions/git-integration/"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",

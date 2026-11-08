@@ -2,14 +2,14 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import { usePaneWidth } from '../../src/hooks/usePaneWidth'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 function Pane() {
   const { paneRef, width } = usePaneWidth()
   return <div ref={paneRef}>{width === null ? 'not measured' : `${width}px`}</div>
 }
 
-/** The observers the hook made; tests/setup.ts installs one that never reports. */
+/** The observers the hook made; packages/test-support/setup.ts installs one that never reports. */
 const observers = new Set<{ callback: ResizeObserverCallback; targets: Set<Element> }>()
 
 class FakeResizeObserver {

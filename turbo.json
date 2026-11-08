@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  // Turborepo runs each workspace's checks side by side. Nothing is cached: every run checks
+  // everything once (Constitution XIV, ADR 151). The root tasks cover what no workspace owns.
+  "envMode": "loose",
+  "tasks": {
+    "typecheck": { "cache": false },
+    "lint": { "cache": false },
+    "test": { "cache": false },
+    "//#typecheck:specs": { "cache": false },
+    "//#lint:root": { "cache": false }
+  }
+}

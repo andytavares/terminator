@@ -8,8 +8,8 @@ import { rulesFor, rulesAtRung } from '../../src/verify/rules.js'
 import { CHECK_NAMES } from '../../src/verify/check-names.js'
 import type { Toolchain } from '../../src/verify/toolchain-probe.js'
 import type { RiskAssessment } from '../../src/order/schema.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { partialFake } from '../../../../tests/support/fakes'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import type { Rule } from '../../src/recipe/parse.js'
 
 // Two properties matter more than the ordering: a failure stops the climb at

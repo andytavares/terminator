@@ -9,7 +9,7 @@ import { WsTicketStore } from '../../src/server/ws-ticket-store'
 import { WsSubscriberManager } from '../../src/server/ws-subscriber-manager'
 import { ConnectedDeviceRegistry } from '../../src/server/connected-devices'
 import { createFakePtyManager, type FakePtyManager } from './helpers/fake-pty-manager'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 let ptyManager: FakePtyManager
 let ticketStore: WsTicketStore

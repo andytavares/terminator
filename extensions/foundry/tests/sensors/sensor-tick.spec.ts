@@ -10,14 +10,14 @@ import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost
 
-// Each test activates Foundry afresh: the fake clock only lasts one test (tests/setup.ts), and the
+// Each test activates Foundry afresh: the fake clock only lasts one test (packages/test-support/setup.ts), and the
 // interval the sensors tick on is made at activation.
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-sensors')

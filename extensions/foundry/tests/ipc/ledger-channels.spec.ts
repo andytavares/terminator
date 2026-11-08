@@ -15,7 +15,7 @@ import type { LedgerEntry } from '../../src/ledger/append.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // The real built-in directory, so a test asking for "the skills that ship
 // with the tool" is asking about the ones that actually do.

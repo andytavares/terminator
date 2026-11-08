@@ -1,7 +1,7 @@
 import { test, type ElectronApplication } from '@playwright/test'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import { orOnHang } from '../support/hang-bound'
+import { orOnHang } from '../../packages/test-support/src/hang-bound'
 
 // With E2E_IPC_TRACE=<dir>, writes <spec>.jsonl per spec file there: one [kind, channel, payload]
 // line per renderer invoke or send and per event main pushed, the evidence behind

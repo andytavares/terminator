@@ -1,0 +1,106 @@
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
+import { makeTempDir } from '../../../../test-support/src/temp-dir'
+
+let userData: string
+
+vi.mock('electron', () => ({
+  app: { getPath: () => userData },
+  safeStorage: {
+    isEncryptionAvailable: () => true,
+    encryptString: (value: string) => Buffer.from(`enc:${value}`, 'utf8'),
+    decryptString: (buf: Buffer) => buf.toString('utf8').replace(/^enc:/, ''),
+  },
+}))
+
+const providers = vi.hoisted(() => ({
+  linear: { id: 'linear', get: vi.fn().mockResolvedValue(null) },
+}))
+
+vi.mock('../../../src/integrations/providers/linear.provider', () => ({
+  createLinearProvider: vi.fn(() => providers.linear),
+}))
+
+// The service records each call's outcome with a write nobody awaits
+// (`void setLastError`). Each test waits for its writes, so none lands in a
+// later test's userData or in a directory already removed.
+const lastErrorWrites = vi.hoisted(() => [] as Promise<void>[])
+vi.mock('../../../src/integrations/tracker-store', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../../src/integrations/tracker-store')>()
+  return {
+    ...real,
+    setLastError: (...args: Parameters<typeof real.setLastError>) => {
+      const write = real.setLastError(...args)
+      lastErrorWrites.push(write)
+      return write
+    },
+  }
+})
+afterEach(() => Promise.all(lastErrorWrites.splice(0)))
+
+const LINEAR = { tracker: 'linear', apiKey: 'k' } as const
+
+let trackers: typeof import('../../../src/integrations/tracker-store')
+
+async function load() {
+  return import('../../../src/integrations/index')
+}
+
+beforeEach(async () => {
+  vi.clearAllMocks()
+  vi.resetModules()
+  userData = makeTempDir('integrations-index-')
+  trackers = await import('../../../src/integrations/tracker-store')
+  await trackers.setCredential(LINEAR)
+})
+
+describe('integrations composition root', () => {
+  it('hands out one service, so a cached issue is shared across every surface', async () => {
+    const mod = await load()
+    expect(mod.getIssueService()).toBe(mod.getIssueService())
+  })
+
+  it('builds a fresh service after a reset — a new credential needs a new client', async () => {
+    const mod = await load()
+    const first = mod.getIssueService()
+    mod.resetIssueService()
+    expect(mod.getIssueService()).not.toBe(first)
+  })
+
+  it('wires the Linear provider in', async () => {
+    const mod = await load()
+    const service = mod.getIssueService()
+    await service.get('linear', 'TAV-1')
+    expect(providers.linear.get).toHaveBeenCalledWith(LINEAR, 'TAV-1')
+  })
+})
+
+describe('integrations composition root — errors and credentials', () => {
+  it('records a tracker error against the connection so settings can show it', async () => {
+    const mod = await load()
+    // Built from the freshly-loaded module graph: vi.resetModules() gives the
+    // service its own copy of the class, and `instanceof` across the two
+    // copies is false.
+    const { TrackerError } = await import('../../../src/integrations/tracker-error')
+    providers.linear.get.mockRejectedValueOnce(new TrackerError('auth-failed', 'revoked'))
+    await mod
+      .getIssueService()
+      .get('linear', 'TAV-1')
+      .catch(() => null)
+    // The store answers a read after the writes asked for before it, and the
+    // error was recorded before get() rejected.
+    expect(await trackers.listConnections()).toContainEqual(
+      expect.objectContaining({ tracker: 'linear', lastError: 'auth-failed' })
+    )
+  })
+
+  it('reads credentials from the store rather than holding its own', async () => {
+    const mod = await load()
+    const service = mod.getIssueService()
+    await trackers.setCredential({ tracker: 'linear', apiKey: 'rotated' })
+    await service.get('linear', 'TAV-1')
+    expect(providers.linear.get).toHaveBeenCalledWith(
+      { tracker: 'linear', apiKey: 'rotated' },
+      'TAV-1'
+    )
+  })
+})

@@ -33,7 +33,7 @@ function middleValue(values) {
   return sorted[Math.floor(sorted.length / 2)]
 }
 
-// The utilityProcess serviceName src/main/extensions/host/host-process.ts gives the host.
+// The utilityProcess serviceName packages/core-main/src/extensions/host/host-process.ts gives the host.
 const HOST_NAME = 'Extension Host'
 
 // The host's working set and peak in MB, or null when no host is running.

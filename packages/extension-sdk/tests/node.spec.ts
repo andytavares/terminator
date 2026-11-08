@@ -7,7 +7,7 @@ import {
   shellQuote,
   writeJsonAtomic,
 } from '@terminator/extension-sdk/node'
-import { makeTempDir } from '../../../tests/support/temp-dir'
+import { makeTempDir } from '../../test-support/src/temp-dir'
 
 describe('writeJsonAtomic', () => {
   let dir: string

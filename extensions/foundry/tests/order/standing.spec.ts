@@ -5,7 +5,7 @@ import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { StandingInput } from '../../src/order/standing.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 // One answer to "what is this order doing, and whose move is it".
 //

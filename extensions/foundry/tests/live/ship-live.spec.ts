@@ -11,7 +11,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
-import { requiredLiveEnv } from '../../../../tests/support/live-env'
+import { requiredLiveEnv } from '../../../../packages/test-support/src/live-env'
 
 // The one thing the whole suite could never prove: that `git push` and
 // `gh pr create --draft` do what this code believes they do.
@@ -117,7 +117,7 @@ function commitTheChangeInAWorktree(): void {
   gitIn(worktree, 'commit', '-m', 'read the session TTL from the environment')
 }
 
-/** vitest.live.config.ts has no tests/setup.ts, so this spec removes its own directory, and
+/** vitest.live.config.ts has no packages/test-support/setup.ts, so this spec removes its own directory, and
  * `git worktree prune` drops the live checkout's record of the worktree inside it. */
 function removeTheLiveRecords(): void {
   fs.rmSync(dataRoot, { recursive: true, force: true })

@@ -4,7 +4,7 @@ import { render, cleanup } from '@testing-library/react'
 import { HallScene, sceneActivity, drawOrderY } from '../../../src/components/factory/HallScene.js'
 import type { HallMap, HallProp } from '../../../src/factory/layout.js'
 import type { Crew, World } from '../../../src/factory/sim.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 // jsdom has no canvas at all, so every 2D context here is a fake this spec
 // records calls on. The point of these tests is the render loop's lifecycle

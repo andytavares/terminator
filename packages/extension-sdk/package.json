@@ -43,5 +43,10 @@
   "devDependencies": {
     "vite": "8.3.5"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-extension-sdk-tsconfig.tsbuildinfo -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run packages/extension-sdk/"
+  }
 }

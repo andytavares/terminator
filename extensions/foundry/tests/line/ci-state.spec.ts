@@ -5,7 +5,7 @@ import { ciLabel } from '../../src/line/ci-label.js'
 import type { CiState } from '../../src/line/ci-state.js'
 import { readTimeline } from '../../src/factory/timeline-store.js'
 import { orderDir } from '../../src/data-root.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 let root: string
 

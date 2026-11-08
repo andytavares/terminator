@@ -26,7 +26,7 @@ export function bundledExtensionIds(extensionsDirectory) {
 }
 
 const ERROR_PATTERNS = [
-  // A main-process log line at ERROR level (src/main/logger.ts).
+  // A main-process log line at ERROR level (packages/core-main/src/logger.ts).
   /^\S+ ERROR \[.*$/gm,
   // Electron's report of an uncaught exception in main.
   /^.*(Uncaught Exception|A JavaScript error occurred in the main process).*$/gm,
@@ -82,7 +82,7 @@ function sizeOf(path) {
   return existsSync(path) ? readFileSync(path).length : 0
 }
 
-/** The app's environment: logging on, in the background (src/main/background-mode.ts), so a
+/** The app's environment: logging on, in the background (packages/core-main/src/background-mode.ts), so a
  * smoke run neither shows a window nor takes focus, and in a fresh `home`: the app writes hooks
  * into ~/.claude/settings.json, which must be neither the developer's nor different from CI's. */
 export function launchEnvironment(env, home) {
