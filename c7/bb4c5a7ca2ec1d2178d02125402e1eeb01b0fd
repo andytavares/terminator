@@ -1,0 +1,63 @@
+extensions/git-integration/tests/unit/insights.spec.ts
+  s_7a27f124c1e8e3::t_c152f0eb0f145c 136-137
+extensions/git-integration/tests/unit/ConflictHeader.spec.tsx
+  s_7a27f124c1e8e3::t_d8461821e6ea10 70,90,109,129,149,168,187,206,226,246
+extensions/foundry/src/components/Orders.tsx
+  s_7a27f124c1e8e3::t_bbe2dc4a46c230 784
+extensions/foundry/tests/components/order-frame.spec.tsx
+  s_7a27f124c1e8e3::t_03a0597ebdcc83 60-69,82
+extensions/foundry/tests/components/factory/HallThumbnail.spec.tsx
+  s_7a27f124c1e8e3::t_ab3d41703fc6e4 97,100,108,111,121,126,135,140
+extensions/git-integration/src/components/merge-flow/ConflictHeader.tsx
+  s_7a27f124c1e8e3::t_d8461821e6ea10 5,9,116
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_7a27f124c1e8e3::t_7a863715ef49a5 55,1436
+extensions/foundry/tests/components/App.spec.tsx
+  s_7a27f124c1e8e3::t_01f8ffbfd22ac1 10,127
+extensions/git-integration/src/ipc/github/pr-detail.ts
+  s_7a27f124c1e8e3::t_ac0614e6bf6fa4 105-106
+extensions/git-integration/src/github/pr-review-service.ts
+  s_7a27f124c1e8e3::t_53e99778dcdc5d 149
+extensions/foundry/src/components/Floor.tsx
+  s_7a27f124c1e8e3::t_7a863715ef49a5 939,942
+extensions/foundry/tests/helpers/off-screen-observer.ts
+  s_7a27f124c1e8e3::t_c8ffe100199cf1 1-13
+extensions/foundry/src/components/factory/HallThumbnail.tsx
+  s_7a27f124c1e8e3::t_ab3d41703fc6e4 31,45-46
+extensions/foundry/tests/components/Orders.spec.tsx
+  s_7a27f124c1e8e3::t_62f3e9a323e12b 64,105
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_7a27f124c1e8e3::t_5ee26c3c0f5594 252,259
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_7a27f124c1e8e3::t_b3915f652a46e8 41-42
+extensions/git-integration/src/review/moved-blocks.ts
+  s_7a27f124c1e8e3::t_71161da2acb9e2 58-60
+extensions/git-integration/tests/unit/merge-flow.store.spec.ts
+  s_7a27f124c1e8e3::t_ae3ace1addb6d5 107,117,255,291,321
+extensions/foundry/tests/components/order-document.spec.tsx
+  s_7a27f124c1e8e3::t_01f8ffbfd22ac1 5,38
+  s_7a27f124c1e8e3::t_269705759c5c75 45-55,64
+extensions/foundry/tests/components/orders-seed-and-end.spec.tsx
+  s_7a27f124c1e8e3::t_b3aab508b6a47c 37-45
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_7a27f124c1e8e3::t_ac3b1f2ca5e01e 79-80,82
+  s_7a27f124c1e8e3::t_01f8ffbfd22ac1 9,81
+extensions/git-integration/src/components/merge-flow/ConflictResolver.tsx
+  s_7a27f124c1e8e3::t_d8461821e6ea10 311
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c7bb4c5a7ca2ec1d2178d02125402e1eeb01b0fd",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

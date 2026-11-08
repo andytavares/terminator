@@ -1,0 +1,188 @@
+tests/unit/renderer/quick-actions/custom-actions.spec.ts
+  s_7a27f124c1e8e3::t_614bc22e7eeda3 5,86-111,114-146,149,151,175
+  s_7a27f124c1e8e3::t_e8a6c0da707821 147-148,150
+tests/unit/renderer/components/WallTile.spec.tsx
+  s_7a27f124c1e8e3::t_ef578f7f331e1e 118,121
+tests/unit/renderer/sidebar/views.spec.ts
+  s_7a27f124c1e8e3::t_6cb9555726133b 282,285,287
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_7a27f124c1e8e3::t_de29bff329b448 391,669
+tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_7a27f124c1e8e3::t_282516634e3a86 46,128
+tests/unit/packages/extension-ui/edges.spec.tsx
+  s_7a27f124c1e8e3::t_0f077dc32c0734 3
+tests/unit/renderer/App.spec.tsx
+  s_7a27f124c1e8e3::t_5b5f3cb90c10f1 495,502,504,544,551,553-554,692-696,700-701
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_7a27f124c1e8e3::t_2757bc5bbbfbbf 182-185,191,208,254-261,263-266,270
+  s_7a27f124c1e8e3::t_445e7f5bbdc6b0 15-16,22,24,262,271,273-275,326
+tests/unit/renderer/components/PromptPane.spec.tsx
+  s_7a27f124c1e8e3::t_e060d0ad70d6e2 63-69
+tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_7a27f124c1e8e3::t_9e82fe2c4bd0f5 98,108-117,119-128,130-135,137,146,203-209,281-282
+  s_7a27f124c1e8e3::t_9c2de7b8f041e9 129
+  s_7a27f124c1e8e3::t_894bda555a9330 118
+tests/unit/main/logger.spec.ts
+  s_7a27f124c1e8e3::t_7301d55d4d452e 36-40
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_7a27f124c1e8e3::t_3a3ec571852903 93,351-352,354,375-376,391-395,397
+  s_7a27f124c1e8e3::t_8ee3bf9eec2eb1 355-373
+tests/unit/renderer/components/QuickActionsSettings.spec.tsx
+  s_7a27f124c1e8e3::t_7928e4861021f0 39,57,59,165-174,178-180,182
+  s_7a27f124c1e8e3::t_374ba9927f46dd 40-54,163-164
+  s_7a27f124c1e8e3::t_dfbbd28bfa6c9a 154-162,175,185,187
+tests/unit/extensions/pr-review.store.spec.ts
+  s_7a27f124c1e8e3::t_526935a9fd5ae0 154
+tests/unit/renderer/sidebar/wall-prefs.spec.ts
+  s_7a27f124c1e8e3::t_c2ccd010604db6 45,47
+  s_7a27f124c1e8e3::t_489c0df935cef1 28-33
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 181,303,356
+tests/unit/renderer/sidebar/agent-state.spec.ts
+  s_7a27f124c1e8e3::t_73c29817f7b150 38-39
+tests/unit/renderer/components/ScheduledView.spec.tsx
+  s_7a27f124c1e8e3::t_3d243a3e367c81 191
+  s_7a27f124c1e8e3::t_7928e4861021f0 154-168,170-174
+  s_7a27f124c1e8e3::t_1e9e5c94682abe 126-129,131-133,136-145,147,153
+  s_7a27f124c1e8e3::t_dfbbd28bfa6c9a 152,176,178
+tests/unit/renderer/components/dropped-paths.spec.ts
+  s_7a27f124c1e8e3::t_f3473fd2382c30 2-19,21-31
+  s_7a27f124c1e8e3::t_202a95c96840bc 1
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 20
+tests/unit/renderer/quick-actions/use-core-quick-actions.spec.tsx
+  s_7a27f124c1e8e3::t_3d243a3e367c81 72-73
+tests/unit/renderer/sidebar/branch-rows.spec.ts
+  s_7a27f124c1e8e3::t_e2688ed29ec45b 450-451,454,479
+tests/unit/ipc/log.ipc.spec.ts
+  s_7a27f124c1e8e3::t_4c5ccefeaeb07e 31-36,39
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_7a27f124c1e8e3::t_a8d6be023ca37f 77,203-207,211,415,418,420-421,430-431
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 419
+tests/unit/ConfirmDialog.spec.tsx
+  s_7a27f124c1e8e3::t_77c9b87513e936 1-2
+tests/unit/packages/extension-ui/layers.spec.ts
+  s_7a27f124c1e8e3::t_a8d23c79879750 38-44
+tests/unit/shell/shell-executor.spec.ts
+  s_7a27f124c1e8e3::t_4c5ccefeaeb07e 15-16,19-20
+tests/unit/shell/login-shell-path.spec.ts
+  s_7a27f124c1e8e3::t_b71f602163c6a6 4
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_7a27f124c1e8e3::t_e75c539b1210ab 89
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_7a27f124c1e8e3::t_e503c7a6c6bded 659-665,667,802,1261-1264,1267-1269
+  s_7a27f124c1e8e3::t_29e2dbf5ff9869 1282
+tests/unit/renderer/components/ResumeButton.spec.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 38-42
+tests/unit/renderer/components/AppBand.spec.tsx
+  s_7a27f124c1e8e3::t_d0933e77babff5 26-35,46,49-51,53,55,62-65
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_7a27f124c1e8e3::t_43dd52331997d4 165-169,174-176
+tests/unit/renderer/components/TerminalRow.spec.tsx
+  s_7a27f124c1e8e3::t_982da66a6c1022 44
+tests/unit/extensions/api.spec.ts
+  s_7a27f124c1e8e3::t_7e0e79a3fdbf0e 503-517,519
+tests/unit/renderer-remote/App.spec.tsx
+  s_7a27f124c1e8e3::t_b6938203dd30a1 24-27,33,40,44,60,82,99
+  s_7a27f124c1e8e3::t_5b5f3cb90c10f1 28-32,34-38
+  s_7a27f124c1e8e3::t_24a54a5a3b6274 39
+tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_7a27f124c1e8e3::t_5765aa0150d3cb 88,91-95,98,150-154,157,181,219,227,230,236
+tests/unit/renderer-remote/mobile/MobileApp.spec.tsx
+  s_7a27f124c1e8e3::t_57e7227a0ad623 64
+tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_7a27f124c1e8e3::t_70b56f7cc6b374 3,40,43-44,48
+tests/unit/renderer/home/desk-actions.spec.ts
+  s_7a27f124c1e8e3::t_489c0df935cef1 70-74,77-78
+tests/unit/renderer/components/sidebar/InboxSidebar.spec.tsx
+  s_7a27f124c1e8e3::t_54ffd324fb6f75 124
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_7a27f124c1e8e3::t_b0e878ba2f3e29 175-212,214-230,232-242
+  s_7a27f124c1e8e3::t_87352a54e17e39 243-250,252
+  s_7a27f124c1e8e3::t_76b8742cde80a4 169-174
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_7a27f124c1e8e3::t_5cabbc789fda41 193,516,647-661
+  s_7a27f124c1e8e3::t_a2980dde96832c 642,644-645
+tests/unit/renderer/components/QuickActionsHost.spec.tsx
+  s_7a27f124c1e8e3::t_948e62b918648e 128,143,261-267
+tests/unit/renderer/quick-actions/custom-runtime.spec.ts
+  s_7a27f124c1e8e3::t_ac2434dc834b03 130
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_7a27f124c1e8e3::t_7f388a76155607 51
+  s_7a27f124c1e8e3::t_5a11ef37b2299f 98-99
+tests/unit/renderer/agent/Composer.spec.tsx
+  s_7a27f124c1e8e3::t_be941ae09093ef 259,262
+tests/unit/renderer/components/SplitContainer.spec.tsx
+  s_7a27f124c1e8e3::t_8bd7c72dc6488c 77
+  s_7a27f124c1e8e3::t_ba230748b946ed 55-62,64,72-76,79,81,85-87,90-93,98,101-102
+tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_7a27f124c1e8e3::t_350a4b53bf6350 128-134,137,153-157,164,168
+tests/unit/renderer/quick-actions/variables.spec.ts
+  s_7a27f124c1e8e3::t_2209905e6ee50d 20-29,31,33
+tests/unit/renderer/components/BranchRow.spec.tsx
+  s_7a27f124c1e8e3::t_673dfd7858bfd4 73
+tests/unit/ipc/integrations.ipc.spec.ts
+  s_7a27f124c1e8e3::t_b71f602163c6a6 289-295
+  s_7a27f124c1e8e3::t_13e7855ad7738d 281-288
+tests/unit/renderer/components/SessionLinkDialog.spec.tsx
+  s_7a27f124c1e8e3::t_8bd7c72dc6488c 148,155
+tests/unit/shared/schemas/settings.schema.spec.ts
+  s_7a27f124c1e8e3::t_66b88141b67a6e 1-6,68-176
+tests/unit/renderer/components/LogWindow.spec.tsx
+  s_7a27f124c1e8e3::t_52b65706abb245 26-31,33,37
+tests/unit/packages/extension-ui/tabs.spec.tsx
+  s_7a27f124c1e8e3::t_2757bc5bbbfbbf 48
+tests/unit/terminal/pty-manager.spec.ts
+  s_7a27f124c1e8e3::t_e8fa0c519cb687 170,173-178,182,294
+  s_7a27f124c1e8e3::t_f92086b5ffad04 179,181
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_7a27f124c1e8e3::t_63dfd9a8f200d9 238-242,249,251
+  s_7a27f124c1e8e3::t_dfbbd28bfa6c9a 237
+tests/unit/renderer/components/NameTerminalDialog.spec.tsx
+  s_7a27f124c1e8e3::t_8bd7c72dc6488c 3,28,30-31,56
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_7a27f124c1e8e3::t_758715950eb77d 992-1011,1014-1015
+tests/unit/shared/session-records/retention.spec.ts
+  s_7a27f124c1e8e3::t_16c59f0900e583 52-60
+tests/unit/renderer/stores/workspace.store.spec.ts
+  s_7a27f124c1e8e3::t_38845b79a01cf6 275,278-281,283-284,286,289-292,294-295,300,303,593,677
+tests/unit/logger.spec.ts
+  s_7a27f124c1e8e3::t_76dbda29d85961 35-39,82-87,89-90,94,115,238,240-249
+tests/unit/packages/extension-ui/behaviour-matrix.spec.tsx
+  s_7a27f124c1e8e3::t_457474739e6b2e 16-18
+tests/unit/renderer-remote/mobile/MobileControlToolbar.spec.tsx
+  s_7a27f124c1e8e3::t_cc209db3050e08 6-13,18-19
+tests/unit/renderer-remote/mobile/useReconnect.spec.ts
+  s_7a27f124c1e8e3::t_d00402fd8989f3 45,48,51,59
+tests/unit/renderer/components/IssuePicker.spec.tsx
+  s_7a27f124c1e8e3::t_4410d0ce4f699f 2
+tests/unit/renderer/components/MetricsBar.spec.tsx
+  s_7a27f124c1e8e3::t_9dc17ecd13d7a6 45-50,57,62,66-72,76,85-86
+tests/unit/renderer/components/QuickActions.spec.tsx
+  s_7a27f124c1e8e3::t_6cb232065f5e9e 98-102,233-236,238-239
+tests/unit/renderer/components/RepoHeader.spec.tsx
+  s_7a27f124c1e8e3::t_cd05178e99145a 92-96
+tests/unit/renderer/icon-from-name.spec.tsx
+  s_7a27f124c1e8e3::t_1acd706cf29f45 32-37
+tests/unit/renderer/stores/metrics.store.spec.ts
+  s_7a27f124c1e8e3::t_50ac92630c1e5d 90-93,96-97,102-103,105,108-109,113,156
+tests/unit/renderer/stores/session.store.spec.ts
+  s_7a27f124c1e8e3::t_3d893d299f97ce 345,364-365,913,926
+tests/unit/renderer/stores/toast.store.spec.ts
+  s_7a27f124c1e8e3::t_daeb84dd275655 47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a67e22e9f984fe1a0f8d3250a7c8556a1d069612",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+extensions/task-vault/tests/components/TaskVaultView.spec.tsx
+  s_7a27f124c1e8e3::t_83248ccc82c0f4 5,41,48
+extensions/task-vault/tests/components/DailyLogDialogs.spec.tsx
+  s_7a27f124c1e8e3::t_83248ccc82c0f4 4,18
+extensions/task-vault/tests/components/DailyLog.spec.tsx
+  s_7a27f124c1e8e3::t_e94c307e200ba4 5,39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "058705c974855b8fa06169a3eda62936a3b8b7da",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

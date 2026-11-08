@@ -1,0 +1,73 @@
+packages/extension-ui/stories/SegmentedControl.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 62
+packages/extension-ui/stories/Kbd.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 15
+packages/extension-ui/stories/RelativeTime.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 20
+packages/extension-ui/stories/ToastRegion.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 38
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 2
+packages/extension-ui/stories/in-light.ts
+  s_7a27f124c1e8e3::t_e865de12129ac6 2,4,6-8,11
+packages/extension-ui/stories/DataTable.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 55
+packages/extension-ui/stories/Dialog.stories.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 3
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 70,79
+packages/extension-ui/stories/Tabs.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 48,50
+packages/extension-ui/stories/Button.stories.tsx
+  s_7a27f124c1e8e3::t_0cba9c997e77b9 78-79
+packages/extension-ui/stories/ConfirmDialog.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 25,27
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 2
+packages/extension-ui/stories/Popover.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 59
+packages/extension-ui/stories/StatusDot.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 17
+packages/extension-ui/stories/Sparkline.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 22
+packages/extension-ui/stories/EmptyState.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 33
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 2
+packages/extension-ui/stories/Chip.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 16
+packages/extension-ui/stories/ModalShell.stories.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 3
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 75,77,83,85
+packages/extension-ui/stories/MetricCard.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 29
+packages/extension-ui/stories/StageBar.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 22
+packages/extension-ui/stories/Markdown.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 67
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 3
+packages/extension-ui/stories/Tokens.stories.tsx
+  s_7a27f124c1e8e3::t_e865de12129ac6 72-73,80
+packages/extension-ui/stories/Checkbox.stories.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 3
+packages/extension-ui/stories/Menu.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 39,41
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 3,47-48
+packages/extension-ui/stories/ShareBar.stories.tsx
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 22
+packages/extension-ui/stories/IconButton.stories.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 2
+  s_7a27f124c1e8e3::t_8b26d0491b67ed 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a8416126871a0c032c3e71ebc8f4ece8b498b58b",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
