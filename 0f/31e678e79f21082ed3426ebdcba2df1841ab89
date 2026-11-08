@@ -1,0 +1,23 @@
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_7a27f124c1e8e3::t_143d805bf292b9 1323-1325
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_7a27f124c1e8e3::t_610e874b8d662b 249-251
+tests/e2e/monitor-wall.spec.ts
+  s_7a27f124c1e8e3::t_b89f85e6915807 119-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0f31e678e79f21082ed3426ebdcba2df1841ab89",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
