@@ -1,0 +1,19 @@
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_f53906548e22f9::t_43e9ee74633a60 1421-1433
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9ee267599b1dd10e48814c86f7a968e061977ddb",
+  "prompts": {},
+  "sessions": {
+    "s_f53906548e22f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dff2918-ea06-4902-ae79-8fcf4b2e763c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
