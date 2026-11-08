@@ -1,0 +1,29 @@
+src/main/git/git-service.ts
+  s_7a27f124c1e8e3::t_3fc12631927748 1,78-105
+  s_7a27f124c1e8e3::t_31007fed63b9cf 106
+src/main/ipc/git.ipc.ts
+  s_7a27f124c1e8e3::t_3fc12631927748 45-46
+  s_7a27f124c1e8e3::t_11c90ef96aa00d 6
+tests/unit/ipc/git.ipc.spec.ts
+  s_7a27f124c1e8e3::t_c427bbc4bf943c 67-76
+  s_7a27f124c1e8e3::t_0950c458e49a5e 11,77
+tests/integration/git/is-git-repo.spec.ts
+  s_7a27f124c1e8e3::t_2dc8741a079694 2,42-83
+  s_7a27f124c1e8e3::t_459796b4c9b4e1 84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9f79485d9982f7240a69aeb1602b5910f53dedcf",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
