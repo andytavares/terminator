@@ -13,6 +13,13 @@ const JSDOM_INCLUDE = [
   'extensions/*/tests/**/*.spec.tsx',
 ]
 
+// One boundary the code owns, through a private instance: real git, child processes, files,
+// sockets on loopback, a database each test makes. A unit spec does none of that (T-TIER).
+const INTEGRATION_INCLUDE = [
+  'tests/integration/**/*.spec.{ts,tsx,js}',
+  'extensions/*/tests/integration/**/*.spec.{ts,tsx,js}',
+]
+
 // happy-dom, not jsdom: jsdom validates every CSS declaration CodeMirror and the
 // design system inject, which timed specs out (docs/CONTRIBUTING.md, "Run tests").
 const HAPPY_DOM_INCLUDE = [
@@ -24,8 +31,6 @@ const NODE_INCLUDE = [
   'tests/unit/**/*.spec.ts',
   'tests/unit/**/*.spec.js',
   'packages/*/tests/**/*.spec.ts',
-  'tests/integration/**/*.spec.ts',
-  'tests/integration/**/*.spec.js',
   'extensions/*/tests/**/*.spec.ts',
   'extensions/*/tests/**/*.spec.js',
   'src/main/remote/__tests__/**/*.spec.ts',
@@ -71,6 +76,7 @@ export default defineConfig({
           include: NODE_INCLUDE,
           exclude: [
             ...configDefaults.exclude,
+            ...INTEGRATION_INCLUDE,
             // `.ts` specs under renderer-remote need the DOM — run them in the
             // jsdom project instead.
             'tests/unit/renderer-remote/**/*.spec.ts',
@@ -91,7 +97,7 @@ export default defineConfig({
           name: 'jsdom',
           environment: 'jsdom',
           include: JSDOM_INCLUDE,
-          exclude: [...configDefaults.exclude, ...HAPPY_DOM_INCLUDE],
+          exclude: [...configDefaults.exclude, ...HAPPY_DOM_INCLUDE, ...INTEGRATION_INCLUDE],
         },
       },
       {
@@ -100,6 +106,16 @@ export default defineConfig({
           name: 'happy-dom',
           environment: 'happy-dom',
           include: HAPPY_DOM_INCLUDE,
+          exclude: [...configDefaults.exclude, ...INTEGRATION_INCLUDE],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          environment: 'node',
+          include: INTEGRATION_INCLUDE,
+          exclude: [...configDefaults.exclude, '**/*.perf.spec.ts'],
         },
       },
     ],

@@ -30,7 +30,7 @@ const text = (sessionUpdate: string, value: string): AgentUpdate => ({
   content: { type: 'text', text: value },
 })
 
-const updates = pushedEvent<[{ sessionId: string; update: AgentUpdate }]>()
+const updates = pushedEvent<[{ sessionId: string; update: AgentUpdate; position: number }]>()
 const permissions = pushedEvent<[{ sessionId: string; ask: AgentPermissionAsk }]>()
 const settled = pushedEvent<[{ sessionId: string; requestId: string }]>()
 const ends = pushedEvent<[{ sessionId: string; exitCode: number | null }]>()
@@ -99,26 +99,57 @@ describe('AgentView transcript', () => {
     expect(log.getAttribute('aria-live')).toBe('polite')
     expect(within(log).getByText('Earlier reply')).toBeTruthy()
     act(() =>
-      updates.deliver({ sessionId: 'agent-1', update: text('agent_message_chunk', ' More') })
+      updates.deliver({
+        sessionId: 'agent-1',
+        update: text('agent_message_chunk', ' More'),
+        position: 1,
+      })
     )
     expect(within(log).getByText('Earlier reply More')).toBeTruthy()
   })
 
+  it('ignores another session’s update', async () => {
+    await mountView()
+    act(() =>
+      updates.deliver({
+        sessionId: 'other',
+        update: text('agent_message_chunk', 'Stray'),
+        position: 1,
+      })
+    )
+    expect(screen.queryByText(/Stray/)).toBeNull()
+  })
+})
+
+// Electron sends a push and an invoke reply down two pipes, so either can arrive first.
+describe('AgentView transcript, whichever of a push and the history arrives first', () => {
   it('draws an update that arrives before the history once', async () => {
     let answer: (reply: { data: AgentUpdate[] }) => void = () => undefined
     agents.history.mockReturnValue(new Promise((resolve) => (answer = resolve)))
     render(<AgentView sessionId="agent-1" />)
     const early = text('agent_message_chunk', 'Hello')
-    act(() => updates.deliver({ sessionId: 'agent-1', update: early }))
+    act(() => updates.deliver({ sessionId: 'agent-1', update: early, position: 0 }))
     // Main logs an update before it broadcasts it, so the history read after it holds it.
     await act(async () => answer({ data: [early] }))
     expect(within(screen.getByRole('log')).getByText('Hello')).toBeTruthy()
   })
 
-  it('ignores another session’s update', async () => {
+  it('draws an update the history holds once, though it arrives after the history', async () => {
+    const early = text('agent_message_chunk', 'Hello')
+    agents.history.mockResolvedValue({ data: [early] })
     await mountView()
-    act(() => updates.deliver({ sessionId: 'other', update: text('agent_message_chunk', 'Stray') }))
-    expect(screen.queryByText(/Stray/)).toBeNull()
+    act(() => updates.deliver({ sessionId: 'agent-1', update: early, position: 0 }))
+    expect(screen.getByRole('log').textContent).toBe('Hello')
+  })
+
+  it('draws an update that arrives before a history that lacks it', async () => {
+    let answer: (reply: { data: AgentUpdate[] }) => void = () => undefined
+    agents.history.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    render(<AgentView sessionId="agent-1" />)
+    const later = text('agent_message_chunk', ' there')
+    act(() => updates.deliver({ sessionId: 'agent-1', update: later, position: 1 }))
+    await act(async () => answer({ data: [text('agent_message_chunk', 'Hello')] }))
+    expect(screen.getByRole('log').textContent).toBe('Hello there')
   })
 })
 
@@ -139,6 +170,7 @@ describe('AgentView tool calls', () => {
             { type: 'diff', path: '/r/src/a.ts', oldText: 'old line', newText: 'new line' },
           ],
         },
+        position: 1,
       })
     })
     expect(screen.getByText('Edit file')).toBeTruthy()
@@ -159,7 +191,7 @@ describe('AgentView changed in this turn', () => {
 
   it('shows a changed file in the card with its counts', async () => {
     await mountView()
-    act(() => updates.deliver({ sessionId: 'agent-1', update: edit('t1', 'b\nc') }))
+    act(() => updates.deliver({ sessionId: 'agent-1', update: edit('t1', 'b\nc'), position: 1 }))
     const card = screen.getByRole('group', { name: 'Changed in this turn' })
     expect(within(card).getByText('src/a.ts')).not.toBeNull()
     expect(within(card).getByText('+2')).not.toBeNull()
@@ -179,6 +211,7 @@ describe('AgentView usage', () => {
           size: 200,
           cost: { amount: 0.5, currency: 'USD' },
         },
+        position: 1,
       })
     )
     expect(screen.getByText(/25%/)).toBeTruthy()

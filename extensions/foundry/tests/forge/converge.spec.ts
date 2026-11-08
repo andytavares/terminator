@@ -356,6 +356,28 @@ function badAnswersTests() {
     expect(result.ok).toBe(false)
     expect(!result.ok && result.reason).toMatch(/refused/)
   })
+
+  // WO-0909-6db: the architect wrote file paths into `verify.evidence`, a closed set of kinds.
+  it('refuses a file path where an evidence kind belongs, and names the field', () => {
+    const answer = {
+      acceptance: [
+        {
+          id: 'AC-6',
+          statement: 'every surface renders the change',
+          priority: 'P1',
+          verify: {
+            kind: 'judge',
+            rubric: 'the reviewer confirms the text is red',
+            evidence: ['src/app.css', 'src/theme.ts', 'src/index.css'],
+          },
+          unverifiable: null,
+        },
+      ],
+    }
+    const result = applyArchitectAnswer(order(), answer, 'now')
+    expect(!result.ok && result.reason).toContain('evidence')
+    expect(!result.ok && result.reason).toContain('Invalid option: expected one of "exit_code"')
+  })
 }
 
 function clearedFindingsTests() {

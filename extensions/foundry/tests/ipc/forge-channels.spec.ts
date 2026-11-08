@@ -67,6 +67,7 @@ afterEach(() => {
 describe('foundry:order.create', () => {
   describe('the draft', theDraftTests)
   describe('the ledger and the same issue', theLedgerAndTheSameIssueTests)
+  describe('who seeded the order', whoSeededTests)
   describe('a canary order', theCanaryTests)
 })
 
@@ -143,6 +144,24 @@ function theDraftTests() {
       repoPaths: [repo],
     })) as OrderView
     expect(r.order.redTeam.length).toBeGreaterThan(0)
+  })
+}
+
+function whoSeededTests() {
+  it('records who seeded the order, so the entry is attributable', async () => {
+    const r = (await channels().create({
+      source: { kind: 'typed', text: 'something to record' },
+      repoPaths: [repo],
+    })) as OrderView
+    const ledger = path.join(root, 'orders', r.order.id, 'ledger.jsonl')
+    const entries = fs
+      .readFileSync(ledger, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { actor: string; action: string })
+    expect(entries).toContainEqual(
+      expect.objectContaining({ action: 'order.seeded', actor: 'role:scout' })
+    )
   })
 }
 

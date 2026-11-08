@@ -114,18 +114,9 @@ afterEach(() => {
 })
 
 describe('a proposal refused after the turn ended', () => {
-  describe('refusing', refusedTurnRefusingTests)
   describe('the surface', theSurfaceTests)
   describe('the corrected proposal', theCorrectedProposalTests)
 })
-
-function refusedTurnRefusingTests() {
-  it('refuses a file path where an evidence kind belongs, and names the field', () => {
-    const reason = refusalOf(BAD_PROPOSAL)
-    expect(reason).toContain('evidence')
-    expect(reason).toContain('Invalid option: expected one of "exit_code"')
-  })
-}
 
 function theSurfaceTests() {
   it('reaches the surface that has to say so', async () => {

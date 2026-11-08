@@ -1832,7 +1832,9 @@ export const ELECTRON_API_MANIFEST = [
     channel: 'agents:update',
     signature:
       signature<
-        (handler: (payload: { sessionId: string; update: AgentUpdate }) => void) => Unsubscribe
+        (
+          handler: (payload: { sessionId: string; update: AgentUpdate; position: number }) => void
+        ) => Unsubscribe
       >(),
     remote: 'omit',
   }),

@@ -224,6 +224,18 @@ function navigationTests() {
     expect(bridge.calls('task-vault:vault:get-daily')).toContainEqual({ date: '2026-02-02' })
   })
 
+  it('opens a task picked on another day on that day, selected', async () => {
+    await renderVaultView()
+    await act(async () =>
+      bridge.push('task-vault:navigate', { date: dayFromToday(5), taskId: 't2' })
+    )
+    await eventually(() => expect(seen.detail?.taskText).toBe('Read'))
+    expect(bridge.calls('task-vault:vault:get-daily')).toContainEqual({ date: dayFromToday(5) })
+    expect(seen.daily.log).toMatchObject({ date: dayFromToday(5) })
+    expect(seen.daily.isToday).toBe(false)
+    expect(seen.daily.selectedTaskId).toBe('t2')
+  })
+
   it('clears a pending task the log does not have once loaded', async () => {
     await renderVaultView()
     act(() => useVaultNavStore.setState({ pendingTaskId: 'ghost' }))

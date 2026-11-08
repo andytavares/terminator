@@ -5,7 +5,7 @@ import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRunChannels, proposeRecipe, readRunGraph } from '../../src/ipc/run-channels.js'
+import { createRunChannels, readRunGraph } from '../../src/ipc/run-channels.js'
 import type { RunDeps } from '../../src/ipc/run-channels.js'
 import { idleRunSeams } from './run-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -383,23 +383,6 @@ describe('foundry:run.recipes', () => {
   describe('the proposal', runChannelsTheProposalTests)
 })
 
-function unit(over: Partial<WorkOrder['plan']['units'][number]> = {}) {
-  return {
-    id: 'U-2',
-    title: 'b',
-    role: 'builder',
-    lane: 1,
-    dependsOn: [],
-    satisfies: ['AC-1'],
-    touches: [],
-    verify: [],
-    ...over,
-  }
-}
-function graded(grade: WorkOrder['risk']['grade'], triggers: WorkOrder['risk']['triggers'] = []) {
-  return order({ risk: { grade, triggers, blastRadius: [], criticalPaths: [] } })
-}
-
 function offeringTests() {
   it('offers every shape, marking the ones this repository cannot support', async () => {
     writeToolkitShape()
@@ -460,71 +443,6 @@ function runChannelsTheProposalTests() {
     await store.save({ ...order(), recipe: 'standard' })
     const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as { proposed: string }
     expect(r.proposed).toBe('direct')
-  })
-}
-
-// Choosing the shape.
-//
-// The ladder is lanes first, then risk. Lanes because that is the only thing a
-// heavier shape can actually run in parallel, and risk because that is the
-// order's own statement of who ought to look. Unit count decides nothing: a
-// fan-out is `by lane` now, so seven units in one lane cost one session and
-// pricing the shape off them charged for parallelism that never existed.
-describe('proposeRecipe', () => {
-  describe('direct', directTests)
-  describe('standard', standardTests)
-})
-
-function directTests() {
-  it('keeps a shape the order already carries', () => {
-    expect(proposeRecipe(order({ recipe: 'research' }))).toEqual({
-      name: 'research',
-      why: 'the order already names this shape',
-    })
-  })
-
-  it('proposes the direct shape for one lane at the lowest risk', () => {
-    const proposal = proposeRecipe(graded('P3'))
-    expect(proposal.name).toBe('direct')
-    expect(proposal.why).toBe('one lane, graded low risk')
-  })
-
-  it('still proposes it when that lane holds several units', () => {
-    const o = graded('P3')
-    o.plan.units.push(unit(), unit({ id: 'U-3' }), unit({ id: 'U-4' }))
-    expect(proposeRecipe(o).name).toBe('direct')
-  })
-
-  it('proposes direct for an order graded notable', () => {
-    const proposal = proposeRecipe(graded('P2'))
-    expect(proposal.name).toBe('direct')
-    expect(proposal.why).toContain('ordinary risk')
-  })
-
-  it('proposes direct, naming the trigger, when one fired at the lowest grade', () => {
-    const proposal = proposeRecipe(graded('P3', ['public_interface']))
-    expect(proposal.name).toBe('direct')
-    expect(proposal.why).toContain('public_interface')
-  })
-}
-
-function standardTests() {
-  it('proposes the standard shape once there is more than one lane', () => {
-    const o = graded('P3')
-    o.plan.units.push(unit({ lane: 2 }))
-    o.plan.lanes = [
-      { ord: 1, repo: 'a', branch: '', role: null, blocks: [], blockedBy: [] },
-      { ord: 2, repo: 'b', branch: '', role: null, blocks: [], blockedBy: [] },
-    ]
-    const proposal = proposeRecipe(o)
-    expect(proposal.name).toBe('standard')
-    expect(proposal.why).toBe('2 lanes of work')
-  })
-
-  it('proposes the standard shape for anything above the lowest two grades', () => {
-    const proposal = proposeRecipe(graded('P1'))
-    expect(proposal.name).toBe('standard')
-    expect(proposal.why).toContain("above the direct shape's ceiling")
   })
 }
 

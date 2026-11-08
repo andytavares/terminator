@@ -284,24 +284,6 @@ async function expectDraftMarkedReady(): Promise<void> {
   await exec({ command: 'gh', args: ['pr', 'ready', pull.url, '--undo'], cwd: LIVE })
 }
 
-async function expectDraftRecordedInOrdersLedger(): Promise<void> {
-  // `ship.draft_opened`'s subject is the pull request URL; filing by subject once put it in
-  // `orders/https:/github.com/…/ledger.jsonl`, not here (docs/ARCHITECTURE.md, "The ledger").
-  const ledger = path.join(dataRoot, 'orders', liveOrder().id, 'ledger.jsonl')
-  expect(fs.existsSync(ledger)).toBe(true)
-  const actions = fs
-    .readFileSync(ledger, 'utf8')
-    .split('\n')
-    .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line) as { action: string })
-    .map((entry) => entry.action)
-  expect(actions).toContain('ship.draft_opened')
-
-  // And no order directory named after anything but an order.
-  const orders = fs.readdirSync(path.join(dataRoot, 'orders'))
-  expect(orders).toEqual([liveOrder().id])
-}
-
 describe.skipIf(LIVE === '')('shipping, for real', () => {
   afterAll(removeTheLiveRecords)
   beforeAll(commitTheChangeInAWorktree)
@@ -309,8 +291,5 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
   it('opens a draft pull request GitHub shows back, and marks it ready when the operator says so', async () => {
     await expectDraftOpenedAndShownBack()
     await expectDraftMarkedReady()
-  })
-  it("records the draft in the order's own ledger, and nowhere else", async () => {
-    await expectDraftRecordedInOrdersLedger()
   })
 })

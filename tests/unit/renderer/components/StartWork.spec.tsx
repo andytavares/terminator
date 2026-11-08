@@ -288,6 +288,28 @@ describe('StartWork — run it as', () => {
   })
 })
 
+describe('StartWork — run it as, with the arrow keys', () => {
+  it('is chosen with the arrow keys alone', async () => {
+    const user = userEvent.setup()
+    await open()
+    await goToTab(user, 'Prompt')
+    const choices = screen.getByRole('radiogroup', { name: 'Run it as' })
+    const [first, second] = within(choices).getAllByRole('radio')
+    const runAs = () =>
+      within(choices).getByRole('radio', { checked: true }).getAttribute('aria-label')
+    act(() => first.focus())
+    expect(document.activeElement).toBe(first)
+    expect(runAs()).toBe('Claude Code in an agent tab')
+
+    await user.keyboard('{ArrowDown}')
+    expect(runAs()).toBe('Claude in a terminal')
+    expect(document.activeElement).toBe(second)
+
+    await user.keyboard('{ArrowUp}')
+    expect(runAs()).toBe('Claude Code in an agent tab')
+  })
+})
+
 describe('StartWork — run it as, with an extension option', () => {
   const checked = () => screen.getByRole('radio', { checked: true }).getAttribute('aria-label')
 

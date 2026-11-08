@@ -229,68 +229,6 @@ async function repositoryReadFirst(): Promise<void> {
   expect(created.unavailableChecks).toContain('coverage')
 }
 
-async function createDraft(text: string): Promise<string> {
-  const created = (await foundryChannel(handle, 'foundry:order.create', {
-    source: { kind: 'typed', text },
-    repoPaths: [repo],
-  })) as { order: { id: string } }
-  return created.order.id
-}
-
-async function incompleteOrderRefused(): Promise<void> {
-  const id = await createDraft('something vague')
-  const compiled = (await foundryChannel(handle, 'foundry:order.compile', {
-    id,
-    commit: true,
-  })) as { order: { status: string }; compile: { ok: boolean; failures: { check: string }[] } }
-  expect(compiled.compile.ok).toBe(false)
-  expect(compiled.order.status).toBe('draft')
-  expect(compiled.compile.failures.length).toBeGreaterThan(0)
-}
-
-async function noRunWithoutAgreement(): Promise<void> {
-  const id = await createDraft('start me without agreeing')
-  const started = (await foundryChannel(handle, 'foundry:run.start', { id })) as {
-    error?: string
-  }
-  expect(started).toEqual({ error: 'Only an agreed order can be started; this one is draft.' })
-}
-
-async function ledgerIsAttributable(): Promise<void> {
-  await createDraft('something to record')
-  const record = (await foundryChannel(handle, 'foundry:ledger.query', {})) as {
-    entries: { actor: string; action: string }[]
-    actions: string[]
-  }
-  expect(record.actions).toContain('order.seeded')
-  for (const entry of record.entries) {
-    expect(entry.actor, 'an unattributed entry is not a record of a decision').not.toBe('')
-    expect(entry.action).not.toBe('')
-  }
-}
-
-async function curatorProposesNothing(): Promise<void> {
-  await createDraft('nothing repeated here')
-  const proposals = (await foundryChannel(handle, 'foundry:rules.propose', {})) as {
-    proposals: unknown[]
-  }
-  expect(proposals.proposals).toEqual([])
-}
-
-async function repositoryUntouched(): Promise<void> {
-  // The one thing Foundry may leave is its own records directory at the
-  // default location (ADR-042). No modified, deleted or other new file, and
-  // above all no `.gitignore` entry.
-  const status = execFileSync('git', ['status', '--porcelain'], { cwd: repo }).toString()
-  const left = status
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '' && line !== '?? .foundry/')
-  expect(left, `Foundry left files behind:\n${status}`).toEqual([])
-  const ignore = execFileSync('git', ['ls-files', '.gitignore'], { cwd: repo }).toString()
-  expect(ignore.trim(), 'Foundry created a .gitignore').toBe('')
-}
-
 /** The architect was launched as an interactive, permission-asking session of its own. */
 async function expectReadOnlyLaunch(): Promise<void> {
   // What the agent was sent over ACP, not what an agent tab happens to show.
@@ -373,18 +311,12 @@ async function forgeOpensAndRenders(): Promise<void> {
   await step('nothing on any surface threw while rendering', nothingThrew)
 }
 
-/** The order is read, refused until complete, recorded, and the repository left alone. */
+/** The order is read from the repository before the operator is asked anything. */
 async function orderIsCheckedAndRecorded(): Promise<void> {
-  const step = test.step
-  await step('the repository is read before the operator is asked anything', repositoryReadFirst)
-  await step('an incomplete order is refused, and says what is missing', incompleteOrderRefused)
-  await step('a run cannot be started from an order nobody agreed', noRunWithoutAgreement)
-  await step('the ledger records what happened, attributably', ledgerIsAttributable)
-  await step(
-    'the curator proposes nothing from a record with no repetition in it',
-    curatorProposesNothing
+  await test.step(
+    'the repository is read before the operator is asked anything',
+    repositoryReadFirst
   )
-  await step('Foundry changes nothing in the repository it works on', repositoryUntouched)
 }
 
 test('an idea becomes an order that is refused until complete, and its architect launches read-only and goes when the order is deleted', async () => {

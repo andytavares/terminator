@@ -52,10 +52,16 @@ function setup() {
   return { ...fakes, broadcast, service: serviceWith(fakes.connect, broadcast) }
 }
 
+/** What `service.start` answers, or a failure when the fake agent did not start. */
+async function startedOn(service: ReturnType<typeof serviceWith>, input: StartAgentInput) {
+  const result = await service.start(input)
+  if (!result) throw new Error('the fake agent did not start')
+  return result
+}
+
 async function started(input: StartAgentInput = { cwd: '/work' }) {
   const context = setup()
-  const result = await context.service.start(input)
-  if (!result) throw new Error('the fake agent did not start')
+  const result = await startedOn(context.service, input)
   return { ...context, sessionId: result.sessionId, agent: context.agents[0], result }
 }
 
@@ -80,6 +86,12 @@ function chunk(agent: FakeAgent, text: string) {
     update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } },
   })
 }
+
+/** The position each `agents:update` broadcast named, in order. */
+const positionsOf = (broadcast: ReturnType<typeof vi.fn>): unknown[] =>
+  broadcast.mock.calls
+    .filter(([channel]) => channel === 'agents:update')
+    .map(([, payload]) => (payload as { position: unknown }).position)
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -210,7 +222,7 @@ describe('updates', () => {
     await chunk(agent, 'hi')
     const update = heard[0]
     expect(update.sessionUpdate).toBe('agent_message_chunk')
-    expect(broadcast).toHaveBeenCalledWith('agents:update', { sessionId, update })
+    expect(broadcast).toHaveBeenCalledWith('agents:update', { sessionId, update, position: 0 })
     expect(service.readHistory(sessionId)).toEqual([update])
   })
 
@@ -222,6 +234,25 @@ describe('updates', () => {
     dispose()
     await chunk(agent, 'two')
     expect(heard).toHaveLength(1)
+  })
+})
+
+describe('updates and the history', () => {
+  it('reach windows with their position in the history', async () => {
+    const { agent, broadcast } = await started()
+    await chunk(agent, 'one')
+    await chunk(agent, 'two')
+    expect(positionsOf(broadcast)).toEqual([0, 1])
+  })
+
+  it('of a resumed session take positions after its history', async () => {
+    const { service, agents, broadcast } = setup()
+    const first = await startedOn(service, { cwd: '/work' })
+    await chunk(agents[0], 'before')
+    await service.close(first.sessionId)
+    await startedOn(service, { cwd: '/work', resume: first.sessionId })
+    await chunk(agents[1], 'after')
+    expect(positionsOf(broadcast)).toEqual([0, 1])
   })
 })
 
@@ -739,7 +770,11 @@ describe('the sent message', () => {
     await service.prompt(sessionId, 'hello')
     expect(loggedAtPrompt).toEqual([[sent('hello')]])
     expect(service.readHistory(sessionId)).toEqual([sent('hello')])
-    expect(broadcast).toHaveBeenCalledWith('agents:update', { sessionId, update: sent('hello') })
+    expect(broadcast).toHaveBeenCalledWith('agents:update', {
+      sessionId,
+      update: sent('hello'),
+      position: 0,
+    })
   })
 })
 

@@ -37,9 +37,11 @@ function trackedStart(input: StartInput): Promise<unknown> {
   return Promise.race([theRunner.start(tracked), gone])
 }
 
-/** Ends every turn still open, with no exit code, as disposing the real runner does. */
-export function endOpenTurns(): void {
-  for (const turn of [...openTurns]) turn.end()
+/** Ends every turn still open, with no exit code, as disposing the real runner does; how many. */
+export function endOpenTurns(): number {
+  const open = [...openTurns]
+  for (const turn of open) turn.end()
+  return open.length
 }
 
 export const createSupervisedRunner = () => ({

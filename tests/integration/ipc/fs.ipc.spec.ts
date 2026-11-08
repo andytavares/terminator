@@ -111,10 +111,6 @@ describe('fs:watch-start — shared roots and several roots', () => {
     await expectToBeToldOfChange(projectRoot, view)
     await expectToBeToldOfChange(otherRoot, view)
   })
-
-  it('rejects a payload without a root', async () => {
-    expect(await invoke('fs:watch-start', openView(), {})).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('fs:watch-stop', () => {

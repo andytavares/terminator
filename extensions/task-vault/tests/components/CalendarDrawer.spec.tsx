@@ -68,6 +68,7 @@ function calendarDrawerTests() {
 
   describe('today', calendarDrawerTodayTests)
   describe('opening a task', calendarDrawerOpeningTaskTests)
+  describe('opening a task on another day', calendarDrawerOtherDayTests)
   describe('refreshing', calendarDrawerRefreshingTests)
 }
 
@@ -113,6 +114,29 @@ function calendarDrawerOpeningTaskTests() {
     expect(mockInvoke).toHaveBeenCalledWith('task-vault:open-panel', {
       date: todayStr,
       taskId: 'task-abc',
+    })
+  })
+}
+
+function calendarDrawerOtherDayTests() {
+  it('opens a task picked on another day with that day, not today', async () => {
+    const user = userEvent.setup()
+    const otherDay = '2026-01-20'
+    answerDays([{ date: otherDay, status: 'open', count: 1 }], {
+      date: otherDay,
+      tasks: [dayTask('task-moodboard', 'Present the moodboard')],
+      events: [],
+      notes: [],
+      exists: true,
+    })
+
+    await renderDrawer()
+    await user.click(await screen.findByRole('button', { name: new RegExp(`^${otherDay}`) }))
+    await user.click(await screen.findByText('Present the moodboard'))
+
+    expect(mockInvoke).toHaveBeenCalledWith('task-vault:open-panel', {
+      date: otherDay,
+      taskId: 'task-moodboard',
     })
   })
 }

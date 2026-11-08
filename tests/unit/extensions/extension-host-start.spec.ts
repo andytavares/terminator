@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import os from 'os'
-import { newExtensionHost, storedExtensionRecord } from './fake-backend-host'
+import { newExtensionHost, storedExtensionRecord } from '../../support/fake-backend-host'
 
 vi.mock('electron', () => ({
   app: {

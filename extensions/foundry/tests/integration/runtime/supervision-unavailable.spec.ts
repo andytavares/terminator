@@ -1,0 +1,93 @@
+/**
+ * Foundry with a supervision runtime that could not start: the operator is
+ * told, and nothing that needs an agent pretends to have started one.
+ */
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { activate, deactivate } from '../../../src/index.ts'
+import * as path from 'node:path'
+
+import { fakeHost, seededRepository, temporaryDirectory } from '../../helpers/foundry-host.js'
+import type { FoundryHost } from '../../helpers/foundry-host.js'
+import { createOrderStore } from '../../../src/order/store.js'
+import { orderStoreAt } from '../../../src/state/live-index.js'
+
+import { readyDraft } from '../../helpers/forge-turns.js'
+import { eventually } from '../../../../../tests/support/eventually'
+vi.mock('../../../src/runtime/supervised-runner.js', () => ({
+  createSupervisedRunner: () => {
+    throw new Error('the runner could not be created')
+  },
+}))
+
+let dataDir = ''
+let repo = ''
+let host: FoundryHost
+
+async function toastShown(): Promise<void> {
+  await eventually(() => expect(host.showToast).toHaveBeenCalled())
+}
+
+beforeAll(async () => {
+  const parent = temporaryDirectory('fdry-no-runtime')
+  dataDir = path.join(parent, 'records')
+  repo = await seededRepository(parent)
+  host = fakeHost(() => dataDir)
+  activate(host.api)
+  await toastShown()
+})
+
+// `unstubEnvs` resets env before each test, so the stub goes here, not in beforeAll.
+beforeEach(() => {
+  vi.stubEnv('HOME', path.join(temporaryDirectory('fdry-no-runtime-home'), 'home'))
+})
+
+afterAll(async () => {
+  await deactivate()
+  vi.unstubAllEnvs()
+})
+
+describe('a supervision runtime that could not start', () => {
+  describe('saying so', sayingSoTests)
+  describe('refusals', supervisionUnavailableRefusalsTests)
+})
+
+function sayingSoTests() {
+  it('is said out loud: phases would approve their own tool calls', () => {
+    expect(host.showToast).toHaveBeenCalledWith(
+      'error',
+      'Supervision could not start — phases will run unsupervised, approving their own tool calls',
+      'foundry.runtime.unavailable'
+    )
+  })
+
+  it('leaves the console reading empty rather than failing', async () => {
+    expect(await host.call('foundry:feed-list')).toEqual({ entries: [], mutes: [] })
+    expect(await host.call('foundry:run-interrupt', { sessionId: 's' })).toEqual({ ok: false })
+    expect(await host.call('foundry:run-stop', { sessionId: 's' })).toEqual({ ok: false })
+    expect(await host.call('foundry:run-redirect', { sessionId: 's', message: 'x' })).toEqual({
+      ok: false,
+    })
+  })
+}
+
+function supervisionUnavailableRefusalsTests() {
+  it('refuses an architect turn and says why', async () => {
+    await orderStoreAt(dataDir).save(readyDraft(repo))
+    const started = (await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })) as {
+      error?: string
+    }
+    expect(started.error).toBe('The supervision runtime is not running, so intake cannot start.')
+  })
+
+  it('records the red team as refused when a released order would be reviewed', async () => {
+    await orderStoreAt(dataDir).save(readyDraft(repo))
+    await host.call('foundry:order.hold', { id: 'WO-1', held: true })
+    await host.call('foundry:order.hold', { id: 'WO-1', held: false })
+    await eventually(async () => {
+      const entries = await createOrderStore(dataDir).entries('WO-1')
+      expect(entries.find((entry) => entry.action === 'red-team.refused')?.reason).toBe(
+        'the supervision runtime is not running'
+      )
+    })
+  })
+}
