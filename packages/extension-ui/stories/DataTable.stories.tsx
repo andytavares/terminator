@@ -63,7 +63,8 @@ export const Default: Story = {
     )
   },
 }
-export const DefaultLight = inLight(Default)
+// Keeps its play: the screenshot records the state the play leaves.
+export const DefaultLight: Story = { ...Default, globals: { theme: 'light' } }
 
 export const Clickable: Story = {
   args: { onRowClick: () => {}, selectedKey: 'Notes' },

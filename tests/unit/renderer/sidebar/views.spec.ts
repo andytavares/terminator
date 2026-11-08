@@ -9,14 +9,12 @@ const localStorageStub = {
   removeItem: (k: string) => void store.delete(k),
   clear: () => store.clear(),
 }
-Object.defineProperty(globalThis, 'localStorage', {
-  value: localStorageStub,
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('localStorage', localStorageStub)
 })
 
 import {
   BUILT_IN_VIEWS,
-  DEFAULT_VIEW_ID,
   VIEWS_STORAGE_KEY,
   loadViews,
   saveViews,
@@ -102,10 +100,6 @@ describe('built-in views', () => {
   ])('the %s view shows %j', (id, expected) => {
     expect(shownBy(id)).toEqual(expected)
   })
-
-  it('opens on the Everything view', () => {
-    expect(BUILT_IN_VIEWS.find((v) => v.id === DEFAULT_VIEW_ID)!.name).toBe('Everything')
-  })
 })
 
 describe('loadViews', () => {
@@ -167,11 +161,6 @@ describe('loadViews — drops stored entries that are not shaped like a view', (
 })
 
 describe('saveViews', () => {
-  it('persists the custom views', () => {
-    saveViews([...BUILT_IN_VIEWS, custom])
-    expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!).custom).toEqual([custom])
-  })
-
   it('writes no override for a built-in the user has not changed', () => {
     saveViews([...BUILT_IN_VIEWS, custom])
     expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!).overrides).toEqual({})
@@ -289,19 +278,11 @@ describe('a preference naming a retired option (VW-1) — falls back when the st
     expect(loadViews().find((v) => v.id === 'everything')!.sortBy).toBe('manual')
   })
 
-  it('leaves a valid preference alone', () => {
+  it.each(['none', 'task'])('keeps a valid stored grouping of %s across a reload', (groupBy) => {
     localStorage.setItem(
       VIEWS_STORAGE_KEY,
-      JSON.stringify({ custom: [], overrides: { everything: { groupBy: 'none' } } })
+      JSON.stringify({ custom: [], overrides: { everything: { groupBy } } })
     )
-    expect(loadViews().find((v) => v.id === 'everything')!.groupBy).toBe('none')
-  })
-
-  it('remembers grouping by task across a reload', () => {
-    localStorage.setItem(
-      VIEWS_STORAGE_KEY,
-      JSON.stringify({ custom: [], overrides: { everything: { groupBy: 'task' } } })
-    )
-    expect(loadViews().find((v) => v.id === 'everything')!.groupBy).toBe('task')
+    expect(loadViews().find((v) => v.id === 'everything')!.groupBy).toBe(groupBy)
   })
 })

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 import { hallView } from '../../helpers/hall-views.js'
 
@@ -59,7 +60,8 @@ afterEach(() => {
 })
 
 async function openTheLog() {
-  fireEvent.click(await screen.findByRole('button', { name: 'Run log: every station' }))
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'Run log: every station' }))
   return screen.findByRole('region', { name: 'Run log' })
 }
 
@@ -70,28 +72,31 @@ describe('the run log', () => {
 
 function openingTests() {
   it('opens from the whiteboard with a line from each source, and Escape closes it', async () => {
+    const user = userEvent.setup()
     mountHall(LOG_LINES)
     const log = await openTheLog()
     expect(await within(log).findByText('reading tokens')).toBeTruthy()
     expect(within(log).getByText('approve · looks right')).toBeTruthy()
     expect(within(log).getByText('lint.log · 2026-10-12')).toBeTruthy()
-    expect(document.activeElement).toBe(log)
-    fireEvent.keyDown(log, { key: 'Escape' })
+    expect(log.matches(':focus')).toBe(true)
+    await user.keyboard('{Escape}')
     expect(screen.queryByRole('region', { name: 'Run log' })).toBeNull()
   })
 }
 
 function readingTests() {
   it('filters to one kind of line', async () => {
+    const user = userEvent.setup()
     mountHall(LOG_LINES)
     const log = await openTheLog()
     await within(log).findByText('reading tokens')
-    fireEvent.click(within(log).getByRole('button', { name: 'Decisions' }))
+    await user.click(within(log).getByRole('button', { name: 'Decisions' }))
     expect(within(log).queryByText('reading tokens')).toBeNull()
     expect(within(log).getByText('approve · looks right')).toBeTruthy()
   })
 
   it('folds a long command log behind "Show all N lines"', async () => {
+    const user = userEvent.setup()
     const body = Array.from({ length: 30 }, (_, n) => ({
       at: 1,
       station: 'commands',
@@ -104,7 +109,7 @@ function readingTests() {
     const log = await openTheLog()
     await within(log).findByText('row 0')
     expect(within(log).queryByText('row 25')).toBeNull()
-    fireEvent.click(within(log).getByRole('button', { name: 'Show all 30 lines' }))
+    await user.click(within(log).getByRole('button', { name: 'Show all 30 lines' }))
     expect(within(log).getByText('row 25')).toBeTruthy()
   })
 }

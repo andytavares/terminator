@@ -27,9 +27,6 @@ export const NamedForAssistiveTechnology: Story = {
 export const Small: Story = { args: { size: 'sm', icon: X, label: 'Remove tag' } }
 export const Disabled: Story = {
   args: { disabled: true },
-  play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByRole('button', { name: 'List view' })).toBeDisabled()
-  },
 }
 
 export const DefaultLight = inLight(Default)

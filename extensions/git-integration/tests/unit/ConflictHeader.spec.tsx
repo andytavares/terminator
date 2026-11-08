@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 
@@ -57,7 +58,6 @@ const baseSession = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockStoreState = {
-    session: baseSession,
     activeFileIndex: 0,
     activeBlockIndex: 0,
     _undoStack: [],
@@ -68,6 +68,7 @@ describe('ConflictHeader', () => {
   it('renders filename and progress', () => {
     const { container } = render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -83,10 +84,11 @@ describe('ConflictHeader', () => {
   })
 })
 
-describe('ConflictHeader — renders progress dots matching block count', () => {
-  it('renders progress dots matching block count', () => {
-    const { container } = render(
+describe('ConflictHeader — progress dots', () => {
+  it('renders one dot per block and marks only the resolved block', () => {
+    render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -96,34 +98,21 @@ describe('ConflictHeader — renders progress dots matching block count', () => 
         canNext={true}
       />
     )
-    const dots = container.querySelectorAll('.conflict-header__dot')
-    expect(dots.length).toBe(2)
-  })
-})
-
-describe('ConflictHeader — marks resolved dot with resolved class', () => {
-  it('marks resolved dot with resolved class', () => {
-    const { container } = render(
-      <ConflictHeader
-        onBack={vi.fn()}
-        onUndo={vi.fn()}
-        canUndo={false}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={true}
-      />
-    )
-    const dots = container.querySelectorAll('.conflict-header__dot')
-    expect(dots[1].classList.contains('conflict-header__dot--resolved')).toBe(true)
+    const dots = screen.getAllByRole('img', { name: /^Conflict \d/ })
+    expect(dots.map((dot) => dot.getAttribute('aria-label'))).toEqual([
+      'Conflict 1 unresolved',
+      'Conflict 2 resolved',
+    ])
   })
 })
 
 describe('ConflictHeader — calls onBack when Files button clicked', () => {
-  it('calls onBack when Files button clicked', () => {
+  it('calls onBack when Files button clicked', async () => {
+    const user = userEvent.setup()
     const onBack = vi.fn()
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={onBack}
         onUndo={vi.fn()}
         canUndo={false}
@@ -133,16 +122,18 @@ describe('ConflictHeader — calls onBack when Files button clicked', () => {
         canNext={true}
       />
     )
-    fireEvent.click(screen.getByText(/Files/i))
+    await user.click(screen.getByRole('button', { name: 'Back to file list' }))
     expect(onBack).toHaveBeenCalledOnce()
   })
 })
 
 describe('ConflictHeader — calls onUndo when Undo button clicked', () => {
-  it('calls onUndo when Undo button clicked', () => {
+  it('calls onUndo when Undo button clicked', async () => {
+    const user = userEvent.setup()
     const onUndo = vi.fn()
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={onUndo}
         canUndo={true}
@@ -152,88 +143,40 @@ describe('ConflictHeader — calls onUndo when Undo button clicked', () => {
         canNext={true}
       />
     )
-    fireEvent.click(screen.getByText(/Undo/i))
+    await user.click(screen.getByRole('button', { name: 'Undo last decision' }))
     expect(onUndo).toHaveBeenCalledOnce()
   })
 })
 
-describe('ConflictHeader — Undo button is disabled when canUndo is false', () => {
-  it('Undo button is disabled when canUndo is false', () => {
+describe('ConflictHeader — Undo button state', () => {
+  it.each([
+    { canUndo: false, disabled: true },
+    { canUndo: true, disabled: false },
+  ])('sets Undo disabled to $disabled when canUndo is $canUndo', ({ canUndo, disabled }) => {
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
-        canUndo={false}
+        canUndo={canUndo}
         onPrev={vi.fn()}
         onNext={vi.fn()}
         canPrev={false}
         canNext={false}
       />
     )
-    const undoBtn = screen.getByText(/Undo/i).closest('button') as HTMLButtonElement
-    expect(undoBtn.disabled).toBe(true)
-  })
-})
-
-describe('ConflictHeader — Undo button is enabled when canUndo is true', () => {
-  it('Undo button is enabled when canUndo is true', () => {
-    render(
-      <ConflictHeader
-        onBack={vi.fn()}
-        onUndo={vi.fn()}
-        canUndo={true}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={true}
-      />
-    )
-    const undoBtn = screen.getByText(/Undo/i).closest('button') as HTMLButtonElement
-    expect(undoBtn.disabled).toBe(false)
-  })
-})
-
-describe('ConflictHeader — renders null when session is null', () => {
-  it('renders null when session is null', () => {
-    mockStoreState = { ...mockStoreState, session: null }
-    const { container } = render(
-      <ConflictHeader
-        onBack={vi.fn()}
-        onUndo={vi.fn()}
-        canUndo={false}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={false}
-      />
-    )
-    expect(container.firstChild).toBeNull()
-  })
-})
-
-describe('ConflictHeader — shows exit button when onExit prop is provided', () => {
-  it('shows exit button when onExit prop is provided', () => {
-    render(
-      <ConflictHeader
-        onBack={vi.fn()}
-        onUndo={vi.fn()}
-        canUndo={false}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={false}
-        onExit={vi.fn()}
-      />
-    )
-    expect(screen.getByLabelText(/exit merge flow/i)).toBeTruthy()
+    const undoBtn = screen.getByRole<HTMLButtonElement>('button', { name: 'Undo last decision' })
+    expect(undoBtn.disabled).toBe(disabled)
   })
 })
 
 describe('ConflictHeader — calls onExit when exit button is clicked', () => {
-  it('calls onExit when exit button is clicked', () => {
+  it('calls onExit when exit button is clicked', async () => {
+    const user = userEvent.setup()
     const onExit = vi.fn()
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -244,7 +187,7 @@ describe('ConflictHeader — calls onExit when exit button is clicked', () => {
         onExit={onExit}
       />
     )
-    fireEvent.click(screen.getByLabelText(/exit merge flow/i))
+    await user.click(screen.getByRole('button', { name: 'Exit merge flow' }))
     expect(onExit).toHaveBeenCalledOnce()
   })
 })
@@ -253,6 +196,7 @@ describe('ConflictHeader — does not show exit button when onExit is not provid
   it('does not show exit button when onExit is not provided', () => {
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}

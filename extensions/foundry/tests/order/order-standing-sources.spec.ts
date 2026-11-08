@@ -39,9 +39,8 @@ describe('orderStandingSources', () => {
   it('names the first check a draft has not cleared, in its own words', () => {
     const sources = orderStandingSources(storeWith([]))
     const blocker = sources.blockerFor?.(draft())
-    expect(blocker).not.toBeNull()
-    expect(blocker?.trim()).not.toBe('')
-    expect(sources.failuresFor?.(draft())).toBeGreaterThan(0)
+    expect(blocker).toBe('The order has no acceptance criteria, so there is nothing to prove.')
+    expect(sources.failuresFor?.(draft())).toBe(1)
   })
 
   it('reads a red-team refusal as why intake stopped', async () => {

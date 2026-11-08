@@ -1,10 +1,18 @@
 import React from 'react'
 import { describe, it, beforeAll, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { usePrReviewStore } from '../../src/stores/pr-review.store'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { usePrReviewStore, type PrReviewStore } from '../../src/stores/pr-review.store'
+import { githubAPI } from '../../src/api/github'
 import { PrReviewDetailSchema } from '../../src/schemas/pr-review.schema'
 
-vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
+vi.mock('../../src/api/github', () => ({
+  githubAPI: {
+    sessionSet: vi.fn().mockResolvedValue({ ok: true }),
+    filesViewedSet: vi.fn().mockResolvedValue({ ok: true }),
+    fileViewedSet: vi.fn().mockResolvedValue({ ok: true }),
+  },
+}))
 vi.mock('../../src/hooks/usePrReview', () => ({ useLoadInlineComments: vi.fn(() => vi.fn()) }))
 vi.mock('../../src/components/pr-review/ChapterNav', () => ({
   ChapterNav: () => <div data-testid="chapter-nav" />,
@@ -46,11 +54,6 @@ vi.mock('../../src/components/pr-review/AgentPanel', () => ({
   AgentPanel: () => <div data-testid="agent-panel" />,
 }))
 vi.mock('../../src/hooks/useAgentRuns', () => ({ useAgentRuns: vi.fn() }))
-
-const mockSetCurrentChapter = vi.fn()
-const mockSetCurrentFile = vi.fn()
-const mockMarkFileViewed = vi.fn()
-const mockSetPaused = vi.fn()
 
 const mockFile = {
   path: 'src/foo.ts',
@@ -103,41 +106,24 @@ const mockPr = PrReviewDetailSchema.parse({
   chapters: [mockChapter],
 })
 
-const mockMarkFilesViewed = vi.fn()
 const mockClose = vi.fn()
 const mockRefresh = vi.fn().mockResolvedValue(undefined)
 
-function setupStore(overrides: Record<string, unknown> = {}) {
-  vi.mocked(usePrReviewStore).mockReturnValue({
-    currentChapterId: null,
-    currentFilePath: null,
-    setCurrentChapter: mockSetCurrentChapter,
-    setCurrentFile: mockSetCurrentFile,
-    viewedFiles: new Set<string>(),
-    fileOrderOverrides: {},
-    markFileViewed: mockMarkFileViewed,
-    markFilesViewed: mockMarkFilesViewed,
-    setPaused: mockSetPaused,
-    changedSince: new Set<string>(),
-    lastAccessedAt: null,
-    notes: [],
-    drafts: [],
-    ...overrides,
-  })
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
-  setupStore()
+  usePrReviewStore.getState().reset()
 })
 
+/** Seeds the real review store, renders the view on `mockPr` with `prOverrides`, and returns a
+ *  user-event instance to drive it. */
 async function renderView(
   prOverrides: Record<string, unknown> = {},
-  storeOverrides: Record<string, unknown> = {}
+  storeOverrides: Partial<PrReviewStore> = {}
 ) {
   const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-  setupStore(storeOverrides)
-  return render(
+  usePrReviewStore.setState(storeOverrides)
+  const user = userEvent.setup()
+  const rendered = render(
     <PrReviewView
       repoRoot="/repo"
       pr={{ ...mockPr, ...prOverrides }}
@@ -145,6 +131,13 @@ async function renderView(
       onRefresh={mockRefresh}
     />
   )
+  return { user, ...rendered }
+}
+
+/** The reader's position in the real store. */
+function position() {
+  const { currentChapterId, currentFilePath } = usePrReviewStore.getState()
+  return { currentChapterId, currentFilePath }
 }
 
 // The first import compiles the component tree, which on a loaded machine takes longer
@@ -159,65 +152,39 @@ describe('PrReviewView', () => {
     expect(screen.getByTestId('review-diff-pane')).toBeTruthy()
   })
 
-  it('renders chapter file list when switched to guided mode', async () => {
-    const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
-    await renderView(
-      { chapters: [mockChapter, ch2] },
-      { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
-    )
-    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
-    expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-  })
-
   it('shows chapter nav for multi-chapter PRs in guided mode', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
-    await renderView(
+    const { user } = await renderView(
       { chapters: [mockChapter, ch2] },
       { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
     )
-    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
+    await user.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-nav')).toBeTruthy()
   })
 })
 
-describe('PrReviewView — does not show chapter nav for single-chapter PRs', () => {
-  it('does not show chapter nav for single-chapter PRs', async () => {
+describe('PrReviewView — single-chapter PRs', () => {
+  it('offers no file list mode toggle and labels the list "Files" for a single-chapter PR', async () => {
     await renderView()
-    expect(screen.queryByTestId('chapter-nav')).toBeNull()
+    expect(screen.queryByRole('radiogroup', { name: 'File list mode' })).toBeNull()
+    expect(screen.getByText('Files')).toBeTruthy()
   })
 
-  it('shows submit panel when Submit button clicked', async () => {
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /^Submit review/ }))
+  it('opens the submit panel from Submit review and hides it on CloseSubmit', async () => {
+    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
+    await user.click(screen.getByRole('button', { name: /^Submit review/ }))
     expect(screen.getByTestId('submit-panel')).toBeTruthy()
-  })
-
-  it('hides submit panel when CloseSubmit clicked', async () => {
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /^Submit review/ }))
-    fireEvent.click(screen.getByText('CloseSubmit'))
+    await user.click(screen.getByRole('button', { name: 'CloseSubmit' }))
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
 })
 
-describe('PrReviewView — calls setPaused and onClose when Pause is clicked', () => {
-  it('calls setPaused and onClose when Pause is clicked', async () => {
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Pause review' }))
-    expect(mockSetPaused).toHaveBeenCalled()
+describe('PrReviewView — pausing', () => {
+  it('records the pause time and closes the review when Pause review is picked', async () => {
+    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
+    await user.click(screen.getByRole('button', { name: 'More review actions' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Pause review' }))
+    expect(usePrReviewStore.getState().pausedAt).not.toBeNull()
     expect(mockClose).toHaveBeenCalled()
   })
 
@@ -235,180 +202,117 @@ describe('PrReviewView — calls setPaused and onClose when Pause is clicked', (
 
 describe('PrReviewView — opens the Agent tab of the inspector from Ask agent, and closes it', () => {
   it('opens the Agent tab of the inspector from Ask agent, and closes it', async () => {
-    await renderView({}, { currentFilePath: 'src/foo.ts' })
-    fireEvent.click(screen.getByRole('button', { name: 'Ask agent about this PR' }))
+    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
+    await user.click(screen.getByRole('button', { name: 'Ask agent about this PR' }))
     expect(screen.getByRole('tab', { name: /Agent/, selected: true })).toBeTruthy()
     expect(screen.getByTestId('agent-panel')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }))
+    await user.click(screen.getByRole('button', { name: 'Close inspector' }))
     expect(screen.queryByTestId('agent-panel')).toBeNull()
     expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
   })
 
   it('hides and restores the file list from the more menu', async () => {
-    await renderView({}, { currentFilePath: 'src/foo.ts' })
+    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
+    await user.click(screen.getByRole('button', { name: 'More review actions' }))
+    await user.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
     expect(screen.queryByTestId('full-file-list')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
+    await user.click(screen.getByRole('button', { name: 'More review actions' }))
+    await user.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 })
 
 describe('PrReviewView — shows risk panel when ShowRisk is clicked', () => {
   it('shows risk panel when ShowRisk is clicked', async () => {
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
-    )
-    fireEvent.click(screen.getByText('ShowRisk'))
+    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
+    await user.click(screen.getByRole('button', { name: 'ShowRisk' }))
     expect(screen.getByRole('tab', { name: 'Why this file', selected: true })).toBeTruthy()
     expect(screen.getByTestId('risk-panel')).toBeTruthy()
   })
 
   it('opens submit panel when FinishChapter is clicked on the last (only) chapter', async () => {
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
+    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
+    await user.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
     expect(screen.getByTestId('submit-panel')).toBeTruthy()
   })
 })
 
-describe('PrReviewView — advances to next chapter (not submit) when FinishChapter is clicked on a non-final chapter', () => {
-  it('advances to next chapter (not submit) when FinishChapter is clicked on a non-final chapter', async () => {
+describe('PrReviewView — finishing a non-final chapter', () => {
+  it('opens the next chapter, not the submit panel, when Viewed, next chapter is clicked', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2', files: [mockFile] }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [mockChapter, ch2] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
+    const { user } = await renderView(
+      { chapters: [mockChapter, ch2] },
+      { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
     )
-    fireEvent.click(screen.getByRole('button', { name: /^Viewed, next chapter/ }))
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+    await user.click(screen.getByRole('button', { name: /^Viewed, next chapter/ }))
+    expect(usePrReviewStore.getState().currentChapterId).toBe('ch-2')
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
 })
 
 describe('PrReviewView — finishing a chapter marks its unviewed files in one batch', () => {
-  it('finishing a chapter marks its unviewed files in one batch', async () => {
+  it('marks every file of the chapter viewed and mirrors the unviewed ones in one request', async () => {
     const file2 = { ...mockFile, path: 'src/bar.ts' }
     const file3 = { ...mockFile, path: 'src/baz.ts' }
-    const chapter = { ...mockChapter, files: [mockFile, file2, file3] }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/baz.ts', viewedFiles: new Set(['src/bar.ts']) })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [chapter] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
+    const { user } = await renderView(
+      { chapters: [{ ...mockChapter, files: [mockFile, file2, file3] }] },
+      { currentFilePath: 'src/baz.ts', viewedFiles: new Set(['src/bar.ts']) }
     )
-    fireEvent.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
-    expect(mockMarkFilesViewed).toHaveBeenCalledTimes(1)
-    expect(mockMarkFilesViewed).toHaveBeenCalledWith(
-      { repoRoot: '/repo', prNumber: 1, headSHA: 'abc' },
-      ['src/foo.ts', 'src/baz.ts']
+    await user.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
+    expect([...usePrReviewStore.getState().viewedFiles].sort()).toEqual([
+      'src/bar.ts',
+      'src/baz.ts',
+      'src/foo.ts',
+    ])
+    expect(githubAPI.filesViewedSet).toHaveBeenCalledTimes(1)
+    expect(githubAPI.filesViewedSet).toHaveBeenCalledWith(
+      expect.objectContaining({ prNumber: 1, paths: ['src/foo.ts', 'src/baz.ts'], viewed: true })
     )
-    expect(mockMarkFileViewed).not.toHaveBeenCalled()
+    expect(githubAPI.fileViewedSet).not.toHaveBeenCalled()
   })
 })
 
-describe('PrReviewView — calls markFileViewed and advances file on MarkViewed', () => {
-  it('calls markFileViewed and advances file on MarkViewed', async () => {
+describe('PrReviewView — MarkViewed', () => {
+  it('marks the open file viewed and opens the next file', async () => {
     const file2 = { ...mockFile, path: 'src/bar.ts' }
-    const chapter = { ...mockChapter, files: [mockFile, file2] }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [chapter] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
+    const { user } = await renderView(
+      { chapters: [{ ...mockChapter, files: [mockFile, file2] }] },
+      { currentFilePath: 'src/foo.ts' }
     )
-    fireEvent.click(screen.getByText('MarkViewed'))
-    expect(mockMarkFileViewed).toHaveBeenCalledWith(
-      { repoRoot: '/repo', prNumber: 1, headSHA: 'abc' },
-      'src/foo.ts'
-    )
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('src/bar.ts')
+    await user.click(screen.getByRole('button', { name: 'MarkViewed' }))
+    expect([...usePrReviewStore.getState().viewedFiles]).toEqual(['src/foo.ts'])
+    expect(usePrReviewStore.getState().currentFilePath).toBe('src/bar.ts')
   })
 })
 
 describe('PrReviewView — shows full-file-list by default, restores it after switching to guided and back', () => {
   it('shows full-file-list by default, restores it after switching to guided and back', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts', currentChapterId: 'ch-1' })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [mockChapter, ch2] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
+    const { user } = await renderView(
+      { chapters: [mockChapter, ch2] },
+      { currentFilePath: 'src/foo.ts', currentChapterId: 'ch-1' }
     )
-    // Full is default
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
-    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
+    await user.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-    fireEvent.click(screen.getByRole('radio', { name: 'Files' }))
+    await user.click(screen.getByRole('radio', { name: 'Files' }))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 })
 
-describe('PrReviewView — switches to guided mode from full mode', () => {
-  it('switches to guided mode from full mode', async () => {
-    const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts', currentChapterId: 'ch-1' })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [mockChapter, ch2] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
-    )
-    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
-    expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-  })
-
+describe('PrReviewView — refresh', () => {
   it('calls onRefresh when Refresh button is clicked', async () => {
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Refresh PR/ }))
+    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
+    await user.click(screen.getByRole('button', { name: 'More review actions' }))
+    await user.click(screen.getByRole('menuitem', { name: /^Refresh PR/ }))
     expect(mockRefresh).toHaveBeenCalled()
   })
 })
 
 describe('PrReviewView — shows empty state message when no active file', () => {
   it('shows empty state message when no active file', async () => {
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: null })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
-    )
+    await renderView({ chapters: [] }, { currentFilePath: null })
     expect(screen.getByText('Select a file to review.')).toBeTruthy()
   })
 })
@@ -417,21 +321,19 @@ function makeLargeFile(path: string, additions: number) {
   return { ...mockFile, path, additions, deletions: 0 }
 }
 
+/** A one-chapter PR of 500 added lines, open at its only file. */
+function renderLargePr() {
+  const bigFile = makeLargeFile('src/big.ts', 500)
+  return renderView(
+    { chapters: [{ ...mockChapter, files: [bigFile] }] },
+    { currentFilePath: 'src/big.ts' }
+  )
+}
+
 describe('PrReviewView (continued) — large-PR warning', () => {
   it('shows large-PR banner when PR exceeds 400 LOC', async () => {
-    const bigFile = makeLargeFile('src/big.ts', 500)
-    const chapter = { ...mockChapter, files: [bigFile] }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/big.ts' })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [chapter] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /500 LOC/ }))
+    const { user } = await renderLargePr()
+    await user.click(screen.getByRole('button', { name: /500 LOC/ }))
     expect(screen.getByText(/Large PR — 500 LOC, estimated 125 min to review/)).toBeTruthy()
   })
 
@@ -439,47 +341,20 @@ describe('PrReviewView (continued) — large-PR warning', () => {
     await renderView()
     expect(screen.queryByRole('button', { name: /LOC ·/ })).toBeNull()
   })
-})
 
-describe('PrReviewView (continued) — large-PR warning — dismisses large-PR banner when × clicked', () => {
   it('dismisses large-PR banner when × clicked', async () => {
-    const bigFile = makeLargeFile('src/big.ts', 500)
-    const chapter = { ...mockChapter, files: [bigFile] }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/big.ts' })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [chapter] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /500 LOC/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    const { user } = await renderLargePr()
+    await user.click(screen.getByRole('button', { name: /500 LOC/ }))
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(screen.queryByRole('button', { name: /500 LOC/ })).toBeNull()
   })
-})
 
-describe('PrReviewView (continued) — large-PR warning — toggles focus mode on/off', () => {
   it('toggles focus mode on/off', async () => {
-    const bigFile = makeLargeFile('src/big.ts', 500)
-    const chapter = { ...mockChapter, files: [bigFile] }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/big.ts' })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [chapter] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
-    )
+    const { user } = await renderLargePr()
     expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /^Focus mode/ }))
-    const pill = screen.getByRole('button', { name: 'Focus mode', pressed: true })
-    fireEvent.click(pill)
+    await user.click(screen.getByRole('button', { name: 'More review actions' }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /^Focus mode/ }))
+    await user.click(screen.getByRole('button', { name: 'Focus mode', pressed: true }))
     expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
   })
 })
@@ -493,17 +368,16 @@ describe('PrReviewView (continued) — large-PR warning — drops all-low-risk c
     }
     const lowChapter = { ...mockChapter, id: 'ch-low', name: 'Low only', files: [lowFile] }
     const highChapter = { ...mockChapter, id: 'ch-high', name: 'High risk', files: [highFile] }
-    const { unmount } = await renderView(
+    const { user } = await renderView(
       { chapters: [lowChapter, highChapter] },
       { currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' }
     )
-    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /^Focus mode/ }))
+    await user.click(screen.getByRole('button', { name: 'More review actions' }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /^Focus mode/ }))
     // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
     expect(
       screen.getByRole('progressbar', { name: 'Files viewed' }).getAttribute('aria-valuemax')
     ).toBe('1')
-    unmount()
   })
 })
 
@@ -513,24 +387,18 @@ describe('PrReviewView (continued) — large-PR warning — progress bar does no
       ...makeLargeFile('src/low.ts', 500),
       riskScore: { ...mockFile.riskScore, level: 'low' as const },
     }
-    const chapter = { ...mockChapter, files: [bigFile] }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
     // 3 viewed files but only 1 file in PR
-    setupStore({
-      currentFilePath: 'src/low.ts',
-      viewedFiles: new Set(['src/low.ts', 'src/other.ts', 'src/another.ts']),
-    })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [chapter] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
+    await renderView(
+      { chapters: [{ ...mockChapter, files: [bigFile] }] },
+      {
+        currentFilePath: 'src/low.ts',
+        viewedFiles: new Set(['src/low.ts', 'src/other.ts', 'src/another.ts']),
+      }
     )
     // Only the one displayed file counts, however many viewed paths the store holds.
     const segments = screen.getByRole('progressbar', { name: 'Files viewed' })
-    expect(segments.querySelector('i')?.style.getPropertyValue('--filled')).toBe('100%')
+    const [segment] = within(segments).getAllByTestId('progress-segment')
+    expect(segment.style.getPropertyValue('--filled')).toBe('100%')
   })
 })
 
@@ -542,40 +410,42 @@ const chapters = [
   { ...mockChapter, id: 'ch-3', name: 'Three', files: [f('e.ts')] },
 ]
 
-const press = (key: string) => fireEvent.keyDown(window, { key })
-
+// user-event reads `{` and `[` as the start of a key name; doubling one types it.
 describe('PrReviewView (continued) — chapter keyboard navigation', () => {
   it('} selects the next chapter and its first file', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-    press('}')
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-1', currentFilePath: 'b.ts' }
+    )
+    await user.keyboard('}')
+    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
   })
 
   it('{ selects the previous chapter and its first file', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
-    press('{')
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-3', currentFilePath: 'e.ts' }
+    )
+    await user.keyboard('{{')
+    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
   })
 
-  it('chapter keys do not wrap at the ends', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
-    press('{')
-    expect(mockSetCurrentChapter).not.toHaveBeenCalled()
-    expect(mockSetCurrentFile).not.toHaveBeenCalled()
-  })
-
-  it('chapter keys do not wrap past the last chapter', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
-    press('}')
-    expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+  it.each([
+    { key: '{{', name: '{ at the first chapter', chapterId: 'ch-1', path: 'a.ts' },
+    { key: '}', name: '} at the last chapter', chapterId: 'ch-3', path: 'e.ts' },
+  ])('$name leaves the position unchanged', async ({ key, chapterId, path }) => {
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: chapterId, currentFilePath: path }
+    )
+    await user.keyboard(key)
+    expect(position()).toEqual({ currentChapterId: chapterId, currentFilePath: path })
   })
 })
 
 describe('PrReviewView (continued) — chapter keyboard navigation — } respects the file order override of the target chapter', () => {
   it('} respects the file order override of the target chapter', async () => {
-    await renderView(
+    const { user } = await renderView(
       { chapters },
       {
         currentChapterId: 'ch-1',
@@ -583,64 +453,96 @@ describe('PrReviewView (continued) — chapter keyboard navigation — } respect
         fileOrderOverrides: { 'ch-2': ['d.ts', 'c.ts'] },
       }
     )
-    press('}')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('d.ts')
+    await user.keyboard('}')
+    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'd.ts' })
   })
 
   it('] crosses into the next chapter from the last file of a chapter (Files view)', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-    press(']')
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-1', currentFilePath: 'b.ts' }
+    )
+    await user.keyboard(']')
+    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
   })
 
   it('] stays in the chapter and does not switch it mid-chapter', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
-    press(']')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
-    expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-1', currentFilePath: 'a.ts' }
+    )
+    await user.keyboard(']')
+    expect(position()).toEqual({ currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
   })
 })
 
 describe('PrReviewView (continued) — chapter keyboard navigation — ] crosses chapters in the Chapters view too', () => {
   it('] crosses chapters in the Chapters view too', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
-    press(']')
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-1', currentFilePath: 'b.ts' }
+    )
+    await user.click(screen.getByRole('radio', { name: 'Chapters' }))
+    await user.keyboard(']')
+    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
   })
 
   it('[ crosses back to the last file of the previous chapter', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
-    press('[')
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-1')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-2', currentFilePath: 'c.ts' }
+    )
+    await user.keyboard('[[')
+    expect(position()).toEqual({ currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
   })
 
-  it('] and [ stop at the first and last files of the whole PR', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
-    press(']')
-    expect(mockSetCurrentFile).not.toHaveBeenCalled()
+  it.each([
+    { key: '[[', name: '[ at the first file of the PR', chapterId: 'ch-1', path: 'a.ts' },
+    { key: ']', name: '] at the last file of the PR', chapterId: 'ch-3', path: 'e.ts' },
+  ])('$name leaves the position unchanged', async ({ key, chapterId, path }) => {
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: chapterId, currentFilePath: path }
+    )
+    await user.keyboard(key)
+    expect(position()).toEqual({ currentChapterId: chapterId, currentFilePath: path })
   })
 })
 
 describe('PrReviewView (continued) — chapter keyboard navigation — marking the last file of a chapter viewed advances into the next chapter', () => {
   it('marking the last file of a chapter viewed advances into the next chapter', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-    fireEvent.click(screen.getByText('MarkViewed'))
-    expect(mockMarkFileViewed).toHaveBeenCalledWith(
-      { repoRoot: '/repo', prNumber: 1, headSHA: 'abc' },
-      'b.ts'
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-1', currentFilePath: 'b.ts' }
     )
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    await user.click(screen.getByRole('button', { name: 'MarkViewed' }))
+    expect([...usePrReviewStore.getState().viewedFiles]).toEqual(['b.ts'])
+    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
   })
 
   it('shows "Chapter 2 of 3" in the Chapters view only', async () => {
-    await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-2', currentFilePath: 'c.ts' }
+    )
     expect(screen.queryByText('Chapter 2 of 3')).toBeNull()
-    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
+    await user.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByText('Chapter 2 of 3')).toBeTruthy()
+  })
+})
+
+describe('PrReviewView — after a push', () => {
+  it('says how many commits came since the reviewer last looked', async () => {
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={mockPr}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+        sinceInfo={{ commitCount: 1, changedCount: 1, historyRewritten: false }}
+      />
+    )
+    expect(screen.getByText('1 commit since you last looked')).toBeTruthy()
   })
 })

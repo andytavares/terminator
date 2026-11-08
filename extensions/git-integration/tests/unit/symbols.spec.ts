@@ -198,8 +198,9 @@ export function destructure(obj: { a: number; b: number }) {
   it('treats parameters, catch bindings and for-in variables as local', async () => {
     const result = await analyseSnippet('src/locals.ts', LOCALS_SOURCE)
     expect(result!.references).toEqual(expect.arrayContaining(['table', 'use', 'run', 'report']))
-    for (const local of ['req', 'opt', 'key', 'err'])
-      expect(result!.references).not.toContain(local)
+    expect(
+      result!.references.filter((name) => ['req', 'opt', 'key', 'err'].includes(name))
+    ).toEqual([])
   })
 
   it('treats the plain parameters of a JavaScript function as local', async () => {

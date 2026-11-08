@@ -695,9 +695,10 @@ function rungOutputReadingTests() {
       at: AT,
     })
 
-    expect(result?.ok).toBe(true)
-    if (result?.ok !== true) throw new Error('expected a reading')
-    expect(result.order.redTeam[0]?.text).toBe('AC-2 cannot be falsified')
+    expect(result).toMatchObject({
+      ok: true,
+      order: { redTeam: [{ text: 'AC-2 cannot be falsified' }] },
+    })
   })
 }
 
@@ -718,9 +719,7 @@ function aPassedThroughRoundTests() {
       round: 2,
     })
 
-    expect(result?.ok).toBe(true)
-    if (result?.ok !== true) throw new Error('expected a reading')
-    expect(result.order.redTeam[0]?.round).toBe(2)
+    expect(result).toMatchObject({ ok: true, order: { redTeam: [{ round: 2 }] } })
   })
 }
 
@@ -740,9 +739,7 @@ function theDefaultRoundTests() {
       at: AT,
     })
 
-    expect(result?.ok).toBe(true)
-    if (result?.ok !== true) throw new Error('expected a reading')
-    expect(result.order.redTeam[0]?.round).toBe(0)
+    expect(result).toMatchObject({ ok: true, order: { redTeam: [{ round: 0 }] } })
   })
 }
 
@@ -789,9 +786,7 @@ function nothingOrNotJsonTests() {
       outputPath: file,
       at: AT,
     })
-    expect(result?.ok).toBe(false)
-    if (result?.ok !== false) throw new Error('expected a refusal')
-    expect(result.reason).toContain('not readable')
+    expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('not readable') })
   })
 }
 

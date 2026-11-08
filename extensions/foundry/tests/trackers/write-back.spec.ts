@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import {
-  checkCapability,
-  writeBack,
-  INTENT_FOR_EVENT,
-  MAX_ATTEMPTS,
-} from '../../src/trackers/write-back.js'
+import { checkCapability, writeBack, MAX_ATTEMPTS } from '../../src/trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from '../../src/trackers/write-back.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder, WriteBack } from '../../src/order/schema.js'
@@ -166,13 +161,6 @@ describe('the state move (FR-059)', () => {
 })
 
 function movingTests() {
-  it('maps each event to the intent it means', () => {
-    expect(INTENT_FOR_EVENT.started).toBe('started')
-    expect(INTENT_FOR_EVENT.draft_opened).toBe('in_review')
-    expect(INTENT_FOR_EVENT.merged).toBe('done')
-    expect(INTENT_FOR_EVENT.agreed).toBeNull()
-  })
-
   it('moves the issue when work starts', async () => {
     const issues = port()
     await writeBack(order(), { event: 'started' }, deps({ issues }))
@@ -420,15 +408,10 @@ function theStateNamedTests() {
     expect(record).toHaveBeenCalledWith('writeback.ok', 'TAV-42', `TAV-42 moved to ${name}`)
   })
 
-  it('keeps the event to intent mapping', () => {
-    expect(INTENT_FOR_EVENT).toEqual({
-      agreed: null,
-      amended: null,
-      started: 'started',
-      draft_opened: 'in_review',
-      document_ready: 'in_review',
-      merged: 'done',
-    })
+  it.each(['agreed', 'amended'] as const)('leaves the issue where it is on %s', async (event) => {
+    const issues = port()
+    await writeBack(order(), { event }, deps({ issues }))
+    expect(issues.transition).not.toHaveBeenCalled()
   })
 }
 

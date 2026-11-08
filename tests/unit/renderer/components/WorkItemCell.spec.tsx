@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { WorkItemCell } from '../../../../src/renderer/components/session/WorkItemCell'
 import type { Issue } from '../../../../src/shared/types/index'
 
@@ -62,30 +63,34 @@ describe('WorkItemCell — a description', () => {
     expect(screen.getByRole('button', { name: 'Edit description' })).toBeTruthy()
   })
 
-  it('edits and saves', () => {
+  it('edits and saves', async () => {
+    const user = userEvent.setup()
     const save = vi.fn()
     render(
       <WorkItemCell workItem={null} issue={undefined} description="old" onSaveDescription={save} />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }))
+    await user.click(screen.getByRole('button', { name: 'Edit description' }))
     const box = screen.getByRole('textbox', { name: 'What is this session doing?' })
     expect((box as HTMLInputElement).value).toBe('old')
-    fireEvent.change(box, { target: { value: 'new' } })
-    fireEvent.keyDown(box, { key: 'Enter' })
+    await user.clear(box)
+    await user.type(box, 'new')
+    await user.keyboard('{Enter}')
     expect(save).toHaveBeenCalledWith('new')
   })
 })
 
 describe('WorkItemCell — a description — saves a cleared description as null', () => {
-  it('saves a cleared description as null', () => {
+  it('saves a cleared description as null', async () => {
+    const user = userEvent.setup()
     const save = vi.fn()
     render(
       <WorkItemCell workItem={null} issue={undefined} description="old" onSaveDescription={save} />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }))
+    await user.click(screen.getByRole('button', { name: 'Edit description' }))
     const box = screen.getByRole('textbox', { name: 'What is this session doing?' })
-    fireEvent.change(box, { target: { value: '   ' } })
-    fireEvent.keyDown(box, { key: 'Enter' })
+    await user.clear(box)
+    await user.type(box, '   ')
+    await user.keyboard('{Enter}')
     expect(save).toHaveBeenCalledWith(null)
   })
 
@@ -112,31 +117,33 @@ describe('WorkItemCell — nothing yet', () => {
     expect(box.getAttribute('maxlength')).toBe('500')
   })
 
-  it('saves on Enter, trimmed', () => {
+  it('saves on Enter, trimmed', async () => {
+    const user = userEvent.setup()
     const save = vi.fn()
     render(
       <WorkItemCell workItem={null} issue={undefined} description={null} onSaveDescription={save} />
     )
     const box = screen.getByRole('textbox', { name: 'What is this session doing?' })
-    fireEvent.change(box, { target: { value: '  Checking bundle size  ' } })
-    fireEvent.keyDown(box, { key: 'Enter' })
+    await user.clear(box)
+    await user.type(box, '  Checking bundle size  ')
+    await user.keyboard('{Enter}')
     expect(save).toHaveBeenCalledWith('Checking bundle size')
   })
 
-  it('does not save an empty field', () => {
+  it('does not save an empty field', async () => {
+    const user = userEvent.setup()
     const save = vi.fn()
     render(
       <WorkItemCell workItem={null} issue={undefined} description={null} onSaveDescription={save} />
     )
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'What is this session doing?' }), {
-      key: 'Enter',
-    })
+    await user.type(screen.getByRole('textbox', { name: 'What is this session doing?' }), '{Enter}')
     expect(save).not.toHaveBeenCalled()
   })
 })
 
 describe('WorkItemCell — nothing yet — reverts on Escape without saving', () => {
-  it('reverts on Escape without saving', () => {
+  it('reverts on Escape without saving', async () => {
+    const user = userEvent.setup()
     const save = vi.fn()
     render(
       <WorkItemCell workItem={null} issue={undefined} description={null} onSaveDescription={save} />
@@ -144,15 +151,17 @@ describe('WorkItemCell — nothing yet — reverts on Escape without saving', ()
     const box = screen.getByRole('textbox', {
       name: 'What is this session doing?',
     }) as HTMLInputElement
-    fireEvent.change(box, { target: { value: 'half typed' } })
-    fireEvent.keyDown(box, { key: 'Escape' })
+    await user.clear(box)
+    await user.type(box, 'half typed')
+    await user.keyboard('{Escape}')
     expect(box.value).toBe('')
     expect(save).not.toHaveBeenCalled()
   })
 })
 
 describe('WorkItemCell — nothing yet — does not bubble its keys to a surrounding row', () => {
-  it('does not bubble its keys to a surrounding row', () => {
+  it('does not bubble its keys to a surrounding row', async () => {
+    const user = userEvent.setup()
     const rowKey = vi.fn()
     render(
       <div onKeyDown={rowKey}>
@@ -164,15 +173,14 @@ describe('WorkItemCell — nothing yet — does not bubble its keys to a surroun
         />
       </div>
     )
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'What is this session doing?' }), {
-      key: 'Enter',
-    })
+    await user.type(screen.getByRole('textbox', { name: 'What is this session doing?' }), '{Enter}')
     expect(rowKey).not.toHaveBeenCalled()
   })
 })
 
 describe('WorkItemCell — nothing yet — offers a link only when linking is possible here', () => {
-  it('offers a link only when linking is possible here', () => {
+  it('offers a link only when linking is possible here', async () => {
+    const user = userEvent.setup()
     const { rerender } = render(
       <WorkItemCell workItem={null} issue={undefined} description={null} onSaveDescription={noop} />
     )
@@ -187,7 +195,7 @@ describe('WorkItemCell — nothing yet — offers a link only when linking is po
         onLink={link}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Link a work item' }))
+    await user.click(screen.getByRole('button', { name: 'Link a work item' }))
     expect(link).toHaveBeenCalled()
   })
 })

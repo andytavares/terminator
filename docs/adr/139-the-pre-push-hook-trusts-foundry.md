@@ -1,6 +1,6 @@
 # ADR 139: The pre-push hook trusts Foundry's pushes
 
-**Status**: Accepted
+**Status**: Superseded by ADR 151 (there is no pre-push hook)
 
 **Date**: 2026-10-30
 

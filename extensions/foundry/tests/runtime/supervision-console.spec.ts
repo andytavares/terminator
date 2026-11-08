@@ -2,7 +2,7 @@
  * The supervision console, through `activate`: what is held, what stalled, the
  * feed, answering a held call, and the actions on one run.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -25,22 +25,15 @@ const { notePending, noteResolved } = await import('../../src/runtime/held-calls
 let dataDir = ''
 let host: FoundryHost
 
-beforeAll(async () => {
-  vi.stubEnv('HOME', temporaryDirectory('fdry-home'))
-  host = fakeHost(() => dataDir)
-  await activateFoundry(host)
-})
-
-// Each test's proofs and runs end before the next test, or the spec's folder, goes.
-afterEach(settleFoundryWork)
-
-afterAll(async () => {
-  await deactivate()
-  vi.unstubAllEnvs()
-})
-
+// Each test activates its own Foundry, so no run, held call or mute leaks into the next test.
 beforeEach(async () => {
+  vi.stubEnv('HOME', temporaryDirectory('fdry-home'))
   dataDir = temporaryDirectory('fdry-console')
+  host = fakeHost(() => dataDir)
+  theRunner.resolve.mockReset().mockReturnValue(true)
+  theRunner.terminalFor.mockReset().mockReturnValue(null)
+  theRunner.watchable.mockReset().mockReturnValue([])
+  await activateFoundry(host)
   await orderStoreAt(dataDir).save(
     draftOrder({
       id: 'WO-1',
@@ -50,11 +43,12 @@ beforeEach(async () => {
       now: '2026-10-12T10:00:00.000Z',
     })
   )
-  host.broadcast.mockClear()
-  host.showToast.mockClear()
-  host.createNotification.mockClear()
-  theRunner.resolve.mockReset().mockReturnValue(true)
-  theRunner.terminalFor.mockReset().mockReturnValue(null)
+})
+
+// Each test's proofs and runs end before its Foundry, or the spec's folder, goes.
+afterEach(async () => {
+  await settleFoundryWork()
+  await deactivate()
 })
 
 function heldCall(requestId: string) {

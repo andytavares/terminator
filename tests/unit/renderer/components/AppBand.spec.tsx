@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { isInaccessible, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 
 const noop = () => null
@@ -23,113 +24,72 @@ function renderBand(props: Partial<React.ComponentProps<typeof AppBand>> = {}) {
 }
 
 describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
-  it('names every entry for a reader, since the band is icons only (FR-036)', () => {
-    // The 8px text label went: at that size it was barely legible and doubled
-    // the band's height for what the accessible name already carries.
-    const { container } = renderBand()
-    for (const label of ['Overview', 'Notes', 'Task Vault']) {
-      expect(screen.getByRole('button', { name: label })).toBeTruthy()
-    }
-    for (const entry of container.querySelectorAll('.app-band__entry')) {
-      expect(entry.getAttribute('aria-label')).toBeTruthy()
-      expect(entry.getAttribute('title')).toBeTruthy()
-      // No drawn label: the band is icons only.
-      expect(entry.textContent).toBe('')
-    }
-  })
-
-  it('gives every entry an accessible name', () => {
-    const { container } = renderBand()
-    const names = [...container.querySelectorAll('.app-band__entry')].map((el) =>
-      el.getAttribute('aria-label')
-    )
-    expect(names).toEqual(['Overview', 'Notes', 'Task Vault'])
+  it('names every entry as a reachable button with no drawn text, since the band is icons only (FR-036)', () => {
+    renderBand()
+    const entries = screen
+      .getAllByRole('button')
+      .map((el) => [el.getAttribute('aria-label'), el.title, el.textContent, el.tabIndex])
+    expect(entries).toEqual([
+      ['Overview', 'Overview', '', 0],
+      ['Notes', 'Notes', '', 0],
+      ['Task Vault', 'Task Vault', '', 0],
+    ])
   })
 
   it('hides the icon from assistive technology — the label carries it', () => {
-    const { container } = renderBand()
-    for (const icon of container.querySelectorAll('.app-band__icon')) {
-      expect(icon.getAttribute('aria-hidden')).toBe('true')
-    }
+    renderBand()
+    expect(isInaccessible(screen.getByTestId('i-overview'))).toBe(true)
+    expect(isInaccessible(screen.getByTestId('i-notes'))).toBe(true)
+  })
+
+  it('draws the puzzle glyph when a contribution supplies no icon', () => {
+    renderBand()
+    // eslint-disable-next-line testing-library/no-node-access -- the glyph is an aria-hidden SVG with no role, name or test id
+    const icon = screen.getByRole('button', { name: 'Task Vault' }).querySelector('svg')
+    expect(icon?.classList.contains('lucide-puzzle')).toBe(true)
   })
 })
 
-describe('AppBand — one labelled home for app-level surfaces (US4) — falls back to a neutral glyph when a contribution supplies no icon', () => {
-  it('falls back to a neutral glyph when a contribution supplies no icon', () => {
-    const { container } = renderBand()
-    const vault = [...container.querySelectorAll('.app-band__entry')].find(
-      (el) => el.getAttribute('aria-label') === 'Task Vault'
-    )!
-    // Renders something, and does not throw — an extension must not be able to
-    // break the sidebar by omitting an icon.
-    expect(vault.querySelector('.app-band__icon')).toBeTruthy()
-  })
-
-  it('selects a global tab by id', () => {
+describe('AppBand — selection', () => {
+  it('selects a global tab by id', async () => {
+    const user = userEvent.setup()
     renderBand()
-    fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
+    await user.click(screen.getByRole('button', { name: 'Notes' }))
     expect(onSelect).toHaveBeenCalledWith('notes')
   })
 
-  it('marks the active global tab', () => {
-    const { container } = renderBand({ activeId: 'notes' })
-    const active = container.querySelectorAll('.app-band__entry--active')
-    expect(active).toHaveLength(1)
-    expect(active[0].getAttribute('aria-label')).toBe('Notes')
-  })
-
-  it('exposes selection state to assistive technology as well as visually', () => {
-    const { container } = renderBand({ activeId: 'notes' })
-    const notes = [...container.querySelectorAll('.app-band__entry')].find(
-      (el) => el.getAttribute('aria-label') === 'Notes'
-    )!
-    expect(notes.getAttribute('aria-current')).toBe('page')
-  })
-})
-
-describe('AppBand — one labelled home for app-level surfaces (US4) — keeps every entry keyboard reachable in reading order', () => {
-  it('keeps every entry keyboard reachable in reading order', () => {
-    const { container } = renderBand()
-    for (const el of container.querySelectorAll('.app-band__entry')) {
-      expect(el.tagName).toBe('BUTTON')
-      expect(el.getAttribute('tabindex')).not.toBe('-1')
-    }
+  it('marks only the active global tab as the current page', () => {
+    renderBand({ activeId: 'notes' })
+    const current = screen.getAllByRole('button').map((el) => el.getAttribute('aria-current'))
+    expect(current).toEqual([null, 'page', null])
   })
 
   it('omits a global tab that asked to be hidden', () => {
-    const { container } = renderBand({
+    renderBand({
       globalTabs: [...globalTabs, { id: 'secret', label: 'Secret', component: noop, hidden: true }],
     })
-    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(3)
+    expect(screen.getAllByRole('button')).toHaveLength(3)
     expect(screen.queryByText('Secret')).toBeNull()
   })
 
   it('renders nothing at all when nothing is contributed', () => {
     const { container } = renderBand({ globalTabs: [] })
-    expect(container.querySelector('.app-band')).toBeNull()
-  })
-
-  it('names no extension in its own markup — it renders registry data only', () => {
-    const { container } = renderBand({
-      globalTabs: [{ id: 'x', label: 'Anything At All', component: noop }],
-    })
-    expect(screen.getByRole('button', { name: 'Anything At All' })).toBeTruthy()
-    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(1)
+    expect(container.innerHTML).toBe('')
   })
 })
 
 describe('AppBand — quick actions', () => {
   it('renders the band for this entry alone', () => {
     const onOpenQuickActions = vi.fn()
-    const { container } = renderBand({ globalTabs: [], onOpenQuickActions })
-    expect(container.querySelector('.app-band')).toBeTruthy()
+    renderBand({ globalTabs: [], onOpenQuickActions })
     expect(screen.getByRole('button', { name: 'Quick actions (⌘P)' })).toBeTruthy()
   })
 
-  it('calls the handler on click', () => {
+  it('calls the handler on click', async () => {
+    const user = userEvent.setup()
     const onOpenQuickActions = vi.fn()
     renderBand({ onOpenQuickActions })
-    fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
+    await user.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
     expect(onOpenQuickActions).toHaveBeenCalledOnce()
   })
 
@@ -141,6 +101,7 @@ describe('AppBand — quick actions', () => {
 
   it('draws the icon with no inline colour', () => {
     renderBand({ onOpenQuickActions: vi.fn() })
+    // eslint-disable-next-line testing-library/no-node-access -- the glyph is an aria-hidden SVG with no role, name or test id
     const icon = screen.getByRole('button', { name: 'Quick actions (⌘P)' }).querySelector('svg')!
     expect(icon.getAttribute('style')).toBeNull()
   })
@@ -166,7 +127,6 @@ describe('AppBand — a tab badge', () => {
     renderBand({
       globalTabs: [{ id: 'core.home', label: 'Home', component: noop, badge: 0, badgeLabel: 'x' }],
     })
-    const entry = screen.getByRole('button', { name: 'Home' })
-    expect(entry.querySelector('.app-band__badge')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Home' }).textContent).toBe('')
   })
 })

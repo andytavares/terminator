@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { BranchSelect } from '../../../../src/renderer/components/sidebar/BranchSelect'
 import type { Branch } from '../../../../src/shared/types/index'
 
@@ -25,98 +26,71 @@ describe('BranchSelect', () => {
     expect(screen.getByText('Select branch…')).toBeTruthy()
   })
 
-  it('opens dropdown on trigger click', () => {
+  it('lists all branches when open', async () => {
+    const user = userEvent.setup()
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    expect(screen.getByPlaceholderText('Search branches…')).toBeTruthy()
-  })
-
-  it('lists all branches when open', () => {
-    render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
+    await user.click(screen.getByRole('button', { name: /main/i }))
     expect(screen.getByText('feature/a')).toBeTruthy()
     expect(screen.getByText('feature/b')).toBeTruthy()
   })
 })
 
 describe('BranchSelect — filters branches by search input', () => {
-  it('filters branches by search input', () => {
+  it('filters branches by search input', async () => {
+    const user = userEvent.setup()
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    fireEvent.change(screen.getByPlaceholderText('Search branches…'), {
-      target: { value: 'feature/a' },
-    })
+    await user.click(screen.getByRole('button', { name: /main/i }))
+    await user.type(screen.getByPlaceholderText('Search branches…'), 'feature/a')
     expect(screen.getByText('feature/a')).toBeTruthy()
     expect(screen.queryByText('feature/b')).toBeNull()
   })
 
-  it('forgets the search text once the dropdown closes', () => {
+  it('forgets the search text once the dropdown closes', async () => {
+    const user = userEvent.setup()
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
     const trigger = screen.getByRole('button', { name: /main/i })
-    fireEvent.click(trigger)
-    fireEvent.change(screen.getByPlaceholderText('Search branches…'), {
-      target: { value: 'feature/a' },
-    })
-    fireEvent.click(trigger)
-    fireEvent.click(trigger)
+    await user.click(trigger)
+    await user.type(screen.getByPlaceholderText('Search branches…'), 'feature/a')
+    await user.click(trigger)
+    await user.click(trigger)
     expect((screen.getByPlaceholderText('Search branches…') as HTMLInputElement).value).toBe('')
     expect(screen.getByText('feature/b')).toBeTruthy()
   })
 })
 
 describe('BranchSelect — shows no matching branches message when filter has no results', () => {
-  it('shows no matching branches message when filter has no results', () => {
+  it('shows no matching branches message when filter has no results', async () => {
+    const user = userEvent.setup()
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    fireEvent.change(screen.getByPlaceholderText('Search branches…'), {
-      target: { value: 'zzz' },
-    })
+    await user.click(screen.getByRole('button', { name: /main/i }))
+    await user.type(screen.getByPlaceholderText('Search branches…'), 'zzz')
     expect(screen.getByText('No matching branches')).toBeTruthy()
   })
 
-  it('calls onChange and closes dropdown when branch is selected', () => {
+  it('calls onChange and closes dropdown when branch is selected', async () => {
+    const user = userEvent.setup()
     const onChange = vi.fn()
     render(<BranchSelect branches={branches} value="main" onChange={onChange} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    fireEvent.click(screen.getByText('feature/a'))
+    await user.click(screen.getByRole('button', { name: /main/i }))
+    await user.click(screen.getByText('feature/a'))
     expect(onChange).toHaveBeenCalledWith('feature/a')
     expect(recordUse).toHaveBeenCalledWith('core.sidebar.branch-switch')
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
 
-  it('closes dropdown on Escape key', () => {
+  it('closes dropdown on Escape key', async () => {
+    const user = userEvent.setup()
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    expect(screen.getByPlaceholderText('Search branches…')).toBeTruthy()
-    fireEvent.keyDown(screen.getByPlaceholderText('Search branches…'), { key: 'Escape' })
+    await user.click(screen.getByRole('button', { name: /main/i }))
+    expect(screen.getByPlaceholderText('Search branches…').matches(':focus')).toBe(true)
+    await user.keyboard('{Escape}')
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
 })
 
-describe('BranchSelect — shows current branch check mark', () => {
-  it('shows current branch check mark', () => {
-    render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    expect(screen.getByText('✓')).toBeTruthy()
-  })
-
-  it('shows newBranchLabel option when provided', () => {
-    render(
-      <BranchSelect
-        branches={branches}
-        value="main"
-        onChange={vi.fn()}
-        newBranchLabel="+ New branch…"
-        onNewBranch={vi.fn()}
-      />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    expect(screen.getByText('+ New branch…')).toBeTruthy()
-  })
-})
-
 describe('BranchSelect — calls onNewBranch and closes when new branch option is clicked', () => {
-  it('calls onNewBranch and closes when new branch option is clicked', () => {
+  it('calls onNewBranch and closes when new branch option is clicked', async () => {
+    const user = userEvent.setup()
     const onNewBranch = vi.fn()
     render(
       <BranchSelect
@@ -127,8 +101,8 @@ describe('BranchSelect — calls onNewBranch and closes when new branch option i
         onNewBranch={onNewBranch}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    fireEvent.click(screen.getByText('+ New branch…'))
+    await user.click(screen.getByRole('button', { name: /main/i }))
+    await user.click(screen.getByText('+ New branch…'))
     expect(onNewBranch).toHaveBeenCalled()
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
@@ -149,47 +123,53 @@ describe('BranchSelect — shows isNewSelected label in trigger when isNewSelect
     expect(screen.getByText('+ New branch…')).toBeTruthy()
   })
 
-  it('toggles dropdown closed when trigger is clicked again', () => {
+  it('toggles dropdown closed when trigger is clicked again', async () => {
+    const user = userEvent.setup()
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
     const trigger = screen.getByRole('button', { name: /main/i })
-    fireEvent.click(trigger)
+    await user.click(trigger)
     expect(screen.getByPlaceholderText('Search branches…')).toBeTruthy()
-    fireEvent.click(trigger)
+    await user.click(trigger)
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
 
-  it('shows empty state when no branches and no filter', () => {
+  it('shows empty state when no branches and no filter', async () => {
+    const user = userEvent.setup()
     render(<BranchSelect branches={[]} value="" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByText('Select branch…'))
+    await user.click(screen.getByText('Select branch…'))
     expect(screen.getByText('No branches')).toBeTruthy()
   })
 })
 
-const openSelect = (props: Partial<React.ComponentProps<typeof BranchSelect>> = {}): void => {
+async function openSelect(
+  props: Partial<React.ComponentProps<typeof BranchSelect>> = {}
+): Promise<UserEvent> {
+  const user = userEvent.setup()
   render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} {...props} />)
-  fireEvent.click(document.querySelector('.branch-select__trigger')!)
+  await user.click(screen.getByRole('button', { expanded: false }))
+  return user
 }
 const activeItems = (): string[] =>
-  [...document.querySelectorAll('.branch-select__item--active')].map((el) => el.textContent ?? '')
+  screen.getAllByRole('button', { current: true }).map((el) => el.textContent ?? '')
 
 describe('BranchSelect — closing on a press elsewhere', () => {
-  it('closes on a pointer press outside it, and stays open for one inside', () => {
-    openSelect()
-    fireEvent.pointerDown(screen.getByPlaceholderText('Search branches…'))
+  it('closes on a pointer press outside it, and stays open for one inside', async () => {
+    const user = await openSelect()
+    await user.click(screen.getByPlaceholderText('Search branches…'))
     expect(screen.getByPlaceholderText('Search branches…')).toBeTruthy()
-    fireEvent.pointerDown(document.body)
+    await user.click(document.body)
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
 })
 
 describe('BranchSelect — the chosen item', () => {
-  it('marks the selected branch', () => {
-    openSelect()
+  it('marks the selected branch', async () => {
+    await openSelect()
     expect(activeItems()).toEqual(['✓main'])
   })
 
-  it('marks the new-branch item instead while it is chosen', () => {
-    openSelect({ newBranchLabel: '+ New branch…', onNewBranch: vi.fn(), isNewSelected: true })
+  it('marks the new-branch item instead while it is chosen', async () => {
+    await openSelect({ newBranchLabel: '+ New branch…', onNewBranch: vi.fn(), isNewSelected: true })
     expect(activeItems()).toEqual(['+ New branch…'])
   })
 
@@ -205,13 +185,14 @@ describe('BranchSelect — fetching', () => {
     expect(screen.queryByRole('button', { name: 'Fetch branches' })).toBeNull()
   })
 
-  it('fetches on click, and is disabled and marked busy while fetching', () => {
+  it('fetches on click, and is disabled and marked busy while fetching', async () => {
+    const user = userEvent.setup()
     const onRefresh = vi.fn()
     const { rerender } = render(
       <BranchSelect branches={branches} value="main" onChange={vi.fn()} onRefresh={onRefresh} />
     )
     const fetch = screen.getByRole('button', { name: 'Fetch branches' })
-    fireEvent.click(fetch)
+    await user.click(fetch)
     expect(onRefresh).toHaveBeenCalledOnce()
     expect(fetch.className).toBe('branch-select__refresh')
     rerender(

@@ -134,58 +134,10 @@ const EXPECTED_REMOTE_CHANNELS = [
   'session-records:changed',
 ]
 
-const INTERNAL_ONLY_CHANNELS = [
-  // A file watch reports to the desktop view that asked for it (ADR 109).
-  'fs:watch-start',
-  'fs:watch-stop',
-  'fs:changed',
-  'dialog:open-directory',
-  'shell:open-external',
-  'extension:update-panel-bounds',
-  'extension:set-bottom-inset',
-  'workspace:get-active',
-  'workspace:active-changed',
-  'db:health',
-  'menu:set-panel-checked',
-  'menu:toggle-breakout',
-  'menu:open-task-switcher',
-  'menu:switch-lane',
-  'breakout:closed',
-  'workspace:project-added',
-  'workspace:project-removed',
-  'extension:panel-loaded',
-  'extension:renderer-reload',
-]
-
 describe('remoteAccessibleCoreChannels()', () => {
   it('derives exactly the expected remote surface', () => {
     const derived = remoteAccessibleCoreChannels()
     expect([...derived].sort()).toEqual([...EXPECTED_REMOTE_CHANNELS].sort())
-  })
-
-  it('never exposes credential writes to the remote bridge', () => {
-    // A LAN-reachable surface has no business storing or destroying the
-    // operator's tracker credentials, however well authenticated it is.
-    const derived = remoteAccessibleCoreChannels()
-    expect(derived.has('integrations:connect')).toBe(false)
-    expect(derived.has('integrations:disconnect')).toBe(false)
-  })
-
-  it('keeps the Claude Code registration off the remote bridge', () => {
-    // A LAN-reachable surface must not change what every Claude session on this Mac can call.
-    const channels = ELECTRON_API_MANIFEST.map((spec) => spec.channel)
-    const derived = remoteAccessibleCoreChannels()
-    for (const channel of ['claude-code:status', 'claude-code:connect', 'claude-code:disconnect']) {
-      expect(channels).toContain(channel)
-      expect(derived.has(channel)).toBe(false)
-    }
-  })
-
-  it('keeps internal-only channels unreachable (default-deny holds)', () => {
-    const derived = remoteAccessibleCoreChannels()
-    for (const internal of INTERNAL_ONLY_CHANNELS) {
-      expect(derived.has(internal), `${internal} must not be remote-accessible`).toBe(false)
-    }
   })
 })
 

@@ -13,11 +13,12 @@ describe('budgetFromSetting', () => {
     expect(budgetFromSetting(0, 25)).toBeNull()
   })
 
-  it('falls back when nothing usable is configured', () => {
-    for (const value of [undefined, null, 'ten', -1, Number.NaN, Infinity]) {
+  it.each([undefined, null, 'ten', -1, Number.NaN, Infinity])(
+    'falls back to the default when the setting is %s',
+    (value) => {
       expect(budgetFromSetting(value, 25)).toBe(25)
     }
-  })
+  )
 
   it('rounds a fractional limit down, since the order only holds whole numbers', () => {
     expect(budgetFromSetting(12.7, 25)).toBe(12)

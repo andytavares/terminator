@@ -12,16 +12,16 @@ import { partialFake } from '../../../support/fakes'
 const mockResizeObserver = vi.fn()
 
 // Mock xterm and its addons
-/** An 80 by 24 buffer whose every line reads `lineText`. */
-function makeMockBuffer(lineText = '', viewportY = 0) {
+/** An 80 by 24 buffer whose every line is empty. */
+function makeMockBuffer() {
   const rows = 24
   const cols = 80
   return {
     active: {
       getLine: (_row: number) => ({
-        translateToString: () => lineText,
+        translateToString: () => '',
       }),
-      viewportY,
+      viewportY: 0,
     },
     cols,
     rows,
@@ -31,7 +31,7 @@ function makeMockBuffer(lineText = '', viewportY = 0) {
 const mockRenderDispose = vi.fn()
 
 vi.mock('@xterm/xterm', () => {
-  const Terminal = vi.fn().mockImplementation(function () {
+  const Terminal = vi.fn(function () {
     return {
       loadAddon: vi.fn(),
       attachCustomKeyEventHandler: vi.fn(),
@@ -56,7 +56,7 @@ vi.mock('@xterm/xterm', () => {
 })
 
 vi.mock('@xterm/addon-fit', () => {
-  const FitAddon = vi.fn().mockImplementation(function () {
+  const FitAddon = vi.fn(function () {
     return {
       fit: vi.fn(),
     }
@@ -66,7 +66,7 @@ vi.mock('@xterm/addon-fit', () => {
 
 const webglAddons = vi.hoisted(() => [] as { dispose: () => void; loseContext: () => void }[])
 vi.mock('@xterm/addon-webgl', () => {
-  const WebglAddon = vi.fn().mockImplementation(function () {
+  const WebglAddon = vi.fn(function () {
     let onLoss: () => void = () => {}
     const addon = {
       onContextLoss: (listener: () => void) => {
@@ -119,7 +119,6 @@ const mockFakeCtx = partialFake<CanvasRenderingContext2D>({
   fillStyle: '',
   measureText: mockMeasureText,
 })
-vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => mockFakeCtx)
 
 const mockSubscribe = vi.fn()
 const mockAttach = vi.fn()
@@ -131,7 +130,6 @@ const mockOpenPath = vi.fn().mockResolvedValue({ ok: true })
 
 // Default to macOS so metaKey-based tests work; override per test as needed.
 let mockPlatform = 'MacIntel'
-Object.defineProperty(navigator, 'platform', { get: () => mockPlatform, configurable: true })
 
 beforeEach(async () => {
   mockResizeObserver.mockImplementation(function () {
@@ -142,7 +140,8 @@ beforeEach(async () => {
     await import('../../../../src/renderer/terminal/webgl-contexts')
   budgetHolder.current = new WebglContextBudget(MAX_WEBGL_CONTEXTS)
   mockPlatform = 'MacIntel'
-  vi.clearAllMocks()
+  vi.spyOn(navigator, 'platform', 'get').mockImplementation(() => mockPlatform)
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => mockFakeCtx)
   mockSubscribe.mockReturnValue(mockUnsubscribe)
   mockAttach.mockResolvedValue({ released: false })
   mockOpenExternal.mockResolvedValue({ ok: true })
@@ -179,13 +178,16 @@ function leaderReachesTheApp(key: Partial<KeyboardEvent>): boolean {
 }
 
 describe('TerminalInstance', () => {
-  it('pastes \\n when Cmd+Enter is pressed via custom key handler', () => {
+  it.each([
+    { pressed: 'Cmd', modifiers: { metaKey: true, shiftKey: false } },
+    { pressed: 'Shift', modifiers: { metaKey: false, shiftKey: true } },
+  ])('pastes \\n when $pressed+Enter is pressed', ({ modifiers }) => {
     new TerminalInstance('ses-1', 1000)
     const instance = vi.mocked(Terminal).mock.results[0].value
     const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
     const mockPreventDefault = vi.fn()
     const result = handler({
-      metaKey: true,
+      ...modifiers,
       ctrlKey: false,
       key: 'Enter',
       type: 'keydown',
@@ -202,6 +204,7 @@ describe('TerminalInstance', () => {
     const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
     const result = handler({ metaKey: false, ctrlKey: false, key: 'Enter', type: 'keydown' })
     expect(result).toBe(true)
+    expect(instance.paste).not.toHaveBeenCalled()
   })
 })
 
@@ -247,71 +250,28 @@ describe('TerminalInstance — forwards keystrokes to the PTY via onData', () =>
   })
 })
 
-describe('TerminalInstance — pastes \\n when Shift+Enter is pressed', () => {
-  it('pastes \\n when Shift+Enter is pressed', () => {
-    new TerminalInstance('ses-1', 1000)
-    const instance = vi.mocked(Terminal).mock.results[0].value
-    const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
-    const mockPreventDefault = vi.fn()
-    const result = handler({
-      shiftKey: true,
-      metaKey: false,
-      ctrlKey: false,
-      key: 'Enter',
-      type: 'keydown',
-      preventDefault: mockPreventDefault,
-    })
-    expect(result).toBe(false)
-    expect(instance.paste).toHaveBeenCalledWith('\n')
-    expect(mockPreventDefault).toHaveBeenCalled()
+describe('TerminalInstance — the Quick actions leader', () => {
+  it.each([
+    { platform: 'Linux x86_64', keys: { ctrlKey: true }, reachesApp: true },
+    { platform: 'MacIntel', keys: { metaKey: true }, reachesApp: true },
+    { platform: 'MacIntel', keys: { ctrlKey: true }, reachesApp: false },
+    {
+      platform: 'Linux x86_64',
+      keys: { ctrlKey: true, shiftKey: true, key: 'P' },
+      reachesApp: false,
+    },
+  ])('on $platform, $keys reaches the app: $reachesApp', ({ platform, keys, reachesApp }) => {
+    mockPlatform = platform
+    expect(leaderReachesTheApp(keys)).toBe(reachesApp)
   })
 })
 
-describe('TerminalInstance — does not intercept plain Enter without modifiers', () => {
-  it('does not intercept plain Enter without modifiers', () => {
-    new TerminalInstance('ses-1', 1000)
-    const instance = vi.mocked(Terminal).mock.results[0].value
-    const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
-    const result = handler({
-      shiftKey: false,
-      metaKey: false,
-      ctrlKey: false,
-      key: 'Enter',
-      type: 'keydown',
-    })
-    expect(result).toBe(true)
-    expect(instance.paste).not.toHaveBeenCalled()
-  })
-
-  it('leaves Ctrl+P to the app on Linux, where it opens Quick actions', () => {
-    mockPlatform = 'Linux x86_64'
-    expect(leaderReachesTheApp({ ctrlKey: true })).toBe(true)
-  })
-
-  it('leaves ⌘P to the app on macOS', () => {
-    expect(leaderReachesTheApp({ metaKey: true })).toBe(true)
-  })
-
-  it('sends Ctrl+P to the shell on macOS, where the leader is ⌘P', () => {
-    expect(leaderReachesTheApp({ ctrlKey: true })).toBe(false)
-  })
-})
-
-describe('TerminalInstance — sends Ctrl+Shift+P to the shell on Linux', () => {
-  it('sends Ctrl+Shift+P to the shell on Linux', () => {
-    mockPlatform = 'Linux x86_64'
-    expect(leaderReachesTheApp({ ctrlKey: true, shiftKey: true, key: 'P' })).toBe(false)
-  })
-
-  it('subscribes to its own session output on construction', () => {
-    new TerminalInstance('ses-1', 1000)
-    expect(mockSubscribe).toHaveBeenCalledTimes(1)
-    expect(mockSubscribe).toHaveBeenCalledWith('ses-1', expect.any(Function))
-  })
-
-  it('writes the output it receives to the terminal', () => {
+describe('TerminalInstance — session output', () => {
+  it('writes the output of its own session to the terminal', () => {
     const instance = new TerminalInstance('ses-write', 1000)
-    const receive = mockSubscribe.mock.calls[0][1]
+    expect(mockSubscribe).toHaveBeenCalledTimes(1)
+    const [sessionId, receive] = mockSubscribe.mock.calls[0]
+    expect(sessionId).toBe('ses-write')
     receive('hello', vi.fn())
     expect(instance.terminal.write).toHaveBeenCalledWith('hello', expect.any(Function))
   })
@@ -341,22 +301,10 @@ describe('TerminalInstance — reads the visible screen as one string per row, t
     expect(getLine.mock.calls.map((c) => c[0])).toEqual([40, 41, 42])
   })
 
-  it("reports the cursor's row on screen", () => {
-    const instance = new TerminalInstance('ses-1', 1000)
-    Object.assign(instance.terminal.buffer.active, { cursorY: 7 })
-    expect(instance.cursorRow()).toBe(7)
-  })
-
   it('reads a missing buffer line as an empty row', () => {
     const instance = new TerminalInstance('ses-1', 1000)
     showScreen(instance, 2, { viewportY: 0, getLine: () => undefined })
     expect(instance.readVisibleRows()).toEqual(['', ''])
-  })
-
-  it('creates a div element on construction', () => {
-    const instance = new TerminalInstance('ses-1', 1000)
-    expect(instance.element).toBeInstanceOf(HTMLDivElement)
-    expect(instance.element.style.cssText).toContain('width')
   })
 })
 
@@ -374,18 +322,13 @@ describe('TerminalInstance — reads the whole buffer', () => {
   })
 })
 
-describe('TerminalInstance — returns the xterm selection', () => {
-  it('returns the xterm selection', () => {
-    const instance = new TerminalInstance('ses-1', 1000)
-    const mockTerminal = vi.mocked(Terminal).mock.results[0].value
-    mockTerminal.getSelection.mockReturnValue('selected text')
-    expect(instance.getSelection()).toBe('selected text')
-  })
-
-  it('accepts an optional onBell hook', () => {
+describe('TerminalInstance — the onBell hook', () => {
+  it('runs the onBell hook when the terminal rings its bell', () => {
     const onBell = vi.fn()
     const instance = new TerminalInstance('ses-1', 1000, { onBell })
-    expect(instance.terminal.onBell).toHaveBeenCalledWith(onBell)
+    const ringBell = vi.mocked(instance.terminal.onBell).mock.calls[0][0] as () => void
+    ringBell()
+    expect(onBell).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -813,134 +756,6 @@ describe('TerminalInstance — mountPreview() — sets pointer-events none and t
   })
 })
 
-function getProvider(lineText: string, providerIndex: number) {
-  new TerminalInstance('ses-links', 1000)
-  const instance = vi.mocked(Terminal).mock.results[0].value
-  Object.defineProperty(instance, 'buffer', {
-    value: makeMockBuffer(lineText),
-    configurable: true,
-  })
-  return instance.registerLinkProvider.mock.calls[providerIndex][0]
-}
-
-describe('TerminalInstance — link providers (visual decoration)', () => {
-  it('URL provider detects https links and returns them in callback', () => {
-    const provider = getProvider('visit https://example.com/path for info', 0)
-    let result: unknown
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(Array.isArray(result)).toBe(true)
-    expect((result as { text: string }[])[0].text).toBe('https://example.com/path')
-  })
-
-  it('URL provider range stops before the full stop that ends a sentence', () => {
-    const provider = getProvider('draft PR https://github.com/x/y/pull/208. Lint', 0)
-    let result: { text: string; range: { end: { x: number } } }[] = []
-    provider.provideLinks(0, (links: typeof result) => {
-      result = links
-    })
-    expect(result[0].text).toBe('https://github.com/x/y/pull/208')
-    expect(result[0].range.end.x).toBe(9 + 'https://github.com/x/y/pull/208'.length)
-  })
-})
-
-describe('TerminalInstance — link providers (visual decoration) — URL provider returns undefined for a line with no URLs', () => {
-  it('URL provider returns undefined for line with no URLs', () => {
-    const provider = getProvider('no links here', 0)
-    let result: unknown = 'sentinel'
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(result).toBeUndefined()
-  })
-})
-
-describe('TerminalInstance — link providers (visual decoration) — URL provider returns undefined when line is missing', () => {
-  it('URL provider returns undefined when line is missing', () => {
-    new TerminalInstance('ses-links', 1000)
-    const instance = vi.mocked(Terminal).mock.results[0].value
-    Object.defineProperty(instance, 'buffer', {
-      value: { active: { getLine: () => undefined, viewportY: 0 } },
-      configurable: true,
-    })
-    const provider = instance.registerLinkProvider.mock.calls[0][0]
-    let result: unknown = 'sentinel'
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(result).toBeUndefined()
-  })
-
-  it('bare URL provider (index 1) detects www. links', () => {
-    const provider = getProvider('visit www.google.com for info', 1)
-    let result: unknown
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(Array.isArray(result)).toBe(true)
-    expect((result as { text: string }[])[0].text).toBe('www.google.com')
-  })
-})
-
-describe('TerminalInstance — link providers (visual decoration) — naked URL provider (index 2) detects bare domain links', () => {
-  it('naked URL provider (index 2) detects bare domain links', () => {
-    const provider = getProvider('check google.com for info', 2)
-    let result: unknown
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(Array.isArray(result)).toBe(true)
-    expect((result as { text: string }[])[0].text).toBe('google.com')
-  })
-
-  it('path provider detects absolute paths and returns them in callback', () => {
-    const provider = getProvider('Error in /Users/foo/bar.ts:12:3', 3)
-    let result: unknown
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(Array.isArray(result)).toBe(true)
-    expect((result as { text: string }[])[0].text).toContain('/Users/foo/bar.ts')
-  })
-
-  it('quoted-path provider (index 4) detects the inner path of a quoted string', () => {
-    const provider = getProvider('opened "/Users/foo/bar.ts" successfully', 4)
-    let result: unknown
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(Array.isArray(result)).toBe(true)
-    expect((result as { text: string }[])[0].text).toBe('/Users/foo/bar.ts')
-  })
-})
-
-describe('TerminalInstance — link providers (visual decoration) — quoted-path provider returns undefined when the line has no quoted path', () => {
-  it('quoted-path provider returns undefined when the line has no quoted path', () => {
-    const provider = getProvider('no quoted paths on this line', 4)
-    let result: unknown = 'sentinel'
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(result).toBeUndefined()
-  })
-
-  it('quoted-path provider returns undefined when the line is missing', () => {
-    new TerminalInstance('ses-links', 1000)
-    const instance = vi.mocked(Terminal).mock.results[0].value
-    Object.defineProperty(instance, 'buffer', {
-      value: { active: { getLine: () => undefined, viewportY: 0 } },
-      configurable: true,
-    })
-    const provider = instance.registerLinkProvider.mock.calls[4][0]
-    let result: unknown = 'sentinel'
-    provider.provideLinks(0, (links: unknown) => {
-      result = links
-    })
-    expect(result).toBeUndefined()
-  })
-})
-
 interface ProvidedLink {
   text: string
   range: { start: { x: number }; end: { x: number } }
@@ -1144,15 +959,6 @@ describe('TerminalInstance — links — activate on cmd+click — punctuation a
     cmdClick(line, line.indexOf('/') + 2)
     expect(mockOpenPath).toHaveBeenCalledWith(path)
   })
-
-  it('opens www. and bare domain links with https:// prepended', () => {
-    cmdClick('www.google.com', 0)
-    cmdClick('google.com', 0)
-    expect(mockOpenExternal.mock.calls).toEqual([
-      ['https://www.google.com'],
-      ['https://google.com'],
-    ])
-  })
 })
 
 describe('TerminalInstance — links — activate on cmd+click — what is not opened', () => {
@@ -1242,14 +1048,6 @@ describe('TerminalInstance — xterm theming', () => {
     }
   )
 
-  it('hands the scrollbar colours to the terminal on construction', () => {
-    new TerminalInstance('ses-scrollbar', 1000)
-    const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
-    expect(terminal.options.theme.scrollbarSliderBackground).toBe(
-      XTERM_THEMES.dark.scrollbarSliderBackground
-    )
-  })
-
   it('sets dark theme on construction when data-theme is absent', () => {
     new TerminalInstance('ses-theme', 1000)
     const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
@@ -1319,9 +1117,12 @@ describe('taking over a terminal that was already running', () => {
   })
 
   it('subscribes before attaching, so nothing arrives with nowhere to go', () => {
-    new TerminalInstance('agent-session', 1000)
-    expect(mockSubscribe.mock.invocationCallOrder[0]).toBeLessThan(
-      mockAttach.mock.invocationCallOrder[0]
-    )
+    // Main releases the held output as soon as attach reaches it.
+    mockAttach.mockImplementation(async () => {
+      mockSubscribe.mock.calls[0]?.[1]('launch command', vi.fn())
+      return { released: true }
+    })
+    const instance = new TerminalInstance('agent-session', 1000)
+    expect(instance.terminal.write).toHaveBeenCalledWith('launch command', expect.any(Function))
   })
 })

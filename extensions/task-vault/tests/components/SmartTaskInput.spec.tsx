@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, act, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, indexedProject } from './helpers/bridge'
 import { SmartTaskInput, invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 
@@ -45,18 +46,18 @@ function InputHarness({ spies, initial }: { spies: Spies; initial: string }) {
 
 async function renderSmartInput(initial = '') {
   const spies: Spies = { onSubmit: vi.fn<() => void>(), onCancel: vi.fn<() => void>(), changes: [] }
+  const user = userEvent.setup()
   render(<InputHarness spies={spies} initial={initial} />)
   await eventually(() => expect(getSettingsValues).toHaveBeenCalled())
   await act(async () => {})
-  return { spies, input: screen.getByRole('textbox') as HTMLInputElement }
-}
-
-function typeInto(input: HTMLInputElement, value: string) {
-  fireEvent.change(input, { target: { value, selectionStart: value.length } })
+  return { user, spies, input: screen.getByRole('textbox') as HTMLInputElement }
 }
 
 const optionTexts = () =>
-  Array.from(document.querySelectorAll('.smart-input__option')).map((b) => b.textContent)
+  within(screen.getByRole('group', { name: 'Suggestions' }))
+    .getAllByRole('button')
+    .map((option) => option.textContent)
+const selectedOption = () => screen.getByRole('button', { current: true }).textContent
 
 describe('SmartTaskInput suggestions', suggestionTests)
 describe('SmartTaskInput choosing', optionChoosingTests)
@@ -71,60 +72,80 @@ function suggestionTests() {
 
 function suggestionProjectsTests() {
   it('suggests projects for @, with a create option for a new name', async () => {
-    const { input } = await renderSmartInput()
-    typeInto(input, 'Call @la')
+    const { user, input } = await renderSmartInput()
+    await user.type(input, 'Call @la')
     expect(screen.getByText('Projects')).toBeTruthy()
     expect(optionTexts()).toEqual(['@Launch Plan', '+Create "@la"'])
     expect(input.className).toBe('smart-input__field extra')
   })
 
   it('treats hyphens as spaces and offers no create option for an exact name', async () => {
-    const { input } = await renderSmartInput()
-    typeInto(input, '@launch-plan')
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '@launch-plan')
     expect(optionTexts()).toEqual(['@Launch Plan'])
   })
 }
 
 function suggestionAreasAndContextsTests() {
-  it('suggests areas for # and contexts for + from the settings', async () => {
-    const { input } = await renderSmartInput()
-    typeInto(input, 'x #')
+  it('suggests areas for #', async () => {
+    const { user, input } = await renderSmartInput()
+    await user.type(input, 'x #')
     expect(screen.getByText('Areas')).toBeTruthy()
     expect(optionTexts()).toEqual(['#Work'])
-    typeInto(input, 'x +')
+  })
+
+  it('suggests contexts for + from the settings', async () => {
+    const { user, input } = await renderSmartInput()
+    await user.type(input, 'x +')
     expect(screen.getByText('Contexts')).toBeTruthy()
     expect(optionTexts()).toEqual(['+home', '+desk'])
-    typeInto(input, 'x +zzz')
+  })
+
+  it('says No matches when no context fits the typed tag', async () => {
+    const { user, input } = await renderSmartInput()
+    await user.type(input, 'x +zzz')
     expect(screen.getByText('No matches')).toBeTruthy()
   })
 
   it('falls back to the default contexts when none are set', async () => {
     getSettingsValues.mockResolvedValue({ values: {} })
-    const { input } = await renderSmartInput()
-    typeInto(input, '+')
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '+')
     expect(optionTexts()).toEqual(['+home', '+work', '+computer', '+phone', '+errands'])
   })
 }
 
 function optionChoosingTests() {
-  it('inserts the chosen project as a slug and closes the list', async () => {
-    const { input, spies } = await renderSmartInput()
-    fireEvent.change(input, { target: { value: 'Call @la tomorrow', selectionStart: 8 } })
-    fireEvent.click(screen.getByText('Launch Plan'))
+  describe('inserting', optionInsertingTests)
+  describe('creating', optionCreatingTests)
+}
+
+function optionInsertingTests() {
+  it('inserts the chosen project as a slug at the caret and closes the list', async () => {
+    const { user, input, spies } = await renderSmartInput()
+    await user.type(input, 'Call  tomorrow')
+    await user.type(input, '@la', { initialSelectionStart: 5, initialSelectionEnd: 5 })
+    await user.click(screen.getByText('Launch Plan'))
     await eventually(() => expect(input.value).toBe('Call @Launch-Plan tomorrow'))
-    expect(document.querySelector('.smart-input__dropdown')).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Suggestions' })).toBeNull()
     expect(spies.changes.at(-1)).toBe('Call @Launch-Plan tomorrow')
   })
+}
 
-  it('creates a new project or area before inserting it', async () => {
-    const { input } = await renderSmartInput()
-    typeInto(input, '@Boat')
-    fireEvent.click(screen.getByText(/Create "@/))
+function optionCreatingTests() {
+  it('creates a new project before inserting it', async () => {
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '@Boat')
+    await user.click(screen.getByText(/Create "@/))
     await eventually(() => expect(input.value).toBe('@Boat '))
     expect(bridge.calls('task-vault:projects:create')).toEqual([{ name: 'Boat' }])
-    typeInto(input, '@Boat #Sea')
-    fireEvent.click(screen.getByText(/Create "#/))
-    await eventually(() => expect(input.value).toBe('@Boat #Sea '))
+  })
+
+  it('creates a new area before inserting it', async () => {
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '#Sea')
+    await user.click(screen.getByText(/Create "#/))
+    await eventually(() => expect(input.value).toBe('#Sea '))
     expect(bridge.calls('task-vault:vault:create-area')).toEqual([{ name: 'Sea' }])
   })
 
@@ -132,9 +153,9 @@ function optionChoosingTests() {
     bridge.responses['task-vault:projects:create'] = () => {
       throw new Error('nope')
     }
-    const { input } = await renderSmartInput()
-    typeInto(input, '@Boat')
-    fireEvent.click(screen.getByText(/Create "@/))
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '@Boat')
+    await user.click(screen.getByText(/Create "@/))
     await eventually(() => expect(input.value).toBe('@Boat '))
   })
 }
@@ -142,86 +163,105 @@ function optionChoosingTests() {
 function keyboardTests() {
   describe('choosing', keyboardChoosingTests)
   describe('hyphens', keyboardHyphensTests)
-  describe('escape and enter', keyboardEscapeAndEnterTests)
+  describe('escape', keyboardEscapeTests)
+  describe('enter', keyboardEnterTests)
 }
 
 function keyboardChoosingTests() {
-  it('moves through suggestions with the arrows and picks with Enter or Tab', async () => {
-    const { input } = await renderSmartInput()
-    typeInto(input, '@')
-    fireEvent.keyDown(input, { key: 'ArrowDown' })
-    fireEvent.keyDown(input, { key: 'ArrowDown' })
-    fireEvent.keyDown(input, { key: 'ArrowUp' })
-    fireEvent.mouseEnter(screen.getByText('Garden'))
-    expect(document.querySelector('.smart-input__option--selected')?.textContent).toBe('@Garden')
-    fireEvent.keyDown(input, { key: 'Enter' })
+  it('moves the selection with the arrows and the pointer', async () => {
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '@')
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowUp}')
+    expect(selectedOption()).toBe('@Launch Plan')
+    await user.hover(screen.getByText('Garden'))
+    expect(selectedOption()).toBe('@Garden')
+  })
+
+  it('inserts the selected suggestion on Enter', async () => {
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '@')
+    await user.keyboard('{ArrowDown}{Enter}')
     await eventually(() => expect(input.value).toBe('@Garden '))
-    typeInto(input, '@Garden #')
-    fireEvent.keyDown(input, { key: 'Tab' })
-    await eventually(() => expect(input.value).toBe('@Garden #Work '))
+  })
+
+  it('inserts the selected suggestion on Tab', async () => {
+    const { user, input } = await renderSmartInput()
+    await user.type(input, 'x #')
+    await user.keyboard('{Tab}')
+    await eventually(() => expect(input.value).toBe('x #Work '))
   })
 }
 
 function keyboardHyphensTests() {
   it('turns a space inside a tag into a hyphen', async () => {
-    const { input } = await renderSmartInput()
-    typeInto(input, '@launch')
-    input.setSelectionRange(7, 7)
-    fireEvent.keyDown(input, { key: ' ' })
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '@launch ')
     expect(input.value).toBe('@launch-')
     expect(optionTexts()).toEqual(['@Launch Plan', '+Create "@launch-"'])
   })
 }
 
-function keyboardEscapeAndEnterTests() {
+function keyboardEscapeTests() {
   it('closes suggestions on Escape, then cancels on a second Escape', async () => {
-    const { input, spies } = await renderSmartInput()
-    typeInto(input, '@')
-    fireEvent.keyDown(input, { key: 'Escape' })
-    expect(document.querySelector('.smart-input__dropdown')).toBeNull()
-    fireEvent.keyDown(input, { key: 'Escape' })
+    const { user, input, spies } = await renderSmartInput()
+    await user.type(input, '@')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('group', { name: 'Suggestions' })).toBeNull()
+    expect(spies.onCancel).not.toHaveBeenCalled()
+    await user.keyboard('{Escape}')
     expect(spies.onCancel).toHaveBeenCalledTimes(1)
   })
 
-  it('submits on Enter, but only closes an open trigger with no suggestions', async () => {
-    const { input, spies } = await renderSmartInput()
-    typeInto(input, 'x +zzz')
-    fireEvent.keyDown(input, { key: 'Enter' })
+  it('does not cancel on Escape while a tag with no matches is open', async () => {
+    const { user, input, spies } = await renderSmartInput()
+    await user.type(input, 'x +zz')
+    await user.keyboard('{Escape}')
+    expect(spies.onCancel).not.toHaveBeenCalled()
+  })
+}
+
+function keyboardEnterTests() {
+  it('only closes an open tag with no matches on Enter, without submitting', async () => {
+    const { user, input, spies } = await renderSmartInput()
+    await user.type(input, 'x +zzz')
+    await user.keyboard('{Enter}')
     expect(spies.onSubmit).not.toHaveBeenCalled()
-    expect(document.querySelector('.smart-input__dropdown')).toBeNull()
-    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(screen.queryByRole('group', { name: 'Suggestions' })).toBeNull()
+  })
+
+  it('submits on Enter once no tag is open, and counts the task created', async () => {
+    const { user, input, spies } = await renderSmartInput()
+    await user.type(input, 'x +zzz{Enter}')
+    await user.keyboard('{Enter}')
     expect(spies.onSubmit).toHaveBeenCalledTimes(1)
     expect(bridge.recordUsage.mock.calls).toEqual([['task-create']])
-    typeInto(input, 'x +zz')
-    fireEvent.keyDown(input, { key: 'Escape' })
-    expect(spies.onCancel).not.toHaveBeenCalled()
   })
 }
 
 function emptySubmitTests() {
   it('does not count a submit of blank text', async () => {
-    const { input } = await renderSmartInput()
-    fireEvent.keyDown(input, { key: 'Enter' })
+    const { user, input } = await renderSmartInput()
+    await user.type(input, '{Enter}')
     expect(bridge.recordUsage).not.toHaveBeenCalled()
   })
 }
 
 function dateTests() {
   it('opens a date picker for due: and inserts the chosen date', async () => {
-    const { input } = await renderSmartInput()
-    typeInto(input, 'Pay due:')
-    fireEvent.click(screen.getByText('Today'))
+    const { user, input } = await renderSmartInput()
+    await user.type(input, 'Pay due:')
+    await user.click(screen.getByText('Today'))
     const d = new Date()
     const twoDigitsOf = (n: number) => String(n).padStart(2, '0')
     const today = `${d.getFullYear()}-${twoDigitsOf(d.getMonth() + 1)}-${twoDigitsOf(d.getDate())}`
     await eventually(() => expect(input.value).toBe(`Pay due:${today} `))
-    expect(document.querySelector('.smart-input__dropdown')).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Suggestions' })).toBeNull()
   })
 
   it('removes the due: trigger when the date is cleared', async () => {
-    const { input } = await renderSmartInput()
-    typeInto(input, 'Pay due:2026-03-04')
-    fireEvent.click(screen.getByText('Clear'))
+    const { user, input } = await renderSmartInput()
+    await user.type(input, 'Pay due:2026-03-04')
+    await user.click(screen.getByText('Clear'))
     await eventually(() => expect(input.value).toBe('Pay '))
   })
 }

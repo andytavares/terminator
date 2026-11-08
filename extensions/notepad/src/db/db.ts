@@ -34,7 +34,7 @@ const NOTE_SCHEMA = `
       PRIMARY KEY (note_id, tag_id)
     );`
 
-// Note comments, and the extension's settings.
+// Note comments.
 const COMMENT_SCHEMA = `    CREATE TABLE IF NOT EXISTS comments (
       id           TEXT PRIMARY KEY,
       note_id      TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
@@ -50,14 +50,7 @@ const COMMENT_SCHEMA = `    CREATE TABLE IF NOT EXISTS comments (
       created_at   TEXT NOT NULL,
       updated_at   TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_comments_note ON comments(note_id, status);
-
-    CREATE TABLE IF NOT EXISTS settings (
-      extension_id TEXT NOT NULL DEFAULT 'notepad',
-      key          TEXT NOT NULL,
-      value        TEXT NOT NULL,
-      PRIMARY KEY (extension_id, key)
-    );`
+    CREATE INDEX IF NOT EXISTS idx_comments_note ON comments(note_id, status);`
 
 // Diagrams, their tags and their comments.
 const DIAGRAM_SCHEMA = `    CREATE TABLE IF NOT EXISTS diagrams (

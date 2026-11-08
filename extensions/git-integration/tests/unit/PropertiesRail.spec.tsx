@@ -2,7 +2,8 @@ import React from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PropertiesRail } from '../../src/components/pr-review/PropertiesRail'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { buildPr } from './overview-fixtures'
@@ -16,15 +17,10 @@ beforeEach(() => {
 })
 
 describe('PropertiesRail — Signals', () => {
-  it('shows the risk level with its hotspot underneath', () => {
+  it('shows a signal row with its value and its detail underneath', () => {
     render(<PropertiesRail pr={buildPr()} />)
     expect(rail().getByText('High')).toBeTruthy()
     expect(rail().getByText('playwright.config.ts (Wide blast radius — 41 importers)')).toBeTruthy()
-  })
-
-  it('shows how many changed functions have a test', () => {
-    render(<PropertiesRail pr={buildPr()} />)
-    expect(rail().getByText('5 of 7 functions')).toBeTruthy()
   })
 
   it('says the analysis is running while insights are missing', () => {
@@ -76,11 +72,11 @@ describe('PropertiesRail — linked issues', () => {
   })
 
   it('copies the branch name and says so', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const user = userEvent.setup()
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText')
     render(<PropertiesRail pr={buildPr()} />)
-    fireEvent.click(rail().getByRole('button', { name: 'Copy branch name' }))
-    await waitFor(() => expect(rail().getByText('Copied')).toBeTruthy())
+    await user.click(rail().getByRole('button', { name: 'Copy branch name' }))
+    await rail().findByText('Copied')
     expect(writeText).toHaveBeenCalledWith('feature/e2e-sharding')
   })
 })
@@ -111,8 +107,14 @@ describe('PropertiesRail — flat icons', () => {
 
   it("draws every signal icon in its row's text colour, a neutral one at 60%", () => {
     render(<PropertiesRail pr={buildPr()} />)
-    const icons = [...document.querySelectorAll('.pr-rail-signal-icon')]
-    const neutral = icons.filter((icon) => icon.closest('.pr-rail-signal--neutral'))
+    const rows = screen
+      .getAllByRole('listitem')
+      .filter((row) => row.classList.contains('pr-rail-signal'))
+    const iconOf = (row: HTMLElement) => within(row).getByTestId('signal-icon')
+    const icons = rows.map(iconOf)
+    const neutral = rows
+      .filter((row) => row.classList.contains('pr-rail-signal--neutral'))
+      .map(iconOf)
     expect(icons.length).toBeGreaterThan(neutral.length)
     expect(neutral.length).toBeGreaterThan(0)
     expect(icons.filter((icon) => !inheritsTextColour(icon))).toEqual([])

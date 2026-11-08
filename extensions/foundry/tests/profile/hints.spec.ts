@@ -114,12 +114,15 @@ describe('format check from a node repository', () => {
     expect(evaluate({ format: 'prettier --write .' })).toBeNull()
   })
 
-  it('uses a check script, and falls back to the prettier tool when only a writer exists', () => {
+  it('uses the format:check script when the repository has one', () => {
     expect(
       evaluate({ format: 'prettier --write .', 'format:check': 'prettier --check .' })
     ).toMatchObject({
       command: 'npm run format:check',
     })
+  })
+
+  it('falls back to the prettier tool in check mode when only a writer script exists', () => {
     expect(evaluate({ format: 'prettier --write .' }, { '.prettierrc': '{}' })).toMatchObject({
       command: 'npx prettier --check .',
     })

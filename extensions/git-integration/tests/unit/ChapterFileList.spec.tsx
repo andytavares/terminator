@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ChapterFileList } from '../../src/components/pr-review/ChapterFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { Chapter } from '../../src/schemas/pr-review.schema'
@@ -56,34 +57,31 @@ const defaultProps = {
 }
 
 describe('ChapterFileList', () => {
-  it('renders file names', () => {
-    render(<ChapterFileList {...defaultProps} />)
-    expect(screen.getByText('foo.ts')).toBeTruthy()
-    expect(screen.getByText('bar.ts')).toBeTruthy()
-  })
-
-  it('calls onSelectFile when file row is clicked', () => {
+  it('calls onSelectFile when file row is clicked', async () => {
+    const user = userEvent.setup()
     const onSelectFile = vi.fn()
     render(<ChapterFileList {...defaultProps} onSelectFile={onSelectFile} />)
-    fireEvent.click(screen.getByText('foo.ts'))
+    await user.click(screen.getByTitle('src/foo.ts'))
     expect(onSelectFile).toHaveBeenCalledWith('src/foo.ts')
   })
 
-  it('calls onSelectFile when Enter is pressed on file row', () => {
+  it("calls onSelectFile with the row's path when Enter is pressed on it", async () => {
+    const user = userEvent.setup()
     const onSelectFile = vi.fn()
     render(<ChapterFileList {...defaultProps} onSelectFile={onSelectFile} />)
-    const rows = screen.getAllByRole('button')
-    fireEvent.keyDown(rows[0], { key: 'Enter' })
-    expect(onSelectFile).toHaveBeenCalled()
+    const row = screen.getByTitle('src/foo.ts')
+    row.focus()
+    expect(row.matches(':focus')).toBe(true)
+    await user.keyboard('{Enter}')
+    expect(onSelectFile).toHaveBeenCalledExactlyOnceWith('src/foo.ts')
   })
 })
 
 describe('ChapterFileList — marks active file with active class', () => {
   it('marks active file with active class', () => {
-    const { container } = render(<ChapterFileList {...defaultProps} currentFilePath="src/foo.ts" />)
-    const active = container.querySelector('.chapter-file-row--active')
-    expect(active?.getAttribute('aria-current')).toBe('true')
-    expect(container.querySelectorAll('[aria-current]')).toHaveLength(1)
+    render(<ChapterFileList {...defaultProps} currentFilePath="src/foo.ts" />)
+    expect(screen.getByTitle('src/foo.ts').getAttribute('aria-current')).toBe('true')
+    expect(screen.getAllByRole('button', { current: true })).toHaveLength(1)
   })
 
   it('shows viewed check for viewed files', () => {
@@ -123,6 +121,7 @@ describe('ChapterFileList — respects fileOrderOverrides for file order', () =>
 })
 
 describe('ChapterFileList — calls reorderFiles on drag and drop between rows', () => {
+  // user-event cannot drag and drop, so the drag tests below fire the drag events directly.
   it('calls reorderFiles on drag and drop between rows', () => {
     render(<ChapterFileList {...defaultProps} />)
     const rows = screen.getAllByRole('button')
@@ -147,20 +146,20 @@ describe('ChapterFileList — calls reorderFiles on drag and drop between rows',
 
 describe('ChapterFileList — sets drag-over class when dragging over a row', () => {
   it('sets drag-over class when dragging over a row', () => {
-    const { container } = render(<ChapterFileList {...defaultProps} />)
+    render(<ChapterFileList {...defaultProps} />)
     const rows = screen.getAllByRole('button')
     fireEvent.dragStart(rows[0])
     fireEvent.dragOver(rows[1])
-    expect(container.querySelector('.chapter-file-row--drag-over')).toBeTruthy()
+    expect(rows[1].classList.contains('chapter-file-row--drag-over')).toBe(true)
   })
 
   it('clears drag state on drag end', () => {
-    const { container } = render(<ChapterFileList {...defaultProps} />)
+    render(<ChapterFileList {...defaultProps} />)
     const rows = screen.getAllByRole('button')
     fireEvent.dragStart(rows[0])
     fireEvent.dragOver(rows[1])
     fireEvent.dragEnd(rows[0])
-    expect(container.querySelector('.chapter-file-row--drag-over')).toBeNull()
+    expect(rows[1].classList.contains('chapter-file-row--drag-over')).toBe(false)
   })
 })
 

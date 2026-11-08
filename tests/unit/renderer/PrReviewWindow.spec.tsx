@@ -23,7 +23,7 @@ function savedSettings(theme: GlobalSettings['appearance']['theme']): void {
 }
 
 function openedWith(search: string): void {
-  Object.defineProperty(window, 'location', { value: { search }, writable: true })
+  vi.stubGlobal('location', { search })
 }
 
 beforeEach(() => {
@@ -57,14 +57,15 @@ describe('ExtensionWindowView', () => {
 
   it('renders accent bar when accentColor param is present', () => {
     openedWith('?accentColor=%23ff0000')
-    const { container } = render(<ExtensionWindowView view="pr-review" />)
-    expect(container.querySelector('div[style*="height: 3px"]')).toBeTruthy()
+    render(<ExtensionWindowView view="pr-review" />)
+    // The browser normalises a hex colour to rgb().
+    expect(screen.getByTestId('window-accent-bar').style.background).toBe('rgb(255, 0, 0)')
   })
 
   it('does not render accent bar when accentColor param is absent', () => {
     openedWith('')
-    const { container } = render(<ExtensionWindowView view="pr-review" />)
-    expect(container.querySelector('div[style*="height: 3px"]')).toBeFalsy()
+    render(<ExtensionWindowView view="pr-review" />)
+    expect(screen.queryByTestId('window-accent-bar')).toBeNull()
   })
 })
 

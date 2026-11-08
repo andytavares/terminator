@@ -29,7 +29,6 @@ beforeEach(() => {
   exitEventHandler = null
 
   useExtensionRegistry.setState({ exitExtensionToTerminal: mockExit })
-  document.querySelectorAll('dialog').forEach((dialog) => dialog.remove())
   installElectronApi({
     extensionEvents: {
       onExtensionExitToTerminal: (handler) => {

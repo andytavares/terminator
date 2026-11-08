@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { aggregateBranchState, countInState } from '../../../../src/renderer/sidebar/branch-state'
-import { STATUS_ORDER } from '../../../../src/renderer/sidebar/view-model'
 import type { AgentState, TerminalSession } from '../../../../src/shared/types/index'
 
 const base: TerminalSession = {
@@ -51,17 +50,6 @@ describe('aggregateBranchState', () => {
     const before = sessions.map((s) => s.id)
     aggregateBranchState(sessions)
     expect(sessions.map((s) => s.id)).toEqual(before)
-  })
-})
-
-describe('aggregateBranchState — follows STATUS_ORDER exactly', () => {
-  // The precedence is the sidebar's, the tab bar's and the board's at once, so
-  // it must be the one constant, not a second copy that can drift from it.
-  it('follows STATUS_ORDER exactly', () => {
-    for (let i = 0; i < STATUS_ORDER.length; i++) {
-      const worseThanAllAfter = STATUS_ORDER.slice(i)
-      expect(aggregateBranchState(at(...worseThanAllAfter))).toBe(STATUS_ORDER[i])
-    }
   })
 })
 

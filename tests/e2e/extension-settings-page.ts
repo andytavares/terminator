@@ -27,7 +27,7 @@ export async function openExtensionSettings(page: Page, name: string): Promise<L
   await openSettingsSection(page, 'Extensions')
   const entry = extensionEntry(page, name)
   if ((await entry.locator('.extension-settings-panel').count()) === 0) {
-    await entry.getByTitle('Configure').click()
+    await entry.getByRole('button', { name: 'Configure', exact: true }).click()
   }
   await expect(entry.locator('.extension-settings-panel')).toBeVisible()
   return entry

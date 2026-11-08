@@ -1,0 +1,37 @@
+import { describe, it, expect } from 'vitest'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
+
+// Run from inside a git hook, every spec inherited the hook's GIT_DIR and GIT_INDEX_FILE, so a
+// fixture's `git init`, `git config` and `git commit` wrote into the real repository: user.name=Test
+// in its config and fixture commits on its branch.
+
+describe('the environment a spec runs git in', () => {
+  it('carries none of the variables that point git at a repository', () => {
+    // Git's own list, so a variable git adds later is covered too.
+    const local = execFileSync('git', ['rev-parse', '--local-env-vars'], { cwd: tmpdir() })
+      .toString()
+      .split('\n')
+      .filter((name) => name !== '')
+    expect(local.length).toBeGreaterThan(0)
+    expect(local.filter((name) => process.env[name] !== undefined)).toEqual([])
+  })
+
+  it('initialises a fixture in the fixture, not in a repository outside it', () => {
+    const fixture = makeTempDir('git-env-fixture-')
+    try {
+      execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: fixture })
+      const gitDir = spawnSync('git', ['rev-parse', '--absolute-git-dir'], { cwd: fixture })
+      expect(realpathSync(gitDir.stdout.toString().trim())).toBe(
+        realpathSync(join(fixture, '.git'))
+      )
+    } finally {
+      // git's own background work can still hold a file here; without the
+      // retries this cleanup fails as ENOTEMPTY under a loaded suite.
+      rmSync(fixture, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+    }
+  })
+})

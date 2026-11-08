@@ -239,6 +239,7 @@ function SingleTerminal({ containerRef, activeSessionId, refocusActive }: Single
   return (
     <div
       className="terminal-pane"
+      data-testid="terminal-pane"
       onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}

@@ -166,9 +166,12 @@ describe('splitTurns', () => {
     expect(turns[1].changes).toEqual([{ path: '/r/b.ts', added: 1, removed: 1 }])
   })
 
-  it('keeps a null old text as null and has no changes for a text-only turn', () => {
+  it('keeps a null old text as null', () => {
     const { entries } = foldAll([edit('t1', '/r/a.ts', [null, 'snippet'])])
     expect(entries[0]).toMatchObject({ output: [{ kind: 'diff', oldText: null }] })
+  })
+
+  it('has no changes for a text-only turn', () => {
     expect(splitTurns(foldAll([chunk('agent_message_chunk', 'hi')]).entries)[0].changes).toEqual([])
   })
 })

@@ -63,10 +63,10 @@ describe('readConflictBlocks', () => {
     expect(blocks[1].oursText).toContain('ours B')
   })
 
-  it('includes context lines before and after conflict', () => {
-    const blocks = readConflictBlocks('src/foo.ts', FILE_WITH_TWO_CONFLICTS)
-    expect(blocks[0].contextBefore.length).toBeGreaterThan(0)
-    expect(blocks[0].contextAfter.length).toBeGreaterThan(0)
+  it('includes up to four lines before and after the conflict as context', () => {
+    const [first] = readConflictBlocks('src/foo.ts', FILE_WITH_TWO_CONFLICTS)
+    expect(first.contextBefore).toEqual(['line before 1', 'line before 2'])
+    expect(first.contextAfter).toEqual(['line between', '<<<<<<< HEAD', 'ours B', '======='])
   })
 })
 
@@ -85,16 +85,13 @@ describe('readConflictBlocks — undo text and clean files', () => {
 })
 
 describe('listConflictedFiles', () => {
-  it('returns list of conflicted file paths', async () => {
-    mockGit.mockReturnValueOnce('src/foo.ts\nsrc/bar.ts\n')
+  it.each([
+    { stdout: 'src/foo.ts\nsrc/bar.ts\n', expected: ['src/foo.ts', 'src/bar.ts'] },
+    { stdout: '', expected: [] },
+  ])('returns $expected for git output $stdout', async ({ stdout, expected }) => {
+    mockGit.mockReturnValueOnce(stdout)
     const files = await listConflictedFiles('/repo')
-    expect(files).toEqual(['src/foo.ts', 'src/bar.ts'])
-  })
-
-  it('returns empty array when no conflicts', async () => {
-    mockGit.mockReturnValueOnce('')
-    const files = await listConflictedFiles('/repo')
-    expect(files).toEqual([])
+    expect(files).toEqual(expected)
   })
 })
 
@@ -149,24 +146,14 @@ function fileWith(
 }
 
 describe('buildConflictSession', () => {
-  it('detects rebase context when REBASE_HEAD exists', async () => {
+  it.each([true, false])('sets isRebase %s from whether REBASE_HEAD exists', async (isRebase) => {
     setupBuildSessionMocks({
       filePaths: 'src/foo.ts\n',
-      isRebase: true,
+      isRebase,
       files: [fileWith(CONFLICT_TEXT)],
     })
     const session = await buildConflictSession('/repo')
-    expect(session.isRebase).toBe(true)
-  })
-
-  it('sets isRebase false when no REBASE_HEAD', async () => {
-    setupBuildSessionMocks({
-      filePaths: 'src/foo.ts\n',
-      isRebase: false,
-      files: [fileWith(CONFLICT_TEXT)],
-    })
-    const session = await buildConflictSession('/repo')
-    expect(session.isRebase).toBe(false)
+    expect(session.isRebase).toBe(isRebase)
   })
 })
 

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import React from 'react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import React, { type ComponentProps } from 'react'
+import type { MobileTerminalList } from '../../../../src/renderer-remote/components/MobileTerminalList'
 
 const mockListWorkspaces = vi.fn()
 const mockListTerminals = vi.fn()
@@ -18,15 +20,23 @@ vi.mock('../../../../src/renderer-remote/api/remote-client', () => ({
 
 vi.mock('../../../../src/renderer-remote/components/MobileTerminalList', () => ({
   MobileTerminalList: ({
+    workspaces,
+    terminals,
     onSelectTerminal,
     onCreateTerminal,
     onAssignWorkspace,
-  }: {
-    onSelectTerminal: (t: { sessionId: string; cwd: string }) => void
-    onCreateTerminal: (workspaceId: string, folderPath: string) => void
-    onAssignWorkspace: (sessionId: string, workspaceId: string | null) => void
-  }) => (
+  }: ComponentProps<typeof MobileTerminalList>) => (
     <div>
+      <ul aria-label="workspaces">
+        {workspaces.map((w) => (
+          <li key={w.name}>{w.name}</li>
+        ))}
+      </ul>
+      <ul aria-label="terminals">
+        {terminals.map((t) => (
+          <li key={t.sessionId}>{t.sessionId}</li>
+        ))}
+      </ul>
       <button onClick={() => onSelectTerminal({ sessionId: 's1', cwd: '/tmp' })}>
         open terminal
       </button>
@@ -52,6 +62,9 @@ vi.mock('../../../../src/renderer-remote/components/MobileTerminalView', () => (
   ),
 }))
 
+const terminal = (sessionId: string) => ({ sessionId, cwd: '/tmp', createdAt: '2026-01-01' })
+const workspace = { id: 'w1', name: 'Home', folderPath: '/home', color: '#000', tags: [] }
+
 beforeEach(() => {
   mockListWorkspaces.mockResolvedValue([])
   mockListTerminals.mockResolvedValue([])
@@ -61,80 +74,51 @@ beforeEach(() => {
 })
 
 describe('MobileApp', () => {
-  it('renders MobileTerminalList by default', async () => {
-    mockListWorkspaces.mockResolvedValue([])
-    mockListTerminals.mockResolvedValue([])
+  it('switches to MobileTerminalView when a terminal is chosen, and back to the list on onBack', async () => {
+    const user = userEvent.setup()
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await screen.findByText('open terminal')
-  })
-
-  it('switches to MobileTerminalView when onSelectTerminal is called', async () => {
-    mockListWorkspaces.mockResolvedValue([])
-    mockListTerminals.mockResolvedValue([])
-    const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
-    render(<MobileApp />)
-    fireEvent.click(await screen.findByText('open terminal'))
-    expect(screen.getByText('terminal:s1')).toBeTruthy()
-  })
-
-  it('returns to list view when onBack is called from MobileTerminalView', async () => {
-    mockListWorkspaces.mockResolvedValue([])
-    mockListTerminals.mockResolvedValue([])
-    const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
-    render(<MobileApp />)
-    fireEvent.click(await screen.findByText('open terminal'))
-    expect(screen.getByText('terminal:s1')).toBeTruthy()
-    fireEvent.click(screen.getByText('back'))
-    expect(screen.getByText('open terminal')).toBeTruthy()
+    await user.click(await screen.findByRole('button', { name: 'open terminal' }))
+    expect(screen.getByText('terminal:s1').textContent).toBe('terminal:s1')
+    await user.click(screen.getByRole('button', { name: 'back' }))
+    expect(screen.queryByText('terminal:s1')).toBeNull()
+    expect(screen.getByRole('button', { name: 'open terminal' }).textContent).toBe('open terminal')
   })
 })
 
-describe('MobileApp — calls listWorkspaces and listTerminals on mount', () => {
-  it('calls listWorkspaces and listTerminals on mount', async () => {
-    mockListWorkspaces.mockResolvedValue([])
-    mockListTerminals.mockResolvedValue([])
+describe('MobileApp — lists the workspaces and terminals the server reports on mount', () => {
+  it('lists the workspaces and terminals the server reports on mount', async () => {
+    mockListWorkspaces.mockResolvedValue([workspace])
+    mockListTerminals.mockResolvedValue([terminal('t-9')])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await waitFor(() => {
-      expect(mockListWorkspaces).toHaveBeenCalledTimes(1)
-      expect(mockListTerminals).toHaveBeenCalledTimes(1)
-    })
+    const terminals = await screen.findByRole('list', { name: 'terminals' })
+    await waitFor(() => expect(terminals.textContent).toBe('t-9'))
+    expect(screen.getByRole('list', { name: 'workspaces' }).textContent).toBe('Home')
   })
 
-  it('onAssignWorkspace calls assignTerminalWorkspace and refreshes terminals', async () => {
-    mockListWorkspaces.mockResolvedValue([])
-    mockListTerminals.mockResolvedValue([])
-    mockAssignTerminalWorkspace.mockResolvedValue(undefined)
+  it('assigns the terminal to the workspace and shows the refreshed terminals', async () => {
+    const user = userEvent.setup()
+    mockListTerminals.mockResolvedValueOnce([terminal('s1')]).mockResolvedValue([terminal('s2')])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await screen.findByText('assign workspace')
-    await act(async () => {
-      fireEvent.click(screen.getByText('assign workspace'))
-    })
-    await waitFor(() => {
-      expect(mockAssignTerminalWorkspace).toHaveBeenCalledWith('s1', 'w1')
-      expect(mockListTerminals).toHaveBeenCalledTimes(2) // once on mount, once after assign
-    })
+    await screen.findByText('s1')
+    await user.click(screen.getByRole('button', { name: 'assign workspace' }))
+    await screen.findByText('s2')
+    expect(mockAssignTerminalWorkspace).toHaveBeenCalledWith('s1', 'w1')
   })
 })
 
 describe('MobileApp — onCreateTerminal calls createTerminal and navigates to terminal view', () => {
   it('onCreateTerminal calls createTerminal and navigates to terminal view', async () => {
+    const user = userEvent.setup()
     const { createTerminal } = await import('../../../../src/renderer-remote/api/remote-client')
     vi.mocked(createTerminal).mockResolvedValue({ sessionId: 'new-s1' })
-    mockListWorkspaces.mockResolvedValue([])
-    mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await screen.findByText('new terminal')
-    await act(async () => {
-      fireEvent.click(screen.getByText('new terminal'))
-    })
-    await waitFor(() => {
-      expect(createTerminal).toHaveBeenCalledWith({ cwd: '/workspace', tabTitle: 'Remote' })
-      expect(screen.getByText('terminal:new-s1')).toBeTruthy()
-    })
+    await user.click(await screen.findByRole('button', { name: 'new terminal' }))
+    await screen.findByText('terminal:new-s1')
+    expect(createTerminal).toHaveBeenCalledWith({ cwd: '/workspace', tabTitle: 'Remote' })
   })
 })
 
@@ -145,35 +129,35 @@ describe('MobileApp when the server fails', () => {
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
     await waitFor(() => expect(mockListTerminals).toHaveBeenCalledTimes(1))
-    expect(screen.getByText('open terminal')).toBeTruthy()
+    expect(screen.getByRole('list', { name: 'terminals' }).textContent).toBe('')
+    expect(screen.getByRole('button', { name: 'open terminal' }).textContent).toBe('open terminal')
   })
 
   it('stays on the list when a new terminal cannot be made', async () => {
+    const user = userEvent.setup()
     const { createTerminal } = await import('../../../../src/renderer-remote/api/remote-client')
     vi.mocked(createTerminal).mockRejectedValue(new Error('refused'))
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await act(async () => {
-      fireEvent.click(screen.getByText('new terminal'))
-    })
+    await user.click(screen.getByRole('button', { name: 'new terminal' }))
     expect(createTerminal).toHaveBeenCalledTimes(1)
-    expect(screen.getByText('open terminal')).toBeTruthy()
+    expect(screen.queryByText(/^terminal:/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'open terminal' }).textContent).toBe('open terminal')
   })
 })
 
 describe('MobileApp when the server fails — refreshes the terminals after a failed assignment and on the way back', () => {
   it('refreshes the terminals after a failed assignment and on the way back', async () => {
+    const user = userEvent.setup()
     mockAssignTerminalWorkspace.mockRejectedValue(new Error('refused'))
     mockListTerminals.mockRejectedValue(new Error('offline'))
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await act(async () => {
-      fireEvent.click(screen.getByText('assign workspace'))
-    })
+    await user.click(screen.getByRole('button', { name: 'assign workspace' }))
     await waitFor(() => expect(mockListTerminals).toHaveBeenCalledTimes(2))
-    fireEvent.click(screen.getByText('open terminal'))
-    fireEvent.click(screen.getByText('back'))
+    await user.click(screen.getByRole('button', { name: 'open terminal' }))
+    await user.click(screen.getByRole('button', { name: 'back' }))
     expect(mockListTerminals).toHaveBeenCalledTimes(3)
-    expect(screen.getByText('open terminal')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'open terminal' }).textContent).toBe('open terminal')
   })
 })

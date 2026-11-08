@@ -1,0 +1,85 @@
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import React from 'react'
+import { cleanup, render, screen } from '@testing-library/react'
+import { EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
+import { NoteEditor, applyExternalDoc } from '../../../src/editor/NoteEditor'
+import { partialFake } from '../../../../../tests/support/fakes'
+
+// A stand-in for EditorView that keeps real EditorState semantics (doc,
+// selection, transaction application) without needing a DOM.
+function makeView(doc: string, cursor = 0) {
+  let state = EditorState.create({ doc, selection: { anchor: cursor } })
+  const view = partialFake<EditorView>({
+    get state() {
+      return state
+    },
+    dispatch(...specs: unknown[]) {
+      state = state.update(specs[0] as Parameters<EditorState['update']>[0]).state
+    },
+  })
+  vi.spyOn(view, 'dispatch')
+  return view
+}
+
+describe('applyExternalDoc', applyExternalDocTests)
+
+function applyExternalDocTests() {
+  describe('replacing the body', applyExternalDocReplacingBodyTests)
+  describe('nothing to change', applyExternalDocNothingChangeTests)
+  describe('local edits', applyExternalDocLocalEditsTests)
+}
+
+function applyExternalDocReplacingBodyTests() {
+  it('replaces the document with the incoming body', () => {
+    const view = makeView('stale body')
+    applyExternalDoc(view, 'fresh body from the other window')
+    expect(view.state.doc.toString()).toBe('fresh body from the other window')
+  })
+
+  it('keeps the caret where it was', () => {
+    const view = makeView('hello world', 5)
+    applyExternalDoc(view, 'hello there world')
+    expect(view.state.selection.main.head).toBe(5)
+  })
+
+  it('clamps the caret when the incoming body is shorter', () => {
+    const view = makeView('a very long body indeed', 20)
+    applyExternalDoc(view, 'short')
+    expect(view.state.selection.main.head).toBe(5)
+  })
+}
+
+function applyExternalDocNothingChangeTests() {
+  it('does nothing when the text already matches, so an echo is free', () => {
+    const view = makeView('same text')
+    applyExternalDoc(view, 'same text')
+    expect(view.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('tolerates a null view', () => {
+    expect(() => applyExternalDoc(null, 'anything')).not.toThrow()
+  })
+
+  it('applies an empty incoming body', () => {
+    const view = makeView('had content', 4)
+    applyExternalDoc(view, '')
+    expect(view.state.doc.toString()).toBe('')
+    expect(view.state.selection.main.head).toBe(0)
+  })
+}
+
+function applyExternalDocLocalEditsTests() {
+  afterEach(cleanup)
+
+  it('is not reported to the editor owner as a local edit', () => {
+    const onChange = vi.fn()
+    render(<NoteEditor initialDoc="before" onChange={onChange} />)
+    const view = EditorView.findFromDOM(screen.getByRole('textbox'))!
+
+    applyExternalDoc(view, 'after')
+
+    expect(view.state.doc.toString()).toBe('after')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+}

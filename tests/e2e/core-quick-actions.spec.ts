@@ -201,7 +201,7 @@ async function viewOpensIssueDrawer(page: Page): Promise<void> {
   await runQuickActionFromPanel(page, 'View OPS-1')
   const drawer = page.getByRole('complementary', { name: 'Issue OPS-1' })
   await expect(drawer.getByRole('heading', { name: 'Fix the login page' })).toBeVisible()
-  await drawer.getByTitle('Close').click()
+  await drawer.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(drawer).toBeHidden()
 }
 

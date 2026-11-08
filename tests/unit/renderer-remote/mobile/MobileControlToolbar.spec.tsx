@@ -1,71 +1,23 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 
 describe('MobileControlToolbar', () => {
-  it('renders exactly 6 buttons', async () => {
-    const { MobileControlToolbar } =
-      await import('../../../../src/renderer-remote/components/MobileControlToolbar')
-    render(<MobileControlToolbar onKey={vi.fn()} />)
-    const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(6)
-  })
-
-  it('calls onKey with \\x03 when Ctrl+C is clicked', async () => {
+  it.each([
+    ['Ctrl+C', '\x03'],
+    ['Ctrl+D', '\x04'],
+    ['Tab', '\t'],
+    ['Esc', '\x1b'],
+    ['↑', '\x1b[A'],
+    ['↓', '\x1b[B'],
+  ])('sends the %s key sequence when its key is pressed', async (label, sequence) => {
+    const user = userEvent.setup()
     const onKey = vi.fn()
     const { MobileControlToolbar } =
       await import('../../../../src/renderer-remote/components/MobileControlToolbar')
     render(<MobileControlToolbar onKey={onKey} />)
-    fireEvent.pointerDown(screen.getByLabelText('Ctrl+C'))
-    expect(onKey).toHaveBeenCalledWith('\x03')
-  })
-
-  it('calls onKey with \\x04 when Ctrl+D is clicked', async () => {
-    const onKey = vi.fn()
-    const { MobileControlToolbar } =
-      await import('../../../../src/renderer-remote/components/MobileControlToolbar')
-    render(<MobileControlToolbar onKey={onKey} />)
-    fireEvent.pointerDown(screen.getByLabelText('Ctrl+D'))
-    expect(onKey).toHaveBeenCalledWith('\x04')
-  })
-})
-
-describe('MobileControlToolbar — calls onKey with \\t when Tab is clicked', () => {
-  it('calls onKey with \\t when Tab is clicked', async () => {
-    const onKey = vi.fn()
-    const { MobileControlToolbar } =
-      await import('../../../../src/renderer-remote/components/MobileControlToolbar')
-    render(<MobileControlToolbar onKey={onKey} />)
-    fireEvent.pointerDown(screen.getByLabelText('Tab'))
-    expect(onKey).toHaveBeenCalledWith('\t')
-  })
-
-  it('calls onKey with \\x1b when Esc is clicked', async () => {
-    const onKey = vi.fn()
-    const { MobileControlToolbar } =
-      await import('../../../../src/renderer-remote/components/MobileControlToolbar')
-    render(<MobileControlToolbar onKey={onKey} />)
-    fireEvent.pointerDown(screen.getByLabelText('Esc'))
-    expect(onKey).toHaveBeenCalledWith('\x1b')
-  })
-
-  it('calls onKey with \\x1b[A when ↑ is clicked', async () => {
-    const onKey = vi.fn()
-    const { MobileControlToolbar } =
-      await import('../../../../src/renderer-remote/components/MobileControlToolbar')
-    render(<MobileControlToolbar onKey={onKey} />)
-    fireEvent.pointerDown(screen.getByLabelText('↑'))
-    expect(onKey).toHaveBeenCalledWith('\x1b[A')
-  })
-})
-
-describe('MobileControlToolbar — calls onKey with \\x1b[B when ↓ is clicked', () => {
-  it('calls onKey with \\x1b[B when ↓ is clicked', async () => {
-    const onKey = vi.fn()
-    const { MobileControlToolbar } =
-      await import('../../../../src/renderer-remote/components/MobileControlToolbar')
-    render(<MobileControlToolbar onKey={onKey} />)
-    fireEvent.pointerDown(screen.getByLabelText('↓'))
-    expect(onKey).toHaveBeenCalledWith('\x1b[B')
+    await user.pointer({ keys: '[MouseLeft>]', target: screen.getByLabelText(label) })
+    expect(onKey).toHaveBeenCalledWith(sequence)
   })
 })

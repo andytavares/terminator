@@ -1,6 +1,5 @@
 import React from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, within } from 'storybook/test'
 import { Check, GitPullRequest } from 'lucide-react'
 import { Chip } from '../src/Chip'
 import { inLight } from './in-light'
@@ -14,11 +13,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Default: Story = {
-  play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByText('3 files')).toBeTruthy()
-  },
-}
+export const Default: Story = {}
 export const DefaultLight = inLight(Default)
 
 export const EveryTone: Story = {

@@ -1,5 +1,5 @@
-// The environment every test process runs in, the same in CI, in ci:local and in a plain
-// `npm test` (ADR 123). It is built from fixed values and a short allowlist, never by copying
+// The environment every test process runs in, the same in CI and in a plain `npm test`
+// (ADR 123). It is built from fixed values and a short allowlist, never by copying
 // the developer's environment: their git config, shell variables, time zone and agent sockets
 // once changed what a test saw.
 

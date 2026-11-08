@@ -1,6 +1,6 @@
 # ADR 132: CI finishes in five minutes
 
-**Status**: Accepted
+**Status**: Superseded by ADR 151
 
 **Date**: 2026-10-27
 

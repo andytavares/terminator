@@ -37,16 +37,22 @@ async function activateNotepadCapturingChannels(): Promise<ChannelSpec[]> {
 
 // ADR 096: whether a channel rejects bad input is its schema's job, so this
 // checks once, for every channel notepad registers, that one is declared.
-describe('every notepad channel', () => {
-  it('declares a schema that keeps a malformed payload from reaching run', async () => {
-    const specs = await activateNotepadCapturingChannels()
+// Activation runs at collection time so each channel gets its own row.
+const notepadChannels = await activateNotepadCapturingChannels()
 
-    expect(specs.map((spec) => spec.channel)).toContain('terminator.notepad:notes.autosave')
-    for (const spec of specs) {
-      expect(spec.schema, `${spec.channel} has no schema`).toBeDefined()
-      const run = vi.fn()
-      await dispatchChannel({ ...spec, run }, 42)
-      expect(run, `${spec.channel} ran a malformed payload`).not.toHaveBeenCalled()
-    }
+describe('every notepad channel', () => {
+  it('includes the autosave channel, so the list below is the registered one', () => {
+    expect(notepadChannels.map((spec) => spec.channel)).toContain(
+      'terminator.notepad:notes.autosave'
+    )
+  })
+
+  it.each(notepadChannels)('$channel keeps a malformed payload from reaching run', async (spec) => {
+    const run = vi.fn()
+
+    await dispatchChannel({ ...spec, run }, 42)
+
+    expect(spec.schema).toBeDefined()
+    expect(run).not.toHaveBeenCalled()
   })
 })

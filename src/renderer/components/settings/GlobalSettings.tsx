@@ -11,6 +11,7 @@ import { QuickActionsSettings } from './QuickActionsSettings'
 import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 import { ThemeChoices } from './ThemeChoices'
+import { ScrollbackInput } from './ScrollbackInput'
 import { useSidebarMode } from '../sidebar/sidebar-mode'
 import { recordUse } from '../../usage/record'
 import { useFieldChangeCounter } from '../../usage/use-field-change-counter'
@@ -104,17 +105,7 @@ function TerminalFields({ settings }: { settings: Settings }): React.JSX.Element
     <>
       <div className="settings-section__field">
         <label className="settings-section__label">Scrollback Limit (1,000–100,000 lines)</label>
-        <input
-          type="number"
-          className="settings-section__input"
-          value={settings.terminal.scrollbackLimit}
-          min={1000}
-          max={100000}
-          onChange={(e) => {
-            const val = parseInt(e.target.value, 10)
-            if (val >= 1000 && val <= 100000) updateScrollbackLimit(val)
-          }}
-        />
+        <ScrollbackInput value={settings.terminal.scrollbackLimit} onSave={updateScrollbackLimit} />
       </div>
       <GlobalDefaultShellField shell={settings.terminal.defaultShell} />
       <PromptForNameField checked={settings.terminal.promptForName ?? false} />
@@ -434,7 +425,12 @@ function OverridesField({ settings }: { settings: Settings }): React.JSX.Element
     <div className="settings-section__field">
       <label className="settings-section__label">Per-Notification Overrides (Core)</label>
       {CORE_NOTIFICATION_KEYS.map(({ key, label }) => (
-        <div key={key} className="settings-section__ext-override-row">
+        <div
+          key={key}
+          className="settings-section__ext-override-row"
+          role="group"
+          aria-label={label}
+        >
           <span className="settings-section__ext-override-name">{label}</span>
           <TargetChecks
             checked={settings.notifications.overrides[key] ?? []}

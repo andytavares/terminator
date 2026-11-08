@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform, type Components, type Options } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './extension-ui.css'
@@ -76,23 +76,26 @@ export interface MarkdownProps {
 const OPENS_OUTSIDE = /^(https?|mailto):/i
 const INLINE_ELEMENTS = ['code', 'strong', 'em', 'del', 'a']
 
-function markdownLink(onOpenLink: (url: string) => void): Components['a'] {
-  return function MarkdownLink({ href, children }) {
-    return (
-      <a
-        href={inPageHref(href)}
-        onClick={(event) => {
-          // Extension views have no navigation guard, so anything but an in-page
-          // link would replace the view itself, an empty href included.
-          if (href?.startsWith('#')) return
-          event.preventDefault()
-          if (href && OPENS_OUTSIDE.test(href)) onOpenLink(href)
-        }}
-      >
-        {children}
-      </a>
-    )
-  }
+// The link reads its handler from context, so it stays one component type: a new type per render
+// would remount every link whenever the view re-rendered, losing a click or focus that landed on it.
+const OpenLinkContext = createContext<(url: string) => void>(() => undefined)
+
+const MarkdownLink: Components['a'] = ({ href, children }) => {
+  const onOpenLink = useContext(OpenLinkContext)
+  return (
+    <a
+      href={inPageHref(href)}
+      onClick={(event) => {
+        // Extension views have no navigation guard, so anything but an in-page
+        // link would replace the view itself, an empty href included.
+        if (href?.startsWith('#')) return
+        event.preventDefault()
+        if (href && OPENS_OUTSIDE.test(href)) onOpenLink(href)
+      }}
+    >
+      {children}
+    </a>
+  )
 }
 
 // Null removes the attribute outright; every other address still goes through
@@ -102,13 +105,12 @@ function withoutResources(url: string, key: string): string | null {
 }
 
 function markdownComponents({
-  onOpenLink,
   renderCode,
   fetchesNothing,
   offline,
-}: MarkdownProps): Components {
+}: Omit<MarkdownProps, 'children' | 'onOpenLink'>): Components {
   return {
-    a: markdownLink(onOpenLink),
+    a: MarkdownLink,
     // An image whose address was removed is not worth a broken-image icon.
     ...((fetchesNothing || offline) && { img: () => null }),
     code({ className, children }) {
@@ -119,32 +121,44 @@ function markdownComponents({
   }
 }
 
-/** The one Markdown renderer: react-markdown with GitHub-flavoured Markdown, and raw HTML parsed
- * then sanitised. A body can come from a pull request or an agent, and this view can run shell
- * commands, so nothing here sets inner HTML. */
-export function Markdown(props: MarkdownProps): React.JSX.Element {
-  const { children, className, inline, fetchesNothing, offline } = props
+/** The HTML plugins, loaded on first use; text that fetches nothing never needs them. */
+function useHtmlPlugins(fetchesNothing: boolean | undefined) {
   const [rehypePlugins, setRehypePlugins] = useState(htmlPlugins)
   useEffect(() => {
     if (!rehypePlugins && !fetchesNothing) void loadHtmlPlugins().then(setRehypePlugins)
   }, [rehypePlugins, fetchesNothing])
+  return rehypePlugins
+}
+
+/** The one Markdown renderer: react-markdown with GitHub-flavoured Markdown, and raw HTML parsed
+ * then sanitised. A body can come from a pull request or an agent, and this view can run shell
+ * commands, so nothing here sets inner HTML. */
+export function Markdown(props: MarkdownProps): React.JSX.Element {
+  const { children, className, inline, fetchesNothing, offline, renderCode, onOpenLink } = props
+  const components = useMemo(
+    () => markdownComponents({ renderCode, fetchesNothing, offline }),
+    [renderCode, fetchesNothing, offline]
+  )
+  const rehypePlugins = useHtmlPlugins(fetchesNothing)
 
   const Container = inline ? 'span' : 'div'
   const classes = ['tmui-markdown', inline && 'tmui-markdown--inline', className]
   return (
     <Container className={classes.filter(Boolean).join(' ')}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        skipHtml={fetchesNothing || !rehypePlugins}
-        remarkRehypeOptions={{ clobberPrefix: '' }}
-        rehypePlugins={fetchesNothing ? undefined : rehypePlugins}
-        urlTransform={fetchesNothing || offline ? withoutResources : undefined}
-        allowedElements={inline ? INLINE_ELEMENTS : undefined}
-        unwrapDisallowed={inline}
-        components={markdownComponents(props)}
-      >
-        {children}
-      </ReactMarkdown>
+      <OpenLinkContext.Provider value={onOpenLink}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          skipHtml={fetchesNothing || !rehypePlugins}
+          remarkRehypeOptions={{ clobberPrefix: '' }}
+          rehypePlugins={fetchesNothing ? undefined : rehypePlugins}
+          urlTransform={fetchesNothing || offline ? withoutResources : undefined}
+          allowedElements={inline ? INLINE_ELEMENTS : undefined}
+          unwrapDisallowed={inline}
+          components={components}
+        >
+          {children}
+        </ReactMarkdown>
+      </OpenLinkContext.Provider>
     </Container>
   )
 }

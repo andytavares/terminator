@@ -8,6 +8,11 @@ const runTextCommand = vi.hoisted(() =>
   vi.fn<() => Promise<ShellExecOutput & { didNotRun: boolean }>>()
 )
 vi.mock('../../../src/main/shell/command-runner.js', () => ({ runTextCommand }))
+// Every folder here has a `.git`, so git is asked (tests/integration/git/is-git-repo.spec.ts has one without).
+vi.mock('fs/promises', () => ({
+  realpath: (path: string) => Promise.resolve(path),
+  access: () => Promise.resolve(),
+}))
 
 import { isGitRepo } from '../../../src/main/git/git-service'
 

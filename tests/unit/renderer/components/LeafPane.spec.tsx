@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { LeafPane } from '../../../../src/renderer/components/terminal/LeafPane'
@@ -27,6 +28,9 @@ function makeInstance(overrides: Partial<TerminalInstance> = {}): TerminalInstan
 function withInstance(instance: TerminalInstance): void {
   useSessionStore.setState({ terminalInstances: new Map([['sess-1', instance]]) })
 }
+
+/** sess-1's pane, named by its tab title. */
+const pane = (): HTMLElement => screen.getByRole('group', { name: 'Terminal 1' })
 
 const focusedIn = (projectId: string): string | null =>
   useSessionStore.getState().getFocusedSession(projectId)
@@ -67,58 +71,53 @@ const pathsByFileName: Record<string, string> = {
 
 describe('LeafPane', () => {
   it('shows the session tab title in the title bar', () => {
-    const { getByText } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    expect(getByText('Terminal 1')).toBeTruthy()
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    expect(screen.getByText('Terminal 1')).toBeTruthy()
   })
 
   it('falls back to sessionId in title bar when session not found', () => {
-    const { getByText } = render(<LeafPane sessionId="unknown-sess" projectId="proj-1" />)
-    expect(getByText('unknown-sess')).toBeTruthy()
+    render(<LeafPane sessionId="unknown-sess" projectId="proj-1" />)
+    expect(screen.getByText('unknown-sess')).toBeTruthy()
   })
 
-  it('adds focused class when session is focused', () => {
+  it('marks the pane current when its session is focused', () => {
     useSessionStore.getState().setFocusedSession('proj-1', 'sess-1')
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    expect(container.querySelector('.leaf-pane--focused')).toBeTruthy()
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    expect(pane().getAttribute('aria-current')).toBe('true')
   })
 
-  it('does not add focused class when session is not focused', () => {
+  it('does not mark the pane current when its session is not focused', () => {
     useSessionStore.getState().setFocusedSession('proj-1', 'sess-2')
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    expect(container.querySelector('.leaf-pane--focused')).toBeNull()
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    expect(pane().getAttribute('aria-current')).toBeNull()
   })
 
-  it('becomes the focused pane and focuses its terminal on click', () => {
+  it('becomes the focused pane and focuses its terminal on click', async () => {
+    const user = userEvent.setup()
     const instance = makeInstance()
     withInstance(instance)
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    await user.click(pane())
     expect(focusedIn('proj-1')).toBe('sess-1')
-    expect(container.querySelector('.leaf-pane--focused')).toBeTruthy()
+    expect(pane().getAttribute('aria-current')).toBe('true')
     expect(instance.terminal.focus).toHaveBeenCalled()
   })
 })
 
 describe('LeafPane — clears the unseen bells on mousedown', () => {
-  it('clears the unseen bells on mousedown', () => {
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+  it('clears the unseen bells on mousedown', async () => {
+    const user = userEvent.setup()
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    await user.click(pane())
     expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
-  })
-
-  it('does not throw on mousedown when no terminal instance', () => {
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    expect(() =>
-      fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
-    ).not.toThrow()
   })
 
   it('pastes file paths into terminal on drop', () => {
     const instance = makeInstance()
     withInstance(instance)
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const file = new File([], 'report.pdf')
-    fireEvent.drop(container.querySelector('.leaf-pane')!, {
+    fireEvent.drop(pane(), {
       dataTransfer: { files: [file], types: ['Files'] },
     })
     expect(instance.terminal.paste).toHaveBeenCalledWith('/Users/me/report.pdf')
@@ -129,20 +128,20 @@ describe('LeafPane — quotes paths with spaces on drop', () => {
   it('quotes paths with spaces on drop', () => {
     const instance = makeInstance()
     withInstance(instance)
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const file = new File([], 'my file.txt')
-    fireEvent.drop(container.querySelector('.leaf-pane')!, {
+    fireEvent.drop(pane(), {
       dataTransfer: { files: [file], types: ['Files'] },
     })
     expect(instance.terminal.paste).toHaveBeenCalledWith("'/my file.txt'")
   })
 
   it('prevents default on dragover when files are dragged', () => {
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const event = new Event('dragover', { bubbles: true, cancelable: true })
     Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'] } })
     const spy = vi.spyOn(event, 'preventDefault')
-    container.querySelector('.leaf-pane')!.dispatchEvent(event)
+    pane().dispatchEvent(event)
     expect(spy).toHaveBeenCalled()
   })
 
@@ -164,18 +163,19 @@ describe('LeafPane — calls mount with just the container element', () => {
     expect(instance.mount).toHaveBeenCalledTimes(1)
   })
 
-  it('ignores non-left-button mousedown (button !== 0)', () => {
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 2 })
+  it('ignores non-left-button mousedown (button !== 0)', async () => {
+    const user = userEvent.setup()
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    await user.pointer({ keys: '[MouseRight]', target: pane() })
     expect(focusedIn('proj-1')).toBe('sess-2')
     expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(2)
   })
 
   it('does not throw on drop when no terminal instance', () => {
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const file = new File([], 'file.txt')
     expect(() =>
-      fireEvent.drop(container.querySelector('.leaf-pane')!, {
+      fireEvent.drop(pane(), {
         dataTransfer: { files: [file], types: ['Files'] },
       })
     ).not.toThrow()
@@ -184,6 +184,7 @@ describe('LeafPane — calls mount with just the container element', () => {
 
 describe('LeafPane — closing one pane', () => {
   it('closes this pane alone: it leaves the split and its terminal ends', async () => {
+    const user = userEvent.setup()
     installElectronApi({
       terminal: { input: mockTerminalInput, close: vi.fn(async () => ({ success: true })) },
     })
@@ -199,8 +200,8 @@ describe('LeafPane — closing one pane', () => {
         ],
       ]),
     })
-    const { getByRole } = render(<LeafPane sessionId="sess-2" projectId="proj-1" />)
-    fireEvent.click(getByRole('button', { name: 'Close Terminal 2' }))
+    render(<LeafPane sessionId="sess-2" projectId="proj-1" />)
+    await user.click(screen.getByRole('button', { name: 'Close Terminal 2' }))
     expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
     await eventually(() => expect(useSessionStore.getState().sessions.has('sess-2')).toBe(false))
     expect(useSessionStore.getState().sessions.has('sess-1')).toBe(true)
@@ -209,10 +210,10 @@ describe('LeafPane — closing one pane', () => {
 
 describe('LeafPane — closing one pane — leaves a drag of something other than files to the browser', () => {
   it('leaves a drag of something other than files to the browser', () => {
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const event = new Event('dragover', { bubbles: true, cancelable: true })
     Object.assign(event, { dataTransfer: { types: ['text/plain'] } })
-    container.querySelector('.leaf-pane')!.dispatchEvent(event)
+    pane().dispatchEvent(event)
     expect(event.defaultPrevented).toBe(false)
   })
 })

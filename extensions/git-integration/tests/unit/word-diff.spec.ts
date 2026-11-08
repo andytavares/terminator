@@ -109,7 +109,7 @@ describe('astral characters', () => {
 
   it('never splits a surrogate pair into two spans', () => {
     const { old, new: next } = wordSpans('ready 😀 now', 'ready 😃 now')
-    for (const span of [...old, ...next]) expect(span.text).not.toMatch(loneSurrogate)
+    expect([...old, ...next].filter((span) => loneSurrogate.test(span.text))).toEqual([])
     expect(next.find((span) => span.changed)?.text).toBe('😃')
   })
 

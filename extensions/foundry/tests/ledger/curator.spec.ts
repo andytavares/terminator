@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import {
-  propose,
-  normaliseReason,
-  citationRef,
-  REPETITION_THRESHOLD,
-  REJECTION_ACTIONS,
-} from '../../src/ledger/curator.js'
+import { propose, normaliseReason, citationRef } from '../../src/ledger/curator.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
 // The factory learns from what you turn away — and only when you ask.
@@ -89,7 +83,6 @@ function theThresholdAndCitationsTests() {
 
   it('produces nothing below the threshold — twice is a coincidence', () => {
     expect(propose({ entries: threeOfTheSame().slice(0, 2) })).toEqual([])
-    expect(REPETITION_THRESHOLD).toBe(3)
   })
 
   it('proposes one rule for three rejections of the same thing', () => {
@@ -142,31 +135,21 @@ function wordingAndOrderingTests() {
 }
 
 function theRungTests() {
-  it('picks the rung from what the rejections were about', () => {
-    const testy = Array.from({ length: 3 }, (_, n) =>
-      entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason: 'no test covers the new branch' })
-    )
-    expect(propose({ entries: testy })[0].rung).toBe('L2')
-
-    const secret = Array.from({ length: 3 }, (_, n) =>
-      entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason: 'the secret is logged in plain text' })
-    )
-    expect(propose({ entries: secret })[0].rung).toBe('L5')
-
-    const docs = Array.from({ length: 3 }, (_, n) =>
-      entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason: 'the readme was not updated' })
-    )
-    expect(propose({ entries: docs })[0].rung).toBe('L6')
-
-    const style = Array.from({ length: 3 }, (_, n) =>
-      entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason: 'the icon carries a colour' })
-    )
-    expect(propose({ entries: style })[0].rung).toBe('L1')
-  })
-
-  it('falls back to the correctness rung for a complaint it cannot place', () => {
-    expect(propose({ entries: threeOfTheSame() })[0].rung).toBe('L3')
-  })
+  it.each([
+    ['no test covers the new branch', 'L2'],
+    ['the secret is logged in plain text', 'L5'],
+    ['the readme was not updated', 'L6'],
+    ['the icon carries a colour', 'L1'],
+    ['hardcodes the timeout', 'L3'],
+  ])(
+    'places the complaint "%s" on rung %s, and an unplaceable one on correctness (L3)',
+    (reason, rung) => {
+      const repeated = Array.from({ length: 3 }, (_, n) =>
+        entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason })
+      )
+      expect(propose({ entries: repeated })[0].rung).toBe(rung)
+    }
+  )
 }
 
 describe('what counts as a rejection', () => {
@@ -218,11 +201,6 @@ function otherActionsTests() {
       entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason: '`U-1` src/a.ts 42' })
     )
     expect(propose({ entries: named })).toEqual([])
-  })
-
-  it('names the actions it reads, rather than reading everything', () => {
-    expect(REJECTION_ACTIONS).toContain('review.rejected')
-    expect(REJECTION_ACTIONS).not.toContain('order.agreed')
   })
 }
 

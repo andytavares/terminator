@@ -62,11 +62,12 @@ function proposalRefusingTests() {
     expect(() => parseProposal({ status: 'agreed' })).toThrow(ProposalRejected)
   })
 
-  it('refuses an id, a source or a provenance', () => {
-    for (const field of ['id', 'source', 'provenance', 'context', 'redTeam']) {
+  it.each(['id', 'source', 'provenance', 'context', 'redTeam'])(
+    'refuses a proposal that sets %s',
+    (field) => {
       expect(() => parseProposal({ [field]: {} })).toThrow(ProposalRejected)
     }
-  })
+  )
 
   it('says which field it refused and why', () => {
     expect(() => parseProposal({ acceptance: [{ id: 'AC-1' }] })).toThrow(/acceptance/)
@@ -290,17 +291,14 @@ function proposalFindingsTests() {
 }
 
 function theMeasuredHalfTests() {
-  it('refuses the measured half — a probe result is not the agent to rewrite', () => {
-    // An agent that could rewrite the toolchain could tell the ladder a
-    // command exists that does not.
-    for (const field of ['repos', 'toolchain', 'houseDocs']) {
+  // An agent that could rewrite the toolchain could tell the ladder a
+  // command exists that does not.
+  it.each(['repos', 'toolchain', 'houseDocs'])(
+    'refuses findings.%s — a probe result is not the agent to rewrite',
+    (field) => {
       expect(() => parseProposal({ findings: { [field]: [] } })).toThrow(ProposalRejected)
     }
-  })
-
-  it('refuses `context` itself', () => {
-    expect(() => parseProposal({ context: {} })).toThrow(ProposalRejected)
-  })
+  )
 }
 
 function leavingAloneTests() {

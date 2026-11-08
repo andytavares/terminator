@@ -7,8 +7,19 @@ import { useNotificationStore, type Notification } from '../stores/notification.
 import { recordUse } from '../usage/record'
 import './NotificationPanel.css'
 
+const TYPE_LABEL: Record<string, string> = {
+  success: 'Success',
+  warning: 'Warning',
+  error: 'Error',
+}
+
 function TypeIcon({ type }: { type: string }): React.JSX.Element {
-  const props = { size: 13, className: 'notif-item__type-icon' }
+  const props = {
+    size: 13,
+    className: 'notif-item__type-icon',
+    role: 'img',
+    'aria-label': TYPE_LABEL[type] ?? 'Info',
+  }
   switch (type) {
     case 'success':
       return <CheckCircle {...props} />

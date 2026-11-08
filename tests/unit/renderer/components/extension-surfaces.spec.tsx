@@ -1,11 +1,11 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
-import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 import type { GroupKey } from '../../../../src/renderer/sidebar/view-model'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
@@ -29,7 +29,7 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateProjectDialog', () =>
 vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () => ({
   CreateWorkspaceDialog: () => null,
 }))
-const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
+const mockCreateSession = vi.fn()
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: () => ({ createSession: mockCreateSession }),
 }))
@@ -77,20 +77,11 @@ const sidebarProps = {
   now: NOW,
 }
 
-/** One saved sidebar view per grouping, so each test can open the sidebar under any of them. */
-function saveGroupingViews(): void {
-  localStorage.clear()
+/** The grouping the user saved for the view the sidebar opens on, so each test can open it under any grouping. */
+function saveOpeningViewGrouping(groupBy: GroupKey): void {
   localStorage.setItem(
     'terminator.sidebar.views',
-    JSON.stringify(
-      GROUPINGS.map((groupBy) => ({
-        id: `g-${groupBy}`,
-        name: groupBy,
-        groupBy,
-        sortBy: 'name',
-        filters: {},
-      }))
-    )
+    JSON.stringify({ overrides: { everything: { groupBy, sortBy: 'name' } } })
   )
 }
 
@@ -128,8 +119,8 @@ function seedRegistry(): void {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  saveGroupingViews()
+  mockCreateSession.mockResolvedValue('ses-1')
+  localStorage.clear()
   seedStores()
   seedRegistry()
 })
@@ -137,52 +128,51 @@ beforeEach(() => {
 const commandLabels = (): string[] =>
   useExtensionRegistry.getState().commands.map((command) => command.label)
 
-const renderSidebar = (groupBy: GroupKey) =>
-  render(<UnifiedSidebar {...sidebarProps} initialViewId={`g-${groupBy}`} />)
+/** The first branch row: a button named "<branch> — <state>". */
+const branchRow = () => screen.getAllByRole('button', { name: / — / })[0]
 
-describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupBy) => {
-  // Both surfaces now hang on the window's own left rail rather than the
-  // sidebar's header; what an extension contributes is unchanged.
-  it('surface 1: the global tab button renders in the app band and fires', () => {
-    const onSelectGlobalTab = vi.fn()
-    render(<AppBand globalTabs={[globalTab]} activeId={null} onSelect={onSelectGlobalTab} />)
-    fireEvent.click(screen.getByLabelText('Fake Tab'))
-    expect(onSelectGlobalTab).toHaveBeenCalledWith('fake.global')
+const renderSidebar = (groupBy: GroupKey) => {
+  saveOpeningViewGrouping(groupBy)
+  return render(<UnifiedSidebar {...sidebarProps} />)
+}
+
+const renderWithWorkspaceTab = (groupBy: GroupKey, onSelectWorkspaceTab: () => void) => {
+  saveOpeningViewGrouping(groupBy)
+  return render(<UnifiedSidebar {...sidebarProps} onSelectWorkspaceTab={onSelectWorkspaceTab} />)
+}
+
+describe('surface 2: the workspace tab is reachable and fires with the owning workspace id', () => {
+  it('opens from the repo header when grouped by workspace', async () => {
+    const user = userEvent.setup()
+    const onSelectWorkspaceTab = vi.fn()
+    renderWithWorkspaceTab('workspace', onSelectWorkspaceTab)
+    await user.click(screen.getByRole('button', { name: 'Fake Workspace Tab' }))
+    expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
   })
 
-  it('surface 2: the workspace tab is reachable and fires with the owning workspace id', () => {
+  it('opens from the branch row menu when ungrouped, as there is no repo header', async () => {
+    const user = userEvent.setup()
     const onSelectWorkspaceTab = vi.fn()
-    const { container } = render(
-      <UnifiedSidebar
-        {...sidebarProps}
-        initialViewId={`g-${groupBy}`}
-        onSelectWorkspaceTab={onSelectWorkspaceTab}
-      />
-    )
-    const headerButton = container.querySelector('.repo-header__action')
-    if (headerButton) {
-      // Grouped by repo: the repo header is the host.
-      fireEvent.click(headerButton)
-    } else {
-      // Ungrouped: there is no repo header, so the branch row's own menu is
-      // the way in — a contributed surface has to be reachable either way.
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      fireEvent.click(screen.getByText('Fake Workspace Tab'))
-    }
+    renderWithWorkspaceTab('none', onSelectWorkspaceTab)
+    expect(screen.queryByRole('button', { name: 'Fake Workspace Tab' })).toBeNull()
+    fireEvent.contextMenu(branchRow())
+    await user.click(screen.getByText('Fake Workspace Tab'))
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
   })
 })
 
 describe.each(GROUPINGS)('the branch scope survives %s grouping', (groupBy) => {
-  it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', () => {
-    const { container } = renderSidebar(groupBy)
-    fireEvent.click(container.querySelector('.branch-row')!)
+  it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', async () => {
+    const user = userEvent.setup()
+    renderSidebar(groupBy)
+    await user.click(branchRow())
     expect(useWorkspaceStore.getState().activeProjectId).toBe('p1')
   })
 
-  it('a new terminal can be created for the branch scope', () => {
-    const { container } = renderSidebar(groupBy)
-    fireEvent.click(container.querySelector('.branch-row__action')!)
+  it('a new terminal can be created for the branch scope', async () => {
+    const user = userEvent.setup()
+    renderSidebar(groupBy)
+    await user.click(screen.getAllByRole('button', { name: /^New terminal in / })[0])
     expect(mockCreateSession).toHaveBeenCalledWith({
       projectId: 'p1',
       type: 'human',
@@ -252,26 +242,5 @@ describe('the extension API surface is unchanged', () => {
       'windowViews',
       'workspaceTab',
     ])
-  })
-})
-
-describe('the extension API surface is unchanged — the renderer-facing extension API still exposes exactly its known members', () => {
-  it('the renderer-facing extension API still exposes exactly its known members', async () => {
-    const state: Record<string, unknown> = { ...useExtensionRegistry.getState() }
-    const rendererApi = [
-      'registerGlobalTab',
-      'registerWorkspaceTab',
-      'registerSidebarPanel',
-      'registerProjectTab',
-      'registerWindowView',
-      'registerOverlay',
-      'registerKeyboardShortcut',
-      'registerCommand',
-      'updateGlobalTab',
-      'updateCommand',
-    ]
-    for (const member of rendererApi) {
-      expect(typeof state[member]).toBe('function')
-    }
   })
 })

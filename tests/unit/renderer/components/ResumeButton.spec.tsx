@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ResumeButton } from '../../../../src/renderer/components/session/ResumeButton'
 import { fact } from '../sidebar/fixtures/facts'
 import type { AgentConversation } from '../../../../src/shared/types/index'
@@ -22,10 +23,11 @@ vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 beforeEach(() => recordUse.mockClear())
 
 describe('ResumeButton', () => {
-  it('offers to resume a stopped conversation, naming the session', () => {
+  it('offers to resume a stopped conversation, naming the session', async () => {
+    const user = userEvent.setup()
     const onResume = vi.fn()
     render(<ResumeButton facts={exited()} onResume={onResume} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    await user.click(screen.getByRole('button', { name: 'Resume claude' }))
     expect(onResume).toHaveBeenCalledWith(exited())
   })
 
@@ -35,31 +37,27 @@ describe('ResumeButton', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('draws nothing for a session that never had a conversation', () => {
-    const { container } = render(
-      <ResumeButton facts={exited({ agent: null, resumable: false })} onResume={vi.fn()} />
-    )
-    expect(container.innerHTML).toBe('')
-  })
-
-  it('draws nothing while the agent is still running', () => {
-    const { container } = render(
-      <ResumeButton facts={exited({ state: 'working' })} onResume={vi.fn()} />
-    )
+  it.each([
+    ['a session that never had a conversation', { agent: null, resumable: false }],
+    ['an agent that is still running', { state: 'working' }],
+  ])('draws nothing for %s', (_case, patch) => {
+    const { container } = render(<ResumeButton facts={exited(patch)} onResume={vi.fn()} />)
     expect(container.innerHTML).toBe('')
   })
 })
 
 describe('ResumeButton — does not open the row or tile it sits on', () => {
-  it('does not open the row or tile it sits on', () => {
+  it('does not open the row or tile it sits on', async () => {
+    const user = userEvent.setup()
     const behind = vi.fn()
     render(
       <div onClick={behind} onKeyDown={behind}>
         <ResumeButton facts={exited()} onResume={vi.fn()} />
       </div>
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Resume claude' }), { key: 'Enter' })
+    await user.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(screen.getByRole('button', { name: 'Resume claude' }).matches(':focus')).toBe(true)
+    await user.keyboard('{Enter}')
     expect(behind).not.toHaveBeenCalled()
   })
 })

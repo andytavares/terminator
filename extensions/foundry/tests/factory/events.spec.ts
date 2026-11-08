@@ -45,8 +45,8 @@ function order(): WorkOrder {
   })
 }
 
-function graph(): RunGraph {
-  const parsed = parseRecipe(RECIPE, 'standard.yaml')
+function graph(recipe = RECIPE, file = 'standard.yaml'): RunGraph {
+  const parsed = parseRecipe(recipe, file)
   if (!parsed.ok) throw new Error(parsed.reason)
   return buildRunGraph(order(), parsed.value)
 }
@@ -265,7 +265,7 @@ function eventsGatesTests() {
 
 function noOpenGateTests() {
   it('gateNodeId falls back to null when there is no open gate node at all', () => {
-    const parsed = parseRecipe(
+    const g = graph(
       `
 schemaVersion: 1
 id: nogate
@@ -276,8 +276,6 @@ steps:
 `,
       'nogate.yaml'
     )
-    if (!parsed.ok) throw new Error(parsed.reason)
-    const g = buildRunGraph(order(), parsed.value)
     expect(gateNodeId(gate({ id: 'gate-1', nodeId: null }), g)).toBe(null)
   })
 }

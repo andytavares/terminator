@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   buildAsks,
   buildFacets,
@@ -40,16 +40,15 @@ describe('buildAsks: review', () => {
     expect(ask.open.args).toEqual({ repoRoot: 'gh:acme/widgets', number: 275 })
   })
 
-  it.each(['team', 'involved'] as const)('asks nothing for the %s section', (section) => {
-    expect(buildAsks([dashboardPrFixture({ section })], NO_ISSUES)).toEqual([])
-  })
+  it.each(['team', 'involved', 're-review'] as const)(
+    'asks nothing for the %s section',
+    (section) => {
+      expect(buildAsks([dashboardPrFixture({ section })], NO_ISSUES)).toEqual([])
+    }
+  )
 })
 
 describe('buildAsks: review — only direct requests, titled by whether I reviewed before', () => {
-  it('asks nothing for a re-review row: only direct review requests are asks', () => {
-    expect(buildAsks([dashboardPrFixture({ section: 're-review' })], NO_ISSUES)).toEqual([])
-  })
-
   it('titles a request on a pull request I reviewed before as a re-review', () => {
     const pr = dashboardPrFixture({ section: 'requested', reviewedByMe: true })
     const [ask] = buildAsks([pr], NO_ISSUES)
@@ -159,16 +158,7 @@ describe('buildFacets: stage and whose move', () => {
   })
 })
 
-afterEach(() => vi.useRealTimers())
-
 describe('buildFacets: shape', () => {
-  it("carries GitHub's updatedAt, not the time the feed is built", () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2030-01-01T00:00:00Z'))
-    const facet = firstFacetOf({ updatedAt: '2026-10-12T08:00:00Z' })
-    expect(facet.updatedAt).toBe('2026-10-12T08:00:00Z')
-  })
-
   it('describes the pull request and when GitHub last updated it', () => {
     expect(firstFacetOf({})).toMatchObject({
       kind: 'pull-request',

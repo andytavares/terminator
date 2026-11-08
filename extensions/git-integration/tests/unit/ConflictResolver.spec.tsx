@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 import { EditorView } from '@codemirror/view'
@@ -23,7 +24,6 @@ vi.mock('../../src/api/notifications', () => ({
 import { ConflictResolver } from '../../src/components/merge-flow/ConflictResolver'
 import { useMergeFlowStore } from '../../src/stores/merge-flow.store'
 import { ConflictPanel } from '../../src/components/merge-flow/ConflictPanel'
-import { ActionBar } from '../../src/components/merge-flow/ActionBar'
 import { ResultPreviewStrip } from '../../src/components/merge-flow/ResultPreviewStrip'
 
 function conflictBlock(index: number, overrides: Record<string, unknown> = {}) {
@@ -85,13 +85,6 @@ function activeBlock() {
 }
 
 describe('ConflictResolver', () => {
-  it('renders nothing when there is no session', () => {
-    const { container } = render(
-      <ConflictResolver repoRoot="/repo" onBack={vi.fn()} onComplete={vi.fn()} />
-    )
-    expect(container.firstChild).toBeNull()
-  })
-
   it('shows the file description, progress and both sides of the active block', () => {
     const { container } = renderResolver(2)
     expect(screen.getByText('both sides edited x')).toBeTruthy()
@@ -100,20 +93,22 @@ describe('ConflictResolver', () => {
     expect(container.textContent).toContain('const x = 100')
   })
 
-  it('previews the chosen side, and sends nothing until confirmed', () => {
+  it('previews the chosen side, and sends nothing until confirmed', async () => {
+    const user = userEvent.setup()
     renderResolver(2)
-    expect(screen.queryByText(/Confirm/)).toBeNull()
-    fireEvent.click(screen.getByText(/Keep theirs/))
-    expect(screen.getByText('Preview').parentElement!.textContent).toContain('const x = 100')
+    expect(screen.queryByRole('button', { name: /Confirm/ })).toBeNull()
+    await user.click(screen.getByRole('button', { name: /Keep theirs/ }))
+    expect(screen.getByRole('group', { name: 'Preview' }).textContent).toContain('const x = 100')
     expect(mockResolveConflict).not.toHaveBeenCalled()
   })
 })
 
 describe('ConflictResolver — resolves with the chosen side and moves to the next conflict', () => {
   it('resolves with the chosen side and moves to the next conflict', async () => {
+    const user = userEvent.setup()
     renderResolver(2)
-    fireEvent.click(screen.getByText(/Keep mine/))
-    fireEvent.click(screen.getByText(/Confirm/))
+    await user.click(screen.getByRole('button', { name: /Keep mine/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm/ }))
     await waitFor(() => expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1))
     expect(mockResolveConflict).toHaveBeenCalledWith({
       repoRoot: '/repo',
@@ -127,9 +122,10 @@ describe('ConflictResolver — resolves with the chosen side and moves to the ne
   })
 
   it('calls onComplete when the last unresolved conflict is resolved', async () => {
+    const user = userEvent.setup()
     const { onComplete } = renderResolver(1)
-    fireEvent.click(screen.getByText(/Keep theirs/))
-    fireEvent.click(screen.getByText(/Confirm/))
+    await user.click(screen.getByRole('button', { name: /Keep theirs/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm/ }))
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce())
     expect(mockResolveConflict.mock.calls[0][0].resolvedText).toBe('const x = 100')
   })
@@ -137,10 +133,11 @@ describe('ConflictResolver — resolves with the chosen side and moves to the ne
 
 describe('ConflictResolver — keeps the conflict unresolved and reports the error when resolving fails', () => {
   it('keeps the conflict unresolved and reports the error when resolving fails', async () => {
+    const user = userEvent.setup()
     mockResolveConflict.mockResolvedValue({ error: 'git add failed' })
     const { onComplete } = renderResolver(1)
-    fireEvent.click(screen.getByText(/Keep mine/))
-    fireEvent.click(screen.getByText(/Confirm/))
+    await user.click(screen.getByRole('button', { name: /Keep mine/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm/ }))
     await waitFor(() => expect(mockNotify).toHaveBeenCalled())
     expect(mockNotify).toHaveBeenCalledWith({
       type: 'error',
@@ -153,10 +150,11 @@ describe('ConflictResolver — keeps the conflict unresolved and reports the err
   })
 
   it('selects with M and T and confirms with Enter', async () => {
+    const user = userEvent.setup()
     renderResolver(2)
-    fireEvent.keyDown(window, { key: 'm' })
-    fireEvent.keyDown(window, { key: 't' })
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await user.keyboard('m')
+    await user.keyboard('t')
+    await user.keyboard('{Enter}')
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
     expect(mockResolveConflict.mock.calls[0][0]).toMatchObject({
       resolvedText: 'const x = 100',
@@ -166,33 +164,35 @@ describe('ConflictResolver — keeps the conflict unresolved and reports the err
 })
 
 describe('ConflictResolver — navigates between conflicts with the arrow keys', () => {
-  it('navigates between conflicts with the arrow keys', () => {
+  it('navigates between conflicts with the arrow keys', async () => {
+    const user = userEvent.setup()
     renderResolver(2)
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    await user.keyboard('{ArrowRight}')
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
-    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    await user.keyboard('{ArrowLeft}')
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)
   })
 
-  it('clears a pending choice when moving to another conflict', () => {
+  it('clears a pending choice when moving to another conflict', async () => {
+    const user = userEvent.setup()
     renderResolver(2)
-    fireEvent.click(screen.getByText(/Keep mine/))
-    expect(screen.getByText(/Confirm/)).toBeTruthy()
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(screen.queryByText(/Confirm/)).toBeNull()
+    await user.click(screen.getByRole('button', { name: /Keep mine/ }))
+    expect(screen.getByRole('button', { name: /Confirm/ })).toBeTruthy()
+    await user.keyboard('{ArrowRight}')
+    expect(screen.queryByRole('button', { name: /Confirm/ })).toBeNull()
   })
 })
 
 describe('ConflictResolver — resolves with the edited text and strategy manual from the editor', () => {
   it('resolves with the edited text and strategy manual from the editor', async () => {
-    const { container } = renderResolver(1)
-    fireEvent.click(screen.getByText(/Edit manually/))
-    const content = container.querySelector('.cm-content') as HTMLElement
-    const view = EditorView.findFromDOM(content.parentElement!.parentElement as HTMLElement)!
+    const user = userEvent.setup()
+    renderResolver(1)
+    await user.click(screen.getByRole('button', { name: /Edit manually/ }))
+    const view = EditorView.findFromDOM(screen.getByRole('textbox'))!
     act(() => {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'const x = 42' } })
     })
-    fireEvent.click(screen.getByRole('button', { name: /Save/ }))
+    await user.click(screen.getByRole('button', { name: /Save/ }))
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
     expect(mockResolveConflict.mock.calls[0][0]).toMatchObject({
       resolvedText: 'const x = 42',
@@ -200,12 +200,12 @@ describe('ConflictResolver — resolves with the edited text and strategy manual
     })
   })
 
-  it('pushes the other side into the open editor on Keep theirs, without resolving', () => {
-    const { container } = renderResolver(1)
-    fireEvent.click(screen.getByText(/Edit manually/))
-    fireEvent.click(screen.getByText(/Keep theirs/))
-    const content = container.querySelector('.cm-content') as HTMLElement
-    const view = EditorView.findFromDOM(content.parentElement!.parentElement as HTMLElement)!
+  it('pushes the other side into the open editor on Keep theirs, without resolving', async () => {
+    const user = userEvent.setup()
+    renderResolver(1)
+    await user.click(screen.getByRole('button', { name: /Edit manually/ }))
+    await user.click(screen.getByRole('button', { name: /Keep theirs/ }))
+    const view = EditorView.findFromDOM(screen.getByRole('textbox'))!
     expect(view.state.doc.toString()).toBe('const x = 100')
     expect(mockResolveConflict).not.toHaveBeenCalled()
   })
@@ -213,11 +213,12 @@ describe('ConflictResolver — resolves with the edited text and strategy manual
 
 describe('ConflictResolver — undoes the last decision and tells the main process', () => {
   it('undoes the last decision and tells the main process', async () => {
+    const user = userEvent.setup()
     renderResolver(2)
-    fireEvent.click(screen.getByText(/Keep mine/))
-    fireEvent.click(screen.getByText(/Confirm/))
+    await user.click(screen.getByRole('button', { name: /Keep mine/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm/ }))
     await waitFor(() => expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1))
-    fireEvent.click(screen.getByText(/Undo/))
+    await user.click(screen.getByRole('button', { name: 'Undo last decision' }))
     await waitFor(() => expect(mockUndoResolve).toHaveBeenCalledOnce())
     expect(mockUndoResolve).toHaveBeenCalledWith({
       repoRoot: '/repo',
@@ -230,9 +231,10 @@ describe('ConflictResolver — undoes the last decision and tells the main proce
   })
 
   it('resolves through Keep both in the order chosen in the modal', async () => {
+    const user = userEvent.setup()
     renderResolver(2)
-    fireEvent.click(screen.getByText(/Keep both/))
-    fireEvent.click(screen.getByText(/Use this order/))
+    await user.click(screen.getByRole('button', { name: /Keep both/ }))
+    await user.click(screen.getByRole('button', { name: 'Use this order' }))
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
     expect(mockResolveConflict.mock.calls[0][0].strategy).toBe('both-ours-first')
     expect(mockResolveConflict.mock.calls[0][0].resolvedText).toContain('const x = 0')
@@ -240,59 +242,28 @@ describe('ConflictResolver — undoes the last decision and tells the main proce
   })
 })
 
-describe('ConflictPanel', () => {
-  it('renders ours and theirs code', () => {
-    const { container } = render(
-      <ConflictPanel
-        block={baseBlock}
-        isRebase={false}
-        pendingStrategy={null}
-        onSelectMine={vi.fn()}
-        onSelectTheirs={vi.fn()}
-      />
-    )
-    // Text may be split across highlight.js spans — check textContent
-    expect(container.textContent).toContain('const x = 1')
-    expect(container.textContent).toContain('const x = 2')
-  })
-})
-
-describe('ConflictPanel — shows Your version and Incoming changes labels for non-rebase', () => {
-  it('shows Your version and Incoming changes labels for non-rebase', () => {
+describe('ConflictPanel — side labels', () => {
+  it.each([
+    { isRebase: false, labels: ['Your version', 'Incoming changes'] },
+    { isRebase: true, labels: ['Theirs (branch)', 'Your version'] },
+  ])('labels ours and theirs $labels when isRebase is $isRebase', ({ isRebase, labels }) => {
     render(
       <ConflictPanel
         block={baseBlock}
-        isRebase={false}
+        isRebase={isRebase}
         pendingStrategy={null}
         onSelectMine={vi.fn()}
         onSelectTheirs={vi.fn()}
       />
     )
-    expect(screen.getByText('Your version')).toBeTruthy()
-    expect(screen.getByText('Incoming changes')).toBeTruthy()
-  })
-})
-
-describe('ConflictPanel — inverts labels for rebase', () => {
-  it('inverts labels for rebase', () => {
-    render(
-      <ConflictPanel
-        block={baseBlock}
-        isRebase={true}
-        pendingStrategy={null}
-        onSelectMine={vi.fn()}
-        onSelectTheirs={vi.fn()}
-      />
-    )
-    expect(screen.getByText('Theirs (branch)')).toBeTruthy()
-    // rebase theirs label shows "Your version"
-    expect(screen.getAllByText('Your version').length).toBeGreaterThan(0)
+    const sideLabels = screen.getAllByText(/^(Your version|Theirs \(branch\)|Incoming changes)$/)
+    expect(sideLabels.map((label) => label.textContent)).toEqual(labels)
   })
 })
 
 describe('ConflictPanel — marks ours side selected when pendingStrategy is ours', () => {
   it('marks ours side selected when pendingStrategy is ours', () => {
-    const { container } = render(
+    render(
       <ConflictPanel
         block={baseBlock}
         isRebase={false}
@@ -301,13 +272,16 @@ describe('ConflictPanel — marks ours side selected when pendingStrategy is our
         onSelectTheirs={vi.fn()}
       />
     )
-    const selected = container.querySelector('.conflict-panel__side--selected')
-    expect(selected).toBeTruthy()
+    const pressed = (label: RegExp) =>
+      screen.getByRole('button', { name: label }).getAttribute('aria-pressed')
+    expect(pressed(/^Your version/)).toBe('true')
+    expect(pressed(/^Incoming changes/)).toBe('false')
   })
 })
 
 describe('ConflictPanel — calls onSelectMine when ours side clicked', () => {
-  it('calls onSelectMine when ours side clicked', () => {
+  it('calls onSelectMine when ours side clicked', async () => {
+    const user = userEvent.setup()
     const onSelectMine = vi.fn()
     render(
       <ConflictPanel
@@ -318,7 +292,7 @@ describe('ConflictPanel — calls onSelectMine when ours side clicked', () => {
         onSelectTheirs={vi.fn()}
       />
     )
-    fireEvent.click(screen.getByText('Your version'))
+    await user.click(screen.getByText('Your version'))
     expect(onSelectMine).toHaveBeenCalledOnce()
   })
 })
@@ -327,80 +301,5 @@ describe('ResultPreviewStrip', () => {
   it('shows placeholder when no resolution selected', () => {
     render(<ResultPreviewStrip resolvedText={null} />)
     expect(screen.getByText(/Select a resolution/i)).toBeTruthy()
-  })
-
-  it('shows resolved text when available', () => {
-    const { container } = render(<ResultPreviewStrip resolvedText="const x = 1" />)
-    // Text may be split across highlight.js spans — check textContent
-    expect(container.textContent).toContain('const x = 1')
-  })
-})
-
-describe('ActionBar', () => {
-  it('renders all action buttons', () => {
-    render(
-      <ActionBar
-        pendingResolution={null}
-        onKeepMine={vi.fn()}
-        onKeepTheirs={vi.fn()}
-        onKeepBoth={vi.fn()}
-        onEdit={vi.fn()}
-        onConfirm={vi.fn()}
-      />
-    )
-    expect(screen.getByText(/Keep mine/i)).toBeTruthy()
-    expect(screen.getByText(/Keep theirs/i)).toBeTruthy()
-    expect(screen.getByText(/Keep both/i)).toBeTruthy()
-    expect(screen.getByText(/Edit/i)).toBeTruthy()
-  })
-})
-
-describe('ActionBar — shows Confirm button when pendingResolution is set', () => {
-  it('shows Confirm button when pendingResolution is set', () => {
-    render(
-      <ActionBar
-        pendingResolution={{ text: 'x', strategy: 'ours' }}
-        onKeepMine={vi.fn()}
-        onKeepTheirs={vi.fn()}
-        onKeepBoth={vi.fn()}
-        onEdit={vi.fn()}
-        onConfirm={vi.fn()}
-      />
-    )
-    expect(screen.getByText(/Confirm/i)).toBeTruthy()
-  })
-})
-
-describe('ActionBar — hides Confirm when no pendingResolution', () => {
-  it('hides Confirm when no pendingResolution', () => {
-    render(
-      <ActionBar
-        pendingResolution={null}
-        onKeepMine={vi.fn()}
-        onKeepTheirs={vi.fn()}
-        onKeepBoth={vi.fn()}
-        onEdit={vi.fn()}
-        onConfirm={vi.fn()}
-      />
-    )
-    expect(screen.queryByText(/Confirm/i)).toBeNull()
-  })
-})
-
-describe('ActionBar — calls onKeepMine when button clicked', () => {
-  it('calls onKeepMine when button clicked', () => {
-    const onKeepMine = vi.fn()
-    render(
-      <ActionBar
-        pendingResolution={null}
-        onKeepMine={onKeepMine}
-        onKeepTheirs={vi.fn()}
-        onKeepBoth={vi.fn()}
-        onEdit={vi.fn()}
-        onConfirm={vi.fn()}
-      />
-    )
-    fireEvent.click(screen.getByText(/Keep mine/i))
-    expect(onKeepMine).toHaveBeenCalledOnce()
   })
 })

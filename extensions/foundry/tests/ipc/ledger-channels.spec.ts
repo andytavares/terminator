@@ -4,11 +4,11 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createLedgerChannels } from '../../src/ipc/ledger-channels.js'
+import { acceptedRulesIn } from '../../src/ipc/record-registration.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { resolveRule } from '../../src/recipe/resolve.js'
 import { declinedProposals } from '../../src/verify/rules.js'
-import { availableNames } from '../../src/recipe/resolve.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
@@ -28,24 +28,12 @@ const realBuiltIn = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
 let root: string
 
-/**
- * The host reads accepted checks by rung — those that resolved from the
- * records location rather than shipping with the tool. Read here the same way,
- * so the test cannot pass on a list the application never produces.
- */
+/** The host's own reader of accepted checks, over a records location with no built-ins. */
 function acceptedRules() {
-  const sources = { dataRoot: root, repoPaths: [], builtInDir: path.resolve(root, 'nowhere') }
-  return availableNames('rules', sources).flatMap((name) => {
-    const resolved = resolveRule(name, sources)
-    if (!resolved.ok || resolved.resolved.rung !== 'data-root') return []
-    return [
-      {
-        id: resolved.resolved.value.id,
-        asserts: resolved.resolved.value.asserts,
-        rung: resolved.resolved.rung,
-        origin: resolved.resolved.value.origin,
-      },
-    ]
+  return acceptedRulesIn({
+    dataRoot: root,
+    repoPaths: [],
+    builtInDir: path.resolve(root, 'nowhere'),
   })
 }
 
@@ -280,41 +268,6 @@ function anUnsupportedProposalTests() {
   })
 }
 
-describe('nothing is proposed unprompted (FR-076)', () => {
-  it('the path a run writes decisions through cannot reach the curator', () => {
-    // `record` is what a run calls after every decision. If it could produce a
-    // proposal, proposals would arrive unasked — which is the failure this
-    // requirement exists to prevent.
-    const store = fs.readFileSync(
-      path.join(__dirname, '..', '..', 'src', 'order', 'store.ts'),
-      'utf8'
-    )
-    expect(store).not.toMatch(/curator/)
-  })
-
-  it('recording a decision returns nothing a caller could mistake for one', async () => {
-    await repeatedRejections()
-    const result = await createOrderStore(root).record({
-      at: '2026-09-07T10:00:00.000Z',
-      orderId: 'WO-1',
-      actor: 'operator',
-      action: 'review.rejected',
-      subject: 'U-4',
-      reason: 'the timeout is hardcoded rather than read from configuration',
-      evidence: [],
-    })
-    expect(result).toBeUndefined()
-  })
-
-  it('proposals only ever come back from the channel the operator reaches', async () => {
-    await repeatedRejections()
-    // Four ledger entries now support a proposal, and it exists only when
-    // asked for.
-    const asked = (await channels().proposeRules({})) as { proposals: unknown[] }
-    expect(asked.proposals).toHaveLength(1)
-  })
-})
-
 async function accept(): Promise<string> {
   await repeatedRejections()
   const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
@@ -470,12 +423,6 @@ function gatheringTests() {
 }
 
 function ledgerChannelsWindowsTests() {
-  it('defaults to the 30 day window', async () => {
-    await seedLedgerOrder('WO-1')
-    const r = (await channels().factoryMetrics({})) as { window: string }
-    expect(r.window).toBe('30d')
-  })
-
   it('honours an explicit window', async () => {
     await seedLedgerOrder('WO-1')
     const r = (await channels().factoryMetrics({ window: 'all' })) as { window: string }

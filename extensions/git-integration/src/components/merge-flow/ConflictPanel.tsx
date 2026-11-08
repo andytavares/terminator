@@ -177,6 +177,7 @@ function SidePanel({ panel }: { panel: SideProps }) {
     <div
       className={`conflict-panel__side conflict-panel__side--${side}${selected}`}
       role="button"
+      aria-pressed={panel.selected}
       tabIndex={0}
       onClick={panel.onSelect}
       onKeyDown={(e) => e.key === 'Enter' && panel.onSelect()}

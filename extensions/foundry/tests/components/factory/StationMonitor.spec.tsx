@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, act, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { StationMonitor } from '../../../src/components/factory/StationMonitor.js'
 import type { MonitorStatus } from '../../../src/components/factory/StationMonitor.js'
 import type { TranscriptLine } from '../../../src/runtime/transcript-excerpt.js'
@@ -47,6 +48,10 @@ function mount(
     />
   )
   return { onAttach, onClose }
+}
+
+function monitor(): HTMLElement {
+  return screen.getByRole('region', { name: 'FILTER LINEAR ISSUES' })
 }
 
 function setReducedMotion(reduce: boolean) {
@@ -98,39 +103,35 @@ function namingTests() {
     expect(screen.getByRole('region', { name: 'FILTER LINEAR ISSUES' })).toBeTruthy()
   })
 
-  it('says the station has no agent, or needs you, before what the step says', () => {
-    const exact = { normalizer: (t: string) => t }
-    mount({ status: 'gone' })
-    expect(screen.getByText('NO AGENT  ATTEMPT 2  BUILDER', exact)).toBeTruthy()
-    cleanup()
-    mount({ status: 'waiting', alert: 'WAITING FOR YOU: WANTS TO RUN BASH' })
-    expect(screen.getByText('NEEDS YOU  ATTEMPT 2  BUILDER', exact)).toBeTruthy()
+  it.each([
+    ['gone', null, 'NO AGENT  ATTEMPT 2  BUILDER'],
+    ['waiting', 'WAITING FOR YOU: WANTS TO RUN BASH', 'NEEDS YOU  ATTEMPT 2  BUILDER'],
+  ] as const)('a %s station says so before what the step says', (status, alert, line) => {
+    mount({ status, alert })
+    expect(screen.getByText(line, { normalizer: (t: string) => t }).textContent).toBe(line)
   })
 
-  it('badges the chin with the floor sign, or the label when the station has none', () => {
+  it('badges the chin with the floor sign', () => {
     mount()
-    expect(screen.getByText('BUILDER U-1')).toBeTruthy()
-    cleanup()
+    expect(screen.getByText('BUILDER U-1', { selector: '.fdry-crt__badge' })).toBeTruthy()
+  })
+
+  it('badges the chin with the label when the station has no floor sign', () => {
     mount({ sign: null })
-    expect(document.querySelector('.fdry-crt__badge')?.textContent).toBe('FILTER LINEAR ISSUES')
+    expect(screen.getByText('FILTER LINEAR ISSUES', { selector: '.fdry-crt__badge' })).toBeTruthy()
   })
 }
 
 function theCursorTests() {
-  it('shows the cursor only while the step is running', () => {
-    const shown: Record<string, boolean> = {}
-    for (const status of ['running', 'waiting', 'failed', 'gone', 'idle'] as const) {
-      mount({ status })
-      shown[status] = document.querySelector('.fdry-crt__cursor') !== null
-      cleanup()
-    }
-    expect(shown).toEqual({
-      running: true,
-      waiting: false,
-      failed: false,
-      gone: false,
-      idle: false,
-    })
+  it.each([
+    ['running', true],
+    ['waiting', false],
+    ['failed', false],
+    ['gone', false],
+    ['idle', false],
+  ] as const)('a %s station shows the cursor: %s', (status, shown) => {
+    mount({ status })
+    expect(screen.queryByTestId('crt-cursor') !== null).toBe(shown)
   })
 }
 
@@ -144,18 +145,20 @@ function ledAndAlertsTests() {
   ] as const)('a %s station lights its LED as "%s"', (status, led) => {
     mount({ status })
     expect(screen.getByRole('img', { name: led })).toBeTruthy()
-    expect(document.querySelector('.fdry-crt')?.getAttribute('data-state')).toBe(status)
+    expect(monitor().getAttribute('data-state')).toBe(status)
   })
 
-  it('draws the alert line for a waiting and for a failed station, and none otherwise', () => {
-    mount({ status: 'waiting', alert: 'WAITING FOR YOU: WANTS TO RUN BASH' })
-    expect(screen.getByText('WAITING FOR YOU: WANTS TO RUN BASH')).toBeTruthy()
-    cleanup()
-    mount({ status: 'failed', alert: 'FAILED: THE CHECKS FAILED' })
-    expect(screen.getByText('FAILED: THE CHECKS FAILED')).toBeTruthy()
-    cleanup()
+  it.each([
+    ['waiting', 'WAITING FOR YOU: WANTS TO RUN BASH'],
+    ['failed', 'FAILED: THE CHECKS FAILED'],
+  ] as const)('a %s station draws its alert line', (status, alert) => {
+    mount({ status, alert })
+    expect(screen.getByRole('alert').textContent).toBe(alert)
+  })
+
+  it('a running station draws no alert line', () => {
     mount({ status: 'running', alert: null })
-    expect(document.querySelector('.fdry-crt__alert')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 }
 
@@ -178,10 +181,9 @@ function linesTests() {
   it('classes tool lines as tool, the agent’s words as say and yours as you', () => {
     mount()
     const log = screen.getByRole('log', { name: 'Transcript' })
-    expect(log.querySelector('.tool')?.textContent).toBe('Read: src/linear.ts')
-    expect(log.querySelector('.say')?.textContent).toBe('I will filter on the state type.')
-    expect(log.querySelector('.you')?.textContent).toBe('go on')
-    expect(log.querySelectorAll('span').length).toBe(LINES.length + 1)
+    expect(within(log).getByText('Read: src/linear.ts').className).toBe('tool')
+    expect(within(log).getByText('I will filter on the state type.').className).toBe('say')
+    expect(within(log).getByText('go on').className).toBe('you')
   })
 
   it('says so when there is nothing to read yet', () => {
@@ -191,29 +193,33 @@ function linesTests() {
 }
 
 function keysTests() {
-  it('attaches from its key', () => {
+  it('attaches from its key', async () => {
+    const user = userEvent.setup()
     const { onAttach, onClose } = mount()
-    fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
+    await user.click(screen.getByRole('button', { name: /ATTACH/ }))
     expect(onAttach).toHaveBeenCalledTimes(1)
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('closes at once from the power key under reduced motion', () => {
+  it('closes at once from the power key under reduced motion', async () => {
+    const user = userEvent.setup()
     const { onClose } = mount()
-    fireEvent.click(screen.getByRole('button', { name: 'Close monitor' }))
+    await user.click(screen.getByRole('button', { name: 'Close monitor' }))
     expect(onClose).toHaveBeenCalledTimes(1)
-    expect(document.querySelector('.fdry-crt')?.classList.contains('is-off')).toBe(false)
+    expect(monitor().classList.contains('is-off')).toBe(false)
   })
 }
 
 function poweringOffAndOnTests() {
-  it('plays the power-off before closing when motion is allowed', () => {
+  it('plays the power-off before closing when motion is allowed', async () => {
     setReducedMotion(false)
-    vi.useFakeTimers()
+    // shouldAdvanceTime: Testing Library's async wrapper waits on a timer, or user-event hangs.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const { onClose } = mount()
-    const root = document.querySelector('.fdry-crt') as HTMLElement
+    const root = monitor()
     expect(root.classList.contains('is-on')).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Close monitor' }))
+    await user.click(screen.getByRole('button', { name: 'Close monitor' }))
     expect(root.classList.contains('is-off')).toBe(true)
     expect(onClose).not.toHaveBeenCalled()
     act(() => {
@@ -224,7 +230,7 @@ function poweringOffAndOnTests() {
 
   it('does not power on under reduced motion', () => {
     mount()
-    expect(document.querySelector('.fdry-crt')?.classList.contains('is-on')).toBe(false)
+    expect(monitor().classList.contains('is-on')).toBe(false)
   })
 }
 
@@ -293,7 +299,7 @@ function noAttachAndNothingDecidedTests() {
     mount({ node: gate, facts: ['Joined Inspector and Scribe'], lines: [] })
     expect(screen.queryByRole('button', { name: /ATTACH/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /Agent closed/ })).toBeNull()
-    expect(document.querySelector('.fdry-crt__cursor')).toBeNull()
+    expect(screen.queryByTestId('crt-cursor')).toBeNull()
   })
 
   it('says so when a step with no agent has decided nothing yet', () => {
@@ -305,12 +311,13 @@ function noAttachAndNothingDecidedTests() {
 }
 
 describe('StationMonitor on a finished agent', () => {
-  it('keeps the transcript and disables attach, naming the reason on the key', () => {
+  it('keeps the transcript and disables attach, naming the reason on the key', async () => {
+    const user = userEvent.setup()
     const { onAttach } = mount({ attachable: false, status: 'idle' })
     expect(screen.getByRole('log', { name: 'Transcript' }).textContent).toContain('go on')
     const key = screen.getByRole('button', { name: /Agent closed/i }) as HTMLButtonElement
     expect(key.disabled).toBe(true)
-    fireEvent.click(key)
+    await user.click(key)
     expect(onAttach).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: /^ATTACH$/ })).toBeNull()
   })

@@ -71,6 +71,8 @@ export function SplitContainer({
         {children[0]}
       </div>
       <div
+        role="separator"
+        aria-orientation={direction}
         className={`split-container__divider split-container__divider--${direction}`}
         onMouseDown={handleDividerMouseDown}
       />

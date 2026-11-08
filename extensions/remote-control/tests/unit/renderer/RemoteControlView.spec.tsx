@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { RemoteControlView } from '../../../src/components/RemoteControlView'
 
 const qrValues = vi.hoisted(() => [] as string[])
@@ -38,21 +39,16 @@ beforeEach(() => {
   invoke.mockReset()
   record.mockClear()
   invoke.mockResolvedValue(SETTINGS)
-  Object.defineProperty(window, 'electronAPI', {
-    value: {
-      extensionBridge: {
-        on: (channel: string, handler: (data: unknown) => void) => {
-          handlers.set(channel, handler)
-          return () => handlers.delete(channel)
-        },
-        invoke,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: {
+      on: (channel: string, handler: (data: unknown) => void) => {
+        handlers.set(channel, handler)
+        return () => handlers.delete(channel)
       },
-      usage: { record },
+      invoke,
     },
-    configurable: true,
-    writable: true,
+    usage: { record },
   })
-  Object.assign(navigator, { clipboard: { writeText: vi.fn() } })
 })
 
 const ON = {
@@ -73,6 +69,7 @@ function remoteViewTests() {
   remoteViewFailureTests()
   describe('a tunnel that failed', remoteViewTunnelTests)
   describe('configuration and control', remoteViewControlTests)
+  describe('stored settings', remoteViewStoredSettingsTests)
   describe('usage', remoteViewUsageTests)
 }
 
@@ -195,20 +192,30 @@ function remoteViewTunnelTests() {
   })
 
   it('reconnects the tunnel alone, leaving the server and its viewers up', async () => {
+    const user = userEvent.setup()
     render(<RemoteControlView />)
     await screen.findByText('Off')
     dropTunnel()
-    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    await user.click(screen.getByRole('button', { name: 'Reconnect' }))
     expect(invoke).toHaveBeenCalledWith('remote:tunnel-reconnect', {})
     expect(invoke).not.toHaveBeenCalledWith('remote:toggle', expect.anything())
   })
 
   it('offers the same for a public address that could not be created', async () => {
+    const user = userEvent.setup()
     render(<RemoteControlView />)
     await screen.findByText('Off')
     emit('remote:status', { ...ON, publicUrl: null, ngrokError: 'ERR_NGROK_8012: upstream down' })
-    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    await user.click(screen.getByRole('button', { name: 'Reconnect' }))
     expect(invoke).toHaveBeenCalledWith('remote:tunnel-reconnect', {})
+  })
+}
+
+function remoteViewStoredSettingsTests() {
+  it('shows the viewer limit stored in Settings', async () => {
+    invoke.mockResolvedValue({ ...SETTINGS, maxSubscribers: 13 })
+    render(<RemoteControlView />)
+    expect(await screen.findByText(/port 7681 · up to 13 viewers/)).toBeTruthy()
   })
 }
 
@@ -222,22 +229,26 @@ function remoteViewControlTests() {
   })
 
   it('counts against the viewer limit just saved in Settings', async () => {
+    const user = userEvent.setup()
     render(<RemoteControlView />)
     await screen.findByText('Off')
     emit('remote:status', ON)
-    fireEvent.click(screen.getByRole('button', { name: /Settings/ }))
+    await user.click(screen.getByRole('button', { name: /Settings/ }))
     const viewers = await screen.findByLabelText('Viewers per terminal')
-    fireEvent.change(viewers, { target: { value: '1' } })
-    fireEvent.blur(viewers)
-    expect(invoke).toHaveBeenCalledWith('remote:update-max-subscribers', { maxSubscribers: 1 })
-    expect(screen.getByText(/up to 1 viewers/)).toBeTruthy()
-    expect(screen.getByText('0 of 1')).toBeTruthy()
+    // Clearing the field snaps it to 1, so typing "2" after it reads 12.
+    await user.clear(viewers)
+    await user.type(viewers, '2')
+    await user.tab()
+    expect(invoke).toHaveBeenCalledWith('remote:update-max-subscribers', { maxSubscribers: 12 })
+    expect(screen.getByText(/up to 12 viewers/)).toBeTruthy()
+    expect(screen.getByText('0 of 12').textContent).toBe('0 of 12')
   })
 
   it('turns on through the bridge', async () => {
+    const user = userEvent.setup()
     render(<RemoteControlView />)
     await screen.findByText('Off')
-    fireEvent.click(await screen.findByRole('button', { name: 'Turn on' }))
+    await user.click(await screen.findByRole('button', { name: 'Turn on' }))
     expect(invoke).toHaveBeenCalledWith('remote:toggle', { enabled: true })
   })
 }
@@ -247,8 +258,9 @@ function remoteViewUsageTests() {
     invoke.mockImplementation(async (channel: string) =>
       channel === 'remote:toggle' ? { ok: true } : SETTINGS
     )
+    const user = userEvent.setup()
     render(<RemoteControlView />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Turn on' }))
+    await user.click(await screen.findByRole('button', { name: 'Turn on' }))
     await waitFor(() => expect(record).toHaveBeenCalledWith('server-start'))
   })
 
@@ -256,8 +268,9 @@ function remoteViewUsageTests() {
     invoke.mockImplementation(async (channel: string) =>
       channel === 'remote:toggle' ? { error: 'PASSWORD_REQUIRED' } : SETTINGS
     )
+    const user = userEvent.setup()
     render(<RemoteControlView />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Turn on' }))
+    await user.click(await screen.findByRole('button', { name: 'Turn on' }))
     await waitFor(() => expect(record).toHaveBeenCalledWith('server-start', { failed: true }))
   })
 }
@@ -282,13 +295,14 @@ function remoteViewDeviceListingTests() {
   })
 
   it('offers to disconnect one', async () => {
+    const user = userEvent.setup()
     render(<RemoteControlView />)
     await screen.findByText('Off')
     emit('remote:status', ON)
     emit('remote:devices', {
       devices: [{ id: 'a', label: 'iPad', viewing: 'scratch', connectedAt: Date.now() }],
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }))
     expect(invoke).toHaveBeenCalledWith('remote:disconnect-device', { id: 'a' })
   })
 }

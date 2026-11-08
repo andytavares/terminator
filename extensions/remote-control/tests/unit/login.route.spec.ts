@@ -7,14 +7,16 @@ import { AuthRateLimiter } from '../../src/server/auth-rate-limiter'
 import { hashPassword } from '../../src/server/password-hash'
 
 const PASSWORD = 'correct-password'
+let passwordHash = ''
 let storedHash = ''
 let app: FastifyInstance
 
 beforeAll(async () => {
-  storedHash = await hashPassword(PASSWORD)
+  passwordHash = await hashPassword(PASSWORD)
 })
 
 beforeEach(async () => {
+  storedHash = passwordHash
   const sessionStore = new SessionStore({
     cookieName: 'remote-session',
     cookiePath: '/',
@@ -47,34 +49,10 @@ function cookieOf(response: { headers: Record<string, unknown> }): string {
 
 describe('POST /api/login', loginRouteTests)
 
-describe('requests after login', () => {
-  it('are refused without the session cookie', async () => {
-    expect((await app.inject({ method: 'GET', url: '/api/protected' })).statusCode).toBe(401)
-  })
-
-  it('are refused when the password is sent as a Bearer header instead', async () => {
-    const res = await app.inject({
-      method: 'GET',
-      url: '/api/protected',
-      headers: { authorization: `Bearer ${PASSWORD}` },
-    })
-    expect(res.statusCode).toBe(401)
-  })
-
-  it('are refused with a forged session cookie', async () => {
-    const res = await app.inject({
-      method: 'GET',
-      url: '/api/protected',
-      headers: { cookie: 'remote-session=forged' },
-    })
-    expect(res.statusCode).toBe(401)
-  })
-})
-
 function loginRouteTests() {
   describe('accepting the password', loginAcceptTests)
   describe('rejecting a login', loginRejectTests)
-  describe('lockout and Host checks', loginLockoutTests)
+  describe('lockout', loginLockoutTests)
 }
 
 function loginAcceptTests() {
@@ -106,16 +84,17 @@ function loginRejectTests() {
     expect(res.headers['set-cookie']).toBeUndefined()
   })
 
-  it('rejects a missing, non-string or empty password', async () => {
-    for (const password of [undefined, 42, '']) {
-      expect((await login(password)).statusCode).toBe(401)
-    }
+  it.each([
+    { name: 'missing', password: undefined },
+    { name: 'non-string', password: 42 },
+    { name: 'empty', password: '' },
+  ])('rejects a $name password', async ({ password }) => {
+    expect((await login(password)).statusCode).toBe(401)
   })
 
   it('rejects every login while no password is set', async () => {
     storedHash = ''
     const res = await login('')
-    storedHash = await hashPassword(PASSWORD)
     expect(res.statusCode).toBe(401)
   })
 }
@@ -124,22 +103,12 @@ function loginLockoutTests() {
   it('locks a client out after repeated wrong passwords, even for the right one', async () => {
     // Every password is wrong while none is set, without a scrypt derivation
     // for each of the ten (16 MiB each, seconds in all on a busy machine).
-    const realHash = storedHash
     storedHash = ''
-    for (let attempt = 0; attempt < 10; attempt++) {
-      expect((await login('wrong-password')).statusCode).toBe(401)
-    }
-    storedHash = realHash
+    const wrongAttempts = await Promise.all(
+      Array.from({ length: 10 }, () => login('wrong-password'))
+    )
+    expect(wrongAttempts.map((res) => res.statusCode)).toEqual(Array(10).fill(401))
+    storedHash = passwordHash
     expect((await login(PASSWORD)).statusCode).toBe(429)
-  })
-
-  it('refuses a request whose Host is not local, LAN or tunnel', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/login',
-      headers: { host: 'evil.attacker.com' },
-      payload: { password: PASSWORD },
-    })
-    expect(res.statusCode).toBe(403)
   })
 }

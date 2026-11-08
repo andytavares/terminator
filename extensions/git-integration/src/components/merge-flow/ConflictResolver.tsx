@@ -308,6 +308,7 @@ function ResolverHeader({ view }: { view: ResolverView }) {
   const canPrev = store.activeFileIndex > 0 || store.activeBlockIndex > 0
   return (
     <ConflictHeader
+      session={view.session}
       onBack={props.onBack}
       onUndo={view.handlers.handleUndo}
       canUndo={store.undoStackLength > 0}

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
+import { stubOffScreenObserver } from '../helpers/off-screen-observer.js'
 import { Orders } from '../../src/components/Orders.js'
 import { Floor } from '../../src/components/Floor.js'
 import { FactorySite } from '../../src/components/factory/FactorySite.js'
@@ -19,7 +21,6 @@ const FILE: DocumentLink = { kind: 'file', url: null, path: '/out/notes/findings
 
 let openExternal: ReturnType<typeof vi.fn>
 let openPath: ReturnType<typeof vi.fn>
-let writeText: ReturnType<typeof vi.fn>
 const bus = createChangeBus()
 
 function install(invoke: (channel: string) => unknown): void {
@@ -34,47 +35,9 @@ function install(invoke: (channel: string) => unknown): void {
 }
 
 beforeEach(() => {
+  stubOffScreenObserver()
   openExternal = vi.fn(async () => ({ ok: true }))
   openPath = vi.fn(async () => ({ ok: true }))
-  writeText = vi.fn(async () => undefined)
-  Object.assign(navigator, { clipboard: { writeText } })
-})
-
-const listRow = (over: Record<string, unknown>) => ({
-  id: 'WO-1',
-  title: 'Research the cache',
-  status: 'done',
-  risk: 'P2',
-  failures: 0,
-  source: { kind: 'typed', tracker: null, key: null },
-  openQuestions: 0,
-  ...over,
-})
-
-describe('the order list', () => {
-  it('links a published document by its address, outside the application', async () => {
-    install(() => ({ orders: [listRow({ document: ARTIFACT })] }))
-    render(<Orders repoRoot="/repo" />)
-    const link = await screen.findByRole('link', { name: 'Claude artifact' })
-    expect(link.getAttribute('href')).toBe(ARTIFACT.url)
-    fireEvent.click(link)
-    expect(openExternal).toHaveBeenCalledWith(ARTIFACT.url)
-  })
-
-  it('names a file by its base name and opens it with the system', async () => {
-    install(() => ({ orders: [listRow({ document: FILE })] }))
-    render(<Orders repoRoot="/repo" />)
-    fireEvent.click(await screen.findByRole('link', { name: 'findings.md' }))
-    expect(openPath).toHaveBeenCalledWith(FILE.path)
-    expect(openExternal).not.toHaveBeenCalled()
-  })
-
-  it('shows no link for an order without a document', async () => {
-    install(() => ({ orders: [listRow({ document: null })] }))
-    render(<Orders repoRoot="/repo" />)
-    await screen.findByText('Research the cache')
-    expect(screen.queryByRole('link')).toBeNull()
-  })
 })
 
 const DONE = {
@@ -87,6 +50,47 @@ const DONE = {
   total: 1,
   gateId: null,
 }
+
+const listRow = (over: Record<string, unknown>) => ({
+  id: 'WO-1',
+  title: 'Research the cache',
+  status: 'done',
+  risk: 'P2',
+  failures: 0,
+  source: { kind: 'typed', tracker: null, key: null },
+  openQuestions: 0,
+  standing: DONE,
+  ...over,
+})
+
+describe('the order list', () => {
+  it('links a published document by its address, outside the application', async () => {
+    const user = userEvent.setup()
+    install(() => ({ orders: [listRow({ document: ARTIFACT })] }))
+    render(<Orders repoRoot="/repo" />)
+    const link = await screen.findByRole('link', { name: 'Claude artifact' })
+    expect(link.getAttribute('href')).toBe(ARTIFACT.url)
+    await user.click(link)
+    expect(openExternal).toHaveBeenCalledWith(ARTIFACT.url)
+  })
+
+  it('names a file by its base name and opens it with the system', async () => {
+    const user = userEvent.setup()
+    install(() => ({ orders: [listRow({ document: FILE })] }))
+    render(<Orders repoRoot="/repo" />)
+    await user.click(await screen.findByRole('link', { name: 'findings.md' }))
+    expect(openPath).toHaveBeenCalledWith(FILE.path)
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('shows no link for an order without a document', async () => {
+    install(() => ({ orders: [listRow({ document: null })] }))
+    render(<Orders repoRoot="/repo" />)
+    await screen.findByText('Research the cache')
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+})
+
 const RUNNING = { ...DONE, kind: 'running', headline: 'Running', done: 0 }
 
 function mountFloor(standing: unknown, document: DocumentLink | null): void {
@@ -106,39 +110,46 @@ function mountFloor(standing: unknown, document: DocumentLink | null): void {
 
 describe('the open order', () => {
   it('offers the artifact, its local copy and its link once the order is done', async () => {
+    const user = userEvent.setup()
     mountFloor(DONE, ARTIFACT)
-    fireEvent.click(await screen.findByRole('button', { name: 'Open artifact' }))
+    await user.click(await screen.findByRole('button', { name: 'Open artifact' }))
     expect(openExternal).toHaveBeenCalledWith(ARTIFACT.url)
-    fireEvent.click(screen.getByRole('button', { name: 'Open local copy' }))
+    await user.click(screen.getByRole('button', { name: 'Open local copy' }))
     expect(openPath).toHaveBeenCalledWith(ARTIFACT.path)
-    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
-    expect(writeText).toHaveBeenCalledWith(ARTIFACT.url)
+    await user.click(screen.getByRole('button', { name: 'Copy link' }))
+    expect(await navigator.clipboard.readText()).toBe(ARTIFACT.url)
   })
 
   it('offers a file once, with no copy of a link it does not have', async () => {
+    const user = userEvent.setup()
     mountFloor(DONE, FILE)
-    fireEvent.click(await screen.findByRole('button', { name: 'Open document' }))
+    await user.click(await screen.findByRole('button', { name: 'Open document' }))
     expect(openPath).toHaveBeenCalledWith(FILE.path)
     expect(screen.queryByRole('button', { name: 'Open local copy' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull()
   })
+})
 
+describe('the open order before it is done, or when the clipboard refuses', () => {
   it('still links the document before the order is done, without the buttons', async () => {
     mountFloor(RUNNING, ARTIFACT)
     await screen.findByRole('link', { name: 'Claude artifact' })
     expect(screen.queryByRole('button', { name: 'Open artifact' })).toBeNull()
   })
 
-  it('survives a refused clipboard', async () => {
-    writeText.mockRejectedValueOnce(new Error('denied'))
+  it('keeps the document buttons on screen when the clipboard refuses', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'))
     mountFloor(DONE, ARTIFACT)
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy link' }))
-    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    await user.click(await screen.findByRole('button', { name: 'Copy link' }))
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Open artifact' })).toBeTruthy()
   })
 })
 
 describe('the factory site card', () => {
   it('puts the document link beside the card button, not inside it', async () => {
+    const user = userEvent.setup()
     install((channel) =>
       channel === 'foundry:order.list'
         ? { orders: [listRow({ document: ARTIFACT })] }
@@ -151,8 +162,8 @@ describe('the factory site card', () => {
     const onOpen = vi.fn()
     render(<FactorySite repoRoot="/repo" onOpen={onOpen} onShowList={vi.fn()} />)
     const link = await screen.findByRole('link', { name: 'Claude artifact' })
-    expect(link.closest('button')).toBeNull()
-    fireEvent.click(link)
+    expect(screen.queryByRole('button', { name: /Claude artifact/ })).toBeNull()
+    await user.click(link)
     expect(openExternal).toHaveBeenCalledWith(ARTIFACT.url)
     expect(onOpen).not.toHaveBeenCalled()
   })

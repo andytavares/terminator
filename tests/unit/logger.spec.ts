@@ -32,6 +32,11 @@ vi.mock('electron', () => ({
   },
 }))
 
+/** The lines written to the log stream, without their leading timestamp. */
+function linesWritten(): string[] {
+  return mockWrite.mock.calls.map(([line]) => line.slice(line.indexOf(' ') + 1))
+}
+
 function useFreshLogger(): void {
   beforeEach(() => {
     vi.resetModules()
@@ -48,24 +53,11 @@ function useFreshLogger(): void {
 
 describe('logger: where it writes', () => {
   useFreshLogger()
-  afterEach(() => {
-    delete process.env.TERMINATOR_LOG_DIR
-  })
 
-  it('writes into the app logs folder by default', async () => {
+  it('writes into the app logs folder', async () => {
     const { makeLogger } = await import('../../src/main/logger')
     makeLogger('ns').info('x')
     expect(mockCreateWriteStream).toHaveBeenCalledWith('/tmp/testlogs/terminator.log', {
-      flags: 'a',
-    })
-  })
-
-  // The canary's app logs on its own, so another app writing the shared log is not its error.
-  it('writes into TERMINATOR_LOG_DIR when it is set', async () => {
-    process.env.TERMINATOR_LOG_DIR = '/tmp/canary-logs'
-    const { makeLogger } = await import('../../src/main/logger')
-    makeLogger('ns').info('x')
-    expect(mockCreateWriteStream).toHaveBeenCalledWith('/tmp/canary-logs/terminator.log', {
       flags: 'a',
     })
   })
@@ -74,48 +66,20 @@ describe('logger: where it writes', () => {
 describe('logger (src/main/logger.ts)', () => {
   useFreshLogger()
 
-  // ── makeLogger ─────────────────────────────────────────────────────────
-  it('debug writes a DEBUG line to the stream', async () => {
+  it.each([
+    ['debug', 'DEBUG [myns] hello\n'],
+    ['info', 'INFO  [myns] hello\n'],
+    ['warn', 'WARN  [myns] hello\n'],
+    ['error', 'ERROR [myns] hello\n'],
+  ] as const)('%s writes one line with its level and namespace', async (level, line) => {
     const { makeLogger } = await import('../../src/main/logger')
-    const log = makeLogger('myns')
-    log.debug('hello debug')
-    expect(mockStream.write).toHaveBeenCalledOnce()
-    const written = mockStream.write.mock.calls[0][0] as string
-    expect(written).toMatch(/DEBUG/)
-    expect(written).toMatch(/\[myns\]/)
-    expect(written).toMatch(/hello debug/)
-  })
-
-  it('info writes an INFO line to the stream', async () => {
-    const { makeLogger } = await import('../../src/main/logger')
-    const log = makeLogger('myns')
-    log.info('hello info')
-    const written = mockStream.write.mock.calls[0][0] as string
-    expect(written).toMatch(/INFO/)
-    expect(written).toMatch(/hello info/)
-  })
-
-  it('warn writes a WARN line to the stream', async () => {
-    const { makeLogger } = await import('../../src/main/logger')
-    const log = makeLogger('myns')
-    log.warn('hello warn')
-    const written = mockStream.write.mock.calls[0][0] as string
-    expect(written).toMatch(/WARN/)
-    expect(written).toMatch(/hello warn/)
+    makeLogger('myns')[level]('hello')
+    expect(linesWritten()).toEqual([line])
   })
 })
 
-describe('logger — errors and meta formatting', () => {
+describe('logger — meta formatting', () => {
   useFreshLogger()
-
-  it('error writes an ERROR line to the stream', async () => {
-    const { makeLogger } = await import('../../src/main/logger')
-    const log = makeLogger('myns')
-    log.error('hello error')
-    const written = mockStream.write.mock.calls[0][0] as string
-    expect(written).toMatch(/ERROR/)
-    expect(written).toMatch(/hello error/)
-  })
 
   it('formats extra meta arguments as space-separated string', async () => {
     const { makeLogger } = await import('../../src/main/logger')
@@ -135,7 +99,7 @@ describe('logger — errors and meta formatting', () => {
   })
 })
 
-describe('logger — renderer lines and the log path', () => {
+describe('logger — renderer lines', () => {
   useFreshLogger()
 
   it('writeFromRenderer writes the correct level to stream', async () => {
@@ -145,16 +109,6 @@ describe('logger — renderer lines and the log path', () => {
     expect(written).toMatch(/ERROR/)
     expect(written).toMatch(/\[renderer\]/)
     expect(written).toMatch(/Something broke/)
-  })
-
-  // ── getStream / rotatIfNeeded ──────────────────────────────────────────
-
-  it('getStream opens a write-stream at the correct path', async () => {
-    const { makeLogger } = await import('../../src/main/logger')
-    makeLogger('stream-test').info('ping')
-    expect(mockCreateWriteStream).toHaveBeenCalledWith(expect.stringContaining('terminator.log'), {
-      flags: 'a',
-    })
   })
 })
 
@@ -268,34 +222,17 @@ describe('logger — no mirroring outside development', () => {
 describe('logger — the top-level export', () => {
   useFreshLogger()
 
-  it('top-level logger.debug writes with "main" namespace', async () => {
+  it('writes every level under the "main" namespace', async () => {
     const { logger } = await import('../../src/main/logger')
-    logger.debug('main debug')
-    const written = mockStream.write.mock.calls[0][0] as string
-    expect(written).toMatch(/\[main\]/)
-    expect(written).toMatch(/main debug/)
-  })
-
-  it('top-level logger.info writes with "main" namespace', async () => {
-    const { logger } = await import('../../src/main/logger')
-    logger.info('main info')
-    const written = mockStream.write.mock.calls[0][0] as string
-    expect(written).toMatch(/\[main\]/)
-  })
-
-  it('top-level logger.warn writes with "main" namespace', async () => {
-    const { logger } = await import('../../src/main/logger')
-    logger.warn('main warn')
-    const written = mockStream.write.mock.calls[0][0] as string
-    expect(written).toMatch(/WARN/)
-    expect(written).toMatch(/\[main\]/)
-  })
-
-  it('top-level logger.error writes with "main" namespace', async () => {
-    const { logger } = await import('../../src/main/logger')
-    logger.error('main error')
-    const written = mockStream.write.mock.calls[0][0] as string
-    expect(written).toMatch(/ERROR/)
-    expect(written).toMatch(/\[main\]/)
+    logger.debug('a')
+    logger.info('b')
+    logger.warn('c')
+    logger.error('d')
+    expect(linesWritten()).toEqual([
+      'DEBUG [main] a\n',
+      'INFO  [main] b\n',
+      'WARN  [main] c\n',
+      'ERROR [main] d\n',
+    ])
   })
 })

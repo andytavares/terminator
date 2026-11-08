@@ -1,0 +1,9 @@
+{"kind":"graph","at":1000,"nodes":[{"id":"build-U-1","state":"waiting","attempts":0,"sessionId":null},{"id":"verify","state":"waiting","attempts":0,"sessionId":null}]}
+{"kind":"graph","at":30000,"nodes":[{"id":"build-U-1","state":"waiting","attempts":0,"sessionId":null},{"id":"verify","state":"waiting","attempts":0,"sessionId":null}]}
+{"kind":"graph","at":60000,"nodes":[{"id":"build-U-1","state":"running","attempts":1,"sessionId":"builder-1"},{"id":"verify","state":"waiting","attempts":0,"sessionId":null}]}
+{"kind":"tool","at":61000,"sessionId":"builder-1","activity":{"kind":"tool_started","toolName":"Read","callId":"call-1","isShell":false,"path":"src/a.ts","at":61000}}
+{"kind":"tool","at":61500,"sessionId":"scout-1","activity":{"kind":"tool_started","toolName":"Grep","callId":"call-2","isShell":false,"path":null,"at":61500}}
+{"kind":"tool","at":62000,"sessionId":"builder-1","activity":{"kind":"tool_finished","toolName":"Read","callId":"call-1","isShell":false,"path":"src/a.ts","at":62000}}
+{"kind":"graph","at":70000,"nodes":[{"id":"build-U-1","state":"passed","attempts":1,"sessionId":"builder-1"},{"id":"verify","state":"running","attempts":1,"sessionId":"verifier-1"}]}
+{"kind":"tool","at":71000,"sessionId":"verifier-1","activity":{"kind":"tool_started","toolName":"Bash","callId":"call-3","isShell":true,"path":null,"at":71000}}
+{"kind":"graph","at":80000,"nodes":[{"id":"build-U-1","state":"passed","attempts":1,"sessionId":"builder-1"},{"id":"verify","state":"passed","attempts":1,"sessionId":"verifier-1"}]}

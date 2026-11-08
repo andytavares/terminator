@@ -180,8 +180,9 @@ export function NoteEditor(props: NoteEditorProps): React.JSX.Element {
 
   useCompartmentSync(viewRef, compartments.readOnly, readOnlyExtension(readOnly))
   useCompartmentSync(viewRef, compartments.preview, previewExtension(sourceMode))
+  const style = useFontSizeStyle()
 
-  return <div ref={containerRef} className="notepad-editor-cm" style={useFontSizeStyle()} />
+  return <div ref={containerRef} className="notepad-editor-cm" data-testid="editor" style={style} />
 }
 
 /** The editor's height, and the text size from Notepad's settings, read by notepad.css. */

@@ -37,8 +37,9 @@ describe('SidebarDialogs — remove-workspace', () => {
     renderRemoval()
 
     expect(screen.getByText('Remove workspace "Backend"?')).toBeTruthy()
-    const description = document.querySelector('.tmui-dialog__description')!
-    expect(description.textContent).toContain('/repos/backend-feature')
+    expect(
+      screen.getByText(/Also deletes these worktree folders from disk:/).textContent
+    ).toContain('/repos/backend-feature')
   })
 
   it('has no description when the workspace holds no worktrees', () => {
@@ -54,6 +55,6 @@ describe('SidebarDialogs — remove-workspace', () => {
       />
     )
 
-    expect(document.querySelector('.tmui-dialog__description')).toBeNull()
+    expect(screen.queryByText(/Also deletes these worktree folders/)).toBeNull()
   })
 })

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { Ledger } from '../../src/components/Ledger.js'
 import { createChangeBus } from '../helpers/change-bus.js'
@@ -182,9 +183,10 @@ function filtersTests() {
   })
 
   it('filters by order', async () => {
+    const user = userEvent.setup()
     mount()
     await screen.findByText('G-1')
-    fireEvent.change(await screen.findByLabelText('Order'), { target: { value: 'WO-2' } })
+    await user.selectOptions(await screen.findByLabelText('Order'), 'WO-2')
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:ledger.query',
@@ -196,9 +198,10 @@ function filtersTests() {
 
 function filteringByWhoAndWhatTests() {
   it('filters by who decided', async () => {
+    const user = userEvent.setup()
     mount()
     await screen.findByText('G-1')
-    fireEvent.change(await screen.findByLabelText('Decided by'), { target: { value: 'operator' } })
+    await user.selectOptions(await screen.findByLabelText('Decided by'), 'operator')
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:ledger.query',
@@ -208,9 +211,10 @@ function filteringByWhoAndWhatTests() {
   })
 
   it('filters by action', async () => {
+    const user = userEvent.setup()
     mount()
     await screen.findByText('G-1')
-    fireEvent.change(await screen.findByLabelText('Action'), { target: { value: 'gate.default' } })
+    await user.selectOptions(await screen.findByLabelText('Action'), 'gate.default')
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:ledger.query',
@@ -224,7 +228,7 @@ function countsAndEmptyTests() {
   it('says how much of the record it is showing', async () => {
     mount()
     await screen.findByText('G-1')
-    expect(screen.getByText(/showing/)).toBeTruthy()
+    expect(screen.getByText(/showing/).textContent).toBe('showing 2 of 2')
   })
 
   it('says so when nothing has been recorded', async () => {
@@ -234,8 +238,9 @@ function countsAndEmptyTests() {
 
   // The tab is the parent's state, so the action's whole effect is the callback.
   it('offers a way to the Forge when nothing has been recorded', async () => {
+    const user = userEvent.setup()
     mount({ entries: [], total: 0, actors: [], actions: [], orders: [] })
-    fireEvent.click(await screen.findByRole('button', { name: 'Open the Forge' }))
+    await user.click(await screen.findByRole('button', { name: 'Open the Forge' }))
     expect(onOpenForge).toHaveBeenCalledTimes(1)
   })
 }
@@ -249,10 +254,11 @@ function filteredOutTests() {
   })
 
   it('clears the filters when asked to show every entry', async () => {
+    const user = userEvent.setup()
     mount({ entries: [], total: 2 })
     const order = (await screen.findByLabelText('Order')) as HTMLSelectElement
-    fireEvent.change(order, { target: { value: 'WO-2' } })
-    fireEvent.click(await screen.findByRole('button', { name: 'Show every entry' }))
+    await user.selectOptions(order, 'WO-2')
+    await user.click(await screen.findByRole('button', { name: 'Show every entry' }))
     await waitFor(() => expect(order.value).toBe(''))
   })
 }
@@ -285,18 +291,20 @@ function ledgerAskingTests() {
   })
 
   it('asks only when the operator presses the button', async () => {
+    const user = userEvent.setup()
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
+    await user.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
   })
 }
 
 function citationsAndThresholdTests() {
   it('shows the citations the proposal derives from', async () => {
+    const user = userEvent.setup()
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
+    await user.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
     expect(screen.getByText(/3 rejections/)).toBeTruthy()
     // The proposal's own words, and the entry it derives from.
@@ -305,21 +313,23 @@ function citationsAndThresholdTests() {
   })
 
   it('explains the threshold rather than showing an empty box', async () => {
+    const user = userEvent.setup()
     mount({ proposals: [] })
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
+    await user.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText(/three times/)
   })
 }
 
 function ledgerAcceptingTests() {
   it('accepts one, and says what that means', async () => {
+    const user = userEvent.setup()
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
+    await user.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
 
-    fireEvent.click(await screen.findByRole('button', { name: /Accept/ }))
+    await user.click(await screen.findByRole('button', { name: /Accept/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:rules.decide', {
         proposalId: PROPOSAL.id,
@@ -332,12 +342,13 @@ function ledgerAcceptingTests() {
 
 function decliningAndRefusalsTests() {
   it('turns one down for good', async () => {
+    const user = userEvent.setup()
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
+    await user.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
 
-    fireEvent.click(await screen.findByRole('button', { name: /Never propose this/ }))
+    await user.click(await screen.findByRole('button', { name: /Never propose this/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:rules.decide', {
         proposalId: PROPOSAL.id,
@@ -348,12 +359,13 @@ function decliningAndRefusalsTests() {
   })
 
   it('reports a refusal rather than claiming the rule was accepted', async () => {
+    const user = userEvent.setup()
     mount({ proposals: [PROPOSAL], decide: { error: 'The ledger no longer supports it.' } })
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
+    await user.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
 
-    fireEvent.click(await screen.findByRole('button', { name: /Accept/ }))
+    await user.click(await screen.findByRole('button', { name: /Accept/ }))
     await screen.findByText(/no longer supports/)
     // Still listed, because it was not decided.
     expect(screen.getByText(PROPOSAL.asserts)).toBeTruthy()
@@ -374,31 +386,25 @@ function inForceTests() {
     await screen.findByText('Checks you accepted')
     expect(screen.getByText('no unit hardcodes a timeout')).toBeTruthy()
   })
-
-  it('offers a way to take one back out', async () => {
-    mount({ inForce: IN_FORCE })
-    await screen.findByText('Checks you accepted')
-    fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:rules.remove', {
-        ruleId: 'curator-hardcodes-the-timeout',
-      })
-    )
-  })
 }
 
 function removingTests() {
-  it('says it is gone and will not come back', async () => {
+  it('takes a check back out, and says it is gone and will not come back', async () => {
+    const user = userEvent.setup()
     mount({ inForce: IN_FORCE })
     await screen.findByText('Checks you accepted')
-    fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
+    await user.click(await screen.findByRole('button', { name: /Remove this check/ }))
     await screen.findByText(/no longer in force/)
+    expect(invoke).toHaveBeenCalledWith('foundry:rules.remove', {
+      ruleId: 'curator-hardcodes-the-timeout',
+    })
   })
 
   it('reports a refusal rather than claiming the check was removed', async () => {
+    const user = userEvent.setup()
     mount({ inForce: IN_FORCE, remove: { error: 'docs-in-pr is not yours to remove.' } })
     await screen.findByText('Checks you accepted')
-    fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
+    await user.click(await screen.findByRole('button', { name: /Remove this check/ }))
     await screen.findByText(/not yours to remove/)
     expect(screen.queryByText(/no longer in force/)).toBeNull()
   })
@@ -462,14 +468,9 @@ describe('the skills in force', () => {
   })
 })
 
-function tileValue(label: string): string | null {
-  const tiles = document.querySelectorAll('.tmui-metric-card')
-  for (const tile of Array.from(tiles)) {
-    if (within(tile as HTMLElement).queryByText(label) !== null) {
-      return tile.querySelector('.tmui-metric-card__value')?.textContent ?? null
-    }
-  }
-  return null
+/** A tile's value: its text after the question that names it. */
+function tileValue(label: string): string | undefined {
+  return screen.getByRole('group', { name: label }).textContent?.slice(label.length)
 }
 
 describe('the Factory view (FR: the factory’s numbers)', () => {
@@ -486,23 +487,25 @@ function ledgerSwitchingTests() {
   })
 
   it('shows the 30-day tiles and a per-order row when switched to Factory', async () => {
+    const user = userEvent.setup()
     mount()
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('tab', { name: 'Factory' }))
+    await user.click(await screen.findByRole('tab', { name: 'Factory' }))
     await screen.findByText('Ship the thing')
 
     expect(tileValue('Shipped')).toBe('1')
     expect(tileValue('Median lead time')).toBe('1 h 20 min')
     expect(tileValue('First-pass yield')).toBe('50%')
 
-    const row = screen.getByText('Ship the thing').closest('tr')
-    expect(row?.textContent).toContain('✓')
-    expect(row?.textContent).toContain('1 h 20 min')
+    const row = screen.getByRole('row', { name: /Ship the thing/ })
+    expect(row.textContent).toContain('✓')
+    expect(row.textContent).toContain('1 h 20 min')
   })
 }
 
 function nullNumbersTests() {
   it('renders a null number as —, never 0', async () => {
+    const user = userEvent.setup()
     mount({
       factoryMetrics: {
         ...FACTORY_METRICS,
@@ -512,23 +515,24 @@ function nullNumbersTests() {
       },
     })
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('tab', { name: 'Factory' }))
+    await user.click(await screen.findByRole('tab', { name: 'Factory' }))
     await screen.findByText('Ship the thing')
 
     expect(tileValue('Median lead time')).toBe('—')
     expect(tileValue('First-pass yield')).toBe('—')
-    const row = screen.getByText('Ship the thing').closest('tr')
-    expect(row?.textContent).toContain('—')
+    const row = screen.getByRole('row', { name: /Ship the thing/ })
+    expect(row.textContent).toContain('—')
   })
 }
 
 function ledgerWindowsTests() {
   it('refetches with the chosen window', async () => {
+    const user = userEvent.setup()
     mount()
     await screen.findByText('G-1')
-    fireEvent.click(await screen.findByRole('tab', { name: 'Factory' }))
+    await user.click(await screen.findByRole('tab', { name: 'Factory' }))
     await screen.findByText('Ship the thing')
-    fireEvent.click(await screen.findByRole('radio', { name: 'All time' }))
+    await user.click(await screen.findByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )

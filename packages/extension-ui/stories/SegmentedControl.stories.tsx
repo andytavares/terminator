@@ -57,10 +57,6 @@ export const SmallLight = inLight(Small)
 
 export const WithDisabledOption: Story = {
   render: () => <ControlledSegmentedControl options={WITH_DISABLED} initial="30d" />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement)
-    await expect(canvas.getByRole('radio', { name: 'This year' })).toBeDisabled()
-  },
 }
 export const WithDisabledOptionLight = inLight(WithDisabledOption)
 

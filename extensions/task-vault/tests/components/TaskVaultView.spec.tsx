@@ -1,7 +1,9 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, task, dayFromToday } from './helpers/bridge'
+import { setLocalClock } from '../support/clock'
 
 /** The props each stubbed view was last rendered with. */
 const seen: Record<string, Record<string, unknown>> = {}
@@ -32,18 +34,18 @@ import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 import { useVaultDataStore } from '../../src/stores/vault-data.store'
 import { useVaultFilterStore } from '../../src/stores/vault-filter.store'
 import { notify } from '../../src/utils/notify'
-import { partialFake } from '../../../../tests/support/fakes'
 
 let bridge: ReturnType<typeof installVaultBridge>
 
 const LOG = {
-  date: dayFromToday(),
+  date: '2026-01-15',
   filePath: 'daily',
   tasks: [task('t1', 'Write'), task('t2', 'Read')],
   exists: true,
 }
 
 beforeEach(() => {
+  setLocalClock('UTC', '2026-01-15T12:00:00.000Z')
   vi.mocked(notify).mockClear()
   for (const key of Object.keys(seen)) delete seen[key]
   bridge = installVaultBridge({
@@ -69,7 +71,10 @@ beforeEach(() => {
   useVaultFilterStore.setState({ selectedContexts: [] })
 })
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 async function renderVaultView() {
   render(<TaskVaultView />)
@@ -83,6 +88,7 @@ describe('TaskVaultView loading', viewLoadingTests)
 describe('TaskVaultView views', viewSwitchTests)
 describe('TaskVaultView daily handlers', dailyTests)
 describe('TaskVaultView days and selection', daySelectionTests)
+describe('TaskVaultView detail panel closing', detailClosingTests)
 describe('TaskVaultView navigation', navigationTests)
 describe('TaskVaultView pending navigation', pendingNavigationTests)
 describe('TaskVaultView toolbar', toolbarTests)
@@ -98,6 +104,12 @@ function viewLoadingTests() {
     expect(screen.getByTestId('calendar')).toBeTruthy()
   })
 
+  it('gives the daily log the stale threshold the vault answers with', async () => {
+    bridge.responses['task-vault:vault:get-today'] = { ...LOG, staleDaysThreshold: 3 }
+    const daily = await renderVaultView()
+    expect(daily.staleDaysThreshold).toBe(3)
+  })
+
   it('loads the viewed date instead of today, and reloads on pushes', async () => {
     useVaultNavStore.setState({ viewingDate: '2026-01-02' })
     await renderVaultView()
@@ -110,19 +122,22 @@ function viewLoadingTests() {
 }
 
 function viewSwitchTests() {
-  it('shows the load error, and the other views by sidebar', async () => {
+  it('shows the load error', async () => {
     await renderVaultView()
     act(() => useVaultDataStore.setState({ error: 'nope' }))
     expect(screen.getByText('nope')).toBeTruthy()
-    for (const [label, id] of [
-      ['Inbox', 'inbox'],
-      ['Projects', 'projects'],
-      ['Areas', 'areas'],
-      ['History', 'archive'],
-    ]) {
-      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}`) }))
-      expect(screen.getByTestId(id)).toBeTruthy()
-    }
+  })
+
+  it.each([
+    ['Inbox', 'inbox'],
+    ['Projects', 'projects'],
+    ['Areas', 'areas'],
+    ['History', 'archive'],
+  ])('shows the %s view when its sidebar button is pressed', async (label, id) => {
+    const user = userEvent.setup()
+    await renderVaultView()
+    await user.click(screen.getByRole('button', { name: new RegExp(`^${label}`) }))
+    expect(screen.getByTestId(id)).toBeTruthy()
   })
 }
 
@@ -172,18 +187,35 @@ function daySelectionTests() {
     )
   })
 
-  it('selects a task into the detail panel, toggles it, and closes on Escape or backdrop', async () => {
+  it('selects a task into the detail panel, and closes it when the task is selected again', async () => {
     await renderVaultView()
     act(() => void dailyLogProps().onSelectTask('t1'))
     expect(seen.detail.taskText).toBe('Write')
     act(() => void dailyLogProps().onSelectTask('t1'))
     expect(screen.queryByTestId('detail')).toBeNull()
+  })
+
+  it('shows a backlog task in the detail panel', async () => {
+    await renderVaultView()
     act(() => void dailyLogProps().onSelectTask('s1'))
     expect(seen.detail.taskText).toBe('Someday thing')
-    fireEvent.keyDown(document, { key: 'Escape' })
+  })
+}
+
+function detailClosingTests() {
+  it('closes the detail panel on Escape', async () => {
+    const user = userEvent.setup()
+    await renderVaultView()
+    act(() => void dailyLogProps().onSelectTask('s1'))
+    await user.keyboard('{Escape}')
     expect(screen.queryByTestId('detail')).toBeNull()
+  })
+
+  it('closes the detail panel when the backdrop is clicked', async () => {
+    const user = userEvent.setup()
+    await renderVaultView()
     act(() => void dailyLogProps().onSelectTask('t2'))
-    fireEvent.click(document.querySelector('.tv-detail-panel__backdrop')!)
+    await user.click(screen.getByTestId('detail-backdrop'))
     expect(screen.queryByTestId('detail')).toBeNull()
   })
 }
@@ -196,6 +228,18 @@ function navigationTests() {
     expect(useVaultNavStore.getState().pendingTaskId).toBeNull()
     await act(async () => bridge.push('task-vault:navigate', { date: '2026-02-02' }))
     expect(bridge.calls('task-vault:vault:get-daily')).toContainEqual({ date: '2026-02-02' })
+  })
+
+  it('opens a task picked on another day on that day, selected', async () => {
+    await renderVaultView()
+    await act(async () =>
+      bridge.push('task-vault:navigate', { date: dayFromToday(5), taskId: 't2' })
+    )
+    await eventually(() => expect(seen.detail?.taskText).toBe('Read'))
+    expect(bridge.calls('task-vault:vault:get-daily')).toContainEqual({ date: dayFromToday(5) })
+    expect(seen.daily.log).toMatchObject({ date: dayFromToday(5) })
+    expect(seen.daily.isToday).toBe(false)
+    expect(seen.daily.selectedTaskId).toBe('t2')
   })
 
   it('clears a pending task the log does not have once loaded', async () => {
@@ -242,69 +286,94 @@ function pendingNavigationTests() {
 
 function toolbarTests() {
   it('filters by contexts and labels the filter by what is chosen', async () => {
+    const user = userEvent.setup()
     await renderVaultView()
     const filter = screen.getByRole('button', { name: 'Filter by context' })
-    fireEvent.click(filter)
-    fireEvent.click(await screen.findByLabelText('+home'))
+    await user.click(filter)
+    await user.click(await screen.findByLabelText('+home'))
     expect(filter.textContent).toContain('+home')
-    fireEvent.click(screen.getByLabelText('+desk'))
+    await user.click(screen.getByLabelText('+desk'))
     expect(filter.textContent).toContain('2 contexts')
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
     expect(filter.textContent).toContain('Filter')
   })
 
-  it('hides the calendar, and says when there are no contexts', async () => {
+  it('hides the calendar when its toolbar button is pressed', async () => {
+    const user = userEvent.setup()
+    await renderVaultView()
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+    expect(screen.queryByTestId('calendar')).toBeNull()
+  })
+
+  it('says when there are no contexts to filter by', async () => {
+    const user = userEvent.setup()
     bridge.responses['task-vault:vault:list-contexts'] = { contexts: [] }
     await renderVaultView()
-    fireEvent.click(screen.getByRole('button', { name: 'Calendar' }))
-    expect(screen.queryByTestId('calendar')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Filter by context' }))
+    await user.click(screen.getByRole('button', { name: 'Filter by context' }))
     expect(screen.getByText('No contexts found')).toBeTruthy()
   })
 }
 
 async function openDataToolsMenu() {
+  const user = userEvent.setup()
   await renderVaultView()
-  fireEvent.click(screen.getByRole('button', { name: 'Data tools (export / import)' }))
+  await user.click(screen.getByRole('button', { name: 'Data tools (export / import)' }))
+  return user
+}
+
+function stubDownload() {
+  Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() })
+  return vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 }
 
 function dataToolsTests() {
-  it('exports the vault as a dated JSON download, or reports a failure', async () => {
-    const createObjectURL = vi.fn(() => 'blob:x')
-    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() })
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  it('exports the vault as a JSON download', async () => {
+    const click = stubDownload()
     bridge.responses['task-vault:vault:export-json'] = { version: 1 }
-    await openDataToolsMenu()
-    fireEvent.click(screen.getByRole('button', { name: 'Export JSON' }))
+    const user = await openDataToolsMenu()
+    await user.click(screen.getByRole('button', { name: 'Export JSON' }))
     expect(await screen.findByText('Exported successfully.')).toBeTruthy()
-    expect(click).toHaveBeenCalled()
+    expect(click).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports an export failure without downloading', async () => {
+    const click = stubDownload()
     bridge.responses['task-vault:vault:export-json'] = { error: 'locked' }
-    fireEvent.click(screen.getByRole('button', { name: 'Export JSON' }))
+    const user = await openDataToolsMenu()
+    await user.click(screen.getByRole('button', { name: 'Export JSON' }))
     expect(await screen.findByText('Export failed: locked')).toBeTruthy()
-    click.mockRestore()
+    expect(click).not.toHaveBeenCalled()
   })
 }
 
+const jsonFile = (text: string) => new File([text], 'vault.json', { type: 'application/json' })
+const fileInput = () => screen.getByLabelText<HTMLInputElement>('Vault JSON file')
+
 function importTests() {
-  it('imports a chosen JSON file, reporting the count or the failure', async () => {
-    await openDataToolsMenu()
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement
-    const textFile = (text: string) => partialFake<File>({ text: async () => text })
+  it('imports a chosen JSON file and reports the count', async () => {
     bridge.responses['task-vault:vault:import-json'] = { success: true, imported: 3 }
-    fireEvent.click(screen.getByRole('button', { name: 'Import JSON' }))
-    fireEvent.change(input, { target: { files: [textFile('{"tasks":[]}')] } })
+    const user = await openDataToolsMenu()
+    await user.upload(fileInput(), jsonFile('{"tasks":[]}'))
     expect(await screen.findByText('Imported 3 records successfully.')).toBeTruthy()
+  })
+
+  it('reports the failure the vault returns for an import', async () => {
     bridge.responses['task-vault:vault:import-json'] = { error: 'bad' }
-    fireEvent.change(input, { target: { files: [textFile('{}')] } })
+    const user = await openDataToolsMenu()
+    await user.upload(fileInput(), jsonFile('{}'))
     expect(await screen.findByText('Import failed: bad')).toBeTruthy()
-    fireEvent.change(input, { target: { files: [textFile('not json')] } })
+  })
+
+  it('reports a file that is not JSON', async () => {
+    const user = await openDataToolsMenu()
+    await user.upload(fileInput(), jsonFile('not json'))
     expect(await screen.findByText(/Import failed: SyntaxError/)).toBeTruthy()
-    fireEvent.change(input, { target: { files: [] } })
+    expect(bridge.calls('task-vault:vault:import-json')).toEqual([])
   })
 
   it('shows the database console, which reloads after a write', async () => {
-    await openDataToolsMenu()
-    fireEvent.click(screen.getByRole('tab', { name: 'Database' }))
+    const user = await openDataToolsMenu()
+    await user.click(screen.getByRole('tab', { name: 'Database' }))
     act(() => (seen.admin.onWrite as () => void)())
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:get-today').length).toBeGreaterThan(1)
@@ -313,23 +382,30 @@ function importTests() {
 }
 
 function captureTests() {
-  it('captures to the inbox and closes', async () => {
+  it('captures the trimmed text to the inbox and closes', async () => {
+    const user = userEvent.setup()
     useVaultNavStore.setState({ showCaptureModal: true })
     render(<CaptureModal />)
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: ' remember milk ' } })
-    fireEvent.click(screen.getByRole('button', { name: /Capture/ }))
+    await user.type(screen.getByRole('textbox'), ' remember milk ')
+    await user.click(screen.getByRole('button', { name: /Capture/ }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:capture')).toEqual([{ text: 'remember milk' }])
     )
     await eventually(() => expect(useVaultNavStore.getState().showCaptureModal).toBe(false))
   })
 
-  it('closes on Escape without capturing, and renders nothing when hidden', () => {
+  it('closes on Escape without capturing', async () => {
+    const user = userEvent.setup()
     useVaultNavStore.setState({ showCaptureModal: true })
     render(<CaptureModal />)
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(useVaultNavStore.getState().showCaptureModal).toBe(false)
     expect(bridge.calls('task-vault:vault:capture')).toEqual([])
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('renders nothing while the capture modal is hidden', () => {
+    render(<CaptureModal />)
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 }

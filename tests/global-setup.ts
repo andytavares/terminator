@@ -11,6 +11,8 @@ declare module 'vitest' {
   export interface ProvidedContext {
     /** The whole environment of a spec's process; tests/support/seal-worker-environment.ts applies it. */
     sealedEnvironment: Record<string, string>
+    /** The project's tier: what tests/setup.ts lets its specs reach (T-TIER, T-BOUNDARY). */
+    testTier: 'unit' | 'integration'
   }
 }
 

@@ -57,6 +57,8 @@ export interface SeedDeps {
   readonly readSignal?: (id: string) => Promise<Signal | null>
   /** Where the stored profiles and the shipped hints are. Absent: hints only, none stored. */
   readonly profile?: { readonly dataRoot: string; readonly hintsDir: string }
+  /** The branch each repository builds on. Absent: asked of git (`baseBranchOfRepo`). */
+  readonly baseBranchOf?: (repoPath: string) => Promise<string>
 }
 
 export type SeedInput =
@@ -126,7 +128,7 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
     title: origin.title,
     source: origin.source,
     repoPaths: input.repoPaths,
-    baseBranches: await Promise.all(input.repoPaths.map(baseBranchOfRepo)),
+    baseBranches: await Promise.all(input.repoPaths.map(deps.baseBranchOf ?? baseBranchOfRepo)),
     now: deps.now(),
   })
   // Scout's pack, before any question could be asked.

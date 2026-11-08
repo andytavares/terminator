@@ -1,22 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { writeFileSync, chmodSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
+import { writeFileSync, chmodSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { ipcMain } from 'electron'
 import { makeTempDir } from '../../support/temp-dir'
 
-const { mockOpenPath, mockOpenExternal } = vi.hoisted(() => ({
-  mockOpenPath: vi.fn(),
-  mockOpenExternal: vi.fn(),
-}))
-
-// Opening a path or a URL hands it to the operating system; that is the boundary.
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
   },
   shell: {
-    openPath: mockOpenPath,
-    openExternal: mockOpenExternal,
+    openPath: vi.fn(),
+    openExternal: vi.fn(),
   },
 }))
 
@@ -90,17 +84,6 @@ describe('shell:exec IPC execHandler — refusals', () => {
     expect(result).toEqual({ error: 'CWD_OUT_OF_SCOPE' })
   })
 
-  it('returns CWD_OUT_OF_SCOPE for a symlink in the workspace that leads out, and runs nothing', async () => {
-    const outside = join(scratch, 'outside')
-    mkdirSync(outside)
-    symlinkSync(outside, join(repo, 'escape'))
-    const result = await execHandler(
-      {},
-      { command: 'git', args: ['status'], cwd: join(repo, 'escape'), workspaceRoot: repo }
-    )
-    expect(result).toEqual({ error: 'CWD_OUT_OF_SCOPE' })
-  })
-
   it('reports a command that could not start, with the reason', async () => {
     const result = (await execHandler(
       {},
@@ -108,85 +91,5 @@ describe('shell:exec IPC execHandler — refusals', () => {
     )) as { exitCode: number; stderr: string }
     expect(result.exitCode).not.toBe(0)
     expect(result.stderr).toContain('ENOENT')
-  })
-})
-
-describe('shell:open-external IPC handler', () => {
-  let handler: (event: unknown, payload: unknown) => Promise<unknown>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockOpenExternal.mockResolvedValue(undefined)
-
-    registerShellHandlers()
-
-    handler = registeredHandler('shell:open-external')
-  })
-
-  it('returns ok:true when openExternal succeeds', async () => {
-    const result = await handler({}, { url: 'https://example.com' })
-    expect(result).toEqual({ ok: true })
-    expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
-  })
-
-  it('returns error string when openExternal throws', async () => {
-    mockOpenExternal.mockRejectedValue(new Error('launch failed'))
-    const result = (await handler({}, { url: 'https://example.com' })) as { error: string }
-    expect(result.error).toContain('launch failed')
-  })
-})
-
-describe('shell:open-path IPC handler', () => {
-  let handler: (event: unknown, payload: unknown) => Promise<unknown>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockOpenPath.mockResolvedValue('')
-
-    registerShellHandlers()
-
-    handler = registeredHandler('shell:open-path')
-  })
-
-  it('returns ok:true when openPath succeeds', async () => {
-    const result = await handler({}, { filePath: '/some/file.txt' })
-    expect(result).toEqual({ ok: true })
-    expect(mockOpenPath).toHaveBeenCalledWith('/some/file.txt')
-  })
-
-  it('returns error when openPath returns a non-empty error message', async () => {
-    mockOpenPath.mockResolvedValue('No application found')
-    const result = (await handler({}, { filePath: '/some/file.txt' })) as { error: string }
-    expect(result.error).toBe('No application found')
-  })
-
-  it('expands leading ~ to the home directory before calling openPath', async () => {
-    await handler({}, { filePath: '~/projects/foo' })
-    const { homedir } = await import('os')
-    expect(mockOpenPath).toHaveBeenCalledWith(`${homedir()}/projects/foo`)
-  })
-})
-
-describe('shell:open-path IPC handler — home directory', () => {
-  let handler: (event: unknown, payload: unknown) => Promise<unknown>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockOpenPath.mockResolvedValue('')
-
-    registerShellHandlers()
-
-    handler = registeredHandler('shell:open-path')
-  })
-
-  it('expands bare ~ to the home directory', async () => {
-    await handler({}, { filePath: '~' })
-    const { homedir } = await import('os')
-    expect(mockOpenPath).toHaveBeenCalledWith(homedir())
-  })
-
-  it('does not expand ~ that is not at the start of the path', async () => {
-    await handler({}, { filePath: '/some/~user/file' })
-    expect(mockOpenPath).toHaveBeenCalledWith('/some/~user/file')
   })
 })

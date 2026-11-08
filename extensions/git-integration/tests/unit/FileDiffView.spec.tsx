@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, beforeAll, beforeEach, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { FileDiff } from '../../src/schemas/git.schema'
 
 const CLEAN = { kind: 'clean', onRefreshStatus: (): void => undefined } as const
@@ -65,38 +66,31 @@ describe('FileDiffView', () => {
   })
 })
 
-describe('FileDiffView — shows Unified and Split toggle buttons', () => {
-  it('shows Unified and Split toggle buttons', async () => {
-    await renderDiff()
-    expect(screen.getByText('Unified')).toBeTruthy()
-    expect(screen.getByText('Split')).toBeTruthy()
-  })
-
+describe('FileDiffView — Unified and Split toggle', () => {
   it('switches to split view when Split is clicked', async () => {
-    const { container } = await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
-    expect(container.querySelector('.diff-table--split')).toBeTruthy()
+    const user = userEvent.setup()
+    await renderDiff()
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    expect(screen.getByRole('table').classList.contains('diff-table--split')).toBe(true)
   })
 
   it('switches back to unified view from split', async () => {
-    const { container } = await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
-    fireEvent.click(screen.getByText('Unified'))
-    expect(container.querySelector('.diff-table:not(.diff-table--split)')).toBeTruthy()
-  })
-
-  it('shows stale banner when isStale is true', async () => {
-    await renderDiff({ isStale: true })
-    expect(screen.getByText(/File changed while viewing/)).toBeTruthy()
+    const user = userEvent.setup()
+    await renderDiff()
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    await user.click(screen.getByRole('radio', { name: 'Unified' }))
+    expect(screen.getByRole('table').classList.contains('diff-table--split')).toBe(false)
   })
 })
 
-describe('FileDiffView — calls onRefresh when Refresh is clicked in stale banner', () => {
-  it('calls onRefresh when Refresh is clicked in stale banner', async () => {
+describe('FileDiffView — stale banner and notices', () => {
+  it('shows the stale banner when isStale is true, and its Refresh calls onRefresh', async () => {
+    const user = userEvent.setup()
     const onRefresh = vi.fn()
     await renderDiff({ isStale: true, onRefresh })
-    fireEvent.click(screen.getByText('Refresh'))
-    expect(onRefresh).toHaveBeenCalled()
+    expect(screen.getByText(/File changed while viewing/)).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(onRefresh).toHaveBeenCalledOnce()
   })
 
   it('shows truncation notice for truncated diffs', async () => {
@@ -105,20 +99,26 @@ describe('FileDiffView — calls onRefresh when Refresh is clicked in stale bann
   })
 
   it('renders add/remove lines with correct classes', async () => {
-    const { container } = await renderDiff()
-    expect(container.querySelector('.diff-line--add')).toBeTruthy()
-    expect(container.querySelector('.diff-line--remove')).toBeTruthy()
+    await renderDiff()
+    expect(screen.getByRole('row', { name: /const b = 3/ }).className).toBe(
+      'diff-line diff-line--add'
+    )
+    expect(screen.getByRole('row', { name: /const b = 2/ }).className).toBe(
+      'diff-line diff-line--remove'
+    )
   })
 
   it('renders split view with hunk header', async () => {
+    const user = userEvent.setup()
     await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
     expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy()
   })
 })
 
-describe('FileDiffView — renders a diff with only removes correctly in split view', () => {
-  it('renders a diff with only removes correctly in split view', async () => {
+describe('FileDiffView — split view of a remove-only hunk', () => {
+  it('puts a removed line on the old side of the split view, beside an empty new side', async () => {
+    const user = userEvent.setup()
     const diff = makeDiff({
       hunks: [
         {
@@ -130,44 +130,73 @@ describe('FileDiffView — renders a diff with only removes correctly in split v
       ],
     })
     await renderDiff({ diff })
-    fireEvent.click(screen.getByText('Split'))
-    expect(screen.getByText('@@ -1 +0,0 @@')).toBeTruthy()
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    expect(cellClasses(/deleted line/)).toEqual(
+      expect.arrayContaining([
+        'diff-line__content diff-line__content--remove diff-line__content--old-side',
+        'diff-line__content diff-line__content--empty diff-line__content--new-side',
+      ])
+    )
   })
 })
 
-describe('FileDiffView — renders a diff with only adds correctly in split view', () => {
-  it('renders a diff with only adds correctly in split view', async () => {
+describe('FileDiffView — split view of an add-only hunk', () => {
+  it('puts an added line on the new side of the split view, beside an empty old side', async () => {
+    const user = userEvent.setup()
     const diff = makeDiff({
       hunks: [
         {
           header: '@@ -0,0 +1 @@',
-          lines: [{ type: 'add', content: 'new line', oldLineNumber: null, newLineNumber: 1 }],
+          lines: [{ type: 'add', content: 'added line', oldLineNumber: null, newLineNumber: 1 }],
         },
       ],
     })
     await renderDiff({ diff })
-    fireEvent.click(screen.getByText('Split'))
-    expect(screen.getByText('@@ -0,0 +1 @@')).toBeTruthy()
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    expect(cellClasses(/added line/)).toEqual(
+      expect.arrayContaining([
+        'diff-line__content diff-line__content--empty diff-line__content--old-side',
+        'diff-line__content diff-line__content--add diff-line__content--new-side',
+      ])
+    )
   })
+})
 
+/** The split view's cells on the row that shows `content`, by class. */
+function cellClasses(content: RegExp): string[] {
+  const cells = within(screen.getByRole('row', { name: content })).getAllByRole('cell')
+  return cells.map((cell) => cell.className)
+}
+
+/** The split view's divider cell on the row that shows `content`. */
+function dividerBeside(content: RegExp): HTMLElement {
+  const cells = within(screen.getByRole('row', { name: content })).getAllByRole('cell')
+  return cells.find((cell) => cell.classList.contains('diff-table__split-divider'))!
+}
+
+// The divider drag listens on window; user-event's moves bubble there from the divider.
+describe('FileDiffView — split divider', () => {
   it('keeps the split position when the divider is pressed and released without moving', async () => {
-    const { container } = await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
-    const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
-    fireEvent.mouseDown(container.querySelector('.diff-table__split-divider') as Element, {
-      clientX: 300,
-    })
-    fireEvent.mouseUp(window)
-    fireEvent.mouseMove(window, { clientX: 500 })
+    const user = userEvent.setup()
+    await renderDiff()
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    const scrollEl = screen.getByTestId('diff-scroll')
+    const divider = dividerBeside(/const a = 1/)
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: divider, coords: { clientX: 300 } },
+      { keys: '[/MouseLeft]' },
+      { coords: { clientX: 500 } },
+    ])
     expect(scrollEl.style.getPropertyValue('--split-left')).toBe('50%')
   })
 })
 
 describe('FileDiffView — moves split position on mousemove while dragging', () => {
   it('moves split position on mousemove while dragging', async () => {
-    const { container } = await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
-    const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
+    const user = userEvent.setup()
+    await renderDiff()
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    const scrollEl = screen.getByTestId('diff-scroll')
     vi.spyOn(scrollEl, 'getBoundingClientRect').mockReturnValue({
       width: 800,
       height: 400,
@@ -179,11 +208,12 @@ describe('FileDiffView — moves split position on mousemove while dragging', ()
       y: 0,
       toJSON: () => ({}),
     })
-    fireEvent.mouseDown(container.querySelector('.diff-table__split-divider') as Element, {
-      clientX: 400,
-    })
-    fireEvent.mouseMove(window, { clientX: 450 })
-    fireEvent.mouseUp(window)
+    const divider = dividerBeside(/const a = 1/)
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: divider, coords: { clientX: 400 } },
+      { coords: { clientX: 450 } },
+      { keys: '[/MouseLeft]' },
+    ])
     expect(scrollEl.style.getPropertyValue('--split-left')).toBe('56.25%')
   })
 })
@@ -207,6 +237,7 @@ describe('FileDiffView usage', () => {
 
 describe('FileDiffView empty state', () => {
   it('offers to open the first change when no file is selected', async () => {
+    const user = userEvent.setup()
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     function Harness() {
       const [opened, setOpened] = React.useState(false)
@@ -219,17 +250,18 @@ describe('FileDiffView empty state', () => {
     }
     render(<Harness />)
     expect(screen.getByText('No file selected')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Open the first change' }))
+    await user.click(screen.getByRole('button', { name: 'Open the first change' }))
     expect(screen.getByText('src/foo.ts')).toBeTruthy()
     expect(screen.queryByText('No file selected')).toBeNull()
   })
 
   it('offers a refresh when nothing has changed', async () => {
+    const user = userEvent.setup()
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     const onRefreshStatus = vi.fn()
     render(<FileDiffView diff={null} empty={{ kind: 'clean', onRefreshStatus }} />)
     expect(screen.getByText('No changes')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(onRefreshStatus).toHaveBeenCalledTimes(1)
   })
 })
@@ -243,11 +275,12 @@ describe('FileDiffView while no diff is shown for the selection', () => {
   })
 
   it('says the selected file cannot be shown and offers a refresh', async () => {
+    const user = userEvent.setup()
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     const onRefreshStatus = vi.fn()
     render(<FileDiffView diff={null} empty={{ kind: 'unreadable', onRefreshStatus }} />)
     expect(screen.getByText("This file's changes cannot be shown")).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(onRefreshStatus).toHaveBeenCalledTimes(1)
   })
 })

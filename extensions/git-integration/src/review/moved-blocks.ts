@@ -55,9 +55,9 @@ function runsIn(lines: DiffLine[], type: 'remove' | 'add', path: string): Run[] 
 }
 
 function runsOf(files: ParsedPrFile[], type: 'remove' | 'add'): Run[] {
-  return files
-    .filter((file) => file.path)
-    .flatMap((file) => file.diff.hunks.flatMap((hunk) => runsIn(hunk.lines, type, file.path)))
+  return files.flatMap((file) =>
+    file.diff.hunks.flatMap((hunk) => runsIn(hunk.lines, type, file.path))
+  )
 }
 
 function extractSymbol(line: string): string | null {

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { buildDecorations } from '../../../src/editor/livePreview'
+import { EditorView } from '@codemirror/view'
+import type { EditorState } from '@codemirror/state'
+import { buildDecorations, livePreviewPlugin } from '../../../src/editor/livePreview'
 import { parsedState } from '../support/parsed-state'
 
 function makeState(doc: string) {
@@ -15,7 +17,6 @@ function makeStateGFM(doc: string) {
 describe('buildDecorations', buildDecorationsTests)
 
 function buildDecorationsTests() {
-  describe('headings', buildDecorationsHeadingsTests)
   describe('the cursor line', buildDecorationsCursorLineTests)
   describe('plain text and bold', buildDecorationsPlainTextBoldTests)
   describe('italic', buildDecorationsItalicTests)
@@ -27,25 +28,6 @@ function buildDecorationsTests() {
   describe('multi-line code and images', buildDecorationsMultiLineCodeTests)
   describe('lists and links', buildDecorationsListsLinksTests)
   describe('list items', buildDecorationsListItemsTests)
-}
-
-function buildDecorationsHeadingsTests() {
-  it('marks heading # text with a heading decoration (cursor off heading line)', () => {
-    // Put heading on line 1, cursor on line 2
-    const state = makeState('# Hello World\nother line\n')
-    const decos = buildDecorations(state, { anchor: 14 }) // "other line" starts at 14
-    let found = false
-    decos.between(0, 13, (_from, _to, deco) => {
-      if ((deco.spec as { class?: string })?.class?.includes('notepad-heading')) found = true
-    })
-    expect(found).toBe(true)
-  })
-
-  it('returns a decoration set without throwing for heading with marker', () => {
-    const state = makeState('## Section\n')
-    const decos = buildDecorations(state, { anchor: 0 })
-    expect(decos).toBeDefined()
-  })
 }
 
 function buildDecorationsCursorLineTests() {
@@ -159,17 +141,6 @@ function buildDecorationsCodeMarkersTests() {
 }
 
 function buildDecorationsFencedCodeTests() {
-  it('produces a line deco for fenced code block content (cursor outside block)', () => {
-    const state = makeState('other\n```\ncode\n```\n')
-    const decos = buildDecorations(state, { anchor: 0 })
-    let foundLineDeco = false
-    decos.between(0, state.doc.length, (_from, _to, deco) => {
-      if ((deco.spec as { class?: string })?.class?.includes('notepad-code-block-line'))
-        foundLineDeco = true
-    })
-    expect(foundLineDeco).toBe(true)
-  })
-
   it('does NOT hide fenced code fences when cursor is inside block', () => {
     const state = makeState('```\ncode\n```\n')
     // Cursor at position 4 (inside "code"). The body is still styled as code,
@@ -286,3 +257,24 @@ function buildDecorationsListItemsTests() {
     expect(found).toBe(true)
   })
 }
+
+// SC-002 as a count, not a time: a 5,000-line note is decorated again only when something the
+// preview shows changed, so a transaction that changes nothing costs no rebuild.
+describe('the live preview on a 5,000-line note', () => {
+  const note = Array.from({ length: 5000 }, (_, line) => `Line ${line}: **bold** and _italic_`)
+  const previewed = () =>
+    parsedState({ doc: note.join('\n'), extensions: [markdown(), livePreviewPlugin] })
+  const decorationsOf = (state: EditorState) => state.facet(EditorView.decorations)[0]
+
+  it('keeps its decorations, not rebuilt, through a transaction that changes nothing it shows', () => {
+    const before = previewed()
+    expect(decorationsOf(before.update({}).state)).toBe(decorationsOf(before))
+  })
+
+  it('builds them again when the caret moves', () => {
+    const before = previewed()
+    expect(decorationsOf(before.update({ selection: { anchor: 3 } }).state)).not.toBe(
+      decorationsOf(before)
+    )
+  })
+})

@@ -209,6 +209,8 @@ function LoadingOverlay(): React.JSX.Element {
   return (
     <div
       data-testid="extension-loading"
+      role="status"
+      aria-label="Loading extension"
       style={{
         position: 'absolute',
         inset: 0,

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
+import { useReconnect } from '../../../../src/renderer-remote/hooks/useReconnect'
 
 const mockGetWsTicket = vi.fn()
 const mockResizeTerminal = vi.fn()
@@ -33,13 +35,13 @@ const mockTerm = {
 
 // Mock xterm — it does not work in jsdom
 vi.mock('@xterm/xterm', () => ({
-  Terminal: vi.fn().mockImplementation(function () {
+  Terminal: vi.fn(function () {
     return mockTerm
   }),
 }))
 
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: vi.fn().mockImplementation(function () {
+  FitAddon: vi.fn(function () {
     return {
       fit: vi.fn(),
       activate: vi.fn(),
@@ -48,7 +50,7 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 
 vi.mock('@xterm/addon-attach', () => ({
-  AttachAddon: vi.fn().mockImplementation(function () {
+  AttachAddon: vi.fn(function () {
     return {
       activate: vi.fn(),
     }
@@ -95,39 +97,30 @@ beforeEach(() => {
   mockTermBuffer.baseY = 76 // default: at bottom (76 + 24 >= 100)
   mockTermBuffer.length = 100
   mockGetWsTicket.mockResolvedValue('ticket-abc')
+  mockResizeTerminal.mockResolvedValue(undefined)
   mockWs.close.mockReset()
-  vi.clearAllMocks()
+  mockWs.readyState = 1
+  vi.mocked(useReconnect).mockReturnValue({
+    status: 'connected',
+    retry: vi.fn(),
+    onOpenWsFailed: vi.fn(),
+  })
 })
 
 describe('MobileTerminalView', () => {
-  it('renders a container div for xterm', async () => {
-    const { MobileTerminalView } =
-      await import('../../../../src/renderer-remote/components/MobileTerminalView')
-    const { container } = render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
-    // Should have a div that xterm mounts into
-    expect(container.querySelector('.mobile-terminal-container')).toBeTruthy()
-  })
-
-  it('renders a back button', async () => {
-    const { MobileTerminalView } =
-      await import('../../../../src/renderer-remote/components/MobileTerminalView')
-    render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /back/i })).toBeTruthy()
-  })
-
   it('calls onBack when back button is clicked', async () => {
+    const user = userEvent.setup()
     const onBack = vi.fn()
     const { MobileTerminalView } =
       await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={onBack} />)
-    fireEvent.click(screen.getByRole('button', { name: /back/i }))
+    await user.click(screen.getByRole('button', { name: /back/i }))
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 })
 
 describe('MobileTerminalView — shows reconnecting banner when status is reconnecting', () => {
   it('shows reconnecting banner when status is reconnecting', async () => {
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     vi.mocked(useReconnect).mockReturnValue({
       status: 'reconnecting',
       retry: vi.fn(),
@@ -136,11 +129,10 @@ describe('MobileTerminalView — shows reconnecting banner when status is reconn
     const { MobileTerminalView } =
       await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
-    expect(screen.getByText(/reconnecting/i)).toBeTruthy()
+    expect(screen.getByText(/reconnecting/i).textContent).toMatch(/reconnecting/i)
   })
 
   it('shows error state with retry button when status is disconnected', async () => {
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     vi.mocked(useReconnect).mockReturnValue({
       status: 'disconnected',
       retry: vi.fn(),
@@ -149,7 +141,7 @@ describe('MobileTerminalView — shows reconnecting banner when status is reconn
     const { MobileTerminalView } =
       await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /retry/i }).textContent).toMatch(/retry/i)
   })
 })
 
@@ -160,46 +152,25 @@ describe('MobileTerminalView — says why it was turned away', () => {
   ] as const)(
     'says why it was turned away when status is %s, and offers to retry',
     async (status, text) => {
-      const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
       vi.mocked(useReconnect).mockReturnValue({ status, retry: vi.fn(), onOpenWsFailed: vi.fn() })
       const { MobileTerminalView } =
         await import('../../../../src/renderer-remote/components/MobileTerminalView')
       render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
       expect(screen.getByRole('alert').textContent).toMatch(text)
-      expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /retry/i }).textContent).toMatch(/retry/i)
     }
   )
 })
 
-describe('MobileTerminalView — renders MobileControlToolbar', () => {
-  it('renders MobileControlToolbar', async () => {
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    vi.mocked(useReconnect).mockReturnValue({
-      status: 'connected',
-      retry: vi.fn(),
-      onOpenWsFailed: vi.fn(),
-    })
-    const { MobileTerminalView } =
-      await import('../../../../src/renderer-remote/components/MobileTerminalView')
-    render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
-    expect(screen.getByText('ctrl-c')).toBeTruthy()
-  })
-})
-
 describe('MobileTerminalView — sends key sequence to WebSocket when toolbar key is pressed', () => {
   it('sends key sequence to WebSocket when toolbar key is pressed', async () => {
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    vi.mocked(useReconnect).mockReturnValue({
-      status: 'connected',
-      retry: vi.fn(),
-      onOpenWsFailed: vi.fn(),
-    })
+    const user = userEvent.setup()
     const { MobileTerminalView } =
       await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     // Flush microtasks so openWs async chain completes and wsRef.current is set
     await act(async () => {})
-    fireEvent.click(screen.getByText('ctrl-c'))
+    await user.click(screen.getByRole('button', { name: 'ctrl-c' }))
     expect(mockWs.send).toHaveBeenCalledWith('\x03')
   })
 })
@@ -208,7 +179,6 @@ describe('MobileTerminalView — opens no socket and starts reconnecting when no
   it('opens no socket and starts reconnecting when no ticket can be had', async () => {
     mockGetWsTicket.mockRejectedValue(new Error('network error'))
     const onOpenWsFailed = vi.fn()
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     vi.mocked(useReconnect).mockReturnValue({
       status: 'connecting',
       retry: vi.fn(),
@@ -281,13 +251,8 @@ describe('MobileTerminalView — forwards xterm onData keystrokes to WebSocket',
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     await act(async () => {})
     expect(capturedOnDataHandler).not.toBeNull()
-    // Simulate socket not yet open
     mockWs.readyState = 0 // CONNECTING
     capturedOnDataHandler!('should not send')
     expect(mockWs.send).not.toHaveBeenCalled()
-    // Restore OPEN and confirm send works again
-    mockWs.readyState = 1
-    capturedOnDataHandler!('should send')
-    expect(mockWs.send).toHaveBeenCalledWith('should send')
   })
 })

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { WhyThisFile } from '../../src/components/pr-review/WhyThisFile'
 import type { RiskScore } from '../../src/schemas/pr-review.schema'
 import { makeRiskScore } from './risk-score-fixtures'
@@ -121,13 +122,15 @@ describe('WhyThisFile — importers', () => {
   it('draws importer buttons that submit nothing and icons hidden from assistive technology', () => {
     renderFile()
     expect(screen.getByRole('button', { name: 'store.ts' }).getAttribute('type')).toBe('button')
-    expect(document.querySelectorAll('.ri-factor-icon[aria-hidden="true"]')).toHaveLength(5)
+    const icons = screen.getAllByTestId('factor-icon')
+    expect(icons.map((icon) => icon.getAttribute('aria-hidden'))).toEqual(Array(5).fill('true'))
   })
 
   it('classes each factor by its severity in words', () => {
     renderFile(riskyScore({}, { churn90d: 60 }))
-    expect(document.querySelector('.ri-factor--high')).toBeTruthy()
-    expect(document.querySelector('.ri-factor--hi')).toBeNull()
+    const classes = screen.getAllByTestId('factor').map((factor) => factor.className)
+    expect(classes).toContain('ri-factor ri-factor--high')
+    expect(classes.every((name) => /--(high|medium|low|fine)$/.test(name))).toBe(true)
   })
 
   it('lists importers as buttons under an Importers heading', () => {
@@ -137,9 +140,10 @@ describe('WhyThisFile — importers', () => {
     expect(screen.getByRole('button', { name: 'api.ts' })).toBeTruthy()
   })
 
-  it('opens an importer from the repository root', () => {
+  it('opens an importer from the repository root', async () => {
+    const user = userEvent.setup()
     renderFile()
-    fireEvent.click(screen.getByRole('button', { name: 'store.ts' }))
+    await user.click(screen.getByRole('button', { name: 'store.ts' }))
     expect(openPath).toHaveBeenCalledWith('/repo/src/store.ts')
   })
 

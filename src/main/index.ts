@@ -12,6 +12,7 @@ import {
 } from './app-updater.js'
 import { announceWindowReadiness, exposeReadinessToTests } from './e2e-readiness.js'
 import { join } from 'path'
+import { buildHelpMenu, buildViewMenu, tickPanelItem } from './app-menu.js'
 import {
   registerWorkspaceHandlers,
   setActiveWorkspaceContext,
@@ -241,55 +242,6 @@ function extensionViewMenuItems(): Electron.MenuItemConstructorOptions[] {
   )
 }
 
-/** A menu item for a key the renderer handles itself: it shows the accelerator and presses the key,
- * so the renderer keeps the one handler. `registerAccelerator: false` lets the real key reach the page. */
-function pressedKeyItem(
-  label: string,
-  accelerator: string,
-  keyCode: string
-): Electron.MenuItemConstructorOptions {
-  return {
-    label,
-    accelerator,
-    registerAccelerator: false,
-    click: () =>
-      mainWindow?.webContents.sendInputEvent({
-        type: 'keyDown',
-        keyCode,
-        modifiers: ['meta', 'alt'],
-      }),
-  }
-}
-
-function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
-  const extItems = extensionViewMenuItems()
-  return [
-    {
-      label: 'Toggle Sidebar',
-      accelerator: 'CmdOrCtrl+B',
-      click: () => mainWindow?.webContents.send('menu:toggle-sidebar'),
-    },
-    { type: 'separator' },
-    pressedKeyItem('Go Back', 'CmdOrCtrl+Alt+Left', 'Left'),
-    pressedKeyItem('Go Forward', 'CmdOrCtrl+Alt+Right', 'Right'),
-    pressedKeyItem('Reopen Closed Tab', 'CmdOrCtrl+Alt+T', 'T'),
-    { type: 'separator' },
-    ...extItems,
-    ...(extItems.length > 0 ? [{ type: 'separator' as const }] : []),
-    {
-      label: 'Open Settings',
-      accelerator: 'CmdOrCtrl+,',
-      click: () => mainWindow?.webContents.send('menu:open-settings'),
-    },
-    { type: 'separator' },
-    {
-      label: 'Open Extension DevTools',
-      accelerator: 'CmdOrCtrl+Shift+I',
-      click: () => mainWindow?.webContents.openDevTools({ mode: 'detach' }),
-    },
-  ]
-}
-
 /** The application menu macOS shows under the app's name; nothing elsewhere. */
 function appNameMenu(): Electron.MenuItemConstructorOptions[] {
   if (process.platform !== 'darwin') return []
@@ -312,20 +264,6 @@ function appNameMenu(): Electron.MenuItemConstructorOptions[] {
   ]
 }
 
-function helpMenu(): Electron.MenuItemConstructorOptions {
-  return {
-    label: 'Help',
-    submenu: [
-      { label: `About ${app.getName()}`, click: openAbout },
-      { type: 'separator' },
-      {
-        label: 'View on GitHub',
-        click: () => void shell.openExternal('https://github.com/anthropics/terminator'),
-      },
-    ],
-  }
-}
-
 function setupMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     ...appNameMenu(),
@@ -337,15 +275,22 @@ function setupMenu(): void {
       label: 'Edit',
       submenu: [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }],
     },
-    {
-      label: 'View',
-      submenu: buildViewSubmenu(),
-    },
+    buildViewMenu({
+      send: (channel) => mainWindow?.webContents.send(channel),
+      pressKey: (keyCode) =>
+        mainWindow?.webContents.sendInputEvent({
+          type: 'keyDown',
+          keyCode,
+          modifiers: ['meta', 'alt'],
+        }),
+      openDevTools: () => mainWindow?.webContents.openDevTools({ mode: 'detach' }),
+      extensionItems: extensionViewMenuItems(),
+    }),
     buildWindowMenu(
       (channel, payload) => mainWindow?.webContents.send(channel, payload),
       sessionOfWindow(BrowserWindow.getFocusedWindow())
     ),
-    helpMenu(),
+    buildHelpMenu(app.getName(), openAbout, (url) => void shell.openExternal(url)),
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
@@ -358,11 +303,7 @@ function registerAppHandlers(): void {
   onChannel(
     'menu:set-panel-checked',
     (_event, { panelId, open }: { panelId: string; open: boolean }) => {
-      const menuItemId = getPanelMenuItemId(panelId)
-      if (menuItemId) {
-        const menuItem = Menu.getApplicationMenu()?.getMenuItemById(menuItemId)
-        if (menuItem) menuItem.checked = open
-      }
+      tickPanelItem(Menu.getApplicationMenu(), getPanelMenuItemId(panelId), open)
     }
   )
 

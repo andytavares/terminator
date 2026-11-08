@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import type { Workspace } from '../../../../src/renderer-remote/api/remote-client'
 import type { TerminalSession } from '../../../../src/renderer-remote/api/remote-client'
@@ -20,6 +21,10 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 async function renderList(workspaces: Workspace[], terminals: TerminalSession[]) {
   const { MobileTerminalList } =
     await import('../../../../src/renderer-remote/components/MobileTerminalList')
@@ -37,51 +42,25 @@ async function renderList(workspaces: Workspace[], terminals: TerminalSession[])
 describe('MobileTerminalList', () => {
   it('renders workspace names', async () => {
     await renderList([workspace], [])
-    expect(screen.getByText('My Workspace')).toBeTruthy()
-  })
-
-  it('renders terminal items with cwd label', async () => {
-    const terminal: TerminalSession = {
-      sessionId: 's1',
-      cwd: '/Users/me/projects/myapp',
-      createdAt: '2026-06-19T10:00:00.000Z',
-    }
-    await renderList([workspace], [terminal])
-    expect(screen.getByText('myapp')).toBeTruthy()
-  })
-
-  it('calls onSelectTerminal with correct sessionId and cwd when terminal is tapped', async () => {
-    const terminal: TerminalSession = {
-      sessionId: 's1',
-      cwd: '/tmp/myapp',
-      createdAt: '2026-06-19T10:00:00.000Z',
-    }
-    await renderList([workspace], [terminal])
-    fireEvent.click(screen.getByText('Scratch 1 · myapp'))
-    expect(mockOnSelectTerminal).toHaveBeenCalledWith({ sessionId: 's1', cwd: '/tmp/myapp' })
-  })
-
-  it('shows "New Terminal" button per workspace', async () => {
-    await renderList([workspace], [])
-    expect(screen.getByRole('button', { name: /new terminal/i })).toBeTruthy()
+    expect(screen.getByText('My Workspace').textContent).toBe('My Workspace')
   })
 })
 
 describe('MobileTerminalList — calls onCreateTerminal with workspaceId and folderPath when "New Terminal" is clicked', () => {
   it('calls onCreateTerminal with workspaceId and folderPath when "New Terminal" is clicked', async () => {
+    const user = userEvent.setup()
     await renderList([workspace], [])
-    fireEvent.click(screen.getByRole('button', { name: /new terminal/i }))
+    await user.click(screen.getByRole('button', { name: /new terminal/i }))
     expect(mockOnCreateTerminal).toHaveBeenCalledWith('w1', '/Users/me/projects')
   })
 
-  it('shows terminal under matching workspace by cwd prefix', async () => {
+  it('shows a terminal inside a workspace folder once, by its folder name', async () => {
     const terminal: TerminalSession = {
       sessionId: 's-ws',
       cwd: '/Users/me/projects/myapp',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
     await renderList([workspace], [terminal])
-    // appears exactly once (under the workspace, not duplicated)
     expect(screen.getAllByText('myapp')).toHaveLength(1)
   })
 
@@ -94,9 +73,7 @@ describe('MobileTerminalList — calls onCreateTerminal with workspaceId and fol
       createdAt: '2026-06-19T10:00:00.000Z',
     }
     await renderList([workspace], [terminal])
-    // Should appear in the fallback section, not under the workspace
-    expect(screen.getByText('Scratch 1 · thing')).toBeTruthy()
-    // Only one occurrence — not duplicated
+    // Should appear once, in the fallback section, not under the workspace
     expect(screen.getAllByText('Scratch 1 · thing')).toHaveLength(1)
   })
 })
@@ -115,29 +92,30 @@ describe('MobileTerminalList — labels unassigned terminals with "Scratch N · 
     }
     await renderList([workspace], [unmatched, assigned])
     // Unassigned terminal gets "Scratch N ·" prefix
-    expect(screen.getByText('Scratch 1 · my-session')).toBeTruthy()
+    expect(screen.getAllByText('Scratch 1 · my-session')).toHaveLength(1)
     // Workspace-assigned terminal does NOT get the prefix
-    expect(screen.getByText('myapp')).toBeTruthy()
+    expect(screen.getAllByText('myapp')).toHaveLength(1)
     expect(screen.queryByText('Scratch 1 · myapp')).toBeNull()
   })
 })
 
-describe('MobileTerminalList — shows unmatched terminal in fallback section outside any workspace', () => {
-  it('shows unmatched terminal in fallback section outside any workspace', async () => {
+describe('MobileTerminalList — selects an unmatched terminal from the fallback section with its sessionId and cwd', () => {
+  it('selects an unmatched terminal from the fallback section with its sessionId and cwd', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-global',
       cwd: '/tmp/scratch',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
     await renderList([workspace], [unmatched])
-    expect(screen.getByText('Scratch 1 · scratch')).toBeTruthy()
-    fireEvent.click(screen.getByText('Scratch 1 · scratch'))
+    await userEvent.click(screen.getByRole('button', { name: 'Scratch 1 · scratch' }))
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-global',
       cwd: '/tmp/scratch',
     })
   })
+})
 
+describe('MobileTerminalList — Enter on a workspace terminal', () => {
   it('triggers onSelectTerminal via Enter key on workspace terminal', async () => {
     const terminal: TerminalSession = {
       sessionId: 's-enter-ws',
@@ -145,7 +123,10 @@ describe('MobileTerminalList — shows unmatched terminal in fallback section ou
       createdAt: '2026-06-19T10:00:00.000Z',
     }
     await renderList([workspace], [terminal])
-    fireEvent.keyDown(screen.getByText('myapp'), { key: 'Enter' })
+    const row = screen.getByRole('button', { name: 'myapp' })
+    row.focus()
+    expect(row.matches(':focus')).toBe(true)
+    await userEvent.keyboard('{Enter}')
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-enter-ws',
       cwd: '/Users/me/projects/myapp',
@@ -160,8 +141,12 @@ describe('MobileTerminalList — triggers onSelectTerminal via Enter key on fall
       cwd: '/tmp/enter-scratch',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
+    const user = userEvent.setup()
     await renderList([workspace], [unmatched])
-    fireEvent.keyDown(screen.getByText('Scratch 1 · enter-scratch'), { key: 'Enter' })
+    const row = screen.getByRole('button', { name: 'Scratch 1 · enter-scratch' })
+    row.focus()
+    expect(row.matches(':focus')).toBe(true)
+    await user.keyboard('{Enter}')
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-enter-global',
       cwd: '/tmp/enter-scratch',
@@ -177,8 +162,8 @@ describe('MobileTerminalList — triggers onSelectTerminal via Enter key on fall
     }
     await renderList([workspace], [terminal])
     // Should appear under the workspace (not in fallback)
-    expect(screen.getByText('random')).toBeTruthy()
     expect(screen.getAllByText('random')).toHaveLength(1)
+    expect(screen.queryByText(/^Scratch/)).toBeNull()
   })
 })
 
@@ -190,11 +175,17 @@ describe('MobileTerminalList — shows context menu with workspace options on ri
       createdAt: '2026-06-19T10:00:00.000Z',
     }
     await renderList([workspace], [unmatched])
-    fireEvent.contextMenu(screen.getByText('Scratch 1 · ctx-scratch'))
-    expect(screen.getAllByText('My Workspace').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('Move to workspace')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'My Workspace' })).toBeNull()
+    await userEvent.pointer({
+      keys: '[MouseRight]',
+      target: screen.getByRole('button', { name: 'Scratch 1 · ctx-scratch' }),
+    })
+    expect(screen.getByText('Move to workspace').textContent).toBe('Move to workspace')
+    expect(screen.getByRole('button', { name: 'My Workspace' }).textContent).toBe('My Workspace')
   })
+})
 
+describe('MobileTerminalList — long-press', () => {
   it('long-press (touchStart → 500ms) opens context menu on scratch terminal', async () => {
     vi.useFakeTimers()
     const unmatched: TerminalSession = {
@@ -203,13 +194,12 @@ describe('MobileTerminalList — shows context menu with workspace options on ri
       createdAt: '2026-06-20T10:00:00.000Z',
     }
     await renderList([workspace], [unmatched])
-    const btn = screen.getByText('Scratch 1 · longpress').closest('button')!
+    const btn = screen.getByRole('button', { name: 'Scratch 1 · longpress' })
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     await act(async () => {
       vi.advanceTimersByTime(600)
     })
-    expect(screen.getByText('Move to workspace')).toBeTruthy()
-    vi.useRealTimers()
+    expect(screen.getAllByText('Move to workspace')).toHaveLength(1)
   })
 })
 
@@ -222,14 +212,13 @@ describe('MobileTerminalList — touchEnd before 500ms cancels long-press and no
       createdAt: '2026-06-20T10:00:00.000Z',
     }
     await renderList([workspace], [unmatched])
-    const btn = screen.getByText('Scratch 1 · touchend').closest('button')!
+    const btn = screen.getByRole('button', { name: 'Scratch 1 · touchend' })
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     fireEvent.touchEnd(btn)
     await act(async () => {
       vi.advanceTimersByTime(600)
     })
     expect(screen.queryByText('Move to workspace')).toBeNull()
-    vi.useRealTimers()
   })
 })
 
@@ -242,16 +231,17 @@ describe('MobileTerminalList — touchMove before 500ms cancels long-press and n
       createdAt: '2026-06-20T10:00:00.000Z',
     }
     await renderList([workspace], [unmatched])
-    const btn = screen.getByText('Scratch 1 · touchmove').closest('button')!
+    const btn = screen.getByRole('button', { name: 'Scratch 1 · touchmove' })
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     fireEvent.touchMove(btn)
     await act(async () => {
       vi.advanceTimersByTime(600)
     })
     expect(screen.queryByText('Move to workspace')).toBeNull()
-    vi.useRealTimers()
   })
+})
 
+describe('MobileTerminalList — a context menu with no workspaces', () => {
   it('shows "No workspaces" message in context menu when workspace list is empty', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-noworkspace',
@@ -259,8 +249,11 @@ describe('MobileTerminalList — touchMove before 500ms cancels long-press and n
       createdAt: '2026-06-19T10:00:00.000Z',
     }
     await renderList([], [unmatched])
-    fireEvent.contextMenu(screen.getByText('Scratch 1 · noworkspace'))
-    expect(screen.getByText('No workspaces')).toBeTruthy()
+    await userEvent.pointer({
+      keys: '[MouseRight]',
+      target: screen.getByRole('button', { name: 'Scratch 1 · noworkspace' }),
+    })
+    expect(screen.getByText('No workspaces').textContent).toBe('No workspaces')
   })
 })
 
@@ -271,11 +264,13 @@ describe('MobileTerminalList — calls onAssignWorkspace when a workspace is cho
       cwd: '/tmp/assign-scratch',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
+    const user = userEvent.setup()
     await renderList([workspace], [unmatched])
-    fireEvent.contextMenu(screen.getByText('Scratch 1 · assign-scratch'))
-    // Click the workspace option in the context menu
-    const menuItems = screen.getAllByText('My Workspace')
-    fireEvent.click(menuItems[menuItems.length - 1])
+    await user.pointer({
+      keys: '[MouseRight]',
+      target: screen.getByRole('button', { name: 'Scratch 1 · assign-scratch' }),
+    })
+    await user.click(screen.getByRole('button', { name: 'My Workspace' }))
     expect(mockOnAssignWorkspace).toHaveBeenCalledWith('s-assign', 'w1')
   })
 })
@@ -294,8 +289,8 @@ describe('MobileTerminalList — second touchStart on a different terminal cance
       createdAt: '2026-06-20T10:00:00.000Z',
     }
     await renderList([], [termA, termB])
-    const btnA = screen.getByText('Scratch 1 · timer-a').closest('button')!
-    const btnB = screen.getByText('Scratch 2 · timer-b').closest('button')!
+    const btnA = screen.getByRole('button', { name: 'Scratch 1 · timer-a' })
+    const btnB = screen.getByRole('button', { name: 'Scratch 2 · timer-b' })
     // Start long-press on A, then immediately start one on B
     fireEvent.touchStart(btnA, { touches: [{ clientX: 10, clientY: 10 }] })
     fireEvent.touchStart(btnB, { touches: [{ clientX: 20, clientY: 20 }] })
@@ -305,7 +300,6 @@ describe('MobileTerminalList — second touchStart on a different terminal cance
     // Only B's context menu should have fired — A's timer was cleared
     const menus = screen.queryAllByText('Move to workspace')
     expect(menus).toHaveLength(1)
-    vi.useRealTimers()
   })
 })
 
@@ -330,16 +324,16 @@ describe('MobileTerminalList — resets longPressFired after blocking a click, s
     await act(async () => {
       vi.advanceTimersByTime(500)
     })
+    vi.useRealTimers()
     // Click the workspace terminal — blocked by longPressFired, but flag is cleared
-    fireEvent.click(screen.getByText('myapp'))
+    await userEvent.click(screen.getByRole('button', { name: 'myapp' }))
     expect(mockOnSelectTerminal).not.toHaveBeenCalled()
     // Second click should now go through
-    fireEvent.click(screen.getByText('myapp'))
+    await userEvent.click(screen.getByRole('button', { name: 'myapp' }))
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-ws',
       cwd: '/Users/me/projects/myapp',
     })
-    vi.useRealTimers()
   })
 })
 
@@ -350,19 +344,23 @@ describe('MobileTerminalList — backdrop touchStart does not close context menu
       cwd: '/tmp/backdrop',
       createdAt: '2026-06-20T10:00:00.000Z',
     }
+    const user = userEvent.setup()
     await renderList([workspace], [unmatched])
-    // Open context menu
-    fireEvent.contextMenu(screen.getByText('Scratch 1 · backdrop'))
-    expect(screen.getByText('Move to workspace')).toBeTruthy()
+    await user.pointer({
+      keys: '[MouseRight]',
+      target: screen.getByRole('button', { name: 'Scratch 1 · backdrop' }),
+    })
+    expect(screen.getAllByText('Move to workspace')).toHaveLength(1)
 
-    // touchStart on the backdrop should NOT close the menu
+    // touchStart on the backdrop should NOT close the menu (user-event has no touch input)
+    // eslint-disable-next-line testing-library/no-node-access -- the backdrop is a bare div with no role, label or text
     const backdrop = document.querySelector('.mobile-context-menu-backdrop') as HTMLElement
     expect(backdrop).not.toBeNull()
     fireEvent.touchStart(backdrop)
-    expect(screen.queryByText('Move to workspace')).not.toBeNull()
+    expect(screen.getByText('Move to workspace')).toBeTruthy()
 
     // click on backdrop closes it
-    fireEvent.click(backdrop)
+    await user.click(backdrop)
     expect(screen.queryByText('Move to workspace')).toBeNull()
   })
 })

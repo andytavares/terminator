@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { ScheduledView } from '../../../../src/renderer/components/home/ScheduledView'
 import { useStartWorkStore } from '../../../../src/renderer/components/home/start-work'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -85,9 +86,9 @@ const shown = async () => {
   render(<ScheduledView />)
   await act(async () => {})
 }
-const rowOf = (prompt: string) => screen.getByText(prompt).closest('tr') as HTMLElement
-const openMenu = (prompt: string) =>
-  fireEvent.click(screen.getByRole('button', { name: `Actions for ${prompt}` }))
+const rowOf = (prompt: string) => screen.getByRole('row', { name: (name) => name.includes(prompt) })
+const openMenu = (user: UserEvent, prompt: string) =>
+  user.click(screen.getByRole('button', { name: `Actions for ${prompt}` }))
 const menuItems = () =>
   within(screen.getByRole('menu'))
     .getAllByRole('menuitem')
@@ -123,71 +124,92 @@ describe('ScheduledView — the table', () => {
 })
 
 describe('ScheduledView — the table, paused runs and editing', () => {
-  it('marks a paused run Paused, and its menu offers Resume', async () => {
+  it.each([
+    ['Summarise merged pull requests', 1, ['Run now', 'Resume', 'Edit…', 'Remove…']],
+    ['Triage the inbox', 0, ['Run now', 'Pause', 'Edit…', 'Remove…']],
+  ])('marks "%s" Paused %i time(s), and its menu offers %j', async (prompt, badges, items) => {
+    const user = userEvent.setup()
     await shown()
-    expect(within(rowOf('Summarise merged pull requests')).getByText('Paused')).toBeTruthy()
-    openMenu('Summarise merged pull requests')
-    expect(menuItems()).toEqual(['Run now', 'Resume', 'Edit…', 'Remove…'])
+    expect(within(rowOf(prompt)).queryAllByText('Paused')).toHaveLength(badges)
+    await openMenu(user, prompt)
+    expect(menuItems()).toEqual(items)
   })
 
-  it('offers Pause for a run that is not paused', async () => {
+  it.each([
+    ['its row is clicked', (user: UserEvent) => user.click(rowOf('Triage the inbox'))],
+    [
+      'Edit… is chosen from its menu',
+      async (user: UserEvent) => {
+        await openMenu(user, 'Triage the inbox')
+        await user.click(screen.getByRole('menuitem', { name: 'Edit…' }))
+      },
+    ],
+  ])('opens Start work to edit the run when %s', async (_case, edit) => {
+    const user = userEvent.setup()
     await shown()
-    expect(within(rowOf('Triage the inbox')).queryByText('Paused')).toBeNull()
-    openMenu('Triage the inbox')
-    expect(menuItems()).toEqual(['Run now', 'Pause', 'Edit…', 'Remove…'])
-  })
-
-  it('opens Start work to edit the run when its row is clicked', async () => {
-    await shown()
-    fireEvent.click(rowOf('Triage the inbox'))
+    await edit(user)
     expect(useStartWorkStore.getState()).toMatchObject({ open: true, editing: triage })
   })
 })
 
+describe('ScheduledView — after an edit', () => {
+  it('reads the list again when Start work closes, and shows the new time', async () => {
+    await shown()
+    act(() => useStartWorkStore.getState().openLauncher('', triage))
+    schedules.list.mockResolvedValue({ data: [{ ...triage, time: '14:30' }, summarise] })
+    act(() => useStartWorkStore.getState().closeLauncher())
+    expect(await within(rowOf('Triage the inbox')).findByText(/every day at 14:30/)).toBeTruthy()
+  })
+})
+
+describe('ScheduledView — pausing and resuming from the row menu', () => {
+  it.each([
+    {
+      action: 'Pause',
+      prompt: 'Triage the inbox',
+      data: [{ ...triage, paused: true }, summarise],
+      saved: { id: 's1', paused: true },
+      badges: 1,
+    },
+    {
+      action: 'Resume',
+      prompt: 'Summarise merged pull requests',
+      data: [triage, { ...summarise, paused: false }],
+      saved: { id: 's2', paused: false },
+      badges: 0,
+    },
+  ])('$action on "$prompt" saves it and shows the list read again', async (row) => {
+    const user = userEvent.setup()
+    await shown()
+    schedules.list.mockResolvedValue({ data: row.data })
+    await openMenu(user, row.prompt)
+    await user.click(screen.getByRole('menuitem', { name: row.action }))
+    expect(schedules.pause).toHaveBeenCalledWith(row.saved)
+    expect(within(rowOf(row.prompt)).queryAllByText('Paused')).toHaveLength(row.badges)
+  })
+})
+
 describe('ScheduledView — the row menu', () => {
-  it('pauses a run and shows the list read again', async () => {
-    await shown()
-    schedules.list.mockResolvedValue({ data: [{ ...triage, paused: true }, summarise] })
-    openMenu('Triage the inbox')
-    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Pause' })))
-    expect(schedules.pause).toHaveBeenCalledWith({ id: 's1', paused: true })
-    expect(within(rowOf('Triage the inbox')).getByText('Paused')).toBeTruthy()
-  })
-
-  it('resumes a paused run', async () => {
-    await shown()
-    schedules.list.mockResolvedValue({ data: [triage, { ...summarise, paused: false }] })
-    openMenu('Summarise merged pull requests')
-    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Resume' })))
-    expect(schedules.pause).toHaveBeenCalledWith({ id: 's2', paused: false })
-    expect(within(rowOf('Summarise merged pull requests')).queryByText('Paused')).toBeNull()
-  })
-
   it('runs a run now and shows its new last run', async () => {
+    const user = userEvent.setup()
     await shown()
     schedules.list.mockResolvedValue({
       data: [{ ...triage, lastRunAt: '2026-11-06T10:15:00' }, summarise],
     })
-    openMenu('Triage the inbox')
-    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Run now' })))
+    await openMenu(user, 'Triage the inbox')
+    await user.click(screen.getByRole('menuitem', { name: 'Run now' }))
     expect(schedules.runNow).toHaveBeenCalledWith({ id: 's1' })
     expect(within(rowOf('Triage the inbox')).getByText('Fri 6 Nov 10:15')).toBeTruthy()
   })
 })
 
-describe('ScheduledView — the row menu, editing and failures', () => {
-  it('opens Start work to edit from Edit…', async () => {
-    await shown()
-    openMenu('Triage the inbox')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit…' }))
-    expect(useStartWorkStore.getState()).toMatchObject({ open: true, editing: triage })
-  })
-
+describe('ScheduledView — the row menu, failures and runs that come due', () => {
   it('says in plain words when a run could not start now', async () => {
+    const user = userEvent.setup()
     schedules.runNow.mockResolvedValue({ error: 'failed', message: 'ZodError: id' })
     await shown()
-    openMenu('Triage the inbox')
-    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Run now' })))
+    await openMenu(user, 'Triage the inbox')
+    await user.click(screen.getByRole('menuitem', { name: 'Run now' }))
     expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([
       'Triage the inbox could not be started now.',
     ])
@@ -208,23 +230,25 @@ describe('ScheduledView — the row menu, editing and failures', () => {
 
 describe('ScheduledView — removing a run', () => {
   it('asks first, and keeps the run when the question is cancelled', async () => {
+    const user = userEvent.setup()
     await shown()
-    openMenu('Triage the inbox')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove…' }))
+    await openMenu(user, 'Triage the inbox')
+    await user.click(screen.getByRole('menuitem', { name: 'Remove…' }))
     const dialog = screen.getByRole('dialog', { name: 'Remove this scheduled run?' })
     expect(within(dialog).getByText('Triage the inbox')).toBeTruthy()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     expect(schedules.delete).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('removes the run on confirm and shows the list without it', async () => {
+    const user = userEvent.setup()
     await shown()
     schedules.list.mockResolvedValue({ data: [summarise] })
-    openMenu('Triage the inbox')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove…' }))
+    await openMenu(user, 'Triage the inbox')
+    await user.click(screen.getByRole('menuitem', { name: 'Remove…' }))
     const dialog = screen.getByRole('dialog', { name: 'Remove this scheduled run?' })
-    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' })))
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }))
     expect(schedules.delete).toHaveBeenCalledWith({ id: 's1' })
     expect(screen.queryByText('Triage the inbox')).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -233,11 +257,12 @@ describe('ScheduledView — removing a run', () => {
 
 describe('ScheduledView — no runs', () => {
   it('says there are none and offers a new scheduled run on a repeat', async () => {
+    const user = userEvent.setup()
     schedules.list.mockResolvedValue({ data: [] })
     await shown()
     expect(screen.getByRole('heading', { name: 'No scheduled runs' })).toBeTruthy()
     expect(screen.queryByRole('table')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'New scheduled run' }))
+    await user.click(screen.getByRole('button', { name: 'New scheduled run' }))
     expect(useStartWorkStore.getState()).toMatchObject({ open: true, repeat: true, editing: null })
   })
 })
@@ -252,11 +277,12 @@ const live = (agentState: 'working' | 'awaiting-input' | 'idle') => {
 
 describe('ScheduledView — a run that is going', () => {
   it('says Running while its agent works, and View opens its session', async () => {
+    const user = userEvent.setup()
     live('working')
     await shown()
     const row = rowOf('Triage the inbox')
     expect(within(row).getByText('Running')).toBeTruthy()
-    fireEvent.click(within(row).getByRole('button', { name: 'View' }))
+    await user.click(within(row).getByRole('button', { name: 'View' }))
     expect(revealSession).toHaveBeenCalledWith('run-1')
     // View is not a press on the row, which edits the run.
     expect(useStartWorkStore.getState().open).toBe(false)
@@ -290,9 +316,8 @@ describe('ScheduledView — dragging a run to an agent tab', () => {
   it('carries the session of a run that is open, without editing the run', async () => {
     live('working')
     await shown()
-    const lastRun = within(rowOf('Triage the inbox')).getByText('Running').closest('[draggable]')!
     const dataTransfer = { setData: vi.fn(), effectAllowed: '' }
-    fireEvent.dragStart(lastRun, { dataTransfer })
+    fireEvent.dragStart(within(rowOf('Triage the inbox')).getByText('Running'), { dataTransfer })
     expect(dataTransfer.setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 'run-1')
     expect(dataTransfer.effectAllowed).toBe('copy')
     expect(useStartWorkStore.getState().open).toBe(false)
@@ -300,6 +325,8 @@ describe('ScheduledView — dragging a run to an agent tab', () => {
 
   it('offers nothing to drag for a run with no open session', async () => {
     await shown()
-    expect(rowOf('Triage the inbox').querySelector('[draggable="true"]')).toBeNull()
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(rowOf('Triage the inbox'), { dataTransfer })
+    expect(dataTransfer.setData).not.toHaveBeenCalledWith(SESSION_DRAG_TYPE, expect.anything())
   })
 })

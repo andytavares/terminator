@@ -33,9 +33,9 @@ async function loadShimInFrame(): Promise<{ port: FakePort }> {
   vi.resetModules()
   const port = fakeFramePort()
   // happy-dom has window.top === window by default; pretend this is a frame.
-  Object.defineProperty(window, 'top', { value: {}, configurable: true })
+  vi.stubGlobal('top', {})
   // happy-dom reports "X11; Darwin arm64"; a real mac reads "MacIntel".
-  Object.defineProperty(navigator, 'platform', { value: 'MacIntel', configurable: true })
+  vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
   await import(SHIM_PATH)
   return { port }
 }
@@ -43,13 +43,13 @@ async function loadShimInFrame(): Promise<{ port: FakePort }> {
 beforeEach(() => {
   Reflect.deleteProperty(window, 'electronAPI')
   document.documentElement.removeAttribute('data-theme')
+  document.documentElement.removeAttribute('data-escape-gesture')
   document.documentElement.style.height = ''
   document.body.style.height = ''
   document.body.innerHTML = ''
 })
 
 afterEach(() => {
-  Object.defineProperty(window, 'top', { value: window, configurable: true })
   vi.resetModules()
 })
 
@@ -64,11 +64,6 @@ describe('frame-shim outside a frame', () => {
 })
 
 describe('frame-shim port handshake', () => {
-  it('installs window.electronAPI before the port arrives', async () => {
-    await loadShimInFrame()
-    expect(frameApi()).toBeDefined()
-  })
-
   it('ignores a message from a source other than the parent window', async () => {
     const { port } = await loadShimInFrame()
     deliverPort(port as unknown as MessagePort, {})
@@ -227,6 +222,40 @@ describe('frame-shim keyboard gestures', () => {
   })
 })
 
+describe('frame-shim Escape decisions', () => {
+  // The e2e specs read this to know a key was handled, and that it asked for no exit.
+  it('stamps the page with what each Escape decided: the first waits, the second exits', async () => {
+    await connectedFrame()
+    const decision = () => document.documentElement.getAttribute('data-escape-gesture')
+    pressFrameKey('Escape')
+    expect(decision()).toBe('pending')
+    pressFrameKey('Escape')
+    expect(decision()).toBe('exit')
+  })
+
+  // Escape twice while typing used to close the extension and take the draft with it.
+  it('does not post request-exit on two Escapes in a text field, and leaves the draft there', async () => {
+    const { port } = await connectedFrame()
+    const field = document.body.appendChild(document.createElement('textarea'))
+    field.value = 'UNSAVED DRAFT'
+    field.focus()
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(port.posted).not.toContainEqual({ type: 'request-exit' })
+    expect(document.documentElement.getAttribute('data-escape-gesture')).toBe('suppressed')
+    expect(field.value).toBe('UNSAVED DRAFT')
+  })
+
+  it('stamps an Escape a modal dialog holds as suppressed', async () => {
+    await connectedFrame()
+    const dialog = document.body.appendChild(document.createElement('dialog'))
+    dialog.showModal()
+    pressFrameKey('Escape')
+    dialog.remove()
+    expect(document.documentElement.getAttribute('data-escape-gesture')).toBe('suppressed')
+  })
+})
+
 /** Presses `key` on the frame's page and returns the event, to read whether it was swallowed. */
 function pressShortcut(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { key, cancelable: true, bubbles: true, ...init })
@@ -290,14 +319,8 @@ function createFitContentSpies() {
 /** Loads the shim as if the frame's page were at `url`, embedded by the page at `referrer`. */
 async function loadShimAt(url: string, referrer = 'http://localhost:5173/home'): Promise<void> {
   const realLocation = window.location
-  Object.defineProperty(window, 'location', {
-    value: { ...realLocation, search: new URL(url).search },
-    configurable: true,
-  })
-  Object.defineProperty(document, 'referrer', {
-    value: referrer,
-    configurable: true,
-  })
+  vi.stubGlobal('location', { ...realLocation, search: new URL(url).search })
+  vi.spyOn(document, 'referrer', 'get').mockReturnValue(referrer)
   await loadShimInFrame()
 }
 

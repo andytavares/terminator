@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import os from 'os'
-import { newExtensionHost, storedExtensionRecord } from './fake-backend-host'
+import { newExtensionHost, storedExtensionRecord } from '../../support/fake-backend-host'
 
 vi.mock('electron', () => ({
   app: {
@@ -252,5 +252,36 @@ describe('ExtensionHost.whenActivated', () => {
     const { host } = await newExtensionHost()
     await host.startAll({ bundledDirectory: '/nonexistent/bundle', beforeActivation: ready })
     await expect(host.whenActivated('com.unknown')).resolves.toBeUndefined()
+  })
+})
+
+/** The next app start: a fresh module and host over the same stored records, with no bundle. */
+async function restartedHost() {
+  vi.resetModules()
+  const restarted = await newExtensionHost()
+  await restarted.host.startAll({ bundledDirectory: join(bundle, 'none'), beforeActivation: ready })
+  return restarted
+}
+
+describe('ExtensionHost — an extension installed from a folder, across a restart', () => {
+  it('is listed as enabled and activated again on the next start', async () => {
+    const { host } = await newExtensionHost()
+    await host.load(join(writeBundle({ 'e2e.probe': [] }), 'e2e.probe'))
+
+    const { host: next, backendHost } = await restartedHost()
+
+    expect(next.listAll()).toMatchObject([{ id: 'e2e.probe', status: 'enabled' }])
+    expect(backendHost.activated.map((record) => record.id)).toEqual(['e2e.probe'])
+  })
+
+  it('stays gone on the next start once uninstalled', async () => {
+    const { host } = await newExtensionHost()
+    await host.load(join(writeBundle({ 'e2e.probe': [] }), 'e2e.probe'))
+    await host.uninstallExtension('e2e.probe')
+
+    const { host: next, backendHost } = await restartedHost()
+
+    expect(next.listAll()).toEqual([])
+    expect(backendHost.activated).toEqual([])
   })
 })

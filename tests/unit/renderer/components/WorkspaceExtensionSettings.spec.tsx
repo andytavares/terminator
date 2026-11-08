@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { WorkspaceExtensionSettings } from '../../../../src/renderer/components/settings/WorkspaceExtensionSettings'
 import { seedStore } from '../../../support/renderer-stores'
@@ -100,9 +101,10 @@ describe('WorkspaceExtensionSettings', () => {
   })
 
   it("saves an edit as this workspace's own value", async () => {
+    const user = userEvent.setup()
     render(<WorkspaceExtensionSettings workspaceId={WORKSPACE_ID} />)
 
-    fireEvent.click(await signOffSwitch())
+    await user.click(await signOffSwitch())
 
     await eventually(() =>
       expect(updateWorkspaceSetting).toHaveBeenCalledWith(WORKSPACE_ID, SIGN_OFF, false)
@@ -115,10 +117,11 @@ describe('WorkspaceExtensionSettings — a workspace that sets its own value', (
   beforeEach(() => setUp({ [SIGN_OFF]: false }, { [SIGN_OFF]: true }))
 
   it('shows its own value, and "Use global default" hands the setting back', async () => {
+    const user = userEvent.setup()
     render(<WorkspaceExtensionSettings workspaceId={WORKSPACE_ID} />)
     expect((await signOffSwitch()).getAttribute('aria-checked')).toBe('false')
 
-    fireEvent.click(screen.getByText('Use global default'))
+    await user.click(screen.getByText('Use global default'))
 
     await waitFor(() =>
       expect(updateWorkspaceSetting).toHaveBeenCalledWith(WORKSPACE_ID, SIGN_OFF, undefined)
@@ -131,13 +134,15 @@ describe('WorkspaceExtensionSettings — a workspace that sets its own value', (
 })
 
 describe('WorkspaceExtensionSettings — no workspace-scoped settings', () => {
-  it('shows nothing', async () => {
+  it('shows nothing once the schemas have loaded', async () => {
     setUp({})
-    vi.mocked(window.electronAPI.extension.getSettingsSchemas).mockResolvedValue({
-      schemas: [schemas[1]],
-    })
+    const getSchemas = vi.mocked(window.electronAPI.extension.getSettingsSchemas)
+    getSchemas.mockResolvedValue({ schemas: [schemas[1]] })
     const { container } = render(<WorkspaceExtensionSettings workspaceId={WORKSPACE_ID} />)
-    await waitFor(() => expect(window.electronAPI.extension.getSettingsSchemas).toHaveBeenCalled())
+    // The component's own `.then` on this promise runs first, so the schemas are in state here.
+    await act(async () => {
+      await getSchemas.mock.results[0].value
+    })
     expect(container.textContent).toBe('')
   })
 })

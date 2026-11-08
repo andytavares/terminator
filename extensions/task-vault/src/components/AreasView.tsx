@@ -275,9 +275,9 @@ function AreasHeader({ statusFilter, onFilter, onNew }: HeaderProps): React.JSX.
   )
 }
 
-function percentDone(area: AreaData): string {
-  if (area.taskCount <= 0) return '0%'
-  return `${Math.round(((area.taskCount - area.openTaskCount) / area.taskCount) * 100)}%`
+function percentDone(area: AreaData): number {
+  if (area.taskCount <= 0) return 0
+  return Math.round(((area.taskCount - area.openTaskCount) / area.taskCount) * 100)
 }
 
 function CardProjects({ projects }: { projects: AreaProject[] }): React.JSX.Element {
@@ -313,8 +313,16 @@ function CardStats({ area }: { area: AreaData }): React.JSX.Element {
           </span>
         )}
       </div>
-      <div className="areas-view__card-progress">
-        <div className="areas-view__card-progress-fill" style={{ width: percentDone(area) }} />
+      <div
+        className="areas-view__card-progress"
+        role="progressbar"
+        aria-label="Tasks done"
+        aria-valuenow={percentDone(area)}
+      >
+        <div
+          className="areas-view__card-progress-fill"
+          style={{ width: `${percentDone(area)}%` }}
+        />
       </div>
       {projects.length > 0 && <CardProjects projects={projects} />}
     </div>

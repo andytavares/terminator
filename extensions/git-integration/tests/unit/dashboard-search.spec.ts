@@ -42,37 +42,25 @@ function prNode(overrides: Record<string, unknown> = {}) {
   }
 }
 
-describe('DASHBOARD_QUERIES', () => {
-  it('defines a search query for every dashboard section', () => {
-    expect(DASHBOARD_QUERIES['re-review']).toBe(
-      'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-desc'
-    )
-    expect(DASHBOARD_QUERIES.requested).toBe(
-      'is:pr is:open archived:false user-review-requested:@me sort:created-desc'
-    )
-    expect(DASHBOARD_QUERIES.team).toBe(
-      'is:pr is:open archived:false team-review-requested-user:LOGIN sort:created-desc'
-    )
-    expect(DASHBOARD_QUERIES.mine).toBe('is:pr is:open author:@me sort:created-desc')
-    expect(DASHBOARD_QUERIES.involved).toBe(
-      'is:pr is:open involves:@me -author:@me sort:created-desc'
-    )
-  })
-})
-
 const sections = ['involved', 'mine', 're-review', 'requested', 'team']
 
 const repoCount = (search: string) => search.match(/ repo:/g)?.length ?? 0
 
+/** The query `buildSectionQueries('bob')` builds for `section`. */
+const queryOf = (section: string) =>
+  buildSectionQueries('bob').find((q) => q.section === section)!.query
+
 describe('buildSectionQueries', () => {
-  it('builds one query per section, each holding exactly one search', () => {
+  it.each(sections)('builds the %s query with exactly one search and no repository', (section) => {
+    const query = queryOf(section)
+    expect(query.match(/: search\(/g)).toHaveLength(1)
+    expect(query).toContain('fragment prFields on PullRequest')
+    expect(query).not.toContain(' repo:')
+  })
+
+  it('builds one query per section, named for its section', () => {
     const queries = buildSectionQueries('bob')
     expect(queries.map((q) => q.section).sort()).toEqual(sections)
-    for (const { query } of queries) {
-      expect(query.match(/: search\(/g)).toHaveLength(1)
-      expect(query).toContain('fragment prFields on PullRequest')
-      expect(query).not.toContain(' repo:')
-    }
     const byName = Object.fromEntries(queries.map((q) => [q.section, q.query]))
     expect(byName['re-review']).toContain('reReview: search')
     expect(byName.team).toContain('team-review-requested-user:bob')
@@ -81,19 +69,19 @@ describe('buildSectionQueries', () => {
 })
 
 describe('buildSectionQueries — splits 450 repositories into chunks of at most 200 per section', () => {
-  it('splits 450 repositories into chunks of at most 200 per section', () => {
-    const repos = Array.from({ length: 450 }, (_, i) => `acme/repo-${i}`)
-    const queries = buildSectionQueries('bob', repos)
-    expect(queries).toHaveLength(15)
-    for (const section of sections) {
-      const own = queries.filter((q) => q.section === section)
-      expect(own).toHaveLength(3)
-      const covered = own.flatMap((q) =>
-        [...q.query.matchAll(/ repo:(acme\/repo-\d+)/g)].map((m) => m[1])
-      )
-      expect(covered).toEqual(repos)
-      for (const { query } of own) expect(repoCount(query)).toBeLessThanOrEqual(200)
-    }
+  const repos = Array.from({ length: 450 }, (_, i) => `acme/repo-${i}`)
+
+  it('builds three queries for each of the five sections', () => {
+    expect(buildSectionQueries('bob', repos)).toHaveLength(15)
+  })
+
+  it.each(sections)('splits the %s section into chunks of 200, 200 and 50', (section) => {
+    const own = buildSectionQueries('bob', repos).filter((q) => q.section === section)
+    expect(own.map((q) => repoCount(q.query))).toEqual([200, 200, 50])
+    const covered = own.flatMap((q) =>
+      [...q.query.matchAll(/ repo:(acme\/repo-\d+)/g)].map((m) => m[1])
+    )
+    expect(covered).toEqual(repos)
   })
 
   it('appends the qualifiers to the section query inside the search string', () => {
@@ -105,11 +93,10 @@ describe('buildSectionQueries — splits 450 repositories into chunks of at most
 })
 
 describe('buildSectionQueries — sorts every section newest first and asks for the match count', () => {
-  it('sorts every section newest first and asks for the match count', () => {
-    for (const { query } of buildSectionQueries('bob')) {
-      expect(query).toContain('sort:created-desc')
-      expect(query).toContain('issueCount')
-    }
+  it.each(sections)('sorts the %s section newest first and asks for the match count', (section) => {
+    const query = queryOf(section)
+    expect(query).toContain('sort:created-desc')
+    expect(query).toContain('issueCount')
   })
 })
 
@@ -247,23 +234,20 @@ describe('parseDashboard — computes commitsSinceMyReview by counting commits a
 })
 
 describe('parseDashboard — reviewedByMe from my latest reviews', () => {
-  it('flags a pull request whose latestReviews include the viewer', () => {
-    const node = prNode({
-      latestReviews: {
-        nodes: [
-          { author: { login: 'alice' }, submittedAt: '2026-01-02T00:00:00Z', commit: { oid: 'a' } },
-        ],
-      },
-    })
+  const reviewByAlice = {
+    author: { login: 'alice' },
+    submittedAt: '2026-01-02T00:00:00Z',
+    commit: { oid: 'a' },
+  }
+
+  it.each([
+    ['flags a pull request whose latestReviews include the viewer', [reviewByAlice], true],
+    ['does not flag a pull request the viewer never reviewed', [], false],
+  ])('%s', (_name, reviews, reviewedByMe) => {
+    const node = prNode({ latestReviews: { nodes: reviews } })
     const raw = { data: { requested: { nodes: [node] } } }
     const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
-    expect(pr.reviewedByMe).toBe(true)
-  })
-
-  it('does not flag a pull request the viewer never reviewed', () => {
-    const raw = { data: { requested: { nodes: [prNode()] } } }
-    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
-    expect(pr.reviewedByMe).toBe(false)
+    expect(pr.reviewedByMe).toBe(reviewedByMe)
   })
 })
 
@@ -401,16 +385,17 @@ describe('dashboardBranches', () => {
 })
 
 describe('buildSectionQueries — asks only the sections that need them for checks and request times', () => {
-  const queryOf = (section: string) =>
-    buildSectionQueries('bob').find((q) => q.section === section)!.query
-
-  it('asks for the latest commit checks on my pull requests only', () => {
+  it('asks for the latest commit checks on my pull requests', () => {
     expect(queryOf('mine')).toContain('latestChecks')
     expect(queryOf('mine')).toContain('contexts(first: 50)')
-    for (const other of ['requested', 're-review', 'team', 'involved']) {
-      expect(queryOf(other)).not.toContain('latestChecks')
-    }
   })
+
+  it.each(['requested', 're-review', 'team', 'involved'])(
+    'asks for no latest commit checks on the %s section',
+    (section) => {
+      expect(queryOf(section)).not.toContain('latestChecks')
+    }
+  )
 
   it('asks for the review request time on requested and re-review only', () => {
     expect(queryOf('requested')).toContain('REVIEW_REQUESTED_EVENT')

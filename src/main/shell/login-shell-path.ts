@@ -6,7 +6,7 @@ const MARK = '__TERMINATOR_PATH__'
 /** A shell with heavy rc files (version managers, cloud CLIs) takes 2 to 5 seconds to start; a
  * wait shorter than that loses the PATH for the whole session and `gh` fails with ENOENT.
  * @internal */
-export const LOGIN_SHELL_TIMEOUT_MS = 20_000
+const LOGIN_SHELL_TIMEOUT_MS = 20_000
 
 /**
  * Put the user's login-shell PATH ahead of the app's own.

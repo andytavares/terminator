@@ -98,7 +98,6 @@ describe('asks', () => {
   it.each([
     ['stranded', 'Foundry stopped'],
     ['halted', 'Foundry stopped'],
-    ['failed', 'Foundry stopped'],
     ['stopped', 'Foundry stopped'],
     ['asking', 'Foundry is asking'],
   ] as const)('titles a %s standing "%s"', (kind, title) => {

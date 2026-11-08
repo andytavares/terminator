@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AddToTaskDialog } from '../../../../../src/renderer/components/tasks/AddToTaskDialog'
 import { openAddToTask } from '../../../../../src/renderer/components/tasks/add-to-task'
 import { useTaskStore } from '../../../../../src/renderer/stores/task.store'
@@ -93,10 +94,9 @@ describe('Add to task — which tasks it lists', () => {
     expect(screen.queryByText('Old idea')).toBeNull()
   })
 
-  it('filters as you type', () => {
-    fireEvent.change(screen.getByRole('textbox', { name: 'Find a task' }), {
-      target: { value: 'bill' },
-    })
+  it('filters as you type', async () => {
+    const user = userEvent.setup()
+    await user.type(screen.getByRole('textbox', { name: 'Find a task' }), 'bill')
     expect(screen.queryByRole('button', { name: /Rate limits across services/ })).toBeNull()
     expect(screen.getByRole('button', { name: /Billing copy/ })).toBeTruthy()
   })
@@ -113,11 +113,12 @@ describe('Add to task — which tasks it lists', () => {
 
 describe('Add to task — the same-name suggestion', () => {
   it('offers the other repos’ branches of that name without adding them', async () => {
+    const user = userEvent.setup()
     expect(screen.getByText(/Suggested: 2 other branches named/).textContent).toContain(
       'rate-limits'
     )
     expect(suggestion().getAttribute('aria-checked')).toBe('false')
-    fireEvent.click(screen.getByRole('button', { name: /Billing copy/ }))
+    await user.click(screen.getByRole('button', { name: /Billing copy/ }))
     await waitFor(() => expect(lanesOf('Billing copy')).toHaveLength(2))
     expect(lanesOf('Billing copy')).toEqual([
       { repoRoot: '/repos/web', branch: 'billing' },
@@ -126,8 +127,9 @@ describe('Add to task — the same-name suggestion', () => {
   })
 
   it('adds them too once ticked', async () => {
-    fireEvent.click(suggestion())
-    fireEvent.click(screen.getByRole('button', { name: /Billing copy/ }))
+    const user = userEvent.setup()
+    await user.click(suggestion())
+    await user.click(screen.getByRole('button', { name: /Billing copy/ }))
     await waitFor(() => expect(lanesOf('Billing copy')).toHaveLength(4))
     expect(lanesOf('Billing copy')?.map((l) => l.repoRoot)).toEqual([
       '/repos/web',
@@ -140,14 +142,20 @@ describe('Add to task — the same-name suggestion', () => {
 
 describe('Add to task — a new task', () => {
   it('makes a task named after the branch holding just this lane', async () => {
-    fireEvent.click(screen.getByRole('button', { name: '+ New task from api-gateway/rate-limits' }))
+    const user = userEvent.setup()
+    await user.click(
+      screen.getByRole('button', { name: '+ New task from api-gateway/rate-limits' })
+    )
     await waitFor(() => expect(lanesOf('rate-limits')).toEqual([THIS_LANE]))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('holds the suggested lanes as well when they are ticked', async () => {
-    fireEvent.click(suggestion())
-    fireEvent.click(screen.getByRole('button', { name: '+ New task from api-gateway/rate-limits' }))
+    const user = userEvent.setup()
+    await user.click(suggestion())
+    await user.click(
+      screen.getByRole('button', { name: '+ New task from api-gateway/rate-limits' })
+    )
     await waitFor(() => expect(lanesOf('rate-limits')).toHaveLength(3))
   })
 })

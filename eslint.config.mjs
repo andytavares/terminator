@@ -44,6 +44,54 @@ function extensionImportBoundary() {
   })
 }
 
+const CLOCK_MESSAGE =
+  'A pure layer never reads the clock: `now` is a parameter (ADR-027, Constitution XI).'
+const CLOCK_READS = [
+  "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+  "NewExpression[callee.name='Date'][arguments.length=0]",
+]
+
+/** A pure layer's rules: no value import but its siblings and `allowed` (so no React, store or
+ * zustand), and no clock. `also` names the other allowed imports in the message. */
+function pureLayer({ files, ignores = [], allowed, also }) {
+  const message = `A pure layer value-imports only its siblings and ${also}; import the type, or pass the value in (ADR-027).`
+  return {
+    files,
+    ignores,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ regex: `^(?!\\./|${allowed})`, allowTypeImports: true, message }] },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        ...CLOCK_READS.map((selector) => ({ selector, message: CLOCK_MESSAGE })),
+      ],
+    },
+  }
+}
+
+/** `src/renderer/sidebar/` and the Desk's `src/renderer/home/` decide what is shown from their
+ * arguments alone (ADR-027, Constitution XI). */
+function pureLayers() {
+  return [
+    pureLayer({
+      files: ['src/renderer/sidebar/*.ts'],
+      // The shared type module holds frozen identifiers beside the types; the stored-JSON
+      // helper holds no React, store or clock.
+      allowed: '\\.\\./\\.\\./shared/types/index$|\\.\\./home/local-storage$',
+      also: '../../shared/types/index or ../home/local-storage',
+    }),
+    pureLayer({
+      files: ['src/renderer/home/*.ts'],
+      // The Desk's stores hold what the operator did, so they may use zustand and the clock.
+      ignores: ['src/renderer/home/{dismissals,focus-store,local-storage}.ts'],
+      allowed: '\\.\\./sidebar/|@terminator/extension-sdk/plain$',
+      also: 'the sidebar layer (../sidebar/) or @terminator/extension-sdk/plain',
+    }),
+  ]
+}
+
 const SLEEP_MESSAGE =
   'Tests never sleep or wait a tick (ADR 123). Wait on the condition you assert next: a locator assertion, expect.poll, eventually() from tests/support/eventually.ts, fake timers, or the promise the code under test returns.'
 
@@ -221,6 +269,36 @@ export default defineConfig([
           message: SLEEP_MESSAGE,
         },
         ...TIMEOUT_OVERRIDES.map((selector) => ({ selector, message: TIMEOUT_MESSAGE })),
+        // Any timer a spec starts, not only one inside a promise: a delay in a callback is a guess.
+        { selector: "CallExpression[callee.name='setTimeout']", message: SLEEP_MESSAGE },
+        {
+          selector:
+            "CallExpression[callee.object.name='Object'][callee.property.name='defineProperty'] > Identifier.arguments:first-child[name=/^(window|globalThis|navigator|document)$/]",
+          message:
+            'Stub a global with vi.stubGlobal, which vitest.config.ts undoes after each test (T-CLEAN-SLATE).',
+        },
+        {
+          selector: 'CallExpression[callee.property.name=/^(skipIf|runIf)$/]',
+          message:
+            'A test runs everywhere or fails; a skip that depends on the machine passes on a check nobody ran (T-SAME-ENV).',
+        },
+      ],
+    },
+  },
+  {
+    // A unit spec tests the core; an extension's code is tested by its own specs (T-NO-DUPLICATE).
+    files: ['tests/unit/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/extensions/*/src/**'],
+              message: "Test an extension's code in extensions/<name>/tests (T-NO-DUPLICATE).",
+            },
+          ],
+        },
       ],
     },
   },
@@ -253,6 +331,9 @@ export default defineConfig([
       ],
       'vitest/no-conditional-expect': 'error',
       'vitest/no-standalone-expect': 'error',
+      // One path per test: a branch or loop in its body is two tests or an it.each (T-READABLE).
+      'vitest/no-conditional-in-test': 'error',
+      'vitest/no-disabled-tests': 'error',
     },
   },
   {
@@ -264,10 +345,35 @@ export default defineConfig([
       'testing-library/no-wait-for-side-effects': 'error',
       // Wait for the element the test acts on, not for something else first (the #292 flake).
       'testing-library/prefer-find-by': 'error',
+      // A person clicks, types and presses keys; fireEvent stays only for what user-event cannot do.
+      'testing-library/prefer-user-event': [
+        'error',
+        {
+          allowedMethods: [
+            'drop',
+            'dragStart',
+            'dragOver',
+            'dragEnd',
+            'dragLeave',
+            'dragEnter',
+            'scroll',
+            'wheel',
+            'load',
+            'contextMenu',
+            'touchStart',
+            'touchMove',
+            'touchEnd',
+          ],
+        },
+      ],
+      'testing-library/prefer-presence-queries': 'error',
+      'testing-library/prefer-screen-queries': 'error',
+      // Query what a person perceives (role, label, text), not the DOM's structure (T-READABLE).
+      'testing-library/no-node-access': 'error',
     },
   },
   {
-    files: ['tests/e2e/**/*.ts'],
+    files: ['tests/e2e/**/*.ts', 'packages/extension-ui/visual/**/*.ts'],
     plugins: { playwright },
     rules: {
       'playwright/prefer-web-first-assertions': 'error',
@@ -278,8 +384,8 @@ export default defineConfig([
       'playwright/no-force-option': 'error',
       'playwright/no-element-handle': 'error',
       'playwright/no-useless-await': 'error',
-      // Skipping is forbidden (Constitution XIV); a skip that depends on the machine is allowed.
-      'playwright/no-skipped-test': ['error', { allowConditional: true }],
+      // Skipping is forbidden (Constitution XIV), a skip that depends on the machine included.
+      'playwright/no-skipped-test': ['error', { allowConditional: false }],
       'playwright/no-conditional-in-test': 'error',
     },
   },
@@ -308,6 +414,7 @@ export default defineConfig([
       ],
     },
   },
+  ...pureLayers(),
   {
     files: ['src/renderer/components/**/*.tsx'],
     rules: {

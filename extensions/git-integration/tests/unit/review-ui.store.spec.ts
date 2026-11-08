@@ -103,12 +103,6 @@ describe('review UI store — upserts agent runs newest first without duplicates
     expect(runs.map((r) => `${r.id}:${r.status}`)).toEqual(['a:done', 'b:running'])
   })
 
-  it('defaults diffViewMode to unified and hideFormattingHunks to true', () => {
-    const s = useReviewUiStore.getState()
-    expect(s.diffViewMode).toBe('unified')
-    expect(s.hideFormattingHunks).toBe(true)
-  })
-
   it('sets and persists diff view mode and formatting-hunk visibility', () => {
     const s = useReviewUiStore.getState()
     s.setDiffViewMode('split')

@@ -73,7 +73,7 @@ describe('breakOut', () => {
     expect(useBreakoutStore.getState().windows.get('s1')).toBe(opened)
   })
 
-  it('sizes the window like the terminal, or 800 by 500 when it has no size yet', () => {
+  it('sizes the window 800 by 500 when the terminal has no size yet', () => {
     seedSessions('p1', ['s1', 's2'])
     breakOut('s1')
     expect(open.mock.calls[0]?.[2]).toContain('width=800,height=500')
@@ -115,10 +115,9 @@ describe('breakOut — what stays in the main window', () => {
 
   it('unsplits the pane it takes out of the main pane', () => {
     seedSessions('p1', ['s1', 's2'])
-    const closeSplitLeaf = vi.fn()
-    useSessionStore.setState({ closeSplitLeaf })
+    sessionState().activateSplit('p1', { targetId: 's1', newId: 's2', direction: 'vertical' })
     breakOut('s2')
-    expect(closeSplitLeaf).toHaveBeenCalledWith('p1', 's2')
+    expect(sessionState().getPaneLayout('p1')).toBeNull()
   })
 })
 
@@ -181,13 +180,20 @@ describe('breakOut — styles added later', () => {
 })
 
 describe('breakOut — leaving the main document', () => {
-  it('stops watching the main document once the window is docked', () => {
-    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+  it('stops following the theme once the window is docked', async () => {
+    document.documentElement.dataset.theme = 'light'
     seedSessions('p1', ['s1', 's2'])
     breakOut('s1')
-    expect(disconnect).not.toHaveBeenCalled()
     dockBack('s1')
-    expect(disconnect).toHaveBeenCalledTimes(2)
+    // Observers are told in the order they were made, so once this one hears the change,
+    // breakout's own watcher would have copied it already.
+    const heard = vi.fn()
+    new MutationObserver(heard).observe(document.documentElement, {
+      attributeFilter: ['data-theme'],
+    })
+    document.documentElement.dataset.theme = 'dark'
+    await eventually(() => expect(heard).toHaveBeenCalled())
+    expect(opened.document.documentElement.dataset.theme).toBe('light')
   })
 })
 

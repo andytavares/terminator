@@ -7,8 +7,8 @@ vi.mock('electron', () => ({
 }))
 
 const mockCpus = vi.fn()
-const mockFreemem = vi.fn().mockReturnValue(2 * 1024 ** 3)
-const mockTotalmem = vi.fn().mockReturnValue(8 * 1024 ** 3)
+const mockFreemem = vi.fn()
+const mockTotalmem = vi.fn()
 vi.mock('os', () => ({
   default: { cpus: mockCpus, freemem: mockFreemem, totalmem: mockTotalmem },
   cpus: mockCpus,
@@ -52,6 +52,8 @@ function useMetricsMocks(): void {
     vi.clearAllMocks()
     vi.useFakeTimers()
     mockCpus.mockReturnValue(makeCpus(800, 1000))
+    mockFreemem.mockReturnValue(2 * 1024 ** 3)
+    mockTotalmem.mockReturnValue(8 * 1024 ** 3)
     mockExecFile.mockResolvedValue({ stdout: '' })
     mockReadFile.mockResolvedValue('')
     mockHandle.mockImplementation((_ch: string, fn: (...args: unknown[]) => unknown) => fn)

@@ -1,6 +1,6 @@
 # ADR 125: A security fix skips the release-age cooldown
 
-**Status**: Accepted
+**Status**: Superseded by ADR 151 (the release-age check is removed; `.npmrc`'s `min-release-age` is the rule)
 
 **Date**: 2026-10-23
 

@@ -13,7 +13,7 @@ import * as path from 'node:path'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
+import { execSucceeded, fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -110,7 +110,7 @@ function graphOnDisk(): RunGraph {
 
 beforeAll(async () => {
   host = fakeHost(() => dataDir)
-  host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+  host.exec.mockResolvedValue(execSucceeded(''))
   await activateFoundry(host)
 })
 
@@ -135,6 +135,8 @@ async function previousExecutorWoundDown(): Promise<void> {
 }
 
 beforeEach(async () => {
+  // mockReset clears what beforeAll set: no real git in a unit spec.
+  host.exec.mockResolvedValue(execSucceeded(''))
   // A previous test's resume leaves its executor winding down; while it is marked executing,
   // no node of the order counts as orphaned.
   await previousExecutorWoundDown()
@@ -248,7 +250,7 @@ function interruptedRunIpcPickingUpTests() {
     await seedInterruptedRun()
     await host.call('foundry:attention')
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'resume' })
-    expect(graphOnDisk().nodes[0].sessionId).toBe('session-from-a-dead-process')
+    expect((await restarted()).nodes[0].sessionId).toBe('session-from-a-dead-process')
   })
 }
 
@@ -264,6 +266,7 @@ function stoppingAndHoldingTests() {
     await seedInterruptedRun()
     await host.call('foundry:attention')
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'hold' })
+    expect(gatesOnDisk()[0].decision?.option).toBe('hold')
     expect(graphOnDisk().nodes[0].state).toBe('running')
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
   })
@@ -324,10 +327,6 @@ describe('stopping a run whose agents are still alive', () => {
 })
 
 describe('stopping the whole order rather than one agent', () => {
-  it('is reachable as its own channel, because a gate was the only way out', async () => {
-    await expect(host.call('foundry:run.stop', { id: 'WO-none' })).resolves.toBeDefined()
-  })
-
   it('cancels the order and writes down that a person did it', async () => {
     await seedInterruptedRun()
     expect(await host.call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })

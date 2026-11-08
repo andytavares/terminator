@@ -1,6 +1,6 @@
 # ADR 071: CI is sharded by duration, and the build warns nothing
 
-**Status**: Accepted
+**Status**: Accepted; its sharding by duration is superseded by ADR 151 (Playwright's own `--shard`)
 
 **Date**: 2026-09-27
 

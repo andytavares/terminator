@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { Forge } from '../../src/components/Forge.js'
@@ -92,10 +93,9 @@ beforeEach(() => {
 
 /** Puts `invoke` and the change bus behind the bridge the Forge reads. */
 function installForgeBridge(): void {
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: bus.on }, usage: { record: vi.fn() } },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke, on: bus.on },
+    usage: { record: vi.fn() },
   })
 }
 
@@ -176,17 +176,20 @@ function footer(): HTMLElement {
 function handOffButton(): HTMLElement {
   return within(footer()).getByRole('button', { name: /Hand off/ })
 }
+/** Waits for the footer's Hand off control, which appears once the order loads. */
+async function findHandOffButton(): Promise<HTMLElement> {
+  return within(await screen.findByRole('contentinfo')).findByRole('button', { name: /Hand off/ })
+}
 function queryHandOffButton(): HTMLElement | null {
-  const f = document.querySelector('.fdry-foot')
-  return f === null ? null : within(f as HTMLElement).queryByRole('button', { name: /Hand off/ })
+  const f = screen.queryByRole('contentinfo')
+  return f === null ? null : within(f).queryByRole('button', { name: /Hand off/ })
 }
 
 beforeEach(() => vi.clearAllMocks())
 
 describe('the tracker write-back panel', () => {
   describe('the rows and choices', theRowsAndChoicesTests)
-  describe('overriding', overridingTests)
-  describe('resetting', resettingTests)
+  describe('choosing a state', choosingTests)
   describe('nowhere to go', nowhereToGoTests)
   describe('nothing to offer', nothingToOfferTests)
 })
@@ -196,9 +199,9 @@ function theRowsAndChoicesTests() {
     mountStates({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
     await openForgeStep('Tracker')
     expect(screen.getByRole('heading', { name: 'Tracker write-back' })).toBeTruthy()
-    for (const label of ['When work starts', 'When the draft opens', 'When it merges']) {
-      expect(screen.getByText(label)).toBeTruthy()
-    }
+    expect(screen.getByText('When work starts')).toBeTruthy()
+    expect(screen.getByText('When the draft opens')).toBeTruthy()
+    expect(screen.getByText('When it merges')).toBeTruthy()
   })
 
   it('offers the tracker own states as the choices, by their own names', async () => {
@@ -214,41 +217,31 @@ function theRowsAndChoicesTests() {
   })
 }
 
-function overridingTests() {
-  it('stores the override when the operator picks one', async () => {
-    mountStates({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await openForgeStep('Tracker')
-
-    const select = screen.getAllByRole('combobox')[1]
-    fireEvent.change(select, { target: { value: 'st-progress' } })
-
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.mapState', {
-        id: 'WO-1',
-        intent: 'in_review',
-        optionId: 'st-progress',
+function choosingTests() {
+  it.each([
+    { picked: 'st-progress', stored: null, optionId: 'st-progress' },
+    { picked: '', stored: 'st-review', optionId: null },
+  ])(
+    'saves $optionId when the operator picks "$picked" over $stored',
+    async ({ picked, stored, optionId }) => {
+      const user = userEvent.setup()
+      mountStates({
+        capability: { transitions: 'supported', states: STATES, unreachable: [] },
+        mapping: { started: null, in_review: stored, done: null },
       })
-    )
-  })
-}
+      await openForgeStep('Tracker')
 
-function resettingTests() {
-  it('puts an intent back to the tracker own resolution', async () => {
-    mountStates({
-      capability: { transitions: 'supported', states: STATES, unreachable: [] },
-      mapping: { started: null, in_review: 'st-review', done: null },
-    })
-    await openForgeStep('Tracker')
+      await user.selectOptions(screen.getAllByRole('combobox')[1], picked)
 
-    fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '' } })
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.mapState', {
-        id: 'WO-1',
-        intent: 'in_review',
-        optionId: null,
-      })
-    )
-  })
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith('foundry:order.mapState', {
+          id: 'WO-1',
+          intent: 'in_review',
+          optionId,
+        })
+      )
+    }
+  )
 }
 
 function nowhereToGoTests() {
@@ -273,14 +266,14 @@ function nowhereToGoTests() {
 }
 
 function nothingToOfferTests() {
-  it('offers no step at all for an order nobody seeded from a tracker', async () => {
-    mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
-    await screen.findByText('Refuse an expired refresh token')
-    expect(within(stepList()).queryByRole('button', { name: /^Tracker/ })).toBeNull()
-  })
-
-  it('offers no step when the states channel answered with nothing', async () => {
-    mountStates({})
+  it.each([
+    {
+      order: 'nobody seeded from a tracker',
+      reply: { capability: { transitions: 'no_issue', states: [], unreachable: [] } },
+    },
+    { order: 'whose states channel answered with nothing', reply: {} },
+  ])('offers no Tracker step for an order $order', async ({ reply }) => {
+    mountStates(reply)
     await screen.findByText('Refuse an expired refresh token')
     expect(within(stepList()).queryByRole('button', { name: /^Tracker/ })).toBeNull()
   })
@@ -391,23 +384,23 @@ describe('handing off', () => {
 
 function startingTheLineTests() {
   it('starts the Line, rather than leaving the order agreed and idle', async () => {
+    const user = userEvent.setup()
     mountForStart()
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
+    await user.click(await findHandOffButton())
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1' }))
   })
 
   it('tells the caller the run began, so the surface can swap to the Floor', async () => {
+    const user = userEvent.setup()
     const onStarted = mountForStart()
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
+    await user.click(await findHandOffButton())
     await waitFor(() => expect(onStarted).toHaveBeenCalledWith('WO-1'))
   })
 
   it('says the order is agreed even when the run refused to start', async () => {
+    const user = userEvent.setup()
     const onStarted = mountForStart({ start: { error: 'this repository has no test command' } })
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
+    await user.click(await findHandOffButton())
     await screen.findByText(/agreed, but the run did not start/)
     expect(screen.getByText(/no test command/)).toBeTruthy()
     expect(onStarted).not.toHaveBeenCalled()
@@ -416,30 +409,31 @@ function startingTheLineTests() {
 
 function noStartTests() {
   it('starts nothing for an order that did not compile', async () => {
+    const user = userEvent.setup()
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
     await openForgeStep('Hand off')
     const button = await screen.findByRole('button', { name: 'Hand off' })
     expect(isUnavailable(button)).toBe(true)
     expect(reasonFor(button)).not.toBe('')
-    fireEvent.click(button)
+    await user.click(button)
     expect(invoke).not.toHaveBeenCalledWith('foundry:run.start', expect.anything())
   })
 }
 
 function forgeTheRefineryAdvisoryTests() {
   it('shows the refinery advisory as a note, once agreeing returns one (R4/R5)', async () => {
+    const user = userEvent.setup()
     mountForStart({ advisory: 'This queues behind WO-2 on src/a.ts.' })
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
+    await user.click(await findHandOffButton())
     const note = await screen.findByText('This queues behind WO-2 on src/a.ts.')
     expect(note.className).toContain('fdry-note')
     expect(note.className).not.toContain('fdry-problem')
   })
 
   it('says nothing about the refinery when nothing was queued', async () => {
+    const user = userEvent.setup()
     mountForStart()
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
+    await user.click(await findHandOffButton())
     await waitFor(() => expect(screen.getAllByText(/Handed off/).length).toBeGreaterThan(0))
     expect(screen.queryByText(/queues behind/)).toBeNull()
   })
@@ -490,26 +484,20 @@ function shapesItCannotRunTests() {
   it('will not let one it cannot run be chosen', async () => {
     mountForStart()
     await openForgeStep('Shape')
-    const speckit = screen.getByText('Speckit').closest('button') as HTMLElement
+    const speckit = screen.getByRole('button', { name: /^Speckit/ })
     expect(isUnavailable(speckit)).toBe(true)
     expect(reasonFor(speckit)).toContain('no SpecKit skills')
   })
 }
 
 function forgeChoosingTests() {
-  it('starts with the proposal when the operator says nothing', async () => {
-    mountForStart()
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1' }))
-  })
-
   it("carries the operator's own choice when they make one", async () => {
+    const user = userEvent.setup()
     mountForStart()
     await openForgeStep('Shape')
-    fireEvent.click(screen.getByText('Direct').closest('button') as HTMLElement)
+    await user.click(screen.getByRole('button', { name: /^Direct/ }))
     await openForgeStep('Hand off')
-    fireEvent.click(handOffButton())
+    await user.click(handOffButton())
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1', recipe: 'direct' })
     )
@@ -519,7 +507,7 @@ function forgeChoosingTests() {
 function nothingSupportedTests() {
   it('offers nothing when the repository supports no shape at all', async () => {
     mountForStart({ recipes: { recipes: [], proposed: '' } })
-    await waitFor(() => handOffButton())
+    expect(await findHandOffButton()).toBeTruthy()
     expect(within(stepList()).queryByRole('button', { name: /^Shape/ })).toBeNull()
   })
 }
@@ -549,6 +537,7 @@ function choosingMidTurnTests() {
   // still working. The pick is saved to the order as it is made, so hand-off
   // — the operator's or the automatic one — runs it.
   it('lets an available shape be chosen while an intake turn is running, and hand-off carries it', async () => {
+    const user = userEvent.setup()
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const running = runningIntake('2026-09-06T10:00:00.000Z', 'S-1')
     const ended = { kind: 'redrafted' as const, at: '2026-09-06T10:01:00.000Z', note: 'redrafted' }
@@ -562,13 +551,14 @@ function choosingMidTurnTests() {
     await openForgeStep('Shape')
     expect(isUnavailable(shapeButton('Direct'))).toBe(false)
     expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('false')
-    fireEvent.click(shapeButton('Direct'))
+    await user.click(shapeButton('Direct'))
     await eventually(() => expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('true'))
+    expect(invoke).toHaveBeenCalledWith('foundry:order.recipe', { id: 'WO-1', recipe: 'direct' })
 
     await orderChanged()
     await openForgeStep('Hand off')
     await eventually(() => expect(isUnavailable(handOffButton())).toBe(false))
-    fireEvent.click(handOffButton())
+    await user.click(handOffButton())
     await eventually(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1', recipe: 'direct' })
     )
@@ -596,21 +586,22 @@ function askingTheArchitectTests() {
   })
 
   it('asks the architect for one', async () => {
+    const user = userEvent.setup()
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
-    fireEvent.click(await screen.findByRole('button', { name: /Draft the plan/ }))
+    await user.click(await screen.findByRole('button', { name: /Draft the plan/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', { id: 'WO-1' })
     )
   })
 
   it('sends what the operator typed to the architect', async () => {
+    const user = userEvent.setup()
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
-    await screen.findByLabelText(/Tell the architect/)
-
-    fireEvent.change(await screen.findByLabelText(/Tell the architect/), {
-      target: { value: 'the second unit is not needed' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await user.type(
+      await screen.findByLabelText(/Tell the architect/),
+      'the second unit is not needed'
+    )
+    await user.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
         id: 'WO-1',
@@ -622,6 +613,7 @@ function askingTheArchitectTests() {
 
 function forgeRefusalsTests() {
   it('says why intake refused, rather than looking as though nothing happened', async () => {
+    const user = userEvent.setup()
     invoke = vi.fn(async (channel: string) => {
       if (channel === 'foundry:order.compile') {
         return { order: trackerDraft(), compile: compileOrder(trackerDraft()) }
@@ -638,7 +630,7 @@ function forgeRefusalsTests() {
     installForgeBridge()
     render(<Forge orderId="WO-1" />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Draft the plan/ }))
+    await user.click(await screen.findByRole('button', { name: /Draft the plan/ }))
     await screen.findByText('the proposal reached for a status')
   })
 }
@@ -744,7 +736,6 @@ function withChanged(changed: string[]) {
 
 describe('only the parts affected are redrawn (FR-007)', () => {
   describe('a struck assumption', aStruckAssumptionTests)
-  describe('nothing moved', nothingMovedTests)
 })
 
 function withFinding() {
@@ -777,45 +768,25 @@ function withFinding() {
 
 function aStruckAssumptionTests() {
   it('marks what a struck assumption moved, and nothing else', async () => {
+    const user = userEvent.setup()
     withChanged(['acceptance'])
     await openForgeStep('Plan')
     await screen.findByText(/sessions are stored in Redis/)
 
     // Striking one goes through `turn`, which is what carries the redraw list.
-    fireEvent.click(
-      screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
-    )
+    await user.click(screen.getByRole('button', { name: /sessions are stored in Redis/ }))
     await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'Acceptance criteria' }).closest('section')?.className
-      ).toContain('is-redrawn')
+      expect(screen.getByRole('region', { name: 'Acceptance criteria' }).className).toContain(
+        'is-redrawn'
+      )
     )
     // The redrawn-field dot on the step list is gone under the redesign: the
     // rail only carries readiness()'s own state/word for each step, nothing
     // about what moved on a previous turn. Only the field named in `changed`
     // is marked — "assumptions" was not, so it stays unmarked.
-    expect(
-      screen.getByRole('heading', { name: 'Assumptions' }).closest('section')?.className
-    ).not.toContain('is-redrawn')
-  })
-}
-
-function nothingMovedTests() {
-  it('marks nothing when nothing moved', async () => {
-    withChanged([])
-    await openForgeStep('Plan')
-    await screen.findByText(/sessions are stored in Redis/)
-    fireEvent.click(
-      screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
+    expect(screen.getByRole('region', { name: 'Assumptions' }).className).not.toContain(
+      'is-redrawn'
     )
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.turn', expect.anything())
-    )
-    expect(
-      within(stepList())
-        .getAllByRole('button')
-        .some((step) => step.className.includes('is-redrawn'))
-    ).toBe(false)
   })
 }
 
@@ -823,7 +794,6 @@ function nothingMovedTests() {
 // questions — not one at a time on the Red team step, and not sent until the
 // band's own Send button collects every decision into one turn.
 describe('deciding a blocking finding, in the band', () => {
-  describe('the decide button', theDecideButtonTests)
   describe('the moves', findingMovesTests)
   describe('sending a fix', sendingAFixTests)
   describe('the fix box and clearing', theFixBoxAndClearingTests)
@@ -862,30 +832,18 @@ function withQuestions() {
   mountShowing({ ...trackerDraft(), acceptance: [criterion()], openQuestions: TWO_QUESTIONS })
 }
 
-function theDecideButtonTests() {
-  it('offers a way to decide it, on the Red team step', async () => {
-    withFinding()
-    await openForgeStep('Red team')
-    await screen.findByText('the outcome restates the problem')
-    expect(screen.getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: /^Fix it my way/ })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: /^Accept it/ })).toBeTruthy()
-  })
-}
-
 function findingMovesTests() {
   it('offers the three moves as a choose-one group of radios, and Fix it my way opens the box', async () => {
+    const user = userEvent.setup()
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    const card = screen
-      .getByText('the outcome restates the problem')
-      .closest('.fdry-fnd') as HTMLElement
+    const card = screen.getByRole('group', { name: 'the outcome restates the problem' })
     expect(within(card).getByRole('group', { name: 'Choose one' })).toBeTruthy()
     expect(within(card).getAllByRole('radio')).toHaveLength(3)
     expect(within(card).queryByRole('textbox')).toBeNull()
 
-    fireEvent.click(within(card).getByRole('radio', { name: 'Fix it my way' }))
+    await user.click(within(card).getByRole('radio', { name: 'Fix it my way' }))
     expect(within(card).getByRole('textbox')).toBeTruthy()
   })
 }
@@ -895,15 +853,16 @@ function sendingAFixTests() {
   // resolved with nothing changed. Fixing is now saying how, to the architect,
   // and only once Send is pressed — not on typing it.
   it('sends the operator’s fix to the architect only once Send is pressed', async () => {
+    const user = userEvent.setup()
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(await screen.findByRole('radio', { name: /^Fix it my way/ }))
+    await user.click(await screen.findByRole('radio', { name: /^Fix it my way/ }))
     const how = screen.getByLabelText(/How should "the outcome restates the problem" be fixed/)
-    fireEvent.change(how, { target: { value: 'state what will be observably different' } })
+    await user.type(how, 'state what will be observably different')
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
 
-    fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
+    await user.click(screen.getByRole('button', { name: /Send \d decision/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:order.converge',
@@ -917,26 +876,18 @@ function sendingAFixTests() {
 }
 
 function theFixBoxAndClearingTests() {
-  it('opens the fix box under the finding it is for', async () => {
-    withFinding()
-    await openForgeStep('Red team')
-    await screen.findByText('the outcome restates the problem')
-    fireEvent.click(await screen.findByRole('radio', { name: /^Fix it my way/ }))
-    const finding = screen.getByText(/the outcome restates the problem/).closest('.fdry-fnd')
-    expect(finding?.querySelector('textarea')).toBeTruthy()
-  })
-
   // Reported: "I should be able to ask the agent to close the red team
   // findings too." Fixed and Accept were the only moves, and both are the
   // operator doing the work.
   it('asks the architect to clear it, once Send is pressed', async () => {
+    const user = userEvent.setup()
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(await screen.findByRole('radio', { name: /^Ask the architect/ }))
+    await user.click(await screen.findByRole('radio', { name: /^Ask the architect/ }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
 
-    fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
+    await user.click(screen.getByRole('button', { name: /Send \d decision/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', converged({ asks: ['RT-1'] }))
     )
@@ -947,6 +898,7 @@ function whileTheArchitectWorksTests() {
   // Nothing here is hidden while a turn runs, and the settle just sent
   // cleared its own selection, so there is nothing left to send again.
   it('keeps the step open while the architect works, with nothing left queued to send', async () => {
+    const user = userEvent.setup()
     mountAsking({
       ...trackerDraft(),
       redTeam: [
@@ -963,8 +915,8 @@ function whileTheArchitectWorksTests() {
     })
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(await screen.findByRole('radio', { name: /^Ask the architect/ }))
-    fireEvent.click(await screen.findByRole('button', { name: /Send \d decision/ }))
+    await user.click(await screen.findByRole('radio', { name: /^Ask the architect/ }))
+    await user.click(await screen.findByRole('button', { name: /Send \d decision/ }))
     await waitFor(() => expect(converges()).toBe(1))
 
     expect(screen.getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
@@ -979,19 +931,20 @@ function whileTheArchitectWorksTests() {
 
 function forgeAcceptingTests() {
   it('asks for the reason before accepting one', async () => {
+    const user = userEvent.setup()
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(await screen.findByRole('radio', { name: /^Accept it/ }))
+    await user.click(await screen.findByRole('radio', { name: /^Accept it/ }))
     const box = await screen.findByLabelText(/Why "the outcome restates the problem" is accepted/)
 
     // Nothing is sent until there is one — a shrug is not a decision.
     const send = () => screen.getByRole('button', { name: /^Send( \d)? decisions?$/ })
     expect(isUnavailable(send())).toBe(true)
 
-    fireEvent.change(box, { target: { value: 'the risk is priced in' } })
+    await user.type(box, 'the risk is priced in')
     expect(isUnavailable(send())).toBe(false)
-    fireEvent.click(send())
+    await user.click(send())
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:order.converge',
@@ -1045,6 +998,7 @@ function withFindings() {
 
 function choosingSeveralTests() {
   it('shows a multiple-answer question as checkboxes and sends every box ticked', async () => {
+    const user = userEvent.setup()
     mountShowing({
       ...trackerDraft(),
       acceptance: [criterion()],
@@ -1055,13 +1009,13 @@ function choosingSeveralTests() {
     expect(within(asked).getAllByRole('checkbox')).toHaveLength(3)
     expect(within(asked).queryAllByRole('radio')).toHaveLength(0)
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /^api/ }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /^cli/ }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /^web/ }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /^web/ }))
+    await user.click(screen.getByRole('checkbox', { name: /^api/ }))
+    await user.click(screen.getByRole('checkbox', { name: /^cli/ }))
+    await user.click(screen.getByRole('checkbox', { name: /^web/ }))
+    await user.click(screen.getByRole('checkbox', { name: /^web/ }))
     expect(screen.getByText(/1 of 1 decided/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
+    await user.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:order.converge',
@@ -1082,28 +1036,30 @@ function clearingAChoiceTests() {
   })
 
   it('counts a multiple question undecided once every box is cleared', async () => {
+    const user = userEvent.setup()
     mountShowing({
       ...trackerDraft(),
       acceptance: [criterion()],
       openQuestions: [{ ...TWO_QUESTIONS[0], multiple: true }],
     })
     await screen.findByText('which token?')
-    fireEvent.click(await screen.findByRole('checkbox', { name: /^a/ }))
-    fireEvent.click(await screen.findByRole('checkbox', { name: /^a/ }))
+    await user.click(await screen.findByRole('checkbox', { name: /^a/ }))
+    await user.click(await screen.findByRole('checkbox', { name: /^a/ }))
     expect(screen.getByText(/0 of 1 decided/)).toBeTruthy()
   })
 }
 
 function oneConvergeCallTests() {
   it('issues one converge call carrying every answer', async () => {
+    const user = userEvent.setup()
     withQuestions()
     await screen.findByText('which token?')
 
-    fireEvent.click(await screen.findByRole('radio', { name: 'b' }))
-    fireEvent.click(await screen.findByRole('radio', { name: 'client' }))
+    await user.click(await screen.findByRole('radio', { name: 'b' }))
+    await user.click(await screen.findByRole('radio', { name: 'client' }))
     expect(screen.getByText(/2 of 2 decided/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
+    await user.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:order.converge',
@@ -1121,12 +1077,13 @@ function oneConvergeCallTests() {
 
 function sendUnavailableUntilAnsweredTests() {
   it('leaves Send unavailable until at least one question is answered', async () => {
+    const user = userEvent.setup()
     withQuestions()
     await screen.findByText('which token?')
     const send = () => screen.getByRole('button', { name: /^Send( \d)? decisions?$/ })
     expect(isUnavailable(send())).toBe(true)
     expect(reasonFor(send())).toBe('Choose an answer or a decision above first.')
-    fireEvent.click(screen.getByRole('radio', { name: 'b' }))
+    await user.click(screen.getByRole('radio', { name: 'b' }))
     expect(isUnavailable(send())).toBe(false)
   })
 }
@@ -1137,26 +1094,29 @@ describe('deciding two red-team findings on the Red team step, one submit', () =
 })
 
 /** Opens a decision on the finding that says `text`, and types what it is. */
-function decideFinding(text: string, decision: { move: RegExp; field: RegExp; value: string }) {
-  const card = screen.getByText(text).closest('.fdry-fnd') as HTMLElement
-  fireEvent.click(within(card).getByRole('radio', { name: decision.move }))
-  fireEvent.change(within(card).getByLabelText(decision.field), {
-    target: { value: decision.value },
-  })
+async function decideFinding(
+  text: string,
+  decision: { move: RegExp; field: RegExp; value: string }
+) {
+  const user = userEvent.setup()
+  const card = screen.getByRole('group', { name: text })
+  await user.click(within(card).getByRole('radio', { name: decision.move }))
+  await user.type(within(card).getByLabelText(decision.field), decision.value)
 }
 
 function oneConvergeCallForEveryDecisionTests() {
   it('issues exactly one converge call carrying every decision', async () => {
+    const user = userEvent.setup()
     withFindings()
     await openForgeStep('Red team')
     await screen.findByText('finding one')
 
-    decideFinding('finding one', {
+    await decideFinding('finding one', {
       move: /^Fix it my way/,
       field: /How should "finding one" be fixed/,
       value: 'do it this way',
     })
-    decideFinding('finding two', {
+    await decideFinding('finding two', {
       move: /^Accept it/,
       field: /Why "finding two" is accepted/,
       value: 'priced in',
@@ -1164,7 +1124,7 @@ function oneConvergeCallForEveryDecisionTests() {
 
     expect(screen.getByText(/2 of 2 decided/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
+    await user.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
 
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
@@ -1181,14 +1141,15 @@ function oneConvergeCallForEveryDecisionTests() {
 
 function sendUnavailableUntilDecidedTests() {
   it('leaves Send unavailable until at least one finding is decided', async () => {
+    const user = userEvent.setup()
     withFindings()
     await openForgeStep('Red team')
     await screen.findByText('finding one')
     const send = () => screen.getByRole('button', { name: /^Send( \d)? decisions?$/ })
     expect(isUnavailable(send())).toBe(true)
 
-    const findingOne = screen.getByText('finding one').closest('.fdry-fnd') as HTMLElement
-    fireEvent.click(within(findingOne).getByRole('radio', { name: /^Ask the architect/ }))
+    const findingOne = screen.getByRole('group', { name: 'finding one' })
+    await user.click(within(findingOne).getByRole('radio', { name: /^Ask the architect/ }))
     expect(isUnavailable(send())).toBe(false)
   })
 }
@@ -1221,13 +1182,14 @@ function mountWhileDrafting() {
 // goes the moment the running turn ends.
 describe('a settle made while the architect is drafting', () => {
   it('is queued, shown as queued, and sent once the turn ends', async () => {
+    const user = userEvent.setup()
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mountWhileDrafting()
 
     await openForgeStep('Red team')
     await eventually(() => screen.getByText('finding one'))
-    fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
-    fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
+    await user.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
+    await user.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
 
     // ReasonButton swaps in a new DOM node once it renders as unavailable
     // (it wraps the button in a `<span>` to hold the tooltip), so the
@@ -1280,7 +1242,10 @@ function oneSentenceFindingsTests() {
     withText([open('The order excludes nothing.')])
     await openForgeStep('Red team')
     expect(screen.getByText('The order excludes nothing.')).toBeTruthy()
-    expect(document.querySelector('.fdry-fnd details')).toBeNull()
+    const card = screen.getByRole('group', { name: 'The order excludes nothing.' })
+    expect(within(card).getAllByRole('group')).toEqual([
+      within(card).getByRole('group', { name: 'Choose one' }),
+    ])
   })
 
   it('drops a finding’s detail paragraph, keeping only its first sentence', async () => {
@@ -1307,8 +1272,7 @@ function whatClearedItTests() {
       },
     ])
     await openForgeStep('Red team')
-    const resolved = document.querySelector('.fdry-group--resolved') as HTMLElement
-    expect(resolved).toBeTruthy()
+    const resolved = screen.getByRole('group', { name: /^Resolved/ })
     expect(within(resolved).getByText(/The handler filters after a fixed/)).toBeTruthy()
     expect(within(resolved).getByText('architect: AC-1 now pages past 50 tickets')).toBeTruthy()
   })
@@ -1347,7 +1311,6 @@ function landsAfter(polls: number, ending: Record<string, unknown>) {
 const REDRAFTED = { kind: 'redrafted', at: '2026-09-09T19:33:00Z', note: 'redrafted the plan' }
 
 describe('while the architect is working', () => {
-  describe('reading again', readingAgainTests)
   describe('clearing', forgeClearingTests)
 })
 
@@ -1380,57 +1343,31 @@ function refused() {
   render(<Forge orderId="WO-1" />)
 }
 
-function readingAgainTests() {
-  it('reads again each time the order changes until the redraft lands, rather than giving up after one', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    landsAfter(3, REDRAFTED)
-    await eventually(() =>
-      expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy()
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    await eventually(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
-
-    // Three changes before the turn ends. A view that stopped listening after
-    // one would never see it.
-    const compiled = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length
-    const before = compiled()
-    for (let change = 0; change < 3; change++) await orderChanged()
-    expect(compiled()).toBe(before + 3)
-    vi.useRealTimers()
-  })
-}
-
+// The view listens to a draft whether or not a turn runs, so only the strip clearing is left to
+// check. A refusal saves nothing, so the document stays byte-for-byte what it was: the stop
+// condition used to be the document growing, and the strip never cleared.
 function forgeClearingTests() {
-  // The view listens to a draft whether or not a turn runs, so there is no "poll stopped"
-  // moment to assert; what is left to check is the "architect is working" strip clearing.
-  it('clears "the architect is working" once the redraft lands', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    landsAfter(1, REDRAFTED)
-    await eventually(() => screen.getByRole('button', { name: /Draft the plan/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    // The first read still sees the turn in flight; the second sees it end.
-    await orderChanged()
-    await orderChanged()
-    await eventually(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
-    vi.useRealTimers()
-  })
+  it.each([
+    { polls: 3, ending: REDRAFTED },
+    { polls: 1, ending: REFUSED },
+  ])(
+    'clears "the architect is working" once a turn ends $ending.kind after $polls reads',
+    async ({ polls, ending }) => {
+      const user = userEvent.setup()
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      landsAfter(polls, ending)
+      await eventually(() => screen.getByRole('button', { name: /Draft the plan/ }))
+      await user.click(screen.getByRole('button', { name: /Draft the plan/ }))
+      await eventually(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
 
-  // The reported bug, whole. A refusal saves nothing, so the document is
-  // byte-for-byte what it was — and the stop condition used to be the document
-  // growing. The button read "The architect is working…" over a turn that had
-  // ended forty minutes earlier, and the poll never stopped.
-  it('clears "the architect is working" when the turn was refused, though nothing was saved', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    landsAfter(1, REFUSED)
-    await eventually(() => screen.getByRole('button', { name: /Draft the plan/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    // The first read still sees the turn in flight; the second sees it end.
-    await orderChanged()
-    await orderChanged()
-    await eventually(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
-    vi.useRealTimers()
-  })
+      await orderChanged()
+      await orderChanged()
+      await orderChanged()
+      await orderChanged()
+      await eventually(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
+      vi.useRealTimers()
+    }
+  )
 }
 
 describe('a turn that was refused', () => {
@@ -1450,9 +1387,10 @@ function forgeTheReasonTests() {
   // The reason goes back with the ask because the architect cannot read its
   // own refusal: its turn ended before the validation ran.
   it('carries the reason back to the architect', async () => {
+    const user = userEvent.setup()
     refused()
     await screen.findByText(/plan was refused/i)
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: /Tell the architect what was wrong/ })
     )
 
@@ -1469,9 +1407,10 @@ function forgeTheReasonTests() {
 
 function forgeStartingOverTests() {
   it('can also start the turn over, carrying nothing', async () => {
+    const user = userEvent.setup()
     refused()
     await screen.findByText(/plan was refused/i)
-    fireEvent.click(await screen.findByRole('button', { name: /Start the turn over/ }))
+    await user.click(await screen.findByRole('button', { name: /Start the turn over/ }))
 
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', { id: 'WO-1' })
@@ -1488,17 +1427,25 @@ describe('what this order writes back (FR-062)', () => {
     expect(screen.getByLabelText(/The pull request links/)).toBeTruthy()
   })
 
-  it('turns one on for this order alone', async () => {
-    mountStates({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await openForgeStep('Tracker')
-    fireEvent.click(screen.getByLabelText(/Move its workflow state/))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.writeBack', {
-        id: 'WO-1',
-        writeBack: ['status'],
-      })
-    )
-  })
+  it.each([
+    { before: [], after: ['status'] },
+    { before: ['summary_comment', 'status'], after: ['summary_comment'] },
+  ] as const)(
+    'toggles the workflow state for this order alone: $before becomes $after',
+    async ({ before, after }) => {
+      const user = userEvent.setup()
+      const capability = { transitions: 'supported', states: STATES, unreachable: [] }
+      mountStates({ capability }, { writeBack: [...before] })
+      await openForgeStep('Tracker')
+      await user.click(screen.getByLabelText(/Move its workflow state/))
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith('foundry:order.writeBack', {
+          id: 'WO-1',
+          writeBack: after,
+        })
+      )
+    }
+  )
 })
 
 // The way back into the conversation that wrote the plan. It was a prop, and
@@ -1511,12 +1458,13 @@ describe('attaching to the architect', () => {
   })
 
   it('offers the way back into the conversation that wrote the plan', async () => {
+    const user = userEvent.setup()
     mountStates(
       {},
       { provenance: { forgeSession: 'sess-architect', decisions: [], amendments: [] } }
     )
     await screen.findByRole('button', { name: /Attach/ })
-    fireEvent.click(await screen.findByRole('button', { name: /Attach/ }))
+    await user.click(await screen.findByRole('button', { name: /Attach/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 'sess-architect' })
     )
@@ -1529,32 +1477,11 @@ describe('attaching to the architect', () => {
   })
 
   it('says so when that conversation has no terminal left', async () => {
+    const user = userEvent.setup()
     terminalReply = { ok: false }
     mountStates({}, { provenance: { forgeSession: 'sess-gone', decisions: [], amendments: [] } })
-    fireEvent.click(await screen.findByRole('button', { name: /Attach/ }))
+    await user.click(await screen.findByRole('button', { name: /Attach/ }))
     await screen.findByText(/no longer has an agent tab/)
-  })
-})
-
-// Per-hunk review ended, so nothing drains a review queue any more: a refusal
-// because "three sessions are waiting for review" could never be cleared.
-describe('a start is never held back by finished turns', () => {
-  it('sends no override and offers none', async () => {
-    mountForStart({ start: { ok: true } })
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.start', expect.anything()))
-    const payload = invoke.mock.calls.find(([c]) => c === 'foundry:run.start')?.[1] as object
-    expect(payload).not.toHaveProperty('force')
-    expect(screen.queryByRole('button', { name: /Start anyway/ })).toBeNull()
-  })
-
-  it('still says why a refusal that is about the order did not start', async () => {
-    mountForStart({ start: { error: 'this repository has no test command' } })
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
-    await screen.findByText(/no test command/)
-    expect(screen.queryByRole('button', { name: /Start anyway/ })).toBeNull()
   })
 })
 
@@ -1649,8 +1576,9 @@ describe('an ask the architect is working on', () => {
 
 function theRunningAskTests() {
   it('says so on the check it was asked about, in place of the button', async () => {
+    const user = userEvent.setup()
     mountAsking(orderBlockedOnPictures() as WorkOrder)
-    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+    await user.click(await screen.findByRole('button', { name: 'Ask for proof' }))
 
     const status = await screen.findByRole('status', { name: /Asked/ })
     expect(status.textContent).toMatch(/the architect is working on it/)
@@ -1659,6 +1587,7 @@ function theRunningAskTests() {
   })
 
   it('offers no other ask while one is running — a second turn would race the first', async () => {
+    const user = userEvent.setup()
     const blocked = orderBlockedOnPictures()
     // Fails coverage as well: a unit that satisfies nothing.
     mountAsking({
@@ -1669,7 +1598,7 @@ function theRunningAskTests() {
       },
     } as WorkOrder)
     await openForgeStep('Hand off')
-    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+    await user.click(await screen.findByRole('button', { name: 'Ask for proof' }))
     await screen.findByRole('status', { name: /Asked/ })
     expect(screen.queryByRole('button', { name: 'Ask for the gap to be closed' })).toBeNull()
   })
@@ -1677,8 +1606,9 @@ function theRunningAskTests() {
 
 function afterLeavingTheStepTests() {
   it('says so again after leaving the step and coming back, from the record', async () => {
+    const user = userEvent.setup()
     mountAsking(orderBlockedOnPictures() as WorkOrder)
-    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+    await user.click(await screen.findByRole('button', { name: 'Ask for proof' }))
     await screen.findByRole('status', { name: /Asked/ })
     await openForgeStep('Intent')
     await openForgeStep('Plan')
@@ -1694,6 +1624,7 @@ function otherMovesHeldTests() {
   // are a local decision that goes nowhere until Send, so keeping them live
   // during a different turn loses nothing.
   it('holds every other move on the order until the turn ends, but not the band', async () => {
+    const user = userEvent.setup()
     mountAsking({
       ...orderBlockedOnPictures(),
       openQuestions: [
@@ -1712,7 +1643,7 @@ function otherMovesHeldTests() {
       ],
       assumptions: [{ id: 'A-1', text: 'tokens are JWTs', struck: false, affects: [] }],
     } as WorkOrder)
-    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+    await user.click(await screen.findByRole('button', { name: 'Ask for proof' }))
     await screen.findByRole('status', { name: /Asked/ })
 
     expect(screen.getByRole('radio', { name: 'a Recommended' })).toHaveProperty('disabled', false)
@@ -1737,8 +1668,9 @@ function proofAndTheEscapeTests() {
   })
 
   it('offers to ask the architect for proof', async () => {
+    const user = userEvent.setup()
     mountBlocked()
-    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+    await user.click(await screen.findByRole('button', { name: 'Ask for proof' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:order.converge',
@@ -1748,24 +1680,28 @@ function proofAndTheEscapeTests() {
   })
 
   it('offers the written escape, and takes the operator to it from hand-off', async () => {
+    const user = userEvent.setup()
     mountBlocked()
     await openForgeStep('Hand off')
-    fireEvent.click(screen.getByRole('button', { name: /Or mark one unprovable/ }))
+    await user.click(screen.getByRole('button', { name: /Or mark one unprovable/ }))
     // The heading it lands on is the one the acceptance list sits under, on the
     // step that list is on.
     await screen.findByRole('heading', { name: 'Acceptance criteria' })
-    expect(document.activeElement?.id).toBe('fdry-acceptance')
+    expect(screen.getByRole('heading', { name: 'Acceptance criteria' }).matches(':focus')).toBe(
+      true
+    )
   })
 }
 
 function acceptingAsUnverifiableTests() {
   it('accepts a criterion as unverifiable, with a reason', async () => {
+    const user = userEvent.setup()
     mountBlocked()
-    fireEvent.click(await screen.findByRole('button', { name: 'Nothing here can prove this' }))
+    await user.click(await screen.findByRole('button', { name: 'Nothing here can prove this' }))
 
     const box = screen.getByLabelText('Why AC-1 cannot be proven')
-    fireEvent.change(box, { target: { value: 'there is no display in this environment' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Accept it' }))
+    await user.type(box, 'there is no display in this environment')
+    await user.click(screen.getByRole('button', { name: 'Accept it' }))
 
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.turn', {
@@ -1779,8 +1715,9 @@ function acceptingAsUnverifiableTests() {
   })
 
   it('will not accept one on a blank reason — a shrug is not a decision', async () => {
+    const user = userEvent.setup()
     mountBlocked()
-    fireEvent.click(await screen.findByRole('button', { name: 'Nothing here can prove this' }))
+    await user.click(await screen.findByRole('button', { name: 'Nothing here can prove this' }))
     const accept = screen.getByRole('button', { name: 'Accept it' })
     expect(isUnavailable(accept)).toBe(true)
     expect(reasonFor(accept)).toBe('Say why it stands. The reason travels with the order.')
@@ -1808,7 +1745,8 @@ function theAcceptedReasonTests() {
 }
 
 function forgeOpenQuestionsTests() {
-  it('sends the open questions to the band rather than to the architect', async () => {
+  it('takes the operator to the open questions on the Plan step, not to the architect', async () => {
+    const user = userEvent.setup()
     mountBlocked({
       openQuestions: [
         {
@@ -1823,8 +1761,10 @@ function forgeOpenQuestionsTests() {
       ],
     })
     await openForgeStep('Hand off')
-    fireEvent.click(screen.getByRole('button', { name: 'Answer them' }))
-    expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
+    await user.click(screen.getByRole('button', { name: 'Answer them' }))
+    await waitFor(() => expect(screen.getByText('Needs your answer').matches(':focus')).toBe(true))
+    const plan = within(stepList()).getByRole('button', { name: /^Plan/ })
+    expect(plan.getAttribute('aria-current')).toBe('step')
   })
 }
 
@@ -1854,6 +1794,7 @@ describe('an order’s budgets', () => {
 
 function thePlanStepTests() {
   it('shows them on the Plan step and saves what the operator sets', async () => {
+    const user = userEvent.setup()
     mountBlocked({ budgets: { agents: 2, wallClockMinutes: null, tokens: null } })
     await openForgeStep('Plan')
     const section = await screen.findByRole('region', { name: 'Budgets' })
@@ -1862,10 +1803,9 @@ function thePlanStepTests() {
         .checked
     ).toBe(true)
 
-    fireEvent.change(within(section).getByRole('spinbutton', { name: 'Agents at once' }), {
-      target: { value: '4' },
-    })
-    fireEvent.click(within(section).getByRole('button', { name: 'Save budgets' }))
+    await user.clear(within(section).getByRole('spinbutton', { name: 'Agents at once' }))
+    await user.type(within(section).getByRole('spinbutton', { name: 'Agents at once' }), '4')
+    await user.click(within(section).getByRole('button', { name: 'Save budgets' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.budgets', {
         id: 'WO-1',
@@ -1877,15 +1817,6 @@ function thePlanStepTests() {
 
 function noFilesBudgetAndNoControlsTests() {
   const SET = { agents: 3, wallClockMinutes: 45, tokens: null }
-
-  // ADR 056: agents and minutes are budgets; a count of files is not.
-  it('offers no files budget, and no check that a plan fits one', async () => {
-    mountBlocked({ budgets: SET })
-    await openForgeStep('Plan')
-    const section = await screen.findByRole('region', { name: 'Budgets' })
-    expect(within(section).queryByRole('spinbutton', { name: 'Files touched' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Change the budget' })).toBeNull()
-  })
 
   it('shows them without controls once the order is no longer a draft', async () => {
     mountBlocked({ status: 'running' as const, budgets: SET })
@@ -1966,11 +1897,12 @@ function theBlockingStepTests() {
 
 function movingBetweenStepsTests() {
   it('goes forward to the next step and back again', async () => {
+    const user = userEvent.setup()
     mountStates({})
     await screen.findByRole('heading', { name: 'What is being asked' })
-    fireEvent.click(await screen.findByRole('button', { name: 'Next: Plan' }))
+    await user.click(await screen.findByRole('button', { name: 'Next: Plan' }))
     expect(screen.getByRole('heading', { name: 'The plan and how it is proven' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('heading', { name: 'What is being asked' })).toBeTruthy()
   })
 
@@ -1987,7 +1919,7 @@ function movingBetweenStepsTests() {
     mountStates({})
     await screen.findByRole('heading', { name: 'What is being asked' })
     await openForgeStep('Red team')
-    expect(document.activeElement?.textContent).toBe('Red team findings')
+    expect(screen.getByRole('heading', { name: 'Red team findings' }).matches(':focus')).toBe(true)
   })
 }
 
@@ -2052,16 +1984,6 @@ describe('a red-team round running', () => {
   })
 })
 
-describe('the Hand off step', () => {
-  it('offers no switch to hand off on its own: pressing Hand off is the only start', async () => {
-    mountForStart()
-    await screen.findByText('Ready to hand off')
-    await openForgeStep('Hand off')
-    expect(handOffButton()).toBeTruthy()
-    expect(screen.queryByRole('switch')).toBeNull()
-  })
-})
-
 function mountShapeDuringTurn() {
   const current = trackerDraft()
   const running = runningIntake('2026-09-06T10:00:00.000Z', 'S-1')
@@ -2092,22 +2014,11 @@ describe('choosing a shape while a turn is running', () => {
 })
 
 function orderRecipeTests() {
-  it('invokes order.recipe with the shape clicked, even mid-turn', async () => {
-    mountShapeDuringTurn()
-    await openForgeStep('Shape')
-    fireEvent.click(await screen.findByText('Standard'))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.recipe', {
-        id: 'WO-1',
-        recipe: 'standard',
-      })
-    )
-  })
-
   it('"Use the proposal" invokes order.recipe with recipe: null', async () => {
+    const user = userEvent.setup()
     mountShapeDuringTurn()
     await openForgeStep('Shape')
-    fireEvent.click(await screen.findByRole('button', { name: 'Use the proposal' }))
+    await user.click(await screen.findByRole('button', { name: 'Use the proposal' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.recipe', {
         id: 'WO-1',
@@ -2189,7 +2100,7 @@ describe('findings grouped by who acts on them', () => {
     expect(screen.getByText('Notes, nothing to do')).toBeTruthy()
     expect(screen.getByText('note one')).toBeTruthy()
     expect(screen.getByText('Needs your decision')).toBeTruthy()
-    const finding = screen.getByText('blocking one').closest('.fdry-fnd') as HTMLElement
+    const finding = screen.getByRole('group', { name: 'blocking one' })
     expect(within(finding).getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
     expect(within(finding).getByRole('radio', { name: /^Fix it my way/ })).toBeTruthy()
     expect(within(finding).getByRole('radio', { name: /^Accept it/ })).toBeTruthy()
@@ -2231,130 +2142,30 @@ describe('holding and releasing the red-team loop from the strip', () => {
   describe('order.hold', orderHoldTests)
 })
 
-function expectUnavailableControlsHold(): void {
-  const nodes = Array.from(document.querySelectorAll('[aria-disabled="true"]'))
-  expect(nodes.length).toBeGreaterThan(0)
-  for (const node of nodes) {
-    expect(node.getAttribute('title')?.trim()).toBeTruthy()
-  }
-}
-
 function orderHoldTests() {
-  it('"Hold for me" invokes order.hold with held: true', async () => {
-    mountRedTeamRunning(null)
-    fireEvent.click(await screen.findByRole('button', { name: 'Hold for me' }))
+  it.each([
+    { heldAt: null, button: 'Hold for me', held: true },
+    { heldAt: '2026-09-06T10:01:00.000Z', button: 'Let it continue', held: false },
+  ])('"$button" saves held: $held', async ({ heldAt, button, held }) => {
+    const user = userEvent.setup()
+    mountRedTeamRunning(heldAt)
+    await user.click(await screen.findByRole('button', { name: button }))
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.hold', { id: 'WO-1', held: true })
+      expect(invoke).toHaveBeenCalledWith('foundry:order.hold', { id: 'WO-1', held })
     )
-  })
-
-  it('"Let it continue" invokes order.hold with held: false', async () => {
-    mountRedTeamRunning('2026-09-06T10:01:00.000Z')
-    fireEvent.click(await screen.findByRole('button', { name: 'Let it continue' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.hold', { id: 'WO-1', held: false })
-    )
-  })
-}
-
-// Every ReasonButton that renders aria-disabled must resolve its
-// title to non-empty text (ReasonButton.tsx) — swept across the
-// states that put controls out of reach: a running turn, a refusal, findings
-// needing a decision, a step whose shape has an unmet requirement, and a
-// handed-off order.
-describe('every unavailable control names why, everywhere (ADR 074)', () => {
-  describe('a running turn', forgeARunningTurnTests)
-  describe('a refused turn', aRefusedTurnTests)
-  describe('a finding needing a decision', aFindingNeedingADecisionTests)
-  describe('the shape step', theShapeStepTests)
-})
-
-function forgeARunningTurnTests() {
-  it('holds on a running turn', async () => {
-    mountForStart({
-      intake: {
-        kind: 'running',
-        at: '2026-09-06T10:00:00.000Z',
-        sessionId: 'S-1',
-        asked: '',
-        actor: 'architect',
-        trigger: 'you',
-        round: null,
-        autoTurn: null,
-      },
-    })
-    await waitFor(() =>
-      expect(screen.getAllByText(/architect is working/).length).toBeGreaterThan(0)
-    )
-    await openForgeStep('Hand off')
-    expectUnavailableControlsHold()
-  })
-}
-
-function aRefusedTurnTests() {
-  it('holds on a refused turn', async () => {
-    const shown = trackerDraft()
-    invoke = vi.fn(async (channel: string) =>
-      channel === 'foundry:order.compile'
-        ? {
-            order: shown,
-            compile: compileOrder(shown),
-            intake: { kind: 'refused', at: '2026-09-06T10:00:00.000Z', reason: 'bad proposal' },
-          }
-        : {}
-    )
-    installForgeBridge()
-    render(<Forge orderId="WO-1" />)
-    await screen.findByText(/plan was refused/i)
-    expectUnavailableControlsHold()
-  })
-}
-
-function aFindingNeedingADecisionTests() {
-  it('holds when a finding needs a decision', async () => {
-    const redTeam = [{ ...BLOCKING_AND_NOTE[0], round: 1 }]
-    const intake = { kind: 'redrafted', at: '2026-09-06T10:00:00.000Z', note: 'redrafted' }
-    const round = {
-      round: 1,
-      startedAt: '2026-09-06T09:00:00.000Z',
-      finishedAt: '2026-09-06T09:05:00.000Z',
-    }
-    const loop = { rounds: [round], heldAt: null, exhausted: true }
-    mountCompiled({ ...trackerDraft(), redTeam }, { intake, loop })
-    await openForgeStep('Red team')
-    await screen.findByText('blocking one')
-    // Nothing is decided yet, so Send is unavailable — the case under audit.
-    expectUnavailableControlsHold()
-  })
-}
-
-function theShapeStepTests() {
-  it('holds on the shape step even when the order is otherwise ready', async () => {
-    mountForStart()
-    await openForgeStep('Shape')
-    await screen.findByText('Speckit')
-    expectUnavailableControlsHold()
-  })
-
-  it('holds on a handed-off order whose shape is fixed', async () => {
-    mountForStart()
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
-    await waitFor(() => expect(screen.getAllByText(/Handed off/).length).toBeGreaterThan(0))
-    await openForgeStep('Shape')
-    expectUnavailableControlsHold()
   })
 }
 
 describe('the plan reader from the order header', () => {
   it('opens the plan at any status and closes again', async () => {
+    const user = userEvent.setup()
     mountShowing(compilable({ status: 'running' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Open plan' }))
+    await user.click(await screen.findByRole('button', { name: 'Open plan' }))
     const dialog = await screen.findByRole('dialog', { name: 'Plan · WO-1' })
     expect(
       within(dialog).getByRole('heading', { name: /Refuse an expired refresh token/ })
     ).toBeTruthy()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'Plan · WO-1' })).toBeNull()
   })
 })

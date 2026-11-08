@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 
@@ -35,46 +36,40 @@ beforeEach(() => {
 })
 
 describe('KeepBothModal', () => {
-  it('renders both code blocks in preview', () => {
-    const { container } = render(
-      <KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />
-    )
-    // Text may be split across highlight.js spans — check textContent
-    expect(container.textContent).toContain('const x = 1')
-    expect(container.textContent).toContain('const y = 2')
-  })
-
   it('defaults to mine-first order', () => {
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
-    const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
-    expect(previewEl?.textContent).toContain('const x = 1')
-    const text = previewEl?.textContent ?? ''
+    const previewEl = screen.getByRole('group', { name: 'Merged result preview' })
+    expect(previewEl.textContent).toContain('const x = 1')
+    const text = previewEl.textContent ?? ''
     expect(text.indexOf('const x = 1')).toBeLessThan(text.indexOf('const y = 2'))
   })
 
-  it('"Theirs first" toggle changes preview order', () => {
+  it('"Theirs first" toggle changes preview order', async () => {
+    const user = userEvent.setup()
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByRole('radio', { name: /Theirs first/i }))
-    const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
-    const text = previewEl?.textContent ?? ''
+    await user.click(screen.getByRole('radio', { name: /Theirs first/i }))
+    const previewEl = screen.getByRole('group', { name: 'Merged result preview' })
+    const text = previewEl.textContent ?? ''
     expect(text.indexOf('const y = 2')).toBeLessThan(text.indexOf('const x = 1'))
   })
 })
 
 describe('KeepBothModal — Mine first toggle restores original order', () => {
-  it('"Mine first" toggle restores original order', () => {
+  it('"Mine first" toggle restores original order', async () => {
+    const user = userEvent.setup()
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByRole('radio', { name: /Theirs first/i }))
-    fireEvent.click(screen.getByRole('radio', { name: /Mine first/i }))
-    const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
-    const text = previewEl?.textContent ?? ''
+    await user.click(screen.getByRole('radio', { name: /Theirs first/i }))
+    await user.click(screen.getByRole('radio', { name: /Mine first/i }))
+    const previewEl = screen.getByRole('group', { name: 'Merged result preview' })
+    const text = previewEl.textContent ?? ''
     expect(text.indexOf('const x = 1')).toBeLessThan(text.indexOf('const y = 2'))
   })
 
-  it('calls onConfirm with both-ours-first strategy when confirming mine-first', () => {
+  it('calls onConfirm with both-ours-first strategy when confirming mine-first', async () => {
+    const user = userEvent.setup()
     const onConfirm = vi.fn()
     render(<KeepBothModal block={uniqueBlock} onConfirm={onConfirm} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByText(/Confirm|Use this order/i))
+    await user.click(screen.getByRole('button', { name: 'Use this order' }))
     expect(onConfirm).toHaveBeenCalledWith(
       expect.stringContaining('const x = 1'),
       'both-ours-first'
@@ -83,28 +78,25 @@ describe('KeepBothModal — Mine first toggle restores original order', () => {
 })
 
 describe('KeepBothModal — calls onConfirm with both-theirs-first strategy when confirming theirs-first', () => {
-  it('calls onConfirm with both-theirs-first strategy when confirming theirs-first', () => {
+  it('calls onConfirm with both-theirs-first strategy when confirming theirs-first', async () => {
+    const user = userEvent.setup()
     const onConfirm = vi.fn()
     render(<KeepBothModal block={uniqueBlock} onConfirm={onConfirm} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByRole('radio', { name: /Theirs first/i }))
-    fireEvent.click(screen.getByText(/Confirm|Use this order/i))
+    await user.click(screen.getByRole('radio', { name: /Theirs first/i }))
+    await user.click(screen.getByRole('button', { name: 'Use this order' }))
     expect(onConfirm).toHaveBeenCalledWith(
       expect.stringContaining('const y = 2'),
       'both-theirs-first'
     )
   })
 
-  it('calls onCancel when Cancel button clicked', () => {
+  it('calls onCancel and not onConfirm when Cancel is clicked', async () => {
+    const user = userEvent.setup()
     const onCancel = vi.fn()
-    render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={onCancel} />)
-    fireEvent.click(screen.getByText(/Cancel/i))
-    expect(onCancel).toHaveBeenCalledOnce()
-  })
-
-  it('does not call onConfirm when Cancel clicked', () => {
     const onConfirm = vi.fn()
-    render(<KeepBothModal block={uniqueBlock} onConfirm={onConfirm} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByText(/Cancel/i))
+    render(<KeepBothModal block={uniqueBlock} onConfirm={onConfirm} onCancel={onCancel} />)
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onCancel).toHaveBeenCalledOnce()
     expect(onConfirm).not.toHaveBeenCalled()
   })
 })
@@ -112,7 +104,9 @@ describe('KeepBothModal — calls onConfirm with both-theirs-first strategy when
 describe('KeepBothModal — shows duplicate identifier warning when ours and theirs contain same function name', () => {
   it('shows duplicate identifier warning when ours and theirs contain same function name', () => {
     render(<KeepBothModal block={baseBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByText(/duplicate|same name|conflict/i)).toBeTruthy()
+    expect(screen.getByRole('alert').textContent?.trim()).toBe(
+      'This will produce a duplicate identifier. Consider using "Edit manually" to combine them.'
+    )
   })
 
   it('does not show duplicate warning when identifiers are unique', () => {

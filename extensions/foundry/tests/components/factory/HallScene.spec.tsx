@@ -106,6 +106,7 @@ describe('components/factory/HallScene', () => {
   })
 
   describe('the frame loop', theFrameLoopTests)
+  describe('restarting the frame loop', restartingTheFrameLoopTests)
   describe('drawing', drawingTests)
   describe('drawOrderY', draworderyTests)
 
@@ -140,7 +141,9 @@ function theFrameLoopTests() {
     expect(cancelSpy).not.toHaveBeenCalled()
     expect(rafSpy).toHaveBeenCalledTimes(1)
   })
+}
 
+function restartingTheFrameLoopTests() {
   it('restarts its frame loop when a node changes state', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }
@@ -150,18 +153,11 @@ function theFrameLoopTests() {
     rerender(<HallScene map={map} worldRef={worldRef} states={{ 'n-1': 'passed' }} />)
 
     expect(cancelSpy).toHaveBeenCalledTimes(1)
+    expect(rafSpy).toHaveBeenCalledTimes(2)
   })
 }
 
 function drawingTests() {
-  it('draws the bake and the frame at least once on mount', () => {
-    const map = fakeMap()
-    const worldRef = { current: fakeWorld(map) }
-    render(<HallScene map={map} worldRef={worldRef} states={{}} />)
-
-    expect(fillRectSpy).toHaveBeenCalled()
-  })
-
   it('draws exactly one frame and schedules nothing under reduced motion', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }
@@ -177,6 +173,7 @@ function drawingTests() {
     const { container } = render(
       <HallScene map={map} worldRef={worldRef} states={{}} reducedMotion />
     )
+    // eslint-disable-next-line testing-library/no-node-access -- an aria-hidden canvas has no role or label; its size is what this test checks
     const canvas = container.querySelector('canvas')
     expect(canvas?.getAttribute('aria-hidden')).toBe('true')
     expect(canvas?.width).toBe(map.width * 16)

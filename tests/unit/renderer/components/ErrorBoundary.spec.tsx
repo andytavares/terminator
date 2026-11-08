@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { ErrorBoundary } from '../../../../src/renderer/components/ErrorBoundary'
 import { useLogStore } from '../../../../src/renderer/stores/log.store'
@@ -45,15 +46,6 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Something went wrong')).toBeTruthy()
     expect(screen.getByText('Test render error')).toBeTruthy()
   })
-
-  it('shows recovery button when error occurs', () => {
-    render(
-      <ErrorBoundary>
-        <ThrowingChild shouldThrow={true} />
-      </ErrorBoundary>
-    )
-    expect(screen.getByRole('button', { name: /try to recover/i })).toBeTruthy()
-  })
 })
 
 describe('ErrorBoundary — writes the error to the application log', () => {
@@ -73,7 +65,8 @@ describe('ErrorBoundary — writes the error to the application log', () => {
     )
   })
 
-  it('renders the children again once recovery is asked for', () => {
+  it('renders the children again once recovery is asked for', async () => {
+    const user = userEvent.setup()
     fault.present = true
     render(
       <ErrorBoundary>
@@ -81,7 +74,7 @@ describe('ErrorBoundary — writes the error to the application log', () => {
       </ErrorBoundary>
     )
     fault.present = false
-    fireEvent.click(screen.getByRole('button', { name: /try to recover/i }))
+    await user.click(screen.getByRole('button', { name: /try to recover/i }))
     expect(screen.getByText('Content renders fine')).toBeTruthy()
     expect(screen.queryByText('Something went wrong')).toBeNull()
   })
@@ -97,11 +90,7 @@ describe('ErrorBoundary — uses theme tokens for ALL fallback colors — no har
     // Scan every element in the fallback subtree, not just the root container —
     // the message text and recovery button previously kept hardcoded hex that
     // rendered as dark-theme colors under [data-theme="light"].
-    const all = container.querySelectorAll<HTMLElement>('*')
-    expect(all.length).toBeGreaterThan(0)
-    for (const el of all) {
-      const style = el.getAttribute('style') ?? ''
-      expect(style).not.toMatch(/#[0-9a-fA-F]{3,6}\b/)
-    }
+    expect(container.innerHTML).toContain('style="')
+    expect(container.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{3,6}\b/)
   })
 })

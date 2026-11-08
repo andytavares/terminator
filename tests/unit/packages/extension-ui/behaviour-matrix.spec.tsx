@@ -1,10 +1,9 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { Dialog } from '../../../../packages/extension-ui/src/Dialog'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDialog'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
-import { isSurfaceOpen } from '../../../../src/shared/double-escape'
 import { pressOutside } from '../../../support/modal'
 
 /**
@@ -15,7 +14,9 @@ import { pressOutside } from '../../../support/modal'
  * announced modal state, 7 managed focus and 4 could be dismissed from
  * outside. The claim after this feature is that every surface passes, and that
  * claim rests on every surface using one of these primitives — so this asserts
- * the five checks against the primitives themselves, once each.
+ * the five checks against the primitives themselves, once each. Checks a
+ * primitive's own spec already makes (Dialog: dialog.spec.tsx; Escape on
+ * ConfirmDialog and Popover) are not repeated here.
  */
 
 const CHECKS = [
@@ -36,53 +37,6 @@ function expectOpenNativeDialog(): void {
   expect(dialog.hasAttribute('open')).toBe(true)
 }
 
-const openRenameDialog = (onDismiss = vi.fn()) => {
-  render(
-    <Dialog title="Rename" onDismiss={onDismiss} actions={[{ label: 'Go', onSelect: vi.fn() }]}>
-      <input aria-label="name" />
-    </Dialog>
-  )
-  return onDismiss
-}
-
-describe('behaviour matrix: Dialog', () => {
-  it(CHECKS[0], () => {
-    const onDismiss = openRenameDialog()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(onDismiss).toHaveBeenCalled()
-  })
-
-  it(CHECKS[1], () => {
-    openRenameDialog()
-    expect(screen.getByRole('dialog')).toBeTruthy()
-  })
-
-  it(BY_THE_BROWSER, () => {
-    openRenameDialog()
-    expectOpenNativeDialog()
-  })
-
-  it(CHECKS[4], () => {
-    const onDismiss = openRenameDialog()
-    pressOutside(screen.getByRole('dialog'))
-    expect(onDismiss).toHaveBeenCalled()
-  })
-})
-
-describe('behaviour matrix: Dialog — is open for the exit gesture to read', () => {
-  it('is open for the exit gesture to read', () => {
-    expect(isSurfaceOpen(document)).toBe(false)
-    const { unmount } = render(
-      <Dialog title="X" onDismiss={vi.fn()} actions={[]}>
-        <p>body</p>
-      </Dialog>
-    )
-    expect(isSurfaceOpen(document)).toBe(true)
-    unmount()
-    expect(isSurfaceOpen(document)).toBe(false)
-  })
-})
-
 const openConfirmDialog = (onDismiss = vi.fn()) => {
   render(
     <ConfirmDialog
@@ -96,14 +50,11 @@ const openConfirmDialog = (onDismiss = vi.fn()) => {
 }
 
 describe('behaviour matrix: ConfirmDialog', () => {
-  it(CHECKS[0], () => {
-    const onDismiss = openConfirmDialog()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(onDismiss).toHaveBeenCalled()
-  })
   it(CHECKS[1], () => {
     openConfirmDialog()
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Delete this note?' }).textContent).toContain(
+      'It cannot be recovered.'
+    )
   })
   it(BY_THE_BROWSER, () => {
     openConfirmDialog()
@@ -130,19 +81,13 @@ function PopoverHarness({ onDismiss }: { onDismiss: () => void }) {
 }
 
 describe('behaviour matrix: Popover', () => {
-  it(CHECKS[0], () => {
+  it(`${CHECKS[4]}, and is not announced as modal`, async () => {
+    const user = userEvent.setup()
     const onDismiss = vi.fn()
     render(<PopoverHarness onDismiss={onDismiss} />)
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(onDismiss).toHaveBeenCalled()
-  })
-
-  it(`${CHECKS[4]}, and is not announced as modal`, () => {
-    const onDismiss = vi.fn()
-    const { container } = render(<PopoverHarness onDismiss={onDismiss} />)
-    const surface = container.querySelector('[data-tmui-surface]') as HTMLElement
+    const surface = screen.getByRole('group', { name: 'Options' })
     expect(surface.getAttribute('aria-modal')).toBeNull()
-    fireEvent.click(document.body)
+    await user.click(document.body)
     expect(onDismiss).toHaveBeenCalled()
   })
 })

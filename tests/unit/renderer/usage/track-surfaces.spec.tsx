@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest'
 
 // This spec checks the IPC payload, so it runs the real recorder (tests/setup.ts mocks it).
 vi.unmock('../../../../src/renderer/usage/record')
@@ -142,13 +142,12 @@ describe('useTrackSurfaces — idle and unload', () => {
 function focusedFrame(): HTMLIFrameElement {
   const frame = document.createElement('iframe')
   document.body.append(frame)
+  onTestFinished(() => frame.remove())
   frame.focus()
   return frame
 }
 
 describe('useTrackSurfaces — work inside an extension view', () => {
-  afterEach(() => document.querySelectorAll('iframe').forEach((frame) => frame.remove()))
-
   it('keeps counting when focus moves into a frame, and on the input the frame reports', () => {
     registerExtensionTab()
     renderHook(() => useTrackSurfaces())

@@ -209,10 +209,12 @@ function comboOptionClass(opt: ComboOption, highlighted: boolean): string {
 function ComboList({ combo }: { combo: Combo }): React.JSX.Element | null {
   if (!combo.open || combo.options.length === 0) return null
   return (
-    <ul className="area-combobox__dropdown">
+    <ul className="area-combobox__dropdown" role="listbox" aria-label="Areas">
       {combo.options.map((opt, i) => (
         <li
           key={opt.value + String(opt.isCreate)}
+          role="option"
+          aria-selected={i === combo.highlighted}
           className={comboOptionClass(opt, i === combo.highlighted)}
           onMouseDown={(e) => {
             e.preventDefault()
@@ -268,7 +270,12 @@ function ProjectLinkPicker({ open, onSelect, onClose }: PickerProps): React.JSX.
   }
   return (
     <span className="projects-browser__link-picker">
-      <select autoFocus defaultValue="" onChange={(e) => onSelect(e.target.value)}>
+      <select
+        autoFocus
+        aria-label="Terminal session"
+        defaultValue=""
+        onChange={(e) => onSelect(e.target.value)}
+      >
         <SessionOptions sessions={sessions} labelOf={labelOf} placeholder="Select terminal…" />
       </select>
       <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
@@ -616,6 +623,7 @@ function DoneTasks({ done, tasks }: { done: IndexedTask[]; tasks: ProjectTasks }
               size="sm"
               onClick={() => void tasks.restore(t.id)}
               title="Reopen on today's log"
+              aria-label="Reopen on today's log"
             >
               ↩
             </Button>
@@ -983,8 +991,9 @@ function projectCardClass(project: IndexedProject, selectedName: string | null):
 }
 
 function ProjectCard({ project, browser }: CardProps): React.JSX.Element {
+  const className = projectCardClass(project, browser.selectedProjectName)
   return (
-    <div className={projectCardClass(project, browser.selectedProjectName)}>
+    <div role="group" aria-label={project.name} className={className}>
       <CardHeader project={project} browser={browser} />
       <div className="projects-browser__stats">
         <span>{countLabel(project.nextActionCount, 'next action')}</span>

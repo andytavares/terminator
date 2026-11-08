@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useId } from 'react'
 import { Dialog, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { PullRequest } from '../schemas/git.schema'
 import type { ChangeDraft } from '../schemas/review-agent.schema'
@@ -385,10 +385,14 @@ function TextField(props: {
   onChange: (value: string) => void
   placeholder: string
 }) {
+  const id = useId()
   return (
     <div className="pr-dialog__field">
-      <label className="pr-dialog__label">{props.label}</label>
+      <label className="pr-dialog__label" htmlFor={id}>
+        {props.label}
+      </label>
       <input
+        id={id}
         className="pr-dialog__input"
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
@@ -431,10 +435,14 @@ function DraftNote({ form }: { form: PrForm }) {
 }
 
 function TitleField({ form }: { form: PrForm }) {
+  const id = useId()
   return (
     <div className="pr-dialog__field">
-      <label className="pr-dialog__label">Title</label>
+      <label className="pr-dialog__label" htmlFor={id}>
+        Title
+      </label>
       <input
+        id={id}
         className="pr-dialog__input"
         value={form.title}
         onChange={(e) => form.setTitle(e.target.value)}
@@ -444,20 +452,31 @@ function TitleField({ form }: { form: PrForm }) {
   )
 }
 
+/** The Description label, tied to its textarea, beside the Write and Preview tabs. */
+function DescriptionHeader({ fieldId }: { fieldId: string }) {
+  return (
+    <div className="pr-dialog__inline pr-dialog__desc-header">
+      <label className="pr-dialog__label" htmlFor={fieldId}>
+        Description
+      </label>
+      <TabList label="Description">
+        <Tab id="write">Write</Tab>
+        <Tab id="preview">Preview</Tab>
+      </TabList>
+    </div>
+  )
+}
+
 function DescriptionField({ form }: { form: PrForm }) {
   const [descMode, setDescMode] = useState<DescriptionMode>('write')
+  const id = useId()
   return (
     <TabsRoot selectedId={descMode} onSelect={setDescMode}>
       <div className="pr-dialog__field">
-        <div className="pr-dialog__inline pr-dialog__desc-header">
-          <label className="pr-dialog__label">Description</label>
-          <TabList label="Description">
-            <Tab id="write">Write</Tab>
-            <Tab id="preview">Preview</Tab>
-          </TabList>
-        </div>
+        <DescriptionHeader fieldId={id} />
         <TabPanel id="write">
           <textarea
+            id={id}
             className="pr-dialog__textarea"
             value={form.body}
             onChange={(e) => form.setBody(e.target.value)}
@@ -491,17 +510,22 @@ function BranchGroup({ label, branches }: { label: string; branches: Branch[] })
 function BaseField({ form }: { form: PrForm }) {
   const [baseFilter, setBaseFilter] = useState('')
   const matchesBaseFilter = (b: Branch) => b.name.toLowerCase().includes(baseFilter.toLowerCase())
+  const id = useId()
   return (
     <div className="pr-dialog__field pr-dialog__field--flex">
-      <label className="pr-dialog__label">Base branch</label>
+      <label className="pr-dialog__label" htmlFor={id}>
+        Base branch
+      </label>
       <input
         className="pr-dialog__input"
+        aria-label="Filter branches"
         placeholder="Filter branches…"
         value={baseFilter}
         onChange={(e) => setBaseFilter(e.target.value)}
         style={{ marginBottom: 4 }}
       />
       <select
+        id={id}
         className="pr-dialog__input pr-dialog__select"
         value={form.base}
         onChange={(e) => form.setBase(e.target.value)}

@@ -11,13 +11,19 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   root: dirname,
   plugins: [
+    // A story is a test only when its play function asserts something: Storybook tags it play-fn.
+    // A story that only renders is documentation, and story-screenshots pictures it (T-CAN-FAIL).
     storybookTest({
       configDir: path.join(dirname, '.storybook'),
       storybookScript: 'npm run storybook',
+      tags: { include: ['play-fn'] },
     }),
   ],
   test: {
     name: 'stories',
+    // Every run shuffles, as the repository's own suite does (T-ALONE).
+    sequence: { shuffle: { files: true, tests: true } },
+    restoreMocks: true,
     browser: {
       enabled: true,
       headless: true,

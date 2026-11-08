@@ -59,17 +59,13 @@ function takingTheCriteriaTests() {
 }
 
 function otherHeadingsAndListsTests() {
-  it('reads the other things people call that heading', () => {
-    for (const heading of [
-      '## Acceptance',
-      '### Definition of Done',
-      '# Done when',
-      '## Criteria',
-    ]) {
+  it.each(['## Acceptance', '### Definition of Done', '# Done when', '## Criteria'])(
+    'reads the criteria under "%s"',
+    (heading) => {
       const found = acceptanceFromTicket(`${heading}\n- it works\n`)
       expect(found.map((c) => c.statement)).toEqual(['it works'])
     }
-  })
+  )
 
   it('reads numbered lists and ticked boxes alike', () => {
     const found = acceptanceFromTicket('# Acceptance Criteria\n1. one\n2) two\n- [x] three\n')

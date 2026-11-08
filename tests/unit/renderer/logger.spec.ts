@@ -73,11 +73,11 @@ describe('makeRendererLogger() — calls window.electronAPI.logger.write', () =>
     expect(mockLoggerWrite).toHaveBeenCalledWith('info', 'ns', 'test ipc')
   })
 
-  it('does not throw when window.electronAPI is unavailable', () => {
-    vi.stubGlobal('window', undefined)
+  it('still logs to the log window when window.electronAPI is unavailable', () => {
+    vi.stubGlobal('window', {})
     const log = makeRendererLogger('ns')
-    expect(() => log.info('no window')).not.toThrow()
-    expect(logged()).toContainEqual(['info', '[ns] no window'])
+    expect(() => log.info('no ipc')).not.toThrow()
+    expect(logged()).toContainEqual(['info', '[ns] no ipc'])
   })
 })
 

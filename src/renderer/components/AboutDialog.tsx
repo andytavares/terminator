@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Dialog } from '@terminator/extension-ui'
 import type { Extension } from '../../shared/types/index'
 import { recordUse } from '../usage/record'
@@ -54,10 +54,11 @@ function dbStatusText(dbStatus: DbStatus | null): string {
 }
 
 function InfoRow({ label, value }: { label: string; value: string | undefined }) {
+  const labelId = useId()
   return (
     <div className="about-dialog__row">
-      <dt>{label}</dt>
-      <dd>{value ?? '—'}</dd>
+      <dt id={labelId}>{label}</dt>
+      <dd aria-labelledby={labelId}>{value ?? '—'}</dd>
     </div>
   )
 }

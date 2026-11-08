@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { Orders } from '../../src/components/Orders.js'
 import { Forge } from '../../src/components/Forge.js'
@@ -11,10 +12,8 @@ import { compileOrder } from '../../src/order/compile.js'
 // An open order is a frame — a way back at the top, the order in the middle
 // scrolling inside it, the controls that end it at the foot — and the Forge's
 // steps are one box inside that frame: the step list, the step scrolling
-// itself, and the way forward pinned under it. Whether it actually holds is measured in the running
-// application (tests/e2e/foundry.spec.ts); what is asserted here is the
-// structure that rule is written against, because a wrapper quietly dropped in
-// a refactor takes the whole layout with it and every other test stays green.
+// itself, and the way forward pinned under it. These tests assert that order
+// through roles and landmarks; the stylesheet's measurements are not checked here.
 
 const ORDER = draftOrder({
   id: 'WO-1',
@@ -39,26 +38,32 @@ function bridge(handlers: Record<string, unknown>): void {
 beforeEach(() => vi.clearAllMocks())
 
 describe('the Forge is one box of steps', () => {
-  it('puts the step list, the step and the way forward inside it, and nothing else', async () => {
+  it('puts the step list first and the way forward at its foot', async () => {
     bridge({
       'foundry:order.compile': { order: ORDER, compile: compileOrder(ORDER) },
       'foundry:run.recipes': { recipes: [], proposed: null },
     })
-    const { container } = render(<Forge orderId="WO-1" />)
-    await waitFor(() => expect(container.querySelector('.fdry-wizard')).not.toBeNull())
-
-    const wizard = container.querySelector('.fdry-wizard')
-    expect(Array.from(wizard?.children ?? []).map((el) => el.className)).toEqual([
-      'fdry-wiz-head',
-      'fdry-strip fdry-strip--neutral',
-      'fdry-body',
-      'fdry-foot',
-    ])
+    render(<Forge orderId="WO-1" />)
+    const steps = await screen.findByRole('navigation', { name: 'Steps' })
+    const foot = await screen.findByRole('contentinfo')
+    expect(steps.compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(foot).getAllByRole('button').length).toBeGreaterThan(0)
   })
 })
 
+const SHAPING = {
+  kind: 'shaping',
+  turn: 'foundry',
+  label: 'being shaped',
+  detail: 'Foundry is still shaping this.',
+  done: 0,
+  total: 0,
+  gateId: null,
+}
+
 describe('an open order is a frame', () => {
-  it('marks the shell, and keeps the controls that end it last', async () => {
+  it('puts the way back first and the controls that end the order last', async () => {
+    const user = userEvent.setup()
     bridge({
       'foundry:order.list': {
         orders: [
@@ -69,19 +74,18 @@ describe('an open order is a frame', () => {
             risk: 'P2',
             failures: 0,
             source: { kind: 'typed', tracker: null, key: null },
+            standing: SHAPING,
           },
         ],
       },
       'foundry:order.compile': { order: ORDER, compile: compileOrder(ORDER) },
       'foundry:run.recipes': { recipes: [], proposed: null },
     })
-    const { container } = render(<Orders repoRoot="/repos/app" />)
-    await waitFor(() => expect(container.querySelector('.fdry-orders')).not.toBeNull())
-    ;(container.querySelector('.fdry-orders button') as HTMLButtonElement).click()
-    await waitFor(() => expect(container.querySelector('.fdry-forge')).not.toBeNull())
-
-    const shell = container.querySelector('.fdry-shell')
-    expect(shell?.classList.contains('is-open'), 'the shell is not framed').toBe(true)
-    expect(shell?.lastElementChild?.className).toBe('fdry-order-controls')
+    render(<Orders repoRoot="/repos/app" />)
+    await user.click(await screen.findByRole('button', { name: new RegExp(ORDER.title) }))
+    const back = await screen.findByRole('button', { name: 'All orders' })
+    const buttons = screen.getAllByRole('button')
+    expect(buttons[0]).toBe(back)
+    expect(buttons.at(-2)).toBe(screen.getByRole('button', { name: 'Discard this order' }))
   })
 })

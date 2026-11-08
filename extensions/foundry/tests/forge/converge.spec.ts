@@ -56,12 +56,12 @@ afterEach(() => {
 
 describe('what the architect is told', () => {
   describe('lane branches', laneBranchesTests)
-  describe('deciding and dismissing', decidingAndDismissingTests)
+  describe('instructions incidents added', incidentInstructionsTests)
   describe('open findings', convergeOpenFindingsTests)
   describe('the prompt and its schema', thePromptAndSchemaTests)
   describe('triggers and evidence', triggersAndEvidenceTests)
   describe('lane roles and closed sets', laneRolesAndClosedSetsTests)
-  describe('units, budgets and refusing checks', unitsBudgetsAndRefusingChecksTests)
+  describe('refusing checks', refusingChecksTests)
   describe('nothing wrong', nothingWrongTests)
   describe('agreeing its own work and the operator', agreeingItsOwnWorkAndTheOperatorTests)
   describe('where it runs', whereItRunsTests)
@@ -101,19 +101,31 @@ function laneBranchesTests() {
   })
 }
 
-function decidingAndDismissingTests() {
-  it('tells the architect to decide what it is 90% sure of rather than ask', () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('90%')
-    expect(plan.prompt).toContain('`confidence`')
-    expect(plan.prompt).toContain('`dismissFindings`')
-  })
+// Each sentence below was added after an incident: a turn refused, a run
+// halted, or a plan split for nothing. They are fixed copy, written for every
+// order, so one test guards them all.
+const REQUIRED_INSTRUCTIONS = [
+  '90%',
+  '`confidence`',
+  '`dismissFindings`',
+  'Only a blocking finding',
+  'wrong-outcome',
+  '`risk.triggers` is a closed set',
+  'closed set too',
+  'kinds of artifact, not paths',
+  'never a bare command string',
+  'Set `touchesInterface` to true when the unit changes something a person sees',
+  'Budgets are the operator’s',
+  'smallest plan that covers the ask',
+  'you\ndo not agree your own work',
+]
+const RETIRED_INSTRUCTIONS = ['a high one is', '"budgets"']
 
-  it('tells the architect only a blocking finding stops hand-off, and any severity may be dismissed', () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('Only a blocking finding')
-    expect(plan.prompt).toContain('wrong-outcome')
-    expect(plan.prompt).not.toContain('a high one is')
+function incidentInstructionsTests() {
+  it('carries each instruction an incident added, and none it retired', () => {
+    const { prompt } = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(REQUIRED_INSTRUCTIONS.filter((line) => !prompt.includes(line))).toEqual([])
+    expect(RETIRED_INSTRUCTIONS.filter((line) => prompt.includes(line))).toEqual([])
   })
 }
 
@@ -158,14 +170,9 @@ function triggersAndEvidenceTests() {
   // `risk.grade` and not for `risk.triggers`, so the architect wrote a
   // sentence into a closed enum and nine minutes of deep-tier work was refused
   // outright. An enum an agent is never shown is an enum it writes prose into.
-  it('names every value a risk trigger may take', () => {
+  it.each(RISK_TRIGGERS)('names the risk trigger "%s" in the brief', (trigger) => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    for (const trigger of RISK_TRIGGERS) expect(plan.prompt).toContain(trigger)
-  })
-
-  it('says a trigger is a label rather than a sentence', () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('`risk.triggers` is a closed set')
+    expect(plan.prompt).toContain(trigger)
   })
 
   // The same failure, one feature later and one field over. On WO-0909-6db the
@@ -173,15 +180,9 @@ function triggersAndEvidenceTests() {
   // the five things that list may hold; the architect wrote three file paths,
   // and six acceptance criteria and the only unit in the plan were refused
   // together on `Invalid enum value`.
-  it('names every value a judge’s evidence may take', () => {
+  it.each(EVIDENCE_KINDS)('names the judge evidence kind "%s" in the brief', (kind) => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    for (const kind of EVIDENCE_KINDS) expect(plan.prompt).toContain(kind)
-  })
-
-  it('says evidence is a kind of artifact rather than a path', () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('closed set too')
-    expect(plan.prompt).toContain('kinds of artifact, not paths')
+    expect(plan.prompt).toContain(kind)
   })
 }
 
@@ -190,9 +191,13 @@ function laneRolesAndClosedSetsTests() {
   // lane's `role` was shown as `null` and named neither value, three lines
   // under a *unit's* `role`, which is a free string whose example reads
   // "builder". The obvious wrong answer was on the same screen as the field.
-  it('names every value a lane’s role may take, and says it is not a unit’s', () => {
+  it.each(LANE_ROLES)('names the lane role "%s" in the brief', (role) => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    for (const role of LANE_ROLES) expect(plan.prompt).toContain(role)
+    expect(plan.prompt).toContain(role)
+  })
+
+  it('says a lane’s role is not a unit’s', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('not the same field as a unit')
   })
 
@@ -203,57 +208,25 @@ function laneRolesAndClosedSetsTests() {
   // because Zod refuses the document rather than the field. This is the list;
   // adding a closed set to a proposable part of the order means adding it
   // here and rendering it there.
-  it('names every closed set a proposal may carry', () => {
+  const closedSets: Record<string, readonly string[]> = {
+    'risk.grade': ['P0', 'P1', 'P2', 'P3'],
+    'risk.triggers': RISK_TRIGGERS,
+    'acceptance[].priority': ['P0', 'P1', 'P2'],
+    'acceptance[].verify.kind': ['test', 'command', 'judge', 'artifact', 'screenshot'],
+    'acceptance[].verify.evidence': EVIDENCE_KINDS,
+    'plan.lanes[].role': LANE_ROLES,
+  }
+  it.each(
+    Object.entries(closedSets).flatMap(([field, members]) =>
+      members.map((member) => [field, member] as const)
+    )
+  )('names %s member "%s" in the output schema', (_field, member) => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    const closedSets: Record<string, readonly string[]> = {
-      'risk.grade': ['P0', 'P1', 'P2', 'P3'],
-      'risk.triggers': RISK_TRIGGERS,
-      'acceptance[].priority': ['P0', 'P1', 'P2'],
-      'acceptance[].verify.kind': ['test', 'command', 'judge', 'artifact', 'screenshot'],
-      'acceptance[].verify.evidence': EVIDENCE_KINDS,
-      'plan.lanes[].role': LANE_ROLES,
-    }
-    const schema = JSON.stringify(plan.outputSchema)
-    for (const [field, members] of Object.entries(closedSets)) {
-      expect(members.length, `${field} has no members`).toBeGreaterThan(0)
-      for (const member of members) {
-        expect(schema, `${field} does not name ${member}`).toContain(`"${member}"`)
-      }
-    }
+    expect(JSON.stringify(plan.outputSchema)).toContain(`"${member}"`)
   })
 }
 
-function unitsBudgetsAndRefusingChecksTests() {
-  // The contract showed a budget of 12 files as an example, the architect
-  // wrote a budget of 10, and a run was halted at a limit the operator had
-  // configured as 25. Budgets are the operator's now; the architect fits them.
-  // TAV-14: the contract showed a unit's `verify` only as `[]`, the architect
-  // wrote two command strings into it, and Zod refused the whole plan with
-  // "plan.units.0.verify.0: Expected object, received string".
-  it("says a unit's verify is a list of check objects, never a bare string", () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('never a bare command string')
-  })
-
-  it('says when to set touchesInterface to true', () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toMatch(/Set `touchesInterface` to true .*a person sees/s)
-  })
-
-  it('does not offer budgets, and says the plan has to fit the ones it has', () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).not.toContain('"budgets"')
-    expect(plan.prompt).toContain('Budgets are the operator’s')
-  })
-
-  // The other half of the same failure: the plan that came back had seven
-  // units in one lane, which cost seven cold sessions for work that was serial
-  // in one checkout.
-  it('says a unit separates work that cannot share a checkout, not work that touches different files', () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('smallest plan that covers the ask')
-  })
-
+function refusingChecksTests() {
   it('says which checks would refuse the order as it stands', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     // An empty draft fails coverage; telling the architect that is the whole
@@ -279,11 +252,6 @@ function nothingWrongTests() {
 }
 
 function agreeingItsOwnWorkAndTheOperatorTests() {
-  it('refuses to let the agent agree its own work', () => {
-    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('you\ndo not agree your own work')
-  })
-
   it('carries what the operator just said, when they said something', () => {
     const plan = convergeBrief({
       order: order(),
@@ -387,6 +355,28 @@ function badAnswersTests() {
     const result = applyArchitectAnswer(order(), answer, 'now')
     expect(result.ok).toBe(false)
     expect(!result.ok && result.reason).toMatch(/refused/)
+  })
+
+  // WO-0909-6db: the architect wrote file paths into `verify.evidence`, a closed set of kinds.
+  it('refuses a file path where an evidence kind belongs, and names the field', () => {
+    const answer = {
+      acceptance: [
+        {
+          id: 'AC-6',
+          statement: 'every surface renders the change',
+          priority: 'P1',
+          verify: {
+            kind: 'judge',
+            rubric: 'the reviewer confirms the text is red',
+            evidence: ['src/app.css', 'src/theme.ts', 'src/index.css'],
+          },
+          unverifiable: null,
+        },
+      ],
+    }
+    const result = applyArchitectAnswer(order(), answer, 'now')
+    expect(!result.ok && result.reason).toContain('evidence')
+    expect(!result.ok && result.reason).toContain('Invalid option: expected one of "exit_code"')
   })
 }
 
@@ -531,12 +521,10 @@ function whatItHandsOverTests() {
 }
 
 function theAmendingFramingTests() {
-  it('says the turn amends the order rather than drafting it again', () => {
-    expect(prompt(drafted())).toContain('This turn amends the order above')
-  })
-
-  it('asks for the keys that changed and not for the ones that did not', () => {
-    expect(prompt(drafted())).toContain('Send only the keys you changed')
+  it('says the turn amends the order, and asks only for the keys that changed', () => {
+    const text = prompt(drafted())
+    expect(text).toContain('This turn amends the order above')
+    expect(text).toContain('Send only the keys you changed')
   })
 
   it('carries the operator’s instruction after the framing, not instead of it', () => {

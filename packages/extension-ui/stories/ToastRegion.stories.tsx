@@ -50,4 +50,5 @@ export const DismissReportsWhichToast: Story = {
 export const Empty: Story = { args: { toasts: [] } }
 
 export const EveryToneLight = inLight(EveryTone)
-export const WithActionLight = inLight(WithAction)
+// Keeps its play: the screenshot records the state the play leaves.
+export const WithActionLight: Story = { ...WithAction, globals: { theme: 'light' } }

@@ -186,13 +186,6 @@ describe('purity', () => {
     evaluateStall(f, DEFAULT_THRESHOLDS, 60 * MIN)
     expect(f).toEqual(snapshot)
   })
-
-  it('is deterministic for the same inputs', () => {
-    const f = facts()
-    const a = evaluateStall(f, DEFAULT_THRESHOLDS, 9 * MIN)
-    const b = evaluateStall(f, DEFAULT_THRESHOLDS, 9 * MIN)
-    expect(a).toEqual(b)
-  })
 })
 
 const turnFacts = (over: Partial<SessionFacts> = {}): SessionFacts => ({

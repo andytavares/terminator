@@ -32,15 +32,22 @@ describe('useLogStore — addEntry', () => {
     // A 24-hour wall-clock time, as the log window prints it.
     expect(entries[0].timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/)
   })
+})
 
+describe('useLogStore — addEntry at the cap', () => {
   it('caps log at 1000 entries, dropping oldest', () => {
-    for (let i = 0; i < 1005; i++) {
-      useLogStore.getState().addEntry('log', `msg ${i}`)
-    }
+    const full = Array.from({ length: 1000 }, (_, i) => ({
+      id: i,
+      level: 'log' as const,
+      message: `msg ${i}`,
+      timestamp: '00:00:00',
+    }))
+    useLogStore.setState({ entries: full })
+    useLogStore.getState().addEntry('log', 'msg 1000')
     const { entries } = useLogStore.getState()
     expect(entries).toHaveLength(1000)
-    // The oldest entries should be gone
-    expect(entries[0].message).toBe('msg 5')
+    expect(entries[0].message).toBe('msg 1')
+    expect(entries[999].message).toBe('msg 1000')
   })
 })
 

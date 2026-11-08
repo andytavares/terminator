@@ -6,8 +6,15 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useNavigationStore } from '../../../../src/renderer/stores/navigation.store'
 import { useKeyboardShortcuts } from '../../../../src/renderer/hooks/useKeyboardShortcuts'
+import { useStartWorkStore } from '../../../../src/renderer/components/home/start-work'
 import type { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
-import { resetStore, terminalSessionOf, workspaceFixture } from '../../../support/renderer-stores'
+import {
+  projectFixture,
+  resetStore,
+  terminalSessionOf,
+  workspaceFixture,
+} from '../../../support/renderer-stores'
+import { revealSession } from '../../../../src/renderer/terminal/navigate-to-session'
 import { installElectronApi } from '../../../support/electron-api'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import { SCRATCH_PROJECT_ID, type TerminalSession } from '../../../../src/shared/types/index'
@@ -428,12 +435,6 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
     expect(sessionState().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('ss2')
   })
 
-  it('regular project shortcuts still work when both activeProjectId and scratchProjectId are null', () => {
-    renderHook(() => useKeyboardShortcuts({ scratchProjectId: null }))
-    pressKey('t', { metaKey: true })
-    expect(createSession).not.toHaveBeenCalled()
-  })
-
   it('Cmd+T calls onNewTab when provided instead of creating a session directly', () => {
     const onNewTab = vi.fn()
     setup({ activeProjectId: 'proj-1' })
@@ -584,6 +585,31 @@ describe('back, forward and reopen closed tab', () => {
   })
 })
 
+describe('back and forward between Overview and a terminal', () => {
+  beforeEach(() => resetStore(useNavigationStore))
+
+  it('Cmd+Option+Left returns from a terminal to Overview, and Cmd+Option+Right to the terminal', () => {
+    setup({ activeProjectId: 'feature-a' })
+    useWorkspaceStore.setState({
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [projectFixture({ id: 'feature-a', workspaceId: 'ws-1' })]],
+      ]),
+    })
+    withTabs('feature-a', ['s1'], 's1')
+    renderHook(() => useKeyboardShortcuts())
+    useExtensionRegistry.getState().setActiveGlobalTab('core.overview')
+    revealSession('s1')
+
+    pressKey('ArrowLeft', { metaKey: true, altKey: true })
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.overview')
+
+    pressKey('ArrowRight', { metaKey: true, altKey: true })
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    expect(workspaceState().activeProjectId).toBe('feature-a')
+    expect(sessionState().getActiveSessionForProject('feature-a')).toBe('s1')
+  })
+})
+
 describe('reopen closed tab', () => {
   beforeEach(() => resetStore(useNavigationStore))
 
@@ -605,5 +631,15 @@ describe('reopen closed tab', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('t', { metaKey: true, altKey: true })
     expect(createSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('useKeyboardShortcuts — Start work', () => {
+  it('opens Start work on Cmd+N', () => {
+    useStartWorkStore.getState().closeLauncher()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('n', { metaKey: true })
+    expect(useStartWorkStore.getState().open).toBe(true)
+    useStartWorkStore.getState().closeLauncher()
   })
 })

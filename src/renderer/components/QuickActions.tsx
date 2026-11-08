@@ -504,7 +504,7 @@ function ActionRowEnd({ action, pinned, onTogglePin }: ActionRowEndProps): React
   return (
     <span className="qa-row__end">
       {pinned && (
-        <span className="qa-pin-indicator" aria-hidden="true">
+        <span className="qa-pin-indicator" role="img" aria-label="Pinned">
           <Pin />
         </span>
       )}

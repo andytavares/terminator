@@ -2,7 +2,8 @@ import React from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import {
   OverviewSummary,
   useSummary,
@@ -57,14 +58,16 @@ describe('OverviewSummary — summarizing a description', () => {
   })
 
   it('sends the body, shows the Brief as busy, then shows the summary with Regenerate', async () => {
+    const user = userEvent.setup()
     const settle = pendingSummary()
     renderDescription('Adds feature X.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await user.click(screen.getByRole('button', { name: 'Summarize' }))
 
     expect(screen.getByText('Brief')).toBeTruthy()
     expect(screen.getByText('reading the description…')).toBeTruthy()
-    expect(screen.getByText('Summarizing').closest('[aria-busy="true"]')).toBeTruthy()
+    expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true')
+    expect(screen.getByRole('status').textContent).toContain('Summarizing')
     expect(mockSummarize).toHaveBeenCalledWith({
       repoRoot: '/repo',
       prNumber: 42,
@@ -80,26 +83,22 @@ describe('OverviewSummary — summarizing a description', () => {
 })
 
 describe('OverviewSummary — a description with nothing to summarize', () => {
-  it('offers no Summarize for an empty description', () => {
-    renderDescription('')
-    expect(screen.queryByRole('button', { name: 'Summarize' })).toBeNull()
-  })
-
-  it('offers no Summarize for a missing description', () => {
-    renderDescription(null)
+  it.each(['', null])('offers no Summarize for the description %j', (description) => {
+    renderDescription(description)
     expect(screen.queryByRole('button', { name: 'Summarize' })).toBeNull()
   })
 })
 
 describe('OverviewSummary — summarizing a discussion', () => {
-  it('sends each comment as **author**: body', () => {
-    mockSummarize.mockResolvedValue({ summary: 's' })
+  it('sends each comment as **author**: body', async () => {
+    const user = userEvent.setup()
+    pendingSummary()
     const comments = [comment(1, 'ana', 'Ship it'), comment(2, 'bo', 'Wait for CI')]
     render(<SummaryOf subject={{ kind: 'discussion', comments }} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await user.click(screen.getByRole('button', { name: 'Summarize' }))
 
-    expect(screen.getByText('reading the discussion…')).toBeTruthy()
+    expect(screen.getByText('reading the discussion…').textContent).toBe('reading the discussion…')
     expect(mockSummarize).toHaveBeenCalledWith({
       repoRoot: '/repo',
       prNumber: 42,
@@ -116,15 +115,16 @@ describe('OverviewSummary — summarizing a discussion', () => {
 
 describe('OverviewSummary — when the agent cannot summarize', () => {
   it('shows the error in plain words and Retry runs the summary again', async () => {
+    const user = userEvent.setup()
     mockSummarize.mockResolvedValueOnce({ error: 'Timed out after 5 min' })
     mockSummarize.mockResolvedValueOnce({ summary: 'Adds X.' })
     renderDescription('Adds feature X.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await user.click(screen.getByRole('button', { name: 'Summarize' }))
     expect((await screen.findByRole('alert')).textContent).toBe(
       'The review agent could not summarize this: Timed out after 5 min.Try again'
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
 
     expect((await screen.findByTestId('rich-content')).textContent).toBe('Adds X.')
     expect(mockSummarize).toHaveBeenCalledTimes(2)
@@ -132,10 +132,11 @@ describe('OverviewSummary — when the agent cannot summarize', () => {
   })
 
   it('shows a failed call as an error with Retry, not a crash', async () => {
+    const user = userEvent.setup()
     mockSummarize.mockRejectedValueOnce(new Error('No handler for review-agent:summarize'))
     renderDescription('Adds feature X.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await user.click(screen.getByRole('button', { name: 'Summarize' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain(
       'No handler for review-agent:summarize'
@@ -170,15 +171,15 @@ describe('OverviewSummary — flat icons', () => {
 
   it('draws the Brief icon in its text colour', () => {
     renderDescription('Adds X.')
-    const icon = document.querySelector('.brief-card__icon') as Element
-    expect(inheritsTextColour(icon)).toBe(true)
+    expect(inheritsTextColour(screen.getByTestId('brief-icon'))).toBe(true)
   })
 
   it('draws the error icon in its text colour', async () => {
+    const user = userEvent.setup()
     mockSummarize.mockResolvedValue({ error: 'Timed out' })
     renderDescription('Adds X.')
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await user.click(screen.getByRole('button', { name: 'Summarize' }))
     await screen.findByRole('alert')
-    expect(inheritsTextColour(document.querySelector('.brief-error__icon') as Element)).toBe(true)
+    expect(inheritsTextColour(screen.getByTestId('brief-error-icon'))).toBe(true)
   })
 })

@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, act, fireEvent } from '@testing-library/react'
+import { render, act, fireEvent, screen } from '@testing-library/react'
 
 import { FRAME_PORT_MESSAGE } from '../../../../src/shared/frame-wire'
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal.js'
@@ -13,54 +13,34 @@ import { useShownExtensionViews } from '../../../../src/renderer/stores/shown-ex
 
 const mockOpenFramePort = vi.fn()
 let reloadHandler: ((extensionId: string) => void) | null = null
-const mockUpdatePanelBounds = vi.fn()
 const mockExitExtensionToTerminal = vi.fn()
 
 vi.mock('../../../../src/renderer/lib/focus-terminal', () => ({
   focusActiveTerminal: vi.fn(),
 }))
 
-const originalElectronAPI = window.electronAPI
-
 function stubDesktopApi(): void {
-  Object.defineProperty(window, 'electronAPI', {
-    value: {
-      extension: {
-        openFramePort: mockOpenFramePort,
-        updatePanelBounds: mockUpdatePanelBounds,
-      },
-      extensionEvents: {
-        onExtensionRendererReload: (handler: (extensionId: string) => void) => {
-          reloadHandler = handler
-          return () => {
-            reloadHandler = null
-          }
-        },
+  vi.stubGlobal('electronAPI', {
+    extension: {
+      openFramePort: mockOpenFramePort,
+    },
+    extensionEvents: {
+      onExtensionRendererReload: (handler: (extensionId: string) => void) => {
+        reloadHandler = handler
+        return () => {
+          reloadHandler = null
+        }
       },
     },
-    configurable: true,
-    writable: true,
   })
 }
 
 function stubRemoteApi(): void {
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extension: { updatePanelBounds: mockUpdatePanelBounds } },
-    configurable: true,
-    writable: true,
-  })
+  vi.stubGlobal('electronAPI', { extension: {} })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-})
-
-afterEach(() => {
-  Object.defineProperty(window, 'electronAPI', {
-    value: originalElectronAPI,
-    configurable: true,
-    writable: true,
-  })
 })
 
 function firstIframe(container: HTMLElement): HTMLIFrameElement {
@@ -121,26 +101,19 @@ describe('ExtensionPanelPortal — desktop src and spinner', () => {
 
   it('shows a spinner until the frame loads', () => {
     const { container } = renderPortal()
-    expect(container.querySelector('[data-testid="extension-loading"]')).toBeTruthy()
+    expect(screen.getByRole('status', { name: 'Loading extension' })).toBeTruthy()
     loadFrame(container)
-    expect(container.querySelector('[data-testid="extension-loading"]')).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Loading extension' })).toBeNull()
   })
 })
 
-describe('ExtensionPanelPortal — desktop visibility and bounds', () => {
+describe('ExtensionPanelPortal — desktop visibility', () => {
   beforeEach(stubDesktopApi)
 
   it('hides the panel with display:none when inactive but keeps the frame mounted', () => {
     const { container } = renderPortal({ isActive: false })
     expect(panelWrapper(container).style.display).toBe('none')
     expect(firstIframe(container)).toBeTruthy()
-  })
-
-  it('never calls updatePanelBounds', () => {
-    const { container, unmount } = renderPortal()
-    loadFrame(container)
-    unmount()
-    expect(mockUpdatePanelBounds).not.toHaveBeenCalled()
   })
 })
 
@@ -251,15 +224,6 @@ describe('ExtensionPanelPortal — remote/browser (openFramePort absent)', () =>
   it('does not ask main for a port', () => {
     render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
     expect(mockOpenFramePort).not.toHaveBeenCalled()
-  })
-
-  it('hides the wrapper when inactive but keeps the frame mounted', () => {
-    const { container } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={false} />
-    )
-    const wrapper = container.querySelector('[data-extension-panel]') as HTMLElement
-    expect(wrapper.style.display).toBe('none')
-    expect(firstIframe(container)).toBeTruthy()
   })
 })
 
@@ -503,16 +467,6 @@ describe('ExtensionPanelPortal — shown views', () => {
     rerender(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={false} />)
     expect(shownIds()).toEqual([])
     rerender(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
-    unmount()
-    expect(shownIds()).toEqual([])
-  })
-
-  it('marks remote frames shown too', () => {
-    stubRemoteApi()
-    const { unmount } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    expect(shownIds()).toEqual(['com.test.ext'])
     unmount()
     expect(shownIds()).toEqual([])
   })

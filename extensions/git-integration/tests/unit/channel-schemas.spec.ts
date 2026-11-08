@@ -19,17 +19,18 @@ import { activateCapturingChannels } from './support/activate'
 // ADR 096: whether a channel rejects bad input is its schema's job, so this
 // checks once, for every channel git-integration registers, that one is declared.
 describe('every git-integration channel', () => {
-  it('declares a schema that keeps a malformed payload from reaching run', async () => {
-    const specs = activateCapturingChannels().channels.map((c) => c.spec)
+  const specs = activateCapturingChannels().channels.map((c) => c.spec)
 
+  it('registers each channel once', () => {
     expect(specs.map((spec) => spec.channel)).toContain('git:commit')
     expect(new Set(specs.map((spec) => spec.channel)).size).toBe(specs.length)
-    for (const spec of specs) {
-      expect(spec.schema, `${spec.channel} has no schema`).toBeDefined()
-      const run = vi.fn()
-      await dispatchChannel({ ...spec, run }, 42)
-      expect(run, `${spec.channel} ran a malformed payload`).not.toHaveBeenCalled()
-    }
+  })
+
+  it.each(specs)('$channel keeps a malformed payload from reaching run', async (spec) => {
+    expect(spec.schema).toBeInstanceOf(Object)
+    const run = vi.fn()
+    await dispatchChannel({ ...spec, run }, 42)
+    expect(run).not.toHaveBeenCalled()
   })
 })
 

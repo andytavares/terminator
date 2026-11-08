@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ViewMenu } from '../../src/components/pr-review/ViewMenu'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
@@ -48,14 +48,20 @@ describe('ViewMenu', () => {
     expect(screen.getByRole('radiogroup', { name: 'Diff view mode' })).toBeTruthy()
   })
 
-  it('changes comment visibility and reflects aria-checked plus the store', async () => {
-    render(<ViewMenu />)
-    await userEvent.click(screen.getByRole('button', { name: 'View' }))
-    const unresolved = screen.getByRole('radio', { name: 'Unresolved' })
-    await userEvent.click(unresolved)
-    expect(unresolved.getAttribute('aria-checked')).toBe('true')
-    expect(useReviewUiStore.getState().commentVisibility).toBe('unresolved')
-  })
+  it.each([
+    { radioName: 'Unresolved', visibility: 'unresolved' },
+    { radioName: 'Hidden', visibility: 'hidden' },
+  ])(
+    'sets comment visibility to $visibility from the $radioName radio',
+    async ({ radioName, visibility }) => {
+      render(<ViewMenu />)
+      await userEvent.click(screen.getByRole('button', { name: 'View' }))
+      const radio = screen.getByRole('radio', { name: radioName })
+      await userEvent.click(radio)
+      expect(radio.getAttribute('aria-checked')).toBe('true')
+      expect(useReviewUiStore.getState().commentVisibility).toBe(visibility)
+    }
+  )
 
   it('shows a dot and "View (changed)" accessible name when a setting is non-default', async () => {
     useReviewUiStore.getState().setAgentNotesOn(false)
@@ -67,20 +73,29 @@ describe('ViewMenu', () => {
 describe('ViewMenu — says comments are hidden in the button name, not as separate text', () => {
   it('says comments are hidden in the button name, not as separate text', () => {
     useReviewUiStore.getState().setCommentVisibility('hidden')
-    const { container } = render(<ViewMenu />)
+    render(<ViewMenu />)
     expect(screen.queryByText('Comments hidden')).toBeNull()
     const button = screen.getByRole('button', { name: 'View · comments hidden' })
     expect(button.getAttribute('title')).toBe('View · comments hidden')
-    expect(container.querySelector('.vm-dot')).toBeTruthy()
+    expect(within(button).getByTestId('vm-dot')).toBeTruthy()
   })
 
-  it('toggles agent notes off via the Off button', async () => {
-    render(<ViewMenu />)
-    await userEvent.click(screen.getByRole('button', { name: 'View' }))
-    await userEvent.click(screen.getByRole('radio', { name: 'Off' }))
-    expect(useReviewUiStore.getState().agentNotesOn).toBe(false)
-  })
+  it.each([
+    { startOn: true, menuName: 'View', radioName: 'Off', expectedOn: false },
+    { startOn: false, menuName: 'View (changed)', radioName: 'On', expectedOn: true },
+  ])(
+    'sets agent notes on to $expectedOn from the $radioName radio',
+    async ({ startOn, menuName, radioName, expectedOn }) => {
+      useReviewUiStore.getState().setAgentNotesOn(startOn)
+      render(<ViewMenu />)
+      await userEvent.click(screen.getByRole('button', { name: menuName }))
+      await userEvent.click(screen.getByRole('radio', { name: radioName }))
+      expect(useReviewUiStore.getState().agentNotesOn).toBe(expectedOn)
+    }
+  )
+})
 
+describe('ViewMenu — diff view mode', () => {
   it('switches diff view mode to Split and back to Unified', async () => {
     render(<ViewMenu />)
     await userEvent.click(screen.getByRole('button', { name: 'View' }))
@@ -91,22 +106,7 @@ describe('ViewMenu — says comments are hidden in the button name, not as separ
   })
 })
 
-describe('ViewMenu — turns agent notes back on via the On button', () => {
-  it('turns agent notes back on via the On button', async () => {
-    useReviewUiStore.getState().setAgentNotesOn(false)
-    render(<ViewMenu />)
-    await userEvent.click(screen.getByRole('button', { name: 'View (changed)' }))
-    await userEvent.click(screen.getByRole('radio', { name: 'On' }))
-    expect(useReviewUiStore.getState().agentNotesOn).toBe(true)
-  })
-
-  it('selects Hidden from the Comments group', async () => {
-    render(<ViewMenu />)
-    await userEvent.click(screen.getByRole('button', { name: 'View' }))
-    await userEvent.click(screen.getByRole('radio', { name: 'Hidden' }))
-    expect(useReviewUiStore.getState().commentVisibility).toBe('hidden')
-  })
-
+describe('ViewMenu — hide-formatting-hunks switch', () => {
   it('toggles hide-formatting-hunks via the switch', async () => {
     render(<ViewMenu />)
     await userEvent.click(screen.getByRole('button', { name: 'View' }))
@@ -119,15 +119,12 @@ describe('ViewMenu — turns agent notes back on via the On button', () => {
 })
 
 describe('ViewMenu — renders the sinceNote when provided', () => {
-  it('renders the sinceNote when provided', async () => {
-    render(<ViewMenu sinceNote="Showing a1b2… head" />)
+  it.each([
+    { sinceNote: 'Showing a1b2… head', noteCount: 1 },
+    { sinceNote: undefined, noteCount: 0 },
+  ])('renders $noteCount sinceNote for sinceNote $sinceNote', async ({ sinceNote, noteCount }) => {
+    render(<ViewMenu sinceNote={sinceNote} />)
     await userEvent.click(screen.getByRole('button', { name: 'View' }))
-    expect(screen.getByText('Showing a1b2… head')).toBeTruthy()
-  })
-
-  it('renders no sinceNote text when the prop is absent', async () => {
-    render(<ViewMenu />)
-    await userEvent.click(screen.getByRole('button', { name: 'View' }))
-    expect(screen.queryByText(/Showing/)).toBeNull()
+    expect(screen.queryAllByText(/Showing/)).toHaveLength(noteCount)
   })
 })

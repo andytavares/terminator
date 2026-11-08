@@ -139,15 +139,12 @@ describe('buildContributionCalendar — levels', () => {
 
 describe('buildContributionCalendar — streaks', () => {
   it('runs the current streak over an empty weekend', () => {
-    // Wednesday, Thursday, Friday worked; today (Friday) has work.
-    const contributions = [
-      ...dayOfWork('2026-10-14'),
-      ...dayOfWork('2026-10-15'),
-      ...dayOfWork('2026-10-16'),
-    ]
+    // The Friday before, then Monday to today (Friday); Saturday and Sunday are empty.
+    const days = ['09', '12', '13', '14', '15', '16'].map((day) => `2026-10-${day}`)
+    const contributions = days.flatMap((day) => dayOfWork(day))
     const calendar = buildContributionCalendar(contributions, TODAY, ZONE)
-    expect(calendar.currentStreak).toBe(3)
-    expect(calendar.longestStreak).toBe(3)
+    expect(calendar.currentStreak).toBe(6) // the weekend leaves the run standing, it adds nothing
+    expect(calendar.longestStreak).toBe(6)
   })
 
   it('does not end the current streak when today has nothing yet', () => {
@@ -245,11 +242,11 @@ describe('previousRange', () => {
   })
 
   it('moves a year-long range back by its own length, across a leap day', () => {
-    // 2025-10-13..2026-10-16 is 369 days (2024 is a leap year), so the previous
-    // 369 days run 2024-10-09..2025-10-12.
-    expect(previousRange({ from: '2025-10-13', to: '2026-10-16' })).toEqual({
-      from: '2024-10-09',
-      to: '2025-10-12',
+    // 2027-10-13..2028-10-16 holds 29 February 2028, so it is 370 days, and the
+    // previous 370 days run 2026-10-08..2027-10-12.
+    expect(previousRange({ from: '2027-10-13', to: '2028-10-16' })).toEqual({
+      from: '2026-10-08',
+      to: '2027-10-12',
     })
   })
 })

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { Orders } from '../../src/components/Orders.js'
 import { payloadsSentOn } from '../helpers/bridge-calls.js'
@@ -18,10 +19,9 @@ function mount(answers: Record<string, Answer>, props: Record<string, unknown> =
     const answer = answers[channel]
     return answer === undefined ? new Promise(() => {}) : answer(payload)
   })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: vi.fn(() => vi.fn()) }, usage: { record: vi.fn() } },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    usage: { record: vi.fn() },
   })
   render(<Orders repoRoot="/repos/app" {...props} />)
 }
@@ -34,6 +34,15 @@ function row(over: Record<string, unknown> = {}) {
     risk: 'P2',
     failures: 0,
     source: { kind: 'typed', tracker: null, key: null },
+    standing: {
+      kind: 'shaping',
+      turn: 'foundry',
+      label: 'being shaped',
+      detail: 'Foundry is still shaping this.',
+      done: 0,
+      total: 0,
+      gateId: null,
+    },
     ...over,
   }
 }
@@ -55,13 +64,14 @@ describe('starting an order from a ticket', () => {
 })
 
 async function pickTicket(answers: Record<string, Answer>): Promise<void> {
+  const user = userEvent.setup()
   mount({
     'foundry:order.list': () => ({ orders: [] }),
     'foundry:issues.mine': () => mine,
     ...answers,
   })
-  fireEvent.click(screen.getByRole('radio', { name: 'Ticket' }))
-  fireEvent.click(await screen.findByRole('button', { name: /TAV-14/ }))
+  await user.click(screen.getByRole('radio', { name: 'Ticket' }))
+  await user.click(await screen.findByRole('button', { name: /TAV-14/ }))
 }
 
 function pickingTests() {
@@ -88,21 +98,24 @@ function pickingTests() {
     await pickTicket({ 'foundry:order.create': () => ({ error: 'no' }) })
     await screen.findByText('no')
     expect(screen.getByText('Todo')).toBeTruthy()
-    expect(document.querySelectorAll('.fdry-ticket-status')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /TAV-16/ }).textContent).toBe(
+      'TAV-16Group the Ledger'
+    )
   })
 }
 
 function searchingTests() {
   it('searches on Enter and on Find, not on every keystroke', async () => {
+    const user = userEvent.setup()
     mount({ 'foundry:order.list': () => ({ orders: [] }), 'foundry:issues.mine': () => mine })
-    fireEvent.click(screen.getByRole('radio', { name: 'Ticket' }))
+    await user.click(screen.getByRole('radio', { name: 'Ticket' }))
     await screen.findByRole('button', { name: /TAV-14/ })
     const search = screen.getByLabelText('Search your tickets')
-    fireEvent.change(search, { target: { value: 'ledger' } })
+    await user.type(search, 'ledger')
     expect(payloadsSentOn(invoke, 'foundry:issues.mine')).toEqual([{ term: '' }])
-    fireEvent.keyDown(search, { key: 'a' })
-    fireEvent.keyDown(search, { key: 'Enter' })
-    fireEvent.click(screen.getByRole('button', { name: 'Find' }))
+    expect(search.matches(':focus')).toBe(true)
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Find' }))
     await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:issues.mine')).toHaveLength(3))
     expect(payloadsSentOn(invoke, 'foundry:issues.mine').slice(1)).toEqual([
       { term: 'ledger' },
@@ -113,29 +126,32 @@ function searchingTests() {
 
 function nothingToPickTests() {
   it('says what went wrong reading the tickets', async () => {
+    const user = userEvent.setup()
     mount({
       'foundry:order.list': () => ({ orders: [] }),
       'foundry:issues.mine': () => ({ error: 'Linear is unreachable' }),
     })
-    fireEvent.click(screen.getByRole('radio', { name: 'Ticket' }))
+    await user.click(screen.getByRole('radio', { name: 'Ticket' }))
     await screen.findByText('Linear is unreachable')
   })
 
   it('says when no ticket matched', async () => {
+    const user = userEvent.setup()
     mount({
       'foundry:order.list': () => ({ orders: [] }),
       'foundry:issues.mine': () => ({ connected: mine.connected, issues: [] }),
     })
-    fireEvent.click(screen.getByRole('radio', { name: 'Ticket' }))
+    await user.click(screen.getByRole('radio', { name: 'Ticket' }))
     await screen.findByText('No tickets matched. Try a different search.')
   })
 
   it('says how to connect a tracker when none is', async () => {
+    const user = userEvent.setup()
     mount({
       'foundry:order.list': () => ({ orders: [] }),
       'foundry:issues.mine': () => ({ connected: [], issues: [] }),
     })
-    fireEvent.click(screen.getByRole('radio', { name: 'Ticket' }))
+    await user.click(screen.getByRole('radio', { name: 'Ticket' }))
     await screen.findByText(/No tracker is connected/)
   })
 }
@@ -155,14 +171,16 @@ function openOn(status: string, answers: Record<string, Answer> = {}): void {
 
 /** Goes back to the list, where whatever the open order's controls ran into is said. */
 async function backToTheList(): Promise<void> {
-  fireEvent.click(screen.getByRole('button', { name: 'All orders' }))
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'All orders' }))
   await screen.findByRole('heading', { name: /Orders/ })
 }
 
 function theWayBackTests() {
   it('goes back to the list and reads it again', async () => {
+    const user = userEvent.setup()
     openOn('draft')
-    fireEvent.click(await screen.findByRole('button', { name: 'All orders' }))
+    await user.click(await screen.findByRole('button', { name: 'All orders' }))
     await screen.findByRole('heading', { name: /Orders/ })
     expect(payloadsSentOn(invoke, 'foundry:order.list').length).toBeGreaterThan(1)
   })
@@ -170,18 +188,21 @@ function theWayBackTests() {
 
 function discardingTests() {
   it('marks a draft cancelled and goes back to the list', async () => {
+    const user = userEvent.setup()
     openOn('draft', { 'foundry:order.cancel': () => ({}) })
-    fireEvent.click(await screen.findByRole('button', { name: 'Discard this order' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard this order' }))
     await screen.findByRole('heading', { name: /Orders/ })
     expect(payloadsSentOn(invoke, 'foundry:order.cancel')).toEqual([{ id: 'WO-1' }])
   })
 
   it('stays open when the discard is refused, and the list says why', async () => {
+    const user = userEvent.setup()
     openOn('draft', { 'foundry:order.cancel': () => ({ error: 'It is running.' }) })
-    fireEvent.click(await screen.findByRole('button', { name: 'Discard this order' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard this order' }))
     await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:order.cancel')).toHaveLength(1))
+    expect(screen.getByRole('button', { name: 'Discard this order' })).toBeTruthy()
     await backToTheList()
-    await screen.findByText('It is running.')
+    expect(await screen.findByText('It is running.')).toBeTruthy()
   })
 
   it('offers no discard for a running order', async () => {
@@ -193,8 +214,9 @@ function discardingTests() {
 }
 
 async function confirmDelete(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete this order' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete it and everything it made' }))
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'Delete this order' }))
+  await user.click(await screen.findByRole('button', { name: 'Delete it and everything it made' }))
 }
 
 function ordersSeedAndEndDeletingTests() {
@@ -211,8 +233,9 @@ function ordersSeedAndEndDeletingTests() {
     })
     await confirmDelete()
     await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:order.delete')).toHaveLength(1))
+    expect(screen.getByRole('button', { name: 'Discard this order' })).toBeTruthy()
     await backToTheList()
-    await screen.findByText('branch foundry/WO-1; worktree lane-1')
+    expect(await screen.findByText('branch foundry/WO-1; worktree lane-1')).toBeTruthy()
   })
 
   it('says the refusal rather than what was left, when the delete is refused', async () => {
@@ -220,6 +243,7 @@ function ordersSeedAndEndDeletingTests() {
     await confirmDelete()
     await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:order.delete')).toHaveLength(1))
     await backToTheList()
-    await screen.findByText('No such order.')
+    expect(await screen.findByText('No such order.')).toBeTruthy()
+    expect(screen.queryByText('x')).toBeNull()
   })
 }

@@ -141,7 +141,7 @@ function AddButton({ item, disabled }: AddProps): JSX.Element {
 
 export function CarriedOverColumn({ rows, full }: { rows: PlanRow[]; full: boolean }): JSX.Element {
   return (
-    <div className="plan__column">
+    <div className="plan__column" role="group" aria-label="Carried over">
       <ColumnTitle icon={<Clock aria-hidden="true" />}>CARRIED OVER</ColumnTitle>
       {rows.length === 0 && <p className="plan__none">Nothing carried over.</p>}
       {rows.map((row) => (
@@ -162,7 +162,7 @@ export function FocusColumn(props: { today: FocusItem[]; reviewMinutes: number }
   const removeFocus = useFocusStore((s) => s.removeFocus)
   const slots = Array.from({ length: FOCUS_LIMIT }, (_, index) => props.today[index])
   return (
-    <div className="plan__column">
+    <div className="plan__column" role="group" aria-label="Today's focus">
       <ColumnTitle
         icon={<Check aria-hidden="true" />}
       >{`TODAY'S FOCUS · PICK UP TO ${FOCUS_LIMIT}`}</ColumnTitle>

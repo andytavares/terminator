@@ -118,6 +118,19 @@ describe('a failed check', () => {
   })
 })
 
+describe('a failed check beside another', () => {
+  it('prompts the live agent for a check that fails beside one already failing', async () => {
+    const unit = { ...failed, name: 'unit' }
+    const { feed, agents } = setup({ live: ['live-1'] })
+    await feed({ checks: [unit] })
+    await feed({ checks: [unit, failed] })
+    expect(agents.prompt).toHaveBeenCalledTimes(1)
+    const text = (agents.prompt.mock.calls[0] as unknown as [string, string])[1]
+    expect(text).toContain('The check "E2E" failed')
+    expect(text).not.toContain('The check "unit" failed')
+  })
+})
+
 describe('resuming an agent', () => {
   it('starts the recorded conversation once, then prompts it while it lives', async () => {
     const { feed, agents } = setup({ resumable: 'old-conversation' })
@@ -169,9 +182,22 @@ describe('resuming an agent: limits', () => {
   })
 })
 
-describe('comments', () => {
-  const moved = (n: number) => ({ updatedAt: `2026-10-17T09:${String(n).padStart(2, '0')}:00Z` })
+const minute = (n: number) => `2026-10-17T09:${String(n).padStart(2, '0')}:00Z`
+const moved = (n: number) => ({ updatedAt: minute(n) })
 
+/** Feeds `count` dashboard snapshots in order, each after one new comment by someone else. */
+async function feedNewComments(
+  feed: ReturnType<typeof setup>['feed'],
+  comments: ReturnType<typeof comment>[],
+  count: number
+) {
+  for (let n = 1; n <= count; n++) {
+    comments.push(comment(minute(n)))
+    await feed(moved(n))
+  }
+}
+
+describe('comments', () => {
   it('wakes on a comment by someone else only', async () => {
     const mine = comment('2026-10-17T09:01:00Z', 'andrew')
     const theirs = comment('2026-10-17T09:02:00Z')
@@ -187,10 +213,7 @@ describe('comments', () => {
     const comments: ReturnType<typeof comment>[] = []
     const { feed, agents, notes } = setup({ live: ['live-1'], comments })
     await feed({})
-    for (let n = 1; n <= 11; n++) {
-      comments.push(comment(`2026-10-17T09:${String(n).padStart(2, '0')}:00Z`))
-      await feed(moved(n))
-    }
+    await feedNewComments(feed, comments, 11)
     expect(agents.prompt).toHaveBeenCalledTimes(10)
     expect(notes.mock.calls.at(-1)?.[0]).toEqual([expect.objectContaining({ kind: 'stopped' })])
   })

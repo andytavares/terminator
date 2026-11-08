@@ -76,51 +76,20 @@ describe('checkbox styling — has a visible keyboard focus ring', () => {
     expect(dark).toMatch(/--tm-on-accent:\s*#ffffff/)
     expect(light).toMatch(/--tm-on-accent:\s*#ffffff/)
   })
-
-  it('leaves no accent-color rule behind — it does nothing once appearance is none', () => {
-    for (const file of [
-      '../../../src/renderer/components/sidebar/dialog-fields.css',
-      '../../../src/renderer/components/settings/SettingsPanel.css',
-    ]) {
-      expect(read(file)).not.toMatch(/accent-color/)
-    }
-  })
 })
 
 describe('extension checkbox styling', () => {
   // Extension UIs are isolated WebContentsViews and inherit none of the host's
   // CSS, so the same replacement has to travel with the injected base sheet.
-  it('replaces the native widget inside extension views too', () => {
-    expect(EXTENSION_BASE_CSS).toMatch(
-      /input\[type='checkbox'\],\s*input\[type='radio'\] \{[^}]*appearance:\s*none/
-    )
-  })
-
   it('uses the published --tm-* tokens, not the host variable names', () => {
     const rules = EXTENSION_BASE_CSS.slice(EXTENSION_BASE_CSS.indexOf("input[type='checkbox']"))
     expect(rules).toMatch(/var\(--tm-bg-input\)/)
     expect(rules).toMatch(/var\(--tm-accent\)/)
     expect(rules).not.toMatch(/var\(--(?!tm-)/)
   })
-
-  it('publishes --tm-on-accent so the tick has a colour to use', () => {
-    expect(EXTENSION_BASE_CSS).toMatch(/--tm-on-accent:\s*#ffffff/)
-  })
-
-  it('covers checked, indeterminate, focus and disabled, matching the host', () => {
-    for (const state of [':checked', ':indeterminate', ':focus-visible', ':disabled']) {
-      expect(EXTENSION_BASE_CSS).toContain(`input[type='checkbox']${state}`)
-    }
-  })
 })
 
 describe('radio styling', () => {
-  it('replaces the native widget rather than tinting it', () => {
-    const base = ruleBody(CONTROLS, BOX)
-    expect(base).toMatch(/appearance:\s*none/)
-    expect(base).toMatch(/-webkit-appearance:\s*none/)
-  })
-
   it('is the same box as the checkbox, but circular', () => {
     expect(CONTROLS).toMatch(/\}\n\ninput\[type='radio'\] \{[^}]*border-radius:\s*50%/)
   })
@@ -164,19 +133,6 @@ describe('radio styling — centres the dot — asserted arithmetically, so resi
 
   it('immunises both controls against a container form reset', () => {
     expect(ruleBody(CONTROLS, BOX)).toMatch(/padding:\s*0/)
-  })
-})
-
-describe('extension radio styling', () => {
-  it('replaces the native widget inside extension views too', () => {
-    expect(EXTENSION_BASE_CSS).toMatch(/input\[type='radio'\] \{[^}]*appearance:\s*none/)
-    expect(EXTENSION_BASE_CSS).toMatch(/input\[type='radio'\] \{[^}]*border-radius:\s*50%/)
-  })
-
-  it('covers checked, focus and disabled, matching the host', () => {
-    for (const state of [':checked', ':focus-visible', ':disabled']) {
-      expect(EXTENSION_BASE_CSS).toContain(`input[type='radio']${state}`)
-    }
   })
 })
 

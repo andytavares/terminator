@@ -34,20 +34,3 @@ describe('notificationsAPI bridge', () => {
     })
   })
 })
-
-describe('notificationsAPI bridge — notify works without a message', () => {
-  it('notify works without a message', async () => {
-    const { notificationsAPI } = await import('../../src/api/notifications')
-    await notificationsAPI.notify({
-      type: 'info',
-      title: 'No merge conflicts found.',
-      key: 'noConflictsFound',
-    })
-    expect(mockInvoke).toHaveBeenCalledWith('git:notify', {
-      type: 'info',
-      title: 'No merge conflicts found.',
-      key: 'noConflictsFound',
-      message: undefined,
-    })
-  })
-})

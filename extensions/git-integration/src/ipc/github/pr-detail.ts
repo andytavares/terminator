@@ -102,8 +102,8 @@ function requestedReviewersOf(reviewers: PrSources['reviewers']): string[] {
  *  "Expected" checks show. Best-effort: a failed lookup keeps the rollup. */
 async function checkRollup(ctx: GithubContext, meta: RawRecord, where: RepoAt) {
   const rollup = meta.statusCheckRollup
-  const headSHA = String(meta.headRefOid ?? '')
-  if ((Array.isArray(rollup) && rollup.length > 0) || !headSHA) return rollup
+  const headSHA = String(meta.headRefOid)
+  if (Array.isArray(rollup) && rollup.length > 0) return rollup
   try {
     const suitesRaw = await ctx.api(where.repoRoot, {
       path: `${where.repoPath}/commits/${headSHA}/check-suites`,

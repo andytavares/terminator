@@ -1,17 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import net from 'node:net'
-import { once } from 'node:events'
-import { assertLoopback } from '../../support/network-guard'
+import { assertLoopback, assertNoTcp } from '../../support/network-guard'
 
 describe('the network guard tests/setup.ts installs', () => {
   it('refuses a connection to another machine, naming the host', () => {
-    expect(() => net.connect({ host: 'example.com', port: 80 })).toThrow(
+    expect(() => assertLoopback([{ host: 'example.com', port: 80 }])).toThrow(
       'A spec may only connect to localhost: example.com'
     )
   })
 
   it('refuses the (port, host) form and an address that is not loopback', () => {
-    expect(() => net.connect(443, '93.184.216.34')).toThrow(
+    expect(() => assertLoopback([443, '93.184.216.34'])).toThrow(
       'A spec may only connect to localhost: 93.184.216.34'
     )
   })
@@ -26,20 +25,14 @@ describe('the network guard tests/setup.ts installs', () => {
   })
 })
 
-describe('the network guard tests/setup.ts installs — localhost', () => {
-  it('lets a spec connect to a server of its own on localhost', async () => {
-    let connections = 0
-    const server = net.createServer((socket) => {
-      connections += 1
-      socket.end()
-    })
-    server.listen(0, '127.0.0.1')
-    await once(server, 'listening')
-    const { port } = server.address() as net.AddressInfo
-    const socket = net.connect(port, '127.0.0.1')
-    await once(socket, 'close')
-    server.close()
-    await once(server, 'close')
-    expect(connections).toBe(1)
+describe('the network guard in a unit test', () => {
+  it('refuses a TCP connection to this machine too', () => {
+    expect(() => net.connect({ host: '127.0.0.1', port: 1 })).toThrow(
+      'A unit test may open no TCP socket (T-BOUNDARY): 127.0.0.1'
+    )
+  })
+
+  it('accepts a Unix socket path, which is a pipe and not the network', () => {
+    expect(() => assertNoTcp([{ path: '/tmp/agent.sock' }])).not.toThrow()
   })
 })

@@ -55,10 +55,9 @@ const listRecords = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   listRecords.mockResolvedValue({ data: [closedRecord] })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { integrations: { getIssue }, sessionRecords: { list: listRecords } },
-    writable: true,
-    configurable: true,
+  vi.stubGlobal('electronAPI', {
+    integrations: { getIssue },
+    sessionRecords: { list: listRecords },
   })
   useSessionStore.setState({ sessions: new Map([['s1', session]]) })
   useWorkspaceStore.setState({

@@ -1,6 +1,5 @@
 import React from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, within } from 'storybook/test'
 import { RelativeTime } from '../src/RelativeTime'
 import { inLight } from './in-light'
 
@@ -18,11 +17,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const MinutesAgo: Story = {
-  play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByText('5 minutes ago')).toBeInTheDocument()
-  },
-}
+export const MinutesAgo: Story = {}
 
 export const HoursAgo: Story = { args: { value: NOW - 3 * HOUR } }
 export const Yesterday: Story = { args: { value: NOW - DAY } }

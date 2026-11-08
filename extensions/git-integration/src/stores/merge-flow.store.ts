@@ -22,8 +22,6 @@ interface MergeFlowStore {
   clearSession(): void
 
   // Navigation
-  setActiveFile(index: number): void
-  setActiveBlock(index: number): void
   goToNextBlock(): void
   goToPrevBlock(): void
 
@@ -103,8 +101,6 @@ function decisionFor(
 
 function navigationActions(set: SetState, get: GetState) {
   return {
-    setActiveFile: (index: number) => set({ activeFileIndex: index, activeBlockIndex: 0 }),
-    setActiveBlock: (index: number) => set({ activeBlockIndex: index }),
     // At the last block of the last file this does nothing.
     goToNextBlock: () => {
       const { session, activeFileIndex, activeBlockIndex } = get()

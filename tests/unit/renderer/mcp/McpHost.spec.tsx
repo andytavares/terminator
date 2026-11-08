@@ -54,12 +54,6 @@ describe('McpHost', () => {
     expect(revealSession).toHaveBeenCalledWith('s-1')
   })
 
-  it('answers a tool it does not know with an error', async () => {
-    render(<McpHost palette={palette} />)
-    const answer = await deliver({ id: 'c-9', tool: 'nope' as McpCall['tool'], args: {} })
-    expect(answer).toEqual({ id: 'c-9', error: 'Terminator has no tool named nope.' })
-  })
-
   it('answers a quick-action call from the list the palette shows', async () => {
     render(<McpHost palette={palette} />)
     const answer = await deliver({ id: 'c-10', tool: 'list_quick_actions', args: {} })

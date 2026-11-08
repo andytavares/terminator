@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReviewPlan } from '../../src/components/pr-review/ReviewPlan'
 import { makeFile } from './overview-fixtures'
 import type { Chapter, PrChangedFile } from '../../src/schemas/pr-review.schema'
@@ -45,10 +46,11 @@ describe('ReviewPlan', () => {
     expect(row.textContent).toContain('5 files')
   })
 
-  it('starts at the chapter whose row is clicked', () => {
+  it('starts at the chapter whose row is clicked', async () => {
+    const user = userEvent.setup()
     const started: string[] = []
     render(<ReviewPlan chapters={chapters} onStartAt={(id) => started.push(id)} />)
-    fireEvent.click(screen.getByRole('button', { name: /Start here: Panel layout/ }))
+    await user.click(screen.getByRole('button', { name: /Start here: Panel layout/ }))
     expect(started).toEqual(['c2'])
   })
 })
@@ -56,10 +58,11 @@ describe('ReviewPlan', () => {
 describe('ReviewPlan rows and headings', () => {
   it('describes each row by its risk, file count and minutes', () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
-    const row = screen.getByRole('button', { name: /Start here: Panel layout/ })
-    expect(row.getAttribute('aria-describedby')).toBeTruthy()
-    const described = document.getElementById(row.getAttribute('aria-describedby') ?? '')
-    expect(described?.textContent).toBe('Low risk, 5 files, 8 min')
+    const row = screen.getByRole('button', {
+      name: /Start here: Panel layout/,
+      description: 'Low risk, 5 files, 8 min',
+    })
+    expect(row).toBeTruthy()
   })
 
   it('titles the plan with a level 2 heading', () => {
@@ -69,7 +72,7 @@ describe('ReviewPlan rows and headings', () => {
 
   it('renders nothing without chapters', () => {
     const { container } = render(<ReviewPlan chapters={[]} onStartAt={() => {}} />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('totals the minutes across chapters in the heading line', () => {

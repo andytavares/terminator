@@ -1,47 +1,36 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
-import { createServer, type AddressInfo, type Server } from 'net'
 import { hashPassword } from '../../src/server/password-hash'
 import { isPending, unfinishedWork } from '../../../../tests/support/pending'
 
+import { createRemoteServer } from '../../src/server/remote-server'
+import { WsTicketStore } from '../../src/server/ws-ticket-store'
+import { WsSubscriberManager } from '../../src/server/ws-subscriber-manager'
+import { partialFake } from '../../../../tests/support/fakes'
+import { createFakePtyManager, type FakePtyManager } from './helpers/fake-pty-manager'
+
 const PASSWORD = 'correct-password'
 
-// Every server here listens on a port the OS picks (0), never a fixed one: a fixed
-// port is shared by every test run on the machine, so two runs at once (another
-// checkout, CI shards) made start() fail with PortInUseError at random.
+// These tests drive the server through inject() and never start() it: a unit test may not
+// listen on a socket (T-TIER). tests/integration/remote-server.spec.ts covers listening.
 const ANY_PORT = 0
-
-/** A port held by a plain TCP server on all interfaces, as the remote server binds. */
-async function occupiedPort(): Promise<{ port: number; holder: Server }> {
-  const holder = createServer()
-  await new Promise<void>((resolve) => holder.listen(0, '0.0.0.0', resolve))
-  return { port: (holder.address() as AddressInfo).port, holder }
-}
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>()
-  return {
-    ...actual,
-    readFileSync: vi.fn(actual.readFileSync),
-    existsSync: vi.fn(() => false),
-    readdirSync: vi.fn(actual.readdirSync),
-  }
+  return { ...actual, readFileSync: vi.fn(), existsSync: vi.fn(), readdirSync: vi.fn() }
 })
 
-const mockTicketStore = vi.hoisted(() => ({
-  createTicket: vi.fn(() => 'a'.repeat(64)),
-  consumeTicket: vi.fn(() => null as string | null),
+vi.mock('../../src/server/ws-ticket-store', () => ({ WsTicketStore: vi.fn() }))
+vi.mock('../../src/server/ws-subscriber-manager', () => ({ WsSubscriberManager: vi.fn() }))
+
+const mockTicketStore = {
+  createTicket: vi.fn<(sessionId: string, purpose: string) => string>(),
+  consumeTicket: vi.fn<(ticket: string, purpose: string) => string | null>(),
   startCleanup: vi.fn(),
   stopCleanup: vi.fn(),
-}))
+}
 
-vi.mock('../../src/server/ws-ticket-store', () => ({
-  WsTicketStore: vi.fn().mockImplementation(function () {
-    return mockTicketStore
-  }),
-}))
-
-const mockSubscriberManager = vi.hoisted(() => ({
+const mockSubscriberManager = {
   addSubscriber: vi.fn(),
   removeSubscriber: vi.fn(),
   broadcast: vi.fn(),
@@ -49,67 +38,58 @@ const mockSubscriberManager = vi.hoisted(() => ({
   destroyAll: vi.fn(),
   isPrimary: vi.fn(),
   getPrimary: vi.fn(),
-  getCount: vi.fn(() => 0),
-}))
+  getCount: vi.fn(),
+}
 
-vi.mock('../../src/server/ws-subscriber-manager', () => ({
-  WsSubscriberManager: vi.fn(function () {
-    return mockSubscriberManager
-  }),
-}))
-
-type RemoteServer = Awaited<
-  ReturnType<typeof import('../../src/server/remote-server').createRemoteServer>
->
+type RemoteServer = Awaited<ReturnType<typeof createRemoteServer>>
 
 let remoteServer: RemoteServer
+let ptyManager: FakePtyManager
+let passwordHash: string
 
-// Minimal stateful fake of the v1.4.0 session-authority PtyManagerAPI
-const ptySessions = new Map<string, Record<string, unknown>>()
-const mockPtyManager = {
-  spawnSession: vi.fn(
-    async (opts: { sessionId: string; cwd: string; type: string; origin: string }) => {
-      const info = { ...opts, createdAt: new Date().toISOString(), pid: 1 }
-      ptySessions.set(opts.sessionId, info)
-      return { ...info }
-    }
-  ),
-  onData: vi.fn(() => () => {}),
-  onExit: vi.fn(() => () => {}),
-  getSession: vi.fn(async (id: string) => ptySessions.get(id)),
-  setWorkspace: vi.fn(async (id: string, ws: string | null) => {
-    const info = ptySessions.get(id)
-    if (!info) return false
-    info.workspaceId = ws ?? undefined
-    return true
-  }),
-  write: vi.fn(),
-  kill: vi.fn((id: string) => {
-    ptySessions.delete(id)
-  }),
-  resize: vi.fn(),
-  listSessions: vi.fn(async () => [...ptySessions.values()]),
+function fakeDeps(passwordHash: string) {
+  return {
+    getPasswordHash: () => passwordHash,
+    getMaxSubscribers: () => 5,
+    listWorkspaces: () => [],
+    listProjects: () => [],
+    invokeChannel: vi.fn().mockResolvedValue(undefined),
+    sendChannel: vi.fn(),
+    onWindowEvent: vi.fn().mockReturnValue(vi.fn()),
+    isRemoteAccessible: async () => true,
+    onPortInUse: vi.fn(),
+  }
 }
 
-const mockDeps = {
-  getPasswordHash: vi.fn(() => ''),
-  getMaxSubscribers: vi.fn(() => 5),
-  listWorkspaces: vi.fn(() => []),
-  listProjects: vi.fn(() => []),
-  invokeChannel: vi.fn().mockResolvedValue(undefined),
-  sendChannel: vi.fn(),
-  onWindowEvent: vi.fn().mockReturnValue(vi.fn()),
-  isRemoteAccessible: vi.fn().mockReturnValue(true),
-  onPortInUse: vi.fn(),
-}
-
-async function createServerOnPort(port: number, deps = mockDeps): Promise<RemoteServer> {
-  const { createRemoteServer } = await import('../../src/server/remote-server')
+function createServerOnPort(port: number): Promise<RemoteServer> {
   return createRemoteServer({
     port,
     appPath: '/mock/app',
-    ptyManager: mockPtyManager as never,
-    deps,
+    ptyManager: ptyManager as never,
+    deps: fakeDeps(passwordHash),
+  })
+}
+
+/** Real fs reads and real tickets, unless a test answers them itself; nothing is installed. */
+async function armFakes(): Promise<void> {
+  const actualFs = await vi.importActual<typeof import('fs')>('fs')
+  vi.mocked(readFileSync).mockImplementation(actualFs.readFileSync)
+  vi.mocked(readdirSync).mockImplementation(actualFs.readdirSync)
+  vi.mocked(existsSync).mockReturnValue(false)
+  const { WsTicketStore: RealTicketStore } = await vi.importActual<
+    typeof import('../../src/server/ws-ticket-store')
+  >('../../src/server/ws-ticket-store')
+  const real = new RealTicketStore()
+  mockTicketStore.createTicket.mockImplementation((id, purpose) => real.createTicket(id, purpose))
+  mockTicketStore.consumeTicket.mockImplementation((ticket, purpose) =>
+    real.consumeTicket(ticket, purpose)
+  )
+  vi.mocked(WsTicketStore).mockImplementation(function () {
+    return partialFake<WsTicketStore>(mockTicketStore)
+  })
+  mockSubscriberManager.getCount.mockReturnValue(0)
+  vi.mocked(WsSubscriberManager).mockImplementation(function () {
+    return partialFake<WsSubscriberManager>(mockSubscriberManager)
   })
 }
 
@@ -151,17 +131,10 @@ function getWithCookie(url: string, cookie?: string) {
 }
 
 beforeEach(async () => {
-  const storedHash = await hashPassword(PASSWORD)
-  mockDeps.getPasswordHash.mockReturnValue(storedHash)
+  await armFakes()
+  ptyManager = createFakePtyManager()
+  passwordHash = await hashPassword(PASSWORD)
   remoteServer = await createServerOnPort(ANY_PORT)
-  await remoteServer.start()
-})
-
-afterEach(async () => {
-  await remoteServer.stop()
-  ptySessions.clear()
-  vi.resetModules()
-  vi.clearAllMocks()
 })
 
 describe('RemoteServer health route', () => {
@@ -169,22 +142,6 @@ describe('RemoteServer health route', () => {
     const response = await remoteServer.inject({ method: 'GET', url: '/health' })
     expect(response.statusCode).toBe(200)
     expect(JSON.parse(response.body)).toEqual({ ok: true })
-  })
-})
-
-describe('RemoteServer start/stop lifecycle', () => {
-  it('server is listening after start()', () => {
-    expect(remoteServer.isListening()).toBe(true)
-  })
-
-  it('stop() closes the server', async () => {
-    await remoteServer.stop()
-    expect(remoteServer.isListening()).toBe(false)
-  })
-
-  it('double stop() is safe', async () => {
-    await remoteServer.stop()
-    await expect(remoteServer.stop()).resolves.not.toThrow()
   })
 })
 
@@ -207,15 +164,16 @@ describe('RemoteServer disconnectAllClients', () => {
 
     // The pty manager has not listed its sessions yet: a disconnect that does not wait kills none.
     const listing = unfinishedWork()
-    mockPtyManager.listSessions.mockImplementationOnce(async () => {
+    const listed = [...ptyManager.sessions.values()]
+    ptyManager.listSessions.mockImplementationOnce(async () => {
       await listing.done
-      return [...ptySessions.values()]
+      return listed
     })
     const disconnected = remoteServer.disconnectAllClients()
     expect(await isPending(disconnected)).toBe(true)
     listing.finish()
     await disconnected
-    expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId)
+    expect(ptyManager.kill).toHaveBeenCalledWith(sessionId)
   })
 })
 
@@ -307,29 +265,7 @@ function injectWorkspaces(headers: Record<string, string>) {
   return remoteServer.inject({ method: 'GET', url: '/api/workspaces', headers })
 }
 
-describe('RemoteServer login', () => {
-  it('returns 401 for every login while no password hash is stored', async () => {
-    mockDeps.getPasswordHash.mockReturnValue('')
-    const res = await remoteServer.inject({
-      method: 'POST',
-      url: '/api/login',
-      payload: { password: PASSWORD },
-    })
-    expect(res.statusCode).toBe(401)
-  })
-
-  it('does not accept the password as a Bearer header on an API request', async () => {
-    const res = await injectWorkspaces({ Authorization: `Bearer ${PASSWORD}` })
-    expect(res.statusCode).toBe(401)
-  })
-})
-
 describe('RemoteServer login sessions', () => {
-  it('authorises an API request with the cookie a correct login issued', async () => {
-    const res = await injectWorkspaces({ cookie: await loginCookie() })
-    expect(res.statusCode).toBe(200)
-  })
-
   it('ends every login session when clients are disconnected (password change)', async () => {
     const cookie = await loginCookie()
     await remoteServer.disconnectAllClients()
@@ -351,12 +287,7 @@ describe('RemoteServer POST /api/mobile-ticket and /api/app-ticket', () => {
     expect(body.ticket.length).toBeGreaterThan(0)
   })
 
-  it('returns 401 without credentials', async () => {
-    const res = await remoteServer.inject({ method: 'POST', url: '/api/mobile-ticket' })
-    expect(res.statusCode).toBe(401)
-  })
-
-  it('issues an app ticket to an authenticated client', async () => {
+  it('issues an authenticated client an app ticket that opens /app/', async () => {
     const cookie = await loginCookie()
     const res = await remoteServer.inject({
       method: 'POST',
@@ -364,7 +295,11 @@ describe('RemoteServer POST /api/mobile-ticket and /api/app-ticket', () => {
       headers: { cookie },
     })
     expect(res.statusCode).toBe(201)
-    expect(mockTicketStore.createTicket).toHaveBeenCalledWith('__app__', 'app')
+    const { ticket } = JSON.parse(res.body) as { ticket: string }
+    vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+    const app = await getWithCookie(`/app/?t=${ticket}`)
+    expect(app.statusCode).toBe(200)
+    expect(allSetCookies(app)).toMatch(/app-session=/)
   })
 })
 
@@ -448,23 +383,7 @@ const BUILT_EXTENSION = {
   '/mock/app/out/renderer/index.html': '<html><head></head></html>',
 }
 
-function restoreFs(): void {
-  vi.mocked(existsSync).mockImplementation(() => false)
-  vi.mocked(readdirSync).mockReset()
-  vi.mocked(readFileSync).mockReset()
-}
-
 describe('RemoteServer /ext/* extension routes', () => {
-  afterEach(restoreFs)
-
-  it('GET /ext/<id>/ is publicly accessible (no session gate on extension statics)', async () => {
-    mockInstalledExtensions(['task-vault'], BUILT_EXTENSION)
-    const extServer = await createServerOnPort(ANY_PORT)
-    const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
-    // No 403 — extension static assets have no session gate
-    expect(res.statusCode).not.toBe(403)
-  })
-
   it('GET /ext/<id>/ returns 200 with shim and base CSS injected when renderer is built', async () => {
     mockInstalledExtensions(['task-vault'], BUILT_EXTENSION)
     const extServer = await createServerOnPort(ANY_PORT)
@@ -478,8 +397,6 @@ describe('RemoteServer /ext/* extension routes', () => {
 })
 
 describe('RemoteServer /ext/* extensions without a renderer', () => {
-  afterEach(restoreFs)
-
   it('GET /ext/<id>/ returns 503 when renderer is not built', async () => {
     // The extension's index.html is missing
     mockInstalledExtensions(['task-vault'], { [`${EXT_DIR}/manifest.json`]: MANIFEST })
@@ -491,9 +408,10 @@ describe('RemoteServer /ext/* extensions without a renderer', () => {
 })
 
 describe('RemoteServer /ext/* extensions it cannot serve', () => {
-  afterEach(restoreFs)
-
-  it('serves no route for an extension whose manifest is malformed, rendererless or unbuilt', async () => {
+  it.each([
+    { kind: 'rendererless', id: 'com.headless' },
+    { kind: 'unbuilt', id: 'com.unbuilt' },
+  ])('serves no route for a $kind extension beside a malformed one', async ({ id }) => {
     mockInstalledExtensions(['broken', 'headless', 'unbuilt', 'bare'], {
       [`${EXT_ROOT}/broken/manifest.json`]: '{ not json',
       [`${EXT_ROOT}/headless/manifest.json`]: JSON.stringify({ id: 'com.headless' }),
@@ -503,10 +421,8 @@ describe('RemoteServer /ext/* extensions it cannot serve', () => {
       }),
     })
     const extServer = await createServerOnPort(ANY_PORT)
-    for (const id of ['com.headless', 'com.unbuilt']) {
-      const res = await extServer.inject({ method: 'GET', url: `/ext/${id}/` })
-      expect(res.statusCode).toBe(404)
-    }
+    const res = await extServer.inject({ method: 'GET', url: `/ext/${id}/` })
+    expect(res.statusCode).toBe(404)
   })
 
   it('serves no extension routes when the extensions folder cannot be read', async () => {
@@ -517,40 +433,5 @@ describe('RemoteServer /ext/* extensions it cannot serve', () => {
     const extServer = await createServerOnPort(ANY_PORT)
     const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
     expect(res.statusCode).toBe(404)
-  })
-})
-
-describe('RemoteServer EADDRINUSE handling', () => {
-  let taken: { port: number; holder: Server }
-
-  beforeEach(async () => {
-    taken = await occupiedPort()
-  })
-
-  afterEach(async () => {
-    await new Promise((resolve) => taken.holder.close(resolve))
-  })
-
-  it('start() with port in use rejects with PortInUseError', async () => {
-    const { PortInUseError } = await import('../../src/server/port-in-use-error')
-    const conflictServer = await createServerOnPort(taken.port, {
-      ...mockDeps,
-      onPortInUse: vi.fn(),
-    })
-    await expect(conflictServer.start()).rejects.toThrow(PortInUseError)
-  })
-
-  it('start() with port in use calls onPortInUse', async () => {
-    const onPortInUse = vi.fn()
-    const conflictServer = await createServerOnPort(taken.port, { ...mockDeps, onPortInUse })
-    await conflictServer.start().catch(() => {})
-    expect(onPortInUse).toHaveBeenCalledWith(taken.port)
-  })
-
-  it('start() rethrows a listen failure other than a port in use', async () => {
-    const onPortInUse = vi.fn()
-    const invalidPortServer = await createServerOnPort(-1, { ...mockDeps, onPortInUse })
-    await expect(invalidPortServer.start()).rejects.toThrow()
-    expect(onPortInUse).not.toHaveBeenCalled()
   })
 })

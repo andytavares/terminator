@@ -13,8 +13,13 @@
   overflow: hidden;
   flex-shrink: 0;
   position: relative;
-  transition: width 0.2s ease;
   z-index: 10;
+}
+
+/* Only once settings have loaded: the first width they set (Home hides the sidebar) must not
+   slide, or the sidebar moves under a pointer at startup. */
+.unified-sidebar--animated {
+  transition: width 0.2s ease;
 }
 
 .unified-sidebar--hidden {

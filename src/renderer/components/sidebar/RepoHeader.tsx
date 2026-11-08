@@ -99,18 +99,17 @@ function RepoHeaderContent(props: RepoHeaderProps): React.JSX.Element {
       <span className="repo-header__chevron" aria-hidden="true">
         {collapsed ? <ChevronRight /> : <ChevronDown />}
       </span>
-      {leading ?? (group.color && <span className="repo-header__swatch" aria-hidden="true" />)}
+      {leading ??
+        (group.color && (
+          <span className="repo-header__swatch" data-testid="repo-swatch" aria-hidden="true" />
+        ))}
       <span className="repo-header__name" title={pathLabel || group.folderPath || undefined}>
         {group.label}
       </span>
 
       {/* A collapsed repo must still be able to say something inside it is
           waiting, or hiding a repo hides the one thing you needed to see. */}
-      {collapsed && group.needsYou && (
-        <span className="repo-header__needs-you" aria-label="A branch here is waiting on you">
-          <Pause aria-hidden="true" />
-        </span>
-      )}
+      {collapsed && group.needsYou && <NeedsYouMarker />}
 
       <RepoHoverActions {...props} />
 
@@ -118,6 +117,18 @@ function RepoHeaderContent(props: RepoHeaderProps): React.JSX.Element {
           and revealing the actions to its left cannot move it. */}
       <span className="repo-header__count">{group.branchCount}</span>
     </>
+  )
+}
+
+function NeedsYouMarker(): React.JSX.Element {
+  return (
+    <span
+      className="repo-header__needs-you"
+      role="img"
+      aria-label="A branch here is waiting on you"
+    >
+      <Pause aria-hidden="true" />
+    </span>
   )
 }
 
@@ -162,6 +173,7 @@ function WorkspaceTabButton({ tab, on, onSelect }: WorkspaceTabButtonProps): Rea
       type="button"
       className={`repo-header__action${on ? ' repo-header__action--on' : ''}`}
       aria-label={tab.label}
+      aria-pressed={on}
       title={tab.label}
       onClick={clickOnly(onSelect)}
     >

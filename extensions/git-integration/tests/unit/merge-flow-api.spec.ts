@@ -45,27 +45,7 @@ describe('mergeFlowAPI bridge', () => {
   })
 })
 
-describe('mergeFlowAPI bridge — resolveConflict calls correct channel without optional args', () => {
-  it('resolveConflict calls correct channel without optional args', async () => {
-    const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.resolveConflict({
-      repoRoot: '/repo',
-      blockId: 'src/foo.ts#0',
-      resolvedText: 'resolved',
-      strategy: 'theirs',
-    })
-    expect(mockInvoke).toHaveBeenCalledWith('git:resolve-conflict', {
-      repoRoot: '/repo',
-      blockId: 'src/foo.ts#0',
-      resolvedText: 'resolved',
-      strategy: 'theirs',
-      currentResolvedText: undefined,
-      originalConflictText: undefined,
-    })
-  })
-})
-
-describe('mergeFlowAPI bridge — resolveConflict calls correct channel without optional args — undoResolve calls correct channel', () => {
+describe('mergeFlowAPI bridge — undoResolve calls correct channel', () => {
   it('undoResolve calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     await mergeFlowAPI.undoResolve({

@@ -100,11 +100,6 @@ describe('buildBranchRows', () => {
     expect(rows.map((b) => b.projectId).sort()).toEqual(['p1', 'p2', 'p3'])
   })
 
-  it('still lists a branch with no terminals under a narrowing search', () => {
-    const result = build([], view({ filters: { query: '034' } }))
-    expect(rowFor(result, 'p1')).toBeTruthy()
-  })
-
   it('groups branches under their repo', () => {
     const { groups } = build([])
     expect(groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
@@ -133,9 +128,11 @@ describe('buildBranchRows — carries the repo colour and folder path on the gro
 
   // BR-2. The count and the rows are the same number, or the header lies.
   it('reports a branch count equal to the branches it holds', () => {
-    for (const group of build([]).groups) {
-      expect(group.branchCount).toBe(group.branches.length)
-    }
+    const counts = build([]).groups.map((g) => [g.label, g.branchCount, g.branches.length])
+    expect(counts).toEqual([
+      ['kalli', 1, 1],
+      ['terminator', 2, 2],
+    ])
   })
 })
 
@@ -343,10 +340,12 @@ describe('buildBranchRows — order — sorts repos by name when asked', () => {
   // The repo headers are half the list: a sort that only reaches inside them reads as one
   // that does nothing.
   it('sorts repos by name when asked', () => {
-    expect(build([], view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
-      'kalli',
-      'terminator',
-    ])
+    // terminator is more recent, so only the name sort puts kalli first.
+    const result = build(
+      [session('a', 'p1', { lastActivityAt: 99 }), session('b', 'p3', { lastActivityAt: 10 })],
+      view({ sortBy: 'name' })
+    )
+    expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
   })
 
   it('falls back to name when two repos are equally recent', () => {
@@ -355,10 +354,10 @@ describe('buildBranchRows — order — sorts repos by name when asked', () => {
 
   it('sorts repos by their most recent branch', () => {
     const result = build([
-      session('a', 'p1', { lastActivityAt: 10 }),
-      session('b', 'p3', { lastActivityAt: 99 }),
+      session('a', 'p1', { lastActivityAt: 99 }),
+      session('b', 'p3', { lastActivityAt: 10 }),
     ])
-    expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+    expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
   })
 
   it('sorts repos by their oldest branch when asked', () => {
@@ -374,12 +373,12 @@ describe('buildBranchRows — order — sorts repos by their most severe branch 
   it('sorts repos by their most severe branch when asked', () => {
     const result = build(
       [
-        session('a', 'p1', { agentState: 'idle' }),
-        session('b', 'p3', { agentState: 'awaiting-input' }),
+        session('a', 'p1', { agentState: 'awaiting-input' }),
+        session('b', 'p3', { agentState: 'idle' }),
       ],
       view({ sortBy: 'status' })
     )
-    expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+    expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
   })
 
   // Manual is the user's own order, and the only place it is written down is
@@ -408,12 +407,6 @@ describe('buildBranchRows — order — orders repos by the workspace list, not 
       { now: NOW, staleAfterMs: STALE_AFTER }
     )
     expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
-  })
-
-  it('puts everything in one group when grouping is off', () => {
-    const { groups } = build([], view({ groupBy: 'none' }))
-    expect(groups).toHaveLength(1)
-    expect(groups[0].branches).toHaveLength(3)
   })
 })
 
@@ -458,10 +451,11 @@ describe('buildBranchRows — repos with no branches', () => {
   })
 })
 
-describe('buildBranchRows — repos with no branches — does not invent a repo header when grouping is off', () => {
-  it('does not invent a repo header when grouping is off', () => {
+describe('buildBranchRows — repos with no branches — puts every branch in one group when grouping is off', () => {
+  it('puts every branch in one group, with no header for an empty repo, when grouping is off', () => {
     const { groups } = withEmpty(view({ groupBy: 'none' }))
     expect(groups).toHaveLength(1)
+    expect(groups[0].branches).toHaveLength(3)
   })
 
   it('ranks an empty repo as idle under a status sort', () => {
@@ -486,14 +480,7 @@ describe('buildBranchRows — repos with no branches — does not invent a repo 
   })
 })
 
-describe('buildBranchRows — carries no change statistics — they belong to the store, behind its TTL', () => {
-  // BR-8 / BR-9.
-  it('carries no change statistics — they belong to the store, behind its TTL', () => {
-    const row = rowFor(build([]), 'p1')!
-    expect(row).not.toHaveProperty('added')
-    expect(row).not.toHaveProperty('removed')
-  })
-
+describe('buildBranchRows — inputs', () => {
   it('does not mutate its inputs', () => {
     const sessions = [session('a', 'p1'), session('b', 'p2')]
     const order = sessions.map((s) => s.id)

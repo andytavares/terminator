@@ -102,21 +102,6 @@ describe('foundry:signals.dismiss', () => {
     expect((await store.get('sig-1'))?.status).toBe('dismissed')
   })
 
-  it('seeds the order from the repository profile stored under the data root', async () => {
-    const { c, store } = channels()
-    await seedSignal(store)
-    const profile = {
-      ...emptyProfile(repo),
-      prepare: { command: 'make setup', source: 'operator' as const },
-    }
-    await writeProfile(root, repo, profile)
-
-    const result = (await c.promote({ id: 'sig-1', repoPaths: [repo] })) as {
-      order: { context: { environment: { prepare: string | null } } }
-    }
-    expect(result.order.context.environment.prepare).toBe('make setup')
-  })
-
   it('errors on an unknown signal', async () => {
     const { c } = channels()
     expect(await c.dismiss({ id: 'nope' })).toEqual({ error: 'No signal nope.' })
@@ -124,6 +109,8 @@ describe('foundry:signals.dismiss', () => {
 })
 
 describe('foundry:signals.promote', () => {
+  describe('the repository profile', promotingWithAProfileTests)
+
   it('seeds a draft order sourced from the signal, marks it promoted, and starts nothing', async () => {
     const { c, store, orderStore } = channels()
     await seedSignal(store)
@@ -257,3 +244,20 @@ describe('foundry:sensors.run-now', () => {
     expect(await c.sensorsRunNow({ id: 'nope' })).toEqual({ error: 'No sensor nope.' })
   })
 })
+
+function promotingWithAProfileTests() {
+  it('seeds the order from the repository profile stored under the data root', async () => {
+    const { c, store } = channels()
+    await seedSignal(store)
+    const profile = {
+      ...emptyProfile(repo),
+      prepare: { command: 'make setup', source: 'operator' as const },
+    }
+    await writeProfile(root, repo, profile)
+
+    const result = (await c.promote({ id: 'sig-1', repoPaths: [repo] })) as {
+      order: { context: { environment: { prepare: string | null } } }
+    }
+    expect(result.order.context.environment.prepare).toBe('make setup')
+  })
+}

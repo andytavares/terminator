@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useSidebarVisibility } from '../../../../src/renderer/shell/useSidebarVisibility'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
@@ -49,10 +50,11 @@ describe('useSidebarVisibility', () => {
     expect(hasTree()).toBe(false)
   })
 
-  it('shows it for this visit when toggled on Home, and hides it again after leaving and returning', () => {
+  it('shows it for this visit when toggled on Home, and hides it again after leaving and returning', async () => {
+    const user = userEvent.setup()
     showTab('core.home')
     render(<Shell />)
-    fireEvent.click(screen.getByText('toggle'))
+    await user.click(screen.getByRole('button', { name: 'toggle' }))
     expect(hasTree()).toBe(true)
     showTab('core.overview')
     showTab('core.home')
@@ -61,21 +63,23 @@ describe('useSidebarVisibility', () => {
 })
 
 describe('useSidebarVisibility — other tabs and the setting', () => {
-  it('leaves other tabs on the user own toggle state', () => {
+  it('leaves other tabs on the user own toggle state', async () => {
+    const user = userEvent.setup()
     showTab('core.overview')
     render(<Shell />)
     expect(hasTree()).toBe(true)
-    fireEvent.click(screen.getByText('toggle'))
+    await user.click(screen.getByRole('button', { name: 'toggle' }))
     expect(hasTree()).toBe(false)
     showTab('core.home')
     showTab('core.overview')
     expect(hasTree()).toBe(false)
   })
 
-  it('does not let a toggle on Home change the user own state elsewhere', () => {
+  it('does not let a toggle on Home change the user own state elsewhere', async () => {
+    const user = userEvent.setup()
     showTab('core.home')
     render(<Shell />)
-    fireEvent.click(screen.getByText('toggle'))
+    await user.click(screen.getByRole('button', { name: 'toggle' }))
     showTab(null)
     expect(hasTree()).toBe(true)
   })

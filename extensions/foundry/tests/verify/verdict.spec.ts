@@ -56,8 +56,8 @@ function passesTests() {
 }
 
 function theWorkingSessionTests() {
-  it('refuses a verdict from the session that did the work', () => {
-    expect(() =>
+  it('refuses a verdict from the session that did the work, and says why in words', () => {
+    const fromTheBuilder = () =>
       makeVerdict({
         ...base(),
         producedBy: { role: 'builder', sessionId: 'sess-builder' },
@@ -65,19 +65,8 @@ function theWorkingSessionTests() {
         reason: '',
         evidence: [{ kind: 'exit_code', exitCode: 0 }],
       })
-    ).toThrow(SelfVerificationError)
-  })
-
-  it('says why it refused, in words rather than a code', () => {
-    expect(() =>
-      makeVerdict({
-        ...base(),
-        producedBy: { role: 'builder', sessionId: 'sess-builder' },
-        result: 'pass',
-        reason: '',
-        evidence: [{ kind: 'exit_code', exitCode: 0 }],
-      })
-    ).toThrow(/own homework/)
+    expect(fromTheBuilder).toThrow(SelfVerificationError)
+    expect(fromTheBuilder).toThrow(/own homework/)
   })
 }
 

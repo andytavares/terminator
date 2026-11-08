@@ -149,6 +149,9 @@ async function captureFromQuickActions(): Promise<void> {
   // host's ⌘P listener cannot hear; blur it so the panel opens.
   await handle.page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await handle.page.keyboard.press('ControlOrMeta+p')
+  // Keys sent before the panel owns focus land on the page underneath.
+  const panel = handle.page.getByRole('dialog', { name: 'Quick actions' })
+  await expect(panel.locator(':focus')).toHaveCount(1)
   await handle.page.keyboard.press('v')
   await handle.page.keyboard.press('c')
 

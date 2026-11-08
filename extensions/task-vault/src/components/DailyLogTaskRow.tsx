@@ -311,7 +311,7 @@ async function completeTask(onComplete: (id: string) => Promise<void>, id: strin
 function TaskMarker({ row }: RowProps): React.JSX.Element {
   if (!row.isOpen) {
     return (
-      <span className="daily-log__task-marker">
+      <span className="daily-log__task-marker" role="img" aria-label={row.task.status}>
         <StatusIcon status={row.task.status} />
       </span>
     )
@@ -608,12 +608,12 @@ export function TaskRow(props: TaskRowProps): React.JSX.Element {
   return (
     <>
       <div
+        role="group"
+        aria-label={row.task.text}
+        aria-current={props.isSelected || undefined}
         className={rowClass({ row })}
         draggable={drag ? true : undefined}
-        onDragStart={drag?.onDragStart}
-        onDragEnd={drag?.onDragEnd}
-        onDragOver={drag?.onDragOver}
-        onDrop={drag?.onDrop}
+        {...drag}
       >
         {drag && <DragHandle />}
         <TaskMarker row={row} />

@@ -1,22 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { eventually } from '../../../../tests/support/eventually'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock the toast store before importing notify
 vi.mock('../../src/stores/extension-toast.store', () => ({
   addExtensionToast: vi.fn(),
 }))
 
-const mockCreate = vi.fn().mockResolvedValue({ id: 'notif-1' })
-
-Object.defineProperty(globalThis, 'window', {
-  value: {
-    electronAPI: {
-      notifications: { create: mockCreate },
-    },
-  },
-  writable: true,
-  configurable: true,
-})
+const mockCreate = vi.fn()
 
 import { notify, toastPushed } from '../../src/utils/notify'
 import { addExtensionToast } from '../../src/stores/extension-toast.store'
@@ -24,11 +13,8 @@ import { addExtensionToast } from '../../src/stores/extension-toast.store'
 const mockAddToast = vi.mocked(addExtensionToast)
 
 beforeEach(() => {
-  vi.clearAllMocks()
-})
-
-afterEach(() => {
-  vi.restoreAllMocks()
+  mockCreate.mockResolvedValue({ id: 'notif-1' })
+  vi.stubGlobal('window', { electronAPI: { notifications: { create: mockCreate } } })
 })
 
 describe('notify', notifyTests)
@@ -63,17 +49,10 @@ function notifyLocalToastsTests() {
   it('forgets the click handler once the dispatcher has answered', async () => {
     const onClick = vi.fn()
     notify('info', 'Archived: test', { key: 'taskArchived', onClick })
+    // notify's own finally() was chained first, so it has run once this await returns.
     await mockCreate.mock.results[0].value
-    await eventually(() => {
-      toastPushed(pushed('Archived: test'))
-      expect(mockAddToast).toHaveBeenLastCalledWith('info', 'Archived: test', {
-        onClick: undefined,
-      })
-    })
-  })
-
-  it('does not throw when called without options', () => {
-    expect(() => notify('error', 'Oops', 'testKey')).not.toThrow()
+    toastPushed(pushed('Archived: test'))
+    expect(mockAddToast).toHaveBeenCalledWith('info', 'Archived: test', { onClick: undefined })
   })
 }
 

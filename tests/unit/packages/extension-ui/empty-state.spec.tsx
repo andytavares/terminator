@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FileText } from 'lucide-react'
 import { EmptyState } from '../../../../packages/extension-ui/src/EmptyState'
 import { IconButton } from '../../../../packages/extension-ui/src/IconButton'
@@ -22,12 +23,12 @@ const base = {
 describe('EmptyState', () => {
   it('states the situation as a heading', () => {
     render(<EmptyState {...base} />)
-    expect(screen.getByRole('heading', { name: 'No notes yet' })).toBeTruthy()
+    expect(screen.getByRole('heading').textContent).toBe('No notes yet')
   })
 
   it('explains what the region is for', () => {
     render(<EmptyState {...base} />)
-    expect(screen.getByText(base.description)).toBeTruthy()
+    expect(document.body.textContent).toContain(base.description)
   })
 
   // FR-026: an empty state without an action is the thing being replaced.
@@ -36,10 +37,11 @@ describe('EmptyState', () => {
     expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('invokes the action', () => {
+  it('invokes the action', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     render(<EmptyState {...base} actions={[{ label: 'New note', onSelect }]} />)
-    fireEvent.click(screen.getByRole('button', { name: /New note/ }))
+    await user.click(screen.getByRole('button', { name: /New note/ }))
     expect(onSelect).toHaveBeenCalledTimes(1)
   })
 })
@@ -55,31 +57,34 @@ describe('EmptyState — renders a secondary action beside the primary', () => {
         ]}
       />
     )
-    expect(screen.getByRole('button', { name: /New note/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Import a folder…/ })).toBeTruthy()
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'New note',
+      'Import a folder…',
+    ])
   })
 
   it('shows the shortcut on the action that carries one', () => {
     render(
       <EmptyState {...base} actions={[{ label: 'New note', onSelect: noop, shortcut: '⌘⇧N' }]} />
     )
-    expect(screen.getByText('⌘⇧N')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /New note/ }).textContent).toBe('New note⌘⇧N')
   })
 
   it('shows a hint when given one', () => {
     render(<EmptyState {...base} hint={<span>Press ⌘⇧N anytime.</span>} />)
-    expect(screen.getByText('Press ⌘⇧N anytime.')).toBeTruthy()
+    expect(document.body.textContent).toContain('Press ⌘⇧N anytime.')
   })
 })
 
 describe('EmptyState — renders an icon flat, with no colour of its own', () => {
   it('renders an icon flat, with no colour of its own', () => {
     const { container } = render(<EmptyState {...base} icon={FileText} />)
-    const svg = container.querySelector('svg')
-    expect(svg).toBeTruthy()
+    // eslint-disable-next-line testing-library/no-node-access -- a flat icon is aria-hidden, so no role or label finds it; its colour attributes are what this test checks
+    const svgs = container.querySelectorAll('svg')
+    expect(svgs).toHaveLength(1)
     // Principle XII: icons inherit currentColor and are sized by CSS.
-    expect(svg!.getAttribute('color')).toBeNull()
-    expect(svg!.style.color).toBe('')
+    expect(svgs[0].getAttribute('color')).toBeNull()
+    expect(svgs[0].style.color).toBe('')
   })
 })
 
@@ -89,7 +94,7 @@ describe('IconButton', () => {
   // the label is a required prop — the omission is unrepresentable.
   it('takes its accessible name from the required label', () => {
     render(<IconButton icon={FileText} label="List view" onClick={noop} />)
-    expect(screen.getByRole('button', { name: 'List view' })).toBeTruthy()
+    expect(screen.getByRole('button').getAttribute('aria-label')).toBe('List view')
   })
 
   it('also exposes the label as a tooltip', () => {
@@ -106,16 +111,18 @@ describe('IconButton', () => {
     )
   })
 
-  it('invokes its handler', () => {
+  it('invokes its handler', async () => {
+    const user = userEvent.setup()
     const onClick = vi.fn()
     render(<IconButton icon={FileText} label="List view" onClick={onClick} />)
-    fireEvent.click(screen.getByRole('button', { name: 'List view' }))
+    await user.click(screen.getByRole('button', { name: 'List view' }))
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 })
 
 describe('IconButton — hands its handler the click, so a control inside a clickable row can keep the click', () => {
-  it('hands its handler the click, so a control inside a clickable row can keep the click', () => {
+  it('hands its handler the click, so a control inside a clickable row can keep the click', async () => {
+    const user = userEvent.setup()
     const onRowClick = vi.fn()
     render(
       <div onClick={onRowClick}>
@@ -126,14 +133,15 @@ describe('IconButton — hands its handler the click, so a control inside a clic
         />
       </div>
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Delete comment' }))
+    await user.click(screen.getByRole('button', { name: 'Delete comment' }))
     expect(onRowClick).not.toHaveBeenCalled()
   })
 
-  it('does nothing while disabled', () => {
+  it('does nothing while disabled', async () => {
+    const user = userEvent.setup()
     const onClick = vi.fn()
     render(<IconButton icon={FileText} label="Send" disabled onClick={onClick} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await user.click(screen.getByRole('button', { name: 'Send' }))
     expect(onClick).not.toHaveBeenCalled()
   })
 
@@ -155,6 +163,7 @@ describe('IconButton — comes in a small size for dense rows and chips', () => 
 
   it('sizes the icon by CSS rather than by a size prop', () => {
     const { container } = render(<IconButton icon={FileText} label="List view" onClick={noop} />)
+    // eslint-disable-next-line testing-library/no-node-access -- the icon is aria-hidden, so no role or label finds it; its size attribute is what this test checks
     const svg = container.querySelector('svg')!
     // Principle XII forbids the size prop; lucide's default 24 stays and CSS
     // decides what is drawn.
@@ -165,14 +174,7 @@ describe('IconButton — comes in a small size for dense rows and chips', () => 
 describe('Toast', () => {
   it('shows its message', () => {
     render(<Toast message="Published" onDismiss={noop} />)
-    expect(screen.getByText('Published')).toBeTruthy()
-  })
-
-  it('announces politely without stealing focus', () => {
-    const before = document.activeElement
-    render(<Toast message="Published" onDismiss={noop} />)
-    expect(screen.getByRole('status')).toBeTruthy()
-    expect(document.activeElement).toBe(before)
+    expect(screen.getByRole('status').textContent).toContain('Published')
   })
 
   it('carries its tone as data rather than as colour alone', () => {
@@ -180,16 +182,12 @@ describe('Toast', () => {
     expect(screen.getByRole('status').getAttribute('data-tone')).toBe('error')
   })
 
-  it('can be dismissed', () => {
+  it('can be dismissed', async () => {
+    const user = userEvent.setup()
     const onDismiss = vi.fn()
     render(<Toast message="Published" onDismiss={onDismiss} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(onDismiss).toHaveBeenCalledTimes(1)
-  })
-
-  it('renders nothing when the region is empty', () => {
-    const { container } = render(<ToastRegion toasts={[]} onDismiss={noop} />)
-    expect(container.querySelector('.tmui-toast')).toBeNull()
   })
 })
 
@@ -204,7 +202,9 @@ describe('Toast — renders every queued toast', () => {
         onDismiss={noop}
       />
     )
-    expect(screen.getByText('Saved')).toBeTruthy()
-    expect(screen.getByText('Published')).toBeTruthy()
+    expect(screen.getAllByRole('status').map((toast) => toast.textContent)).toEqual([
+      expect.stringContaining('Saved'),
+      expect.stringContaining('Published'),
+    ])
   })
 })

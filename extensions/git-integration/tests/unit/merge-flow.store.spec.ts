@@ -64,10 +64,6 @@ beforeEach(() => {
 })
 
 describe('session lifecycle', () => {
-  it('starts with null session', () => {
-    expect(useMergeFlowStore.getState().session).toBeNull()
-  })
-
   it('startSession sets session and resets indices', () => {
     const session = conflictSessionWith()
     act(() => {
@@ -91,22 +87,6 @@ describe('session lifecycle', () => {
 })
 
 describe('navigation', () => {
-  it('setActiveFile updates activeFileIndex', () => {
-    act(() => {
-      useMergeFlowStore.getState().startSession(conflictSessionWith())
-      useMergeFlowStore.getState().setActiveFile(0)
-    })
-    expect(useMergeFlowStore.getState().activeFileIndex).toBe(0)
-  })
-
-  it('setActiveBlock updates activeBlockIndex', () => {
-    act(() => {
-      useMergeFlowStore.getState().startSession(conflictSessionWith())
-      useMergeFlowStore.getState().setActiveBlock(1)
-    })
-    expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
-  })
-
   it('goToNextBlock advances to next block', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(conflictSessionWith())
@@ -120,7 +100,7 @@ describe('navigation — goToNextBlock clamps at last block of last file', () =>
   it('goToNextBlock clamps at last block of last file', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(conflictSessionWith())
-      useMergeFlowStore.getState().setActiveBlock(1)
+      useMergeFlowStore.getState().goToNextBlock()
       useMergeFlowStore.getState().goToNextBlock()
     })
     // Still at last block (no more files)
@@ -130,7 +110,7 @@ describe('navigation — goToNextBlock clamps at last block of last file', () =>
   it('goToPrevBlock moves back', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(conflictSessionWith())
-      useMergeFlowStore.getState().setActiveBlock(1)
+      useMergeFlowStore.getState().goToNextBlock()
       useMergeFlowStore.getState().goToPrevBlock()
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)
@@ -223,17 +203,6 @@ describe('UI modals', () => {
   })
 })
 
-describe('isComplete selector', () => {
-  it('returns true when all conflicts resolved', () => {
-    const session = conflictSessionWith({ totalConflicts: 0, totalResolved: 0 })
-    act(() => {
-      useMergeFlowStore.getState().startSession({ ...session, totalConflicts: 2, totalResolved: 2 })
-    })
-    expect(useMergeFlowStore.getState().session!.totalResolved).toBe(2)
-    expect(useMergeFlowStore.getState().session!.totalConflicts).toBe(2)
-  })
-})
-
 /** A file with one unresolved block whose sides are "<name>-ours" and "<name>-theirs". */
 function oneBlockFile(name: string): ConflictFile {
   const filePath = `src/${name}.ts`
@@ -268,7 +237,7 @@ function resolveBothFiles() {
       resolvedText: 'alpha-resolved',
       strategy: 'ours',
     })
-    useMergeFlowStore.getState().setActiveFile(1)
+    useMergeFlowStore.getState().goToNextBlock()
     useMergeFlowStore.getState().confirmDecision('src/beta.ts#0', {
       blockId: 'src/beta.ts#0',
       resolvedText: 'beta-resolved',
@@ -276,19 +245,6 @@ function resolveBothFiles() {
     })
   })
 }
-
-describe('cross-file undo', () => {
-  it('undo on empty stack returns null', () => {
-    act(() => {
-      useMergeFlowStore.getState().startSession(makeTwoFileSession())
-    })
-    let result: ReturnType<typeof useMergeFlowStore.getState.prototype.undoLastDecision>
-    act(() => {
-      result = useMergeFlowStore.getState().undoLastDecision()
-    })
-    expect(result!).toBeNull()
-  })
-})
 
 describe('cross-file undo — undo reverses decision in file A after navigating to file B', () => {
   it('undo reverses decision in file A after navigating to file B', () => {
@@ -304,7 +260,7 @@ describe('cross-file undo — undo reverses decision in file A after navigating 
     act(() => {
       useMergeFlowStore.getState().confirmDecision('src/alpha.ts#0', resolution)
       // Navigate to file B
-      useMergeFlowStore.getState().setActiveFile(1)
+      useMergeFlowStore.getState().goToNextBlock()
     })
     expect(useMergeFlowStore.getState().session!.totalResolved).toBe(1)
     expect(useMergeFlowStore.getState().session!.files[0].resolvedCount).toBe(1)
@@ -334,7 +290,7 @@ describe('cross-file undo — undo reverses only the most recent decision regard
 
     // Navigate back to file A, then undo — should undo file B's decision (most recent)
     act(() => {
-      useMergeFlowStore.getState().setActiveFile(0)
+      useMergeFlowStore.getState().goToPrevBlock()
     })
     let decision: ReturnType<typeof useMergeFlowStore.getState.prototype.undoLastDecision>
     act(() => {

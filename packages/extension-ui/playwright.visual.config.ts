@@ -29,6 +29,7 @@ export default defineConfig({
     command: `npx vite preview --outDir storybook-static --host 127.0.0.1 --port ${PORT} --strictPort`,
     cwd: dirname,
     url: `http://127.0.0.1:${PORT}/index.json`,
-    reuseExistingServer: !process.env.CI,
+    // The same on a laptop as on CI: a server left running from another checkout never answers.
+    reuseExistingServer: false,
   },
 })

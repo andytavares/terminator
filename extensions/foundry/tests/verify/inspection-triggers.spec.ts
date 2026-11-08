@@ -74,11 +74,12 @@ function dependenciesAndCriticalPathsTests() {
     expect(inspectionFor(order(), input(['package.json'])).triggers).toContain('new_dependency')
   })
 
-  it('triggers on a manifest in any of the languages it knows', () => {
-    for (const manifest of ['Cargo.toml', 'go.mod', 'pyproject.toml', 'Gemfile']) {
+  it.each(['Cargo.toml', 'go.mod', 'pyproject.toml', 'Gemfile'])(
+    'triggers a new dependency on the %s manifest',
+    (manifest) => {
       expect(inspectionFor(order(), input([manifest])).triggers).toContain('new_dependency')
     }
-  })
+  )
 
   it('triggers when the change enters an operator-declared critical path', () => {
     const o = order()
@@ -166,7 +167,9 @@ function stayingInsideTests() {
   })
 
   it('keeps the grader own words, so a gate can show the specific reason', () => {
-    expect(inspectionFor(order(), input(['src/auth/session.ts'])).reason).toBeTruthy()
+    expect(inspectionFor(order(), input(['src/auth/session.ts'])).reason).toBe(
+      'touches authentication: src/auth/session.ts'
+    )
   })
 }
 

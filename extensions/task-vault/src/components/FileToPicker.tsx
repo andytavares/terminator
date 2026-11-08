@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { IconButton, useCloseOnOutsidePress } from '@terminator/extension-ui'
+import { IconButton } from '@terminator/extension-ui'
 import { X } from 'lucide-react'
 import type { IndexedProject } from '../vault/types'
 import { recordUsage } from '@terminator/extension-sdk/renderer'
@@ -231,16 +231,14 @@ function useFileToPicker(props: PickerProps) {
   return { query, setQuery, loading, options, highlighted, setHighlighted, select, onKeyDown }
 }
 
-/** Picks where to file a task. Escape in the field closes it; useCloseOnOutsidePress adds a click
- *  outside. */
+/** Picks where to file a task, inline in the inbox step. Escape in the field or Close closes it;
+ *  a press outside does not, or it would close before the step's own buttons took the click. */
 export function FileToPicker(props: PickerProps): React.JSX.Element {
   const picker = useFileToPicker(props)
   const inputRef = useRef<HTMLInputElement>(null)
-  const surfaceRef = useRef<HTMLDivElement>(null)
-  useCloseOnOutsidePress(surfaceRef, props.onClose, true)
   useEffect(() => inputRef.current?.focus(), [])
   return (
-    <div className="file-to-picker" ref={surfaceRef} data-tmui-surface="">
+    <div className="file-to-picker" data-tmui-surface="">
       <div className="file-to-picker__header">
         <input
           ref={inputRef}

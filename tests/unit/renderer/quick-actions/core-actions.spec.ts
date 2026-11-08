@@ -93,30 +93,9 @@ describe('buildCoreActions', () => {
     expect(byMnemonic.n).toBe('New scratch terminal')
     expect(byMnemonic.i).toBe('Edit session note')
   })
-
-  it('disables terminal actions with "No terminal focused" when nothing is focused', () => {
-    const actions = buildCoreActions(makeDeps({ hasTerminalFocused: false }))
-    const clear = actions.find((a) => a.id === 'core.clear')!
-    expect(clear.disabledReason).toBe('No terminal focused')
-  })
 })
 
-describe('buildCoreActions — disables New tab with "No project focused" when no project is focused', () => {
-  it('disables New tab with "No project focused" when no project is focused', () => {
-    const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
-    const newTab = actions.find((a) => a.id === 'core.new-tab')!
-    expect(newTab.disabledReason).toBe('No project focused')
-  })
-
-  it('disables issue actions with "No linked issue" when there is a project but no link', () => {
-    const actions = buildCoreActions(makeDeps({ issueLink: null }))
-    expect(actions.find((a) => a.id === 'core.view-issue')!.disabledReason).toBe('No linked issue')
-    expect(actions.find((a) => a.id === 'core.copy-issue-key')!.disabledReason).toBe(
-      'No linked issue'
-    )
-    expect(actions.find((a) => a.id === 'core.open-issue')!.disabledReason).toBe('No linked issue')
-  })
-
+describe('buildCoreActions — never omits an action for lack of context — it is present, only disabled', () => {
   it('never omits an action for lack of context — it is present, only disabled', () => {
     const actions = buildCoreActions(
       makeDeps({ hasProjectFocused: false, hasTerminalFocused: false, issueLink: null })
@@ -126,25 +105,36 @@ describe('buildCoreActions — disables New tab with "No project focused" when n
   })
 })
 
+describe('buildCoreActions — an action without its context is disabled with the reason', () => {
+  it.each([
+    ['core.clear', { hasTerminalFocused: false }, 'No terminal focused'],
+    ['core.new-tab', { hasProjectFocused: false }, 'No project focused'],
+    ['core.view-issue', { issueLink: null }, 'No linked issue'],
+    ['core.copy-issue-key', { issueLink: null }, 'No linked issue'],
+    ['core.open-issue', { issueLink: null }, 'No linked issue'],
+    [
+      'core.link-issue',
+      { hasTerminalFocused: false, hasProjectFocused: true },
+      'No terminal focused',
+    ],
+    ['core.break-out', { hasTerminalFocused: false }, 'No terminal focused'],
+    ['core.break-out', {}, undefined],
+    ['core.go-back', { canGoBack: false }, 'Nothing to go back to'],
+    ['core.go-back', {}, undefined],
+    ['core.go-forward', { canGoForward: false }, 'Nothing to go forward to'],
+    ['core.go-forward', {}, undefined],
+    ['core.reopen-closed-tab', { hasClosedTab: false }, 'No closed tab to reopen'],
+    ['core.reopen-closed-tab', {}, undefined],
+  ] as [string, Partial<CoreActionDeps>, string | undefined][])(
+    '%s with %o has disabledReason %s',
+    (id, deps, reason) => {
+      const action = buildCoreActions(makeDeps(deps)).find((a) => a.id === id)!
+      expect(action.disabledReason).toBe(reason)
+    }
+  )
+})
+
 describe('buildCoreActions — linking issues to a session vs a branch', () => {
-  it('targets the focused terminal, disabled by "No terminal focused" rather than project', () => {
-    const actions = buildCoreActions(
-      makeDeps({ hasTerminalFocused: false, hasProjectFocused: true })
-    )
-    expect(actions.find((a) => a.id === 'core.link-issue')!.disabledReason).toBe(
-      'No terminal focused'
-    )
-  })
-
-  it('runs onLinkIssue, not onLinkIssueBranch', async () => {
-    const deps = makeDeps()
-    await buildCoreActions(deps)
-      .find((a) => a.id === 'core.link-issue')!
-      .run()
-    expect(deps.onLinkIssue).toHaveBeenCalledOnce()
-    expect(deps.onLinkIssueBranch).not.toHaveBeenCalled()
-  })
-
   it('offers a separate "Link issue to branch" action, disabled by "No project focused"', () => {
     const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
     const branch = actions.find((a) => a.id === 'core.link-issue-branch')!
@@ -153,26 +143,7 @@ describe('buildCoreActions — linking issues to a session vs a branch', () => {
   })
 })
 
-describe('buildCoreActions — linking issues to a session vs a branch — runs onLinkIssueBranch for the branch action', () => {
-  it('runs onLinkIssueBranch for the branch action', async () => {
-    const deps = makeDeps()
-    await buildCoreActions(deps)
-      .find((a) => a.id === 'core.link-issue-branch')!
-      .run()
-    expect(deps.onLinkIssueBranch).toHaveBeenCalledOnce()
-  })
-})
-
-describe('buildCoreActions — runs the matching dep callback', () => {
-  it('runs the matching dep callback', async () => {
-    const deps = makeDeps()
-    const actions = buildCoreActions(deps)
-    await actions.find((a) => a.id === 'core.clear')!.run()
-    expect(deps.onClear).toHaveBeenCalled()
-    await actions.find((a) => a.id === 'core.split-vertical')!.run()
-    expect(deps.onSplit).toHaveBeenCalledWith('vertical')
-  })
-
+describe('buildCoreActions — lists one action per open session with mnemonics 1-9', () => {
   it('lists one action per open session with mnemonics 1-9', () => {
     const sessions = Array.from({ length: 3 }, (_, i) => ({
       id: `s${i}`,
@@ -229,6 +200,13 @@ describe('CORE_SHORTCUTS', () => {
 const HANDLED_BY: [string, keyof CoreActionDeps, unknown[]][] = [
   ['core.new-tab', 'onNewTab', []],
   ['core.split-horizontal', 'onSplit', ['horizontal']],
+  ['core.split-vertical', 'onSplit', ['vertical']],
+  ['core.clear', 'onClear', []],
+  ['core.link-issue', 'onLinkIssue', []],
+  ['core.link-issue-branch', 'onLinkIssueBranch', []],
+  ['core.go-back', 'onGoBack', []],
+  ['core.go-forward', 'onGoForward', []],
+  ['core.reopen-closed-tab', 'onReopenClosedTab', []],
   ['core.break-out', 'onBreakOut', []],
   ['core.close-tab', 'onClosePane', []],
   ['core.new-scratch', 'onNewScratch', []],
@@ -297,37 +275,11 @@ describe('buildCoreActions — Move to its own window', () => {
       shortcut: '⌘⇧O',
     })
   })
-
-  it('is unavailable without a focused terminal and available with one', () => {
-    expect(find({ hasTerminalFocused: false })?.disabledReason).toBeDefined()
-    expect(find({ hasTerminalFocused: true })?.disabledReason).toBeUndefined()
-  })
 })
 
 describe('buildCoreActions — back, forward and reopen', () => {
-  const actionOf = (deps: Partial<CoreActionDeps>, id: string) =>
-    buildCoreActions(makeDeps(deps)).find((a) => a.id === id)!
-
-  it('disables Go back and Go forward with a reason when the history has nowhere to go', () => {
-    const none = { canGoBack: false, canGoForward: false }
-    expect(actionOf(none, 'core.go-back').disabledReason).toBe('Nothing to go back to')
-    expect(actionOf(none, 'core.go-forward').disabledReason).toBe('Nothing to go forward to')
-    expect(actionOf({}, 'core.go-back').disabledReason).toBeUndefined()
-    expect(actionOf({}, 'core.go-forward').disabledReason).toBeUndefined()
-  })
-
-  it('disables Reopen closed tab with a reason when no tab was closed', () => {
-    expect(actionOf({ hasClosedTab: false }, 'core.reopen-closed-tab').disabledReason).toBe(
-      'No closed tab to reopen'
-    )
-    expect(actionOf({}, 'core.reopen-closed-tab').disabledReason).toBeUndefined()
-  })
-
-  it('runs the handler and shows the shortcut', async () => {
-    const deps = makeDeps()
-    const back = buildCoreActions(deps).find((a) => a.id === 'core.go-back')!
-    await back.run()
-    expect(deps.onGoBack).toHaveBeenCalled()
+  it('lists Go back with its shortcut in the navigate group', () => {
+    const back = buildCoreActions(makeDeps()).find((a) => a.id === 'core.go-back')!
     expect(back.shortcut).toBe('⌘⌥←')
     expect(back.group).toBe('navigate')
   })

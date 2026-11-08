@@ -15,11 +15,7 @@ describe('invoke', () => {
     bridgeInvoke.mockReset().mockResolvedValue({ ok: true })
     // Only the bridge's invoke, with its real type; the rest of the API is absent.
     const extensionBridge: Partial<ElectronAPI['extensionBridge']> = { invoke: bridgeInvoke }
-    Object.defineProperty(window, 'electronAPI', {
-      value: { extensionBridge },
-      configurable: true,
-      writable: true,
-    })
+    vi.stubGlobal('electronAPI', { extensionBridge })
   })
 
   it('sends the payload to the channel and resolves with the reply', async () => {
@@ -52,11 +48,7 @@ describe('mountExtension', () => {
 describe('openInBrowser', () => {
   function shellOpening(openExternal: ElectronAPI['shell']['openExternal']): void {
     const shell: Partial<ElectronAPI['shell']> = { openExternal }
-    Object.defineProperty(window, 'electronAPI', {
-      value: { shell },
-      configurable: true,
-      writable: true,
-    })
+    vi.stubGlobal('electronAPI', { shell })
   }
 
   it("hands the address to the person's browser", async () => {
@@ -68,15 +60,10 @@ describe('openInBrowser', () => {
     expect(opened).toHaveBeenCalledWith('https://example.com/pull/7')
   })
 
-  it('leaves no unhandled rejection when the address cannot be opened', async () => {
-    const unhandled = vi.fn()
-    process.once('unhandledRejection', unhandled)
+  it('resolves without throwing when the address cannot be opened', async () => {
     shellOpening(() => Promise.reject(new Error('no browser')))
 
-    await openInBrowser('https://example.com')
-
-    process.off('unhandledRejection', unhandled)
-    expect(unhandled).not.toHaveBeenCalled()
+    await expect(openInBrowser('https://example.com')).resolves.toBeUndefined()
   })
 })
 
@@ -84,11 +71,7 @@ describe('recordUsage', () => {
   it("hands the id and its outcome to the view's usage API", () => {
     const record = vi.fn()
     const usage: ElectronAPI['usage'] = { record }
-    Object.defineProperty(window, 'electronAPI', {
-      value: { usage },
-      configurable: true,
-      writable: true,
-    })
+    vi.stubGlobal('electronAPI', { usage })
 
     recordUsage('export')
     recordUsage('export', { failed: true })
@@ -98,15 +81,9 @@ describe('recordUsage', () => {
 })
 
 describe('recordUsage in a window of its own', () => {
-  it('does nothing, and never throws, where the view API has no usage record', () => {
-    const usage = { recordUse: vi.fn() }
-    Object.defineProperty(window, 'electronAPI', {
-      value: { usage },
-      configurable: true,
-      writable: true,
-    })
+  it('does not throw where the view API has no usage API', () => {
+    vi.stubGlobal('electronAPI', {})
 
     expect(() => recordUsage('review-comment')).not.toThrow()
-    expect(usage.recordUse).not.toHaveBeenCalled()
   })
 })

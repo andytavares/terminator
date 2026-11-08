@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { StartWork } from '../../../../src/renderer/components/home/StartWork'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
@@ -93,15 +94,13 @@ beforeEach(() => {
   useWritableTasks()
 })
 
-async function openAcrossRepos(onClose = vi.fn()) {
+async function openAcrossRepos(user: UserEvent, onClose = vi.fn()) {
   render(<StartWork onClose={onClose} />)
-  fireEvent.click(screen.getByRole('tab', { name: 'Across repos' }))
-  fireEvent.change(screen.getByRole('textbox', { name: 'Task title' }), {
-    target: { value: 'Rate limits' },
-  })
-  fireEvent.change(screen.getByRole('textbox', { name: 'Branch in every repo' }), {
-    target: { value: 'rate-limits' },
-  })
+  await user.click(screen.getByRole('tab', { name: 'Across repos' }))
+  await user.type(screen.getByRole('textbox', { name: 'Task title' }), 'Rate limits')
+  const branch = screen.getByRole('textbox', { name: 'Branch in every repo' })
+  await user.clear(branch)
+  await user.type(branch, 'rate-limits')
   await screen.findAllByText('from main')
   return onClose
 }
@@ -124,23 +123,44 @@ vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
 describe('Start work, Across repos — the branch name', () => {
   it('suggests a branch name from the title', async () => {
+    const user = userEvent.setup()
     render(<StartWork onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Across repos' }))
-    fireEvent.change(screen.getByRole('textbox', { name: 'Task title' }), {
-      target: { value: 'Rate limits across services' },
-    })
+    await user.click(screen.getByRole('tab', { name: 'Across repos' }))
+    await user.type(
+      screen.getByRole('textbox', { name: 'Task title' }),
+      'Rate limits across services'
+    )
     const branch = screen.getByRole('textbox', { name: 'Branch in every repo' })
     expect((branch as HTMLInputElement).value).toBe('rate-limits-across-services')
   })
 })
 
+describe('Start work, Across repos — Terminal only', () => {
+  it('starts a terminal in each lane for Terminal only, and no agent', async () => {
+    const user = userEvent.setup()
+    const onClose = await openAcrossRepos(user)
+    await user.click(screen.getByRole('radio', { name: 'Terminal only' }))
+    await user.click(startButton(/Start 3 lanes/))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.inBranch.mock.calls.map(([projectId]) => projectId)).toEqual([
+      'p-ws-1',
+      'p-ws-2',
+      'p-ws-3',
+    ])
+    expect(launched.agentInBranch).not.toHaveBeenCalled()
+    expect(useTaskStore.getState().tasks).toHaveLength(1)
+  })
+})
+
 describe('Start work, Across repos — all repos start', () => {
   it('starts one lane per repo and records one task holding all three', async () => {
-    const onClose = await openAcrossRepos()
-    fireEvent.change(screen.getByRole('textbox', { name: 'First prompt for each agent' }), {
-      target: { value: 'Add per-tenant limits' },
-    })
-    fireEvent.click(startButton(/Start 3 lanes/))
+    const user = userEvent.setup()
+    const onClose = await openAcrossRepos(user)
+    await user.type(
+      screen.getByRole('textbox', { name: 'First prompt for each agent' }),
+      'Add per-tenant limits'
+    )
+    await user.click(startButton(/Start 3 lanes/))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.agentInBranch).toHaveBeenCalledTimes(3)
     expect(launched.agentInBranch).toHaveBeenCalledWith(
@@ -153,11 +173,14 @@ describe('Start work, Across repos — all repos start', () => {
       WORKSPACES.map((w) => ({ repoRoot: w.folderPath, branch: 'rate-limits' }))
     )
   })
+})
 
+describe('Start work, Across repos — all repos start — some repos', () => {
   it('starts only the repos that stay ticked, and the button counts them', async () => {
-    const onClose = await openAcrossRepos()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'web' }))
-    fireEvent.click(startButton(/Start 2 lanes/))
+    const user = userEvent.setup()
+    const onClose = await openAcrossRepos(user)
+    await user.click(screen.getByRole('checkbox', { name: 'web' }))
+    await user.click(startButton(/Start 2 lanes/))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(useTaskStore.getState().tasks[0].lanes.map((l) => l.repoRoot)).toEqual([
       '/repos/terminator',
@@ -168,11 +191,12 @@ describe('Start work, Across repos — all repos start', () => {
 
 describe('Start work, Across repos — a repo that cannot take the branch', () => {
   it('names the repo whose branch is checked out elsewhere and starts nothing', async () => {
+    const user = userEvent.setup()
     git.listWorktrees.mockImplementation(async (path) => ({
       worktrees: path === '/repos/api-gateway' ? [ELSEWHERE_WORKTREE] : [],
     }))
-    const onClose = await openAcrossRepos()
-    fireEvent.click(startButton(/Start 3 lanes/))
+    const onClose = await openAcrossRepos(user)
+    await user.click(startButton(/Start 3 lanes/))
     const row = repoRow('api-gateway')
     await within(row).findByText(/rate-limits is already checked out in \/elsewhere/)
     expect(launched.agentInBranch).not.toHaveBeenCalled()
@@ -182,11 +206,12 @@ describe('Start work, Across repos — a repo that cannot take the branch', () =
   })
 
   it('names a folder that is not a git repo and starts nothing', async () => {
+    const user = userEvent.setup()
     git.isRepo.mockImplementation(async (path) =>
       path === '/repos/web' ? { isRepo: false } : { isRepo: true, root: path }
     )
-    await openAcrossRepos()
-    fireEvent.click(startButton(/Start 3 lanes/))
+    await openAcrossRepos(user)
+    await user.click(startButton(/Start 3 lanes/))
     await within(repoRow('web')).findByText('web is not a git repo.')
     expect(launched.agentInBranch).not.toHaveBeenCalled()
   })
@@ -194,13 +219,14 @@ describe('Start work, Across repos — a repo that cannot take the branch', () =
 
 describe('Start work, Across repos — a repo fails midway', () => {
   it('records only the lanes that were made and says what failed, per repo', async () => {
+    const user = userEvent.setup()
     launched.createFromDraft.mockImplementation(async ({ workspaceId }) =>
       workspaceId === 'ws-2'
         ? { field: 'form', message: 'Worktree error: raw git' }
         : `p-${workspaceId}`
     )
-    const onClose = await openAcrossRepos()
-    fireEvent.click(startButton(/Start 3 lanes/))
+    const onClose = await openAcrossRepos(user)
+    await user.click(startButton(/Start 3 lanes/))
     await within(repoRow('api-gateway')).findByText(/Could not set up rate-limits in api-gateway/)
     expect(within(repoRow('terminator')).getByText('Started')).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
@@ -214,12 +240,13 @@ describe('Start work, Across repos — a repo fails midway', () => {
 
 describe('Start work, Across repos — every repo fails', () => {
   it('says nothing was started or recorded, and keeps the dialog open to try again', async () => {
+    const user = userEvent.setup()
     launched.createFromDraft.mockResolvedValue({
       field: 'form',
       message: 'Worktree error: raw git',
     })
-    const onClose = await openAcrossRepos()
-    fireEvent.click(startButton(/Start 3 lanes/))
+    const onClose = await openAcrossRepos(user)
+    await user.click(startButton(/Start 3 lanes/))
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toMatch(/No lane was started/)
     expect(alert.textContent).not.toMatch(/recorded/)

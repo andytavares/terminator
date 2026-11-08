@@ -93,15 +93,9 @@ function outcomesAndScopeTests() {
 }
 
 function redTeamCriteriaAndUnitsTests() {
-  it('attacks a criterion whose statement is not falsifiable', () => {
+  it('attacks a criterion whose statement is not falsifiable, naming that criterion', () => {
     const o = order()
     o.acceptance[0].statement = 'the terminal works better'
-    expect(ids(o)).toContain('unfalsifiable-statement')
-  })
-
-  it('names the criterion it is attacking', () => {
-    const o = order()
-    o.acceptance[0].statement = 'it should be nicer'
     const finding = structuralFindings(o).find((f) => f.rule === 'unfalsifiable-statement')
     expect(finding?.subjectIds).toEqual(['AC-1'])
   })
@@ -159,7 +153,12 @@ function judgementsTests() {
 function untouchedFilesAndUnavailableChecksTests() {
   it('attacks a plan that touches a file no criterion could be about', () => {
     const o = order()
-    o.plan.units[0].touches = ['src/a.css', '.github/workflows/release.yml']
+    const first = { ...o.plan.units[0], touches: ['src/a.css', '.github/workflows/release.yml'] }
+    o.plan.units = [
+      first,
+      { ...first, id: 'U-2', dependsOn: [first.id], touches: [] },
+      { ...first, id: 'U-3', dependsOn: ['U-2'], touches: ['src/b.css'] },
+    ]
     expect(ids(o)).toContain('touches-release-machinery')
   })
 
@@ -167,10 +166,6 @@ function untouchedFilesAndUnavailableChecksTests() {
     const o = order()
     o.context.toolchain.test = null
     expect(ids(o)).toContain('no-runnable-check')
-  })
-
-  it('does not raise the unavailable-check finding when the repository has a test command', () => {
-    expect(ids(order())).not.toContain('no-runnable-check')
   })
 }
 
@@ -191,11 +186,15 @@ function categoriesTests() {
     })
     o.acceptance[0].statement = 'it should be nicer'
     o.acceptance[0].verify = { kind: 'judge', rubric: 'looks right', evidence: ['screenshot'] }
-    o.plan.units[0].touches = ['src/a.css', '.github/workflows/release.yml']
+    const first = { ...o.plan.units[0], touches: ['src/a.css', '.github/workflows/release.yml'] }
+    o.plan.units = [
+      first,
+      { ...first, id: 'U-2', dependsOn: [first.id], touches: [] },
+      { ...first, id: 'U-3', dependsOn: ['U-2'], touches: ['src/b.css'] },
+    ]
     o.context.toolchain.test = null
-    for (const finding of structuralFindings(o)) {
-      expect(finding.category).toBe(expected[finding.rule])
-    }
+    const categories = structuralFindings(o).map((finding) => [finding.rule, finding.category])
+    expect(Object.fromEntries(categories)).toEqual(expected)
   })
 }
 

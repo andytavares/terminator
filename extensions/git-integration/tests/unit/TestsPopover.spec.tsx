@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 const mockTestsForBlock = vi.fn()
 vi.mock('../../src/api/github', () => ({
@@ -74,8 +75,9 @@ describe('TestsPopover — opens a test that is part of the PR in the review, at
       symbols: ['sortByPriority'],
       locations: [{ path: 'src/utils.spec.ts', line: 12, symbol: 'sortByPriority', text: 't' }],
     })
+    const user = userEvent.setup()
     const { onOpenInReview, onClose } = renderPopover()
-    fireEvent.click(await screen.findByRole('button', { name: /src\/utils\.spec\.ts:12/ }))
+    await user.click(await screen.findByRole('button', { name: /src\/utils\.spec\.ts:12/ }))
     expect(onOpenInReview).toHaveBeenCalledWith('src/utils.spec.ts', 12)
     expect(onClose).toHaveBeenCalled()
     expect(mockOpenPath).not.toHaveBeenCalled()
@@ -86,10 +88,11 @@ describe('TestsPopover — opens a test that is part of the PR in the review, at
       symbols: ['sortByPriority'],
       locations: [{ path: 'tests/old.spec.ts', line: 3, symbol: 'sortByPriority', text: 't' }],
     })
+    const user = userEvent.setup()
     const { onOpenInReview } = renderPopover()
     const row = await screen.findByRole('button', { name: /tests\/old\.spec\.ts:3/ })
     expect(row.textContent).toContain('Open file')
-    fireEvent.click(row)
+    await user.click(row)
     expect(mockOpenPath).toHaveBeenCalledWith('/repo/tests/old.spec.ts')
     expect(onOpenInReview).not.toHaveBeenCalled()
   })

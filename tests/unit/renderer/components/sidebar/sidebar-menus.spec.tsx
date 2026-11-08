@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { DisplayMenu } from '../../../../../src/renderer/components/sidebar/DisplayMenu'
 import { FilterMenu } from '../../../../../src/renderer/components/sidebar/FilterMenu'
 import type { SessionView } from '../../../../../src/renderer/sidebar/view-model'
@@ -20,13 +21,15 @@ vi.mock('../../../../../src/renderer/usage/record', () => ({ recordUse }))
 beforeEach(() => recordUse.mockClear())
 
 describe('sidebar menus', () => {
-  it('Display opens its panel in the top layer', () => {
+  it('Display opens its panel in the top layer', async () => {
+    const user = userEvent.setup()
     render(<DisplayMenu view={VIEW} onChangeView={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Display' }))
+    await user.click(screen.getByRole('button', { name: 'Display' }))
     expect(screen.getByRole('menu').matches(':popover-open')).toBe(true)
   })
 
-  it('Filter opens its panel in the top layer', () => {
+  it('Filter opens its panel in the top layer', async () => {
+    const user = userEvent.setup()
     render(
       <FilterMenu
         views={[VIEW]}
@@ -39,16 +42,16 @@ describe('sidebar menus', () => {
         onShowAll={vi.fn()}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await user.click(screen.getByRole('button', { name: 'Filter' }))
     expect(screen.getByRole('menu').matches(':popover-open')).toBe(true)
   })
 })
 
-function renderFilter(onChangeView = vi.fn(), activeViewId = 'all'): void {
+async function renderFilter(onChangeView = vi.fn()): Promise<void> {
   render(
     <FilterMenu
       views={[{ ...VIEW, filters: { query: 'api' } }]}
-      activeViewId={activeViewId}
+      activeViewId="all"
       onSelectView={vi.fn()}
       onChangeView={onChangeView}
       hideStaleUnavailable={false}
@@ -57,21 +60,15 @@ function renderFilter(onChangeView = vi.fn(), activeViewId = 'all'): void {
       onShowAll={vi.fn()}
     />
   )
-  fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Filter' }))
 }
 
 describe('sidebar menus — Hide stale', () => {
-  it('turns the toggle on, keeping the active view’s other filters', () => {
+  it('turns the toggle on, keeping the active view’s other filters', async () => {
+    const user = userEvent.setup()
     const onChangeView = vi.fn()
-    renderFilter(onChangeView)
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Hide stale' }))
-    expect(onChangeView).toHaveBeenCalledWith({ filters: { query: 'api', hideStale: true } })
-  })
-
-  it('falls back to the first view when the active id is unknown', () => {
-    const onChangeView = vi.fn()
-    renderFilter(onChangeView, 'gone')
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Hide stale' }))
+    await renderFilter(onChangeView)
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Hide stale' }))
     expect(onChangeView).toHaveBeenCalledWith({ filters: { query: 'api', hideStale: true } })
   })
 })

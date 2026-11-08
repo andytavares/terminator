@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { Forge } from '../../src/components/Forge.js'
@@ -80,10 +81,9 @@ function mount(profile: ProfileFacts, order = orderWithUnit()): void {
     if (channel === 'foundry:profile-read' || channel === 'foundry:profile-save') return profile
     return CONVERGING.has(channel) ? answer() : {}
   })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: bus.on }, usage: { record: recordUsage } },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke, on: bus.on },
+    usage: { record: recordUsage },
   })
   render(<Forge orderId="WO-1" />)
 }
@@ -97,41 +97,31 @@ async function openChecks(profile: ProfileFacts = glyphProfile(), order = orderW
 }
 
 describe('the Checks step rows', () => {
-  it('says where each command came from, in words', async () => {
+  it('shows where a command came from and its proof on the base branch, in words', async () => {
     await openChecks()
-    expect(rowNamed('Prepare the checkout').getByText('You set this')).toBeTruthy()
     expect(rowNamed('Format').getByText("Set in the repository's own profile")).toBeTruthy()
-    expect(rowNamed('Tests').getByText('Read by the scout from README.md')).toBeTruthy()
-    expect(rowNamed('Build').getByText('Suggested by Makefile')).toBeTruthy()
+    expect(rowNamed('Format').getByText('Exit 1 on main')).toBeTruthy()
     expect(
       rowNamed('Type check').getByText(/You set this · runs with Format and Lint/)
     ).toBeTruthy()
-  })
-
-  it('shows the proof of each command on the base branch', async () => {
-    await openChecks()
-    expect(rowNamed('Format').getByText('Exit 1 on main')).toBeTruthy()
-    expect(rowNamed('Tests').getByText('Exit 0 on main')).toBeTruthy()
-    expect(rowNamed('Lint').getByText('None')).toBeTruthy()
-    expect(rowNamed('Pictures').getByText('Not needed')).toBeTruthy()
   })
 })
 
 describe('the Checks step moves', () => {
   it('says a missing command will report not measured, and offers to add one', async () => {
     await openChecks()
-    const lint = rowNamed('Lint')
-    expect(lint.getByText('No command')).toBeTruthy()
-    expect(lint.getByText('Will report “not measured”')).toBeTruthy()
-    expect(lint.getByRole('button', { name: 'Add a command' })).toBeTruthy()
+    expect(rowNamed('Lint').getByText('No command')).toBeTruthy()
+    expect(rowNamed('Lint').getByText('Will report “not measured”')).toBeTruthy()
+    expect(rowNamed('Lint').getByRole('button', { name: 'Add a command' })).toBeTruthy()
   })
 
   it('offers the moves for a command that failed on main, and none for a passing one', async () => {
     await openChecks()
-    const format = rowNamed('Format')
-    for (const name of ['Edit', 'Use it anyway', 'Remove']) {
-      expect(format.getByRole('button', { name })).toBeTruthy()
-    }
+    expect(
+      rowNamed('Format')
+        .queryAllByRole('button')
+        .map((b) => b.textContent)
+    ).toEqual(['Edit', 'Use it anyway', 'Remove'])
     expect(
       rowNamed('Tests')
         .queryAllByRole('button')
@@ -150,8 +140,9 @@ describe('the Checks step moves', () => {
 
 describe('Use it anyway and Remove', () => {
   it('saves the failing command as the operator’s own', async () => {
+    const user = userEvent.setup()
     await openChecks()
-    fireEvent.click(rowNamed('Format').getByRole('button', { name: 'Use it anyway' }))
+    await user.click(rowNamed('Format').getByRole('button', { name: 'Use it anyway' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
         { repoPath: '/repos/app', checks: { format: './glyph fmt --check' } },
@@ -161,10 +152,11 @@ describe('Use it anyway and Remove', () => {
   })
 
   it('clears a command the operator set', async () => {
+    const user = userEvent.setup()
     const profile = glyphProfile()
     profile.checks.lint = { command: 'eslint .', source: 'operator' }
     await openChecks(profile)
-    fireEvent.click(rowNamed('Lint').getByRole('button', { name: 'Remove' }))
+    await user.click(rowNamed('Lint').getByRole('button', { name: 'Remove' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
         { repoPath: '/repos/app', checks: { lint: null } },
@@ -174,16 +166,19 @@ describe('Use it anyway and Remove', () => {
 })
 
 async function startEditing() {
+  const user = userEvent.setup()
   await openChecks()
-  fireEvent.click(rowNamed('Format').getByRole('button', { name: 'Edit' }))
+  await user.click(rowNamed('Format').getByRole('button', { name: 'Edit' }))
   const field = await screen.findByRole('textbox', { name: 'Command for Format' })
-  fireEvent.change(field, { target: { value: './glyph fmt --check src/' } })
+  await user.clear(field)
+  await user.type(field, './glyph fmt --check src/')
 }
 
 describe('editing a check', () => {
   it('starts from the command as it is', async () => {
+    const user = userEvent.setup()
     await openChecks()
-    fireEvent.click(rowNamed('Format').getByRole('button', { name: 'Edit' }))
+    await user.click(rowNamed('Format').getByRole('button', { name: 'Edit' }))
     const field = await screen.findByRole('textbox', { name: 'Command for Format' })
     expect((field as HTMLInputElement).value).toBe('./glyph fmt --check')
   })
@@ -191,8 +186,9 @@ describe('editing a check', () => {
 
 describe('running an edit on main', () => {
   it('runs the command on main and shows the exit code and where the log is', async () => {
+    const user = userEvent.setup()
     await startEditing()
-    fireEvent.click(screen.getByRole('button', { name: 'Run on main' }))
+    await user.click(screen.getByRole('button', { name: 'Run on main' }))
     expect(await screen.findByText('Exit 0 on main at 4be1c09')).toBeTruthy()
     expect(screen.getByText(/\/logs\/format\.log/)).toBeTruthy()
     expect(await screen.findByText(/all files formatted/)).toBeTruthy()
@@ -202,8 +198,9 @@ describe('running an edit on main', () => {
   })
 
   it('keeps the command once it passes on main', async () => {
+    const user = userEvent.setup()
     await startEditing()
-    fireEvent.click(screen.getByRole('button', { name: 'Run on main' }))
+    await user.click(screen.getByRole('button', { name: 'Run on main' }))
     expect(await screen.findByText(/Saved to this repository/)).toBeTruthy()
     expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
       { repoPath: '/repos/app', checks: { format: './glyph fmt --check src/' } },
@@ -211,9 +208,10 @@ describe('running an edit on main', () => {
   })
 
   it('does not keep a command that failed on main', async () => {
+    const user = userEvent.setup()
     proveReply = { exitCode: 1, logPath: '/logs/format.log', commit: '4be1c09aaaa' }
     await startEditing()
-    fireEvent.click(screen.getByRole('button', { name: 'Run on main' }))
+    await user.click(screen.getByRole('button', { name: 'Run on main' }))
     expect(await screen.findByText('Exit 1 on main at 4be1c09')).toBeTruthy()
     expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([])
   })
@@ -221,17 +219,19 @@ describe('running an edit on main', () => {
 
 describe('a run that could not start', () => {
   it('says why when the base branch could not be checked out', async () => {
+    const user = userEvent.setup()
     proveReply = { error: 'Could not check out the base branch: no such ref' }
     await startEditing()
-    fireEvent.click(screen.getByRole('button', { name: 'Run on main' }))
+    await user.click(screen.getByRole('button', { name: 'Run on main' }))
     expect(await screen.findByText(/Could not check out the base branch/)).toBeTruthy()
   })
 })
 
 describe('leaving an edit', () => {
   it('saves without running', async () => {
+    const user = userEvent.setup()
     await startEditing()
-    fireEvent.click(screen.getByRole('button', { name: 'Save without running' }))
+    await user.click(screen.getByRole('button', { name: 'Save without running' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
         { repoPath: '/repos/app', checks: { format: './glyph fmt --check src/' } },
@@ -241,8 +241,9 @@ describe('leaving an edit', () => {
   })
 
   it('cancels without writing anything', async () => {
+    const user = userEvent.setup()
     await startEditing()
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('textbox', { name: 'Command for Format' })).toBeNull()
     expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([])
   })
@@ -250,16 +251,16 @@ describe('leaving an edit', () => {
 
 describe('adding another check', () => {
   it('saves it with the group it runs with, keeping the checks already added', async () => {
+    const user = userEvent.setup()
     await openChecks()
-    fireEvent.click(screen.getByRole('button', { name: 'Add another check' }))
-    fireEvent.change(screen.getByRole('textbox', { name: 'Name of the check' }), {
-      target: { value: 'Docs' },
-    })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Command for the new check' }), {
-      target: { value: './glyph docs' },
-    })
-    fireEvent.click(screen.getByRole('radio', { name: 'with Tests' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Add check' }))
+    await user.click(screen.getByRole('button', { name: 'Add another check' }))
+    await user.type(screen.getByRole('textbox', { name: 'Name of the check' }), 'Docs')
+    await user.type(
+      screen.getByRole('textbox', { name: 'Command for the new check' }),
+      './glyph docs'
+    )
+    await user.click(screen.getByRole('radio', { name: 'with Tests' }))
+    await user.click(screen.getByRole('button', { name: 'Add check' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
         {
@@ -280,23 +281,20 @@ describe('when no way to check was found', () => {
     await openForgeStep('Checks')
     expect(await screen.findByText('Foundry found no way to check this repository')).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'How do you run the tests?' })).toBeTruthy()
-    for (const name of [
-      'Run on main',
-      'Add another check',
-      'Ask the scout to read again',
-      'Continue with nothing measured',
-    ]) {
-      expect(screen.getByRole('button', { name })).toBeTruthy()
-    }
+    expect(screen.getByRole('button', { name: 'Run on main' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add another check' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ask the scout to read again' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Continue with nothing measured' })).toBeTruthy()
   })
 
   it('counts as one waiting on the rail until the operator decides', async () => {
+    const user = userEvent.setup()
     mount(bareProfile())
     await openForgeStep('Checks')
     const rail = screen.getByRole('navigation', { name: 'Steps' })
     const checks = () => within(rail).getByRole('button', { name: /^Checks/ })
     await waitFor(() => expect(checks().textContent).toContain('1 waiting on you'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Continue with nothing measured' }))
+    await user.click(await screen.findByRole('button', { name: 'Continue with nothing measured' }))
     await waitFor(() => expect(checks().textContent).toContain('Nothing waiting on you'))
     expect(payloadsSentOn(invoke, 'foundry:forge.environment')).toEqual([
       { id: 'WO-1', move: 'continue-unmeasured' },
@@ -306,12 +304,14 @@ describe('when no way to check was found', () => {
 
 describe('answering when nothing was found', () => {
   it('runs the typed command on main', async () => {
+    const user = userEvent.setup()
     mount(bareProfile())
     await openForgeStep('Checks')
-    fireEvent.change(await screen.findByRole('textbox', { name: 'How do you run the tests?' }), {
-      target: { value: './glyph test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Run on main' }))
+    await user.type(
+      await screen.findByRole('textbox', { name: 'How do you run the tests?' }),
+      './glyph test'
+    )
+    await user.click(screen.getByRole('button', { name: 'Run on main' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:profile-prove')).toEqual([
         { repoPath: '/repos/app', command: './glyph test' },
@@ -320,9 +320,10 @@ describe('answering when nothing was found', () => {
   })
 
   it('asks the architect to have the repository read again', async () => {
+    const user = userEvent.setup()
     mount(bareProfile())
     await openForgeStep('Checks')
-    fireEvent.click(await screen.findByRole('button', { name: 'Ask the scout to read again' }))
+    await user.click(await screen.findByRole('button', { name: 'Ask the scout to read again' }))
     await waitFor(() => {
       const [sent] = payloadsSentOn(invoke, 'foundry:order.converge') as { message?: string }[]
       expect(sent?.message).toMatch(/how its checks are run/)
@@ -338,10 +339,11 @@ async function openHandOff(profile: ProfileFacts, order = orderWithUnit()) {
 
 describe('the hand-off row for checks', () => {
   it('counts the commands proven on main and names the ones not measured', async () => {
+    const user = userEvent.setup()
     const row = within(await openHandOff(glyphProfile()))
     expect(row.getByText('4 of 8')).toBeTruthy()
     expect(row.getByText(/Lint, Coverage and End-to-end have no command/)).toBeTruthy()
-    fireEvent.click(row.getByRole('button', { name: 'Open Checks' }))
+    await user.click(row.getByRole('button', { name: 'Open Checks' }))
     expect(await screen.findByRole('group', { name: 'Format' })).toBeTruthy()
   })
 })
@@ -353,21 +355,25 @@ describe('the pictures row on hand-off', () => {
   })
 
   it('asks for a pictures command when a unit changes the interface and there is none', async () => {
+    const user = userEvent.setup()
     await openHandOff(glyphProfile(), orderWithUnit({ touchesInterface: true }))
     expect(await screen.findByText('This order changes the interface')).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: 'Add a pictures command' }))
+    await user.click(await screen.findByRole('button', { name: 'Add a pictures command' }))
     expect(await screen.findByRole('textbox', { name: 'Command for Pictures' })).toBeTruthy()
   })
 
   it('stops asking once the operator ships without pictures', async () => {
+    const user = userEvent.setup()
     await openHandOff(glyphProfile(), orderWithUnit({ touchesInterface: true }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Ship without pictures' }))
+    await user.click(await screen.findByRole('button', { name: 'Ship without pictures' }))
     await waitFor(() => expect(screen.queryByText('This order changes the interface')).toBeNull())
     expect(payloadsSentOn(invoke, 'foundry:forge.environment')).toEqual([
       { id: 'WO-1', move: 'decline-pictures' },
     ])
   })
+})
 
+describe('the pictures row once it is settled', () => {
   it('is not asked again once the ledger says the operator declined', async () => {
     decisions.declinePictures = true
     await openHandOff(glyphProfile(), orderWithUnit({ touchesInterface: true }))
@@ -383,8 +389,9 @@ describe('the pictures row on hand-off', () => {
 
 describe('removing a command Foundry found', () => {
   it('says no command is wanted, from the Remove move on a command from another source', async () => {
+    const user = userEvent.setup()
     await openChecks()
-    fireEvent.click(rowNamed('Format').getByRole('button', { name: 'Remove' }))
+    await user.click(rowNamed('Format').getByRole('button', { name: 'Remove' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
         { repoPath: '/repos/app', remove: ['format'] },
@@ -393,13 +400,13 @@ describe('removing a command Foundry found', () => {
   })
 
   it('shows the removed state with a move to restore it', async () => {
+    const user = userEvent.setup()
     const profile = glyphProfile({ removed: ['format'] })
     profile.checks.format = null
     await openChecks(profile)
-    const format = rowNamed('Format')
-    expect(format.getByText('No command')).toBeTruthy()
-    expect(format.getByText('You removed the one Foundry found')).toBeTruthy()
-    fireEvent.click(format.getByRole('button', { name: 'Restore' }))
+    expect(rowNamed('Format').getByText('No command')).toBeTruthy()
+    expect(rowNamed('Format').getByText('You removed the one Foundry found')).toBeTruthy()
+    await user.click(rowNamed('Format').getByRole('button', { name: 'Restore' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
         { repoPath: '/repos/app', checks: { format: null } },

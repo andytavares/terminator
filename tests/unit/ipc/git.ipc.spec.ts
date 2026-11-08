@@ -8,6 +8,7 @@ vi.mock('electron', () => ({
 
 const gitService = vi.hoisted(() => ({
   isGitRepo: vi.fn(),
+  workTreeRoot: vi.fn(),
   getGitRoot: vi.fn(),
   getCurrentBranch: vi.fn(),
   listBranches: vi.fn(),
@@ -61,6 +62,17 @@ beforeEach(async () => {
   settingsStore = await import('../../../src/main/storage/settings-store.js')
   const { registerGitHandlers } = await import('../../../src/main/ipc/git.ipc.js')
   registerGitHandlers()
+})
+
+describe('git:is-repo — a checkout in the folder tree', () => {
+  it('answers from the folder tree when it holds a checkout, even while git cannot answer', async () => {
+    gitService.workTreeRoot.mockResolvedValue('/repo')
+    gitService.isGitRepo.mockRejectedValue(new Error('git rev-parse timed out'))
+    await expect(handler('git:is-repo')({}, { path: '/repo/sub' })).resolves.toEqual({
+      isRepo: true,
+      root: '/repo',
+    })
+  })
 })
 
 describe('git:is-repo', () => {

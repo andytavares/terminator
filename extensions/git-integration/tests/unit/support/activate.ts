@@ -35,11 +35,13 @@ const disposable = { dispose: () => {} }
 type ShellExec = (options: ShellExecOptions) => Promise<never>
 type GithubCall = (target: GithubTarget) => Promise<never>
 type LogWarn = ExtensionAPI['log']['warn']
+type RegisterSettingsPage = ExtensionAPI['settings']['register']
 
 interface ApiSpies {
   exec: Mock<ShellExec>
   githubApi: Mock<GithubCall>
   warn: Mock<LogWarn>
+  registerSettingsPage: Mock<RegisterSettingsPage>
 }
 
 /** Where the stand-in API says the workspaces and this extension's own folder are, and its settings. */
@@ -65,7 +67,7 @@ const isWithinFolder = (path: string, folder: string) => {
 }
 
 /** As the core resolves one: the own value of the workspace holding `repoPath`, else the global one. */
-function settingsOver(places: ApiPlaces) {
+function settingsOver(places: ApiPlaces, registerSettingsPage: RegisterSettingsPage) {
   const ownValues = (repoPath?: string) =>
     repoPath === undefined
       ? undefined
@@ -73,7 +75,7 @@ function settingsOver(places: ApiPlaces) {
   return partialFake<ExtensionAPI['settings']>({
     get: <T>(key: string, scope?: SettingScope) =>
       (ownValues(scope?.repoPath)?.[key] ?? places.settings?.[key]) as T | undefined,
-    register: () => disposable,
+    register: registerSettingsPage,
     isBranchExcluded: async () => false,
   })
 }
@@ -86,7 +88,7 @@ function capturingApi(
 ): ExtensionAPI {
   return partialFake<ExtensionAPI>({
     ipc: capturingIpc(channels),
-    settings: settingsOver(places),
+    settings: settingsOver(places, spies.registerSettingsPage),
     paths: { app: '/app', globalStorage: places.globalStorage },
     log: { debug: () => {}, info: () => {}, warn: spies.warn, error: () => {} },
     commands: { register: () => disposable },
@@ -127,7 +129,7 @@ function fakeWorkspaceApi(workspaces: FakeWorkspace[]) {
   })
 }
 
-/** Activates git-integration over these workspaces; returns its channels and the shell, gh and log warn spies. */
+/** Activates git-integration over these workspaces; returns its channels and the shell, gh, log warn and settings-page spies. */
 export function activateInWorkspaces(
   workspaces: FakeWorkspace[],
   settings?: Record<string, unknown>,
@@ -138,6 +140,7 @@ export function activateInWorkspaces(
     exec: vi.fn<ShellExec>(),
     githubApi: vi.fn<GithubCall>(),
     warn: vi.fn<LogWarn>(),
+    registerSettingsPage: vi.fn<RegisterSettingsPage>(() => disposable),
   }
   activate(capturingApi(channels, spies, { workspaces, globalStorage, settings }))
   deactivate()

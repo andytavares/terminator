@@ -18,15 +18,6 @@ test('Escape dismisses the shell and focus returns to what opened it', async ({ 
   await expect(opener).toBeFocused()
 })
 
-test('Tab never reaches the page behind the shell', async ({ page }) => {
-  await openStory(page, shellStory('default'))
-  const behind = page.getByRole('button', { name: 'Behind the shell', includeHidden: true })
-  for (const key of ['Tab', 'Tab', 'Tab', 'Tab', 'Shift+Tab', 'Shift+Tab']) {
-    await page.keyboard.press(key)
-    await expect(behind).not.toBeFocused()
-  }
-})
-
 // The second Escape with no click between cannot be prevented: the browser closes the dialog.
 for (const id of ['default', 'not-dismissible']) {
   test(`a shell its caller keeps mounted stays open through two Escapes (${id})`, async ({

@@ -1,10 +1,12 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
+import { useAddToTaskStore } from '../../../../src/renderer/components/tasks/add-to-task'
 import type { Task } from '../../../../src/shared/schemas/tasks.schema'
 import {
   projectFixture,
@@ -12,11 +14,6 @@ import {
   workspaceFixture,
 } from '../../../support/renderer-stores'
 
-const openAddToTask = vi.hoisted(() => vi.fn())
-vi.mock('../../../../src/renderer/components/tasks/add-to-task', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  openAddToTask,
-}))
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => [],
 }))
@@ -56,11 +53,8 @@ const TWO_LANES = [
 
 beforeEach(() => {
   vi.clearAllMocks()
-  Object.defineProperty(window, 'electronAPI', {
-    configurable: true,
-    writable: true,
-    value: { project: { list: vi.fn(async () => ({ projects: [] })) } },
-  })
+  useAddToTaskStore.getState().close()
+  vi.stubGlobal('electronAPI', { project: { list: vi.fn(async () => ({ projects: [] })) } })
   useWorkspaceStore.setState({
     ...useWorkspaceStore.getInitialState(),
     workspaces: [backend, frontend],
@@ -115,9 +109,9 @@ describe('TabBar — lane switcher', () => {
 })
 
 describe('TabBar — lane switcher — switching', () => {
-  it('selects the other lane’s branch when its button is clicked', () => {
+  it('selects the other lane’s branch when its button is clicked', async () => {
     renderTabBar()
-    fireEvent.click(screen.getByRole('button', { name: 'Frontend' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Frontend' }))
     expect(useWorkspaceStore.getState().activeProjectId).toBe('p-web')
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-2')
   })
@@ -140,19 +134,19 @@ describe('TabBar — lane switcher — switching', () => {
     })
     renderTabBar()
     const lane = screen.getByRole('button', { name: /Frontend/ })
-    expect(lane.querySelector('[aria-label="Needs you"]')).not.toBeNull()
-    expect(
-      screen.getByRole('button', { name: 'Backend' }).querySelector('[aria-label="Needs you"]')
-    ).toBeNull()
+    expect(within(lane).getByRole('img', { name: 'Needs you' })).toBeTruthy()
+    const backend = screen.getByRole('button', { name: 'Backend' })
+    expect(within(backend).queryByRole('img', { name: 'Needs you' })).toBeNull()
   })
 })
 
 describe('TabBar — Add to task…', () => {
-  it('is on a tab’s menu and names the tab’s repo and branch', () => {
+  it('is on a tab’s menu and names the tab’s repo and branch', async () => {
+    const user = userEvent.setup()
     renderTabBar()
-    fireEvent.contextMenu(screen.getByText('api-shell'))
-    fireEvent.click(screen.getByText('Add to task…'))
-    expect(openAddToTask).toHaveBeenCalledWith({ repoRoot: '/b', branch: 'login' })
+    await user.pointer({ keys: '[MouseRight]', target: screen.getByText('api-shell') })
+    await user.click(screen.getByText('Add to task…'))
+    expect(useAddToTaskStore.getState().lane).toEqual({ repoRoot: '/b', branch: 'login' })
   })
 })
 

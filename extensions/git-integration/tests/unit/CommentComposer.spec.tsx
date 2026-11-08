@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { CommentComposer } from '../../src/components/pr-review/CommentComposer'
 
 vi.mock('../../src/components/pr-review/RichContent', () => ({
@@ -50,50 +51,47 @@ const replyProps = {
 }
 
 describe('CommentComposer (new comment)', () => {
-  it('renders Write and Preview tabs', () => {
+  it('switches to preview tab', async () => {
+    const user = userEvent.setup()
     render(<CommentComposer {...newCommentProps} />)
-    expect(screen.getByText('Write')).toBeTruthy()
-    expect(screen.getByText('Preview')).toBeTruthy()
-  })
-
-  it('renders textarea in write mode', () => {
-    render(<CommentComposer {...newCommentProps} />)
-    expect(screen.getByPlaceholderText(/Leave a comment/)).toBeTruthy()
-  })
-
-  it('switches to preview tab', () => {
-    render(<CommentComposer {...newCommentProps} />)
-    fireEvent.click(screen.getByText('Preview'))
+    await user.click(screen.getByRole('tab', { name: 'Preview' }))
     expect(screen.getByText('Nothing to preview.')).toBeTruthy()
   })
 
-  it('shows RichContent when body is non-empty in preview', () => {
+  it('shows RichContent when body is non-empty in preview', async () => {
+    const user = userEvent.setup()
     render(<CommentComposer {...newCommentProps} />)
-    fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Hello' } })
-    fireEvent.click(screen.getByText('Preview'))
+    await user.type(screen.getByRole('textbox'), 'Hello')
+    await user.click(screen.getByRole('tab', { name: 'Preview' }))
     expect(screen.getByTestId('rich-content')).toBeTruthy()
   })
 })
 
 describe('CommentComposer (new comment) — calls onCancel when Cancel is clicked', () => {
-  it('calls onCancel when Cancel is clicked', () => {
+  it('calls onCancel when Cancel is clicked', async () => {
+    const user = userEvent.setup()
     const onCancel = vi.fn()
     render(<CommentComposer {...newCommentProps} onCancel={onCancel} />)
-    fireEvent.click(screen.getByText('Cancel'))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onCancel).toHaveBeenCalled()
   })
 
   it('disables the submit button when body is empty', () => {
     render(<CommentComposer {...newCommentProps} />)
-    const commentBtn = screen.getByText('Add to pending review')
-    expect(commentBtn.closest('button')?.disabled).toBe(true)
+    const commentBtn = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Add to pending review',
+    })
+    expect(commentBtn.disabled).toBe(true)
   })
 
-  it('enables the submit button when body has content', () => {
+  it('enables the submit button when body has content', async () => {
+    const user = userEvent.setup()
     render(<CommentComposer {...newCommentProps} />)
-    fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'LGTM' } })
-    const commentBtn = screen.getByText('Add to pending review')
-    expect(commentBtn.closest('button')?.disabled).toBe(false)
+    await user.type(screen.getByRole('textbox'), 'LGTM')
+    const commentBtn = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Add to pending review',
+    })
+    expect(commentBtn.disabled).toBe(false)
   })
 
   it('shows the "sent when you submit your review" note', () => {
@@ -104,10 +102,11 @@ describe('CommentComposer (new comment) — calls onCancel when Cancel is clicke
 
 describe('CommentComposer (new comment) — adds the comment to the pending review on submit', () => {
   it('adds the comment to the pending review on submit', async () => {
+    const user = userEvent.setup()
     const onSubmitted = vi.fn()
     render(<CommentComposer {...newCommentProps} onSubmitted={onSubmitted} />)
-    fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Nice!' } })
-    fireEvent.click(screen.getByText('Add to pending review'))
+    await user.type(screen.getByRole('textbox'), 'Nice!')
+    await user.click(screen.getByRole('button', { name: 'Add to pending review' }))
     await waitFor(() => expect(mockAddDraft).toHaveBeenCalled())
     expect(mockAddDraft).toHaveBeenCalledWith(
       { repoRoot: '/repo', prNumber: 42, headSHA: 'abc123' },
@@ -140,19 +139,13 @@ describe('CommentComposer (new comment) — shows New comment · line N header, 
 })
 
 describe('CommentComposer (reply)', () => {
-  it('renders a Reply submit button', () => {
-    render(<CommentComposer {...replyProps} />)
-    expect(screen.getByText('Reply')).toBeTruthy()
-  })
-
   it('calls prCommentReply on submit, not addDraft', async () => {
+    const user = userEvent.setup()
     mockPrCommentReply.mockResolvedValue({ success: true })
     const onSubmitted = vi.fn()
     render(<CommentComposer {...replyProps} onSubmitted={onSubmitted} />)
-    fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), {
-      target: { value: 'Agreed!' },
-    })
-    fireEvent.click(screen.getByText('Reply'))
+    await user.type(screen.getByRole('textbox'), 'Agreed!')
+    await user.click(screen.getByRole('button', { name: 'Reply' }))
     await waitFor(() =>
       expect(mockPrCommentReply).toHaveBeenCalledWith({
         repoRoot: '/repo',
@@ -169,10 +162,11 @@ describe('CommentComposer (reply)', () => {
 
 describe('CommentComposer (reply) — shows error when reply submission returns error field', () => {
   it('shows error when reply submission returns error field', async () => {
+    const user = userEvent.setup()
     mockPrCommentReply.mockResolvedValue({ error: 'FORBIDDEN' })
     render(<CommentComposer {...replyProps} />)
-    fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Hi' } })
-    fireEvent.click(screen.getByText('Reply'))
+    await user.type(screen.getByRole('textbox'), 'Hi')
+    await user.click(screen.getByRole('button', { name: 'Reply' }))
     await screen.findByText(/FORBIDDEN/)
     expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('review-comment', { failed: true })
   })

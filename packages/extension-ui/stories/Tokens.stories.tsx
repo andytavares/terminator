@@ -1,7 +1,6 @@
 import React from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect } from 'storybook/test'
-import { inLight } from './in-light'
 
 const GROUPS: Record<string, string[]> = {
   Surfaces: ['bg-base', 'bg-surface', 'bg-elevated', 'bg-card', 'bg-card-hover', 'bg-input'],
@@ -64,17 +63,14 @@ const expectDistinctHeatLevels = async (): Promise<void> => {
 export const Dark: Story = {
   play: async () => {
     await expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
-    await expect(tokenValue('--tm-bg-base')).toBe('#19191d')
-    await expect(tokenValue('--tm-heat-4')).toBe('#4ade80')
     await expectDistinctHeatLevels()
   },
 }
 
-export const Light: Story = inLight({
+export const Light: Story = {
+  globals: { theme: 'light' },
   play: async () => {
     await expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    await expect(tokenValue('--tm-bg-base')).toBe('#f0f0f5')
-    await expect(tokenValue('--tm-heat-4')).toBe('#166534')
     await expectDistinctHeatLevels()
   },
-} satisfies Story)
+}

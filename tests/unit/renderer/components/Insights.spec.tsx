@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Insights } from '../../../../src/renderer/components/home/Insights'
 import { InsightsBar } from '../../../../src/renderer/components/home/InsightsBar'
 import { useInsightsWindow } from '../../../../src/renderer/components/home/insights-window'
@@ -90,8 +91,13 @@ beforeEach(() => {
   seedFeed([merged, firstPass])
 })
 
-const card = (question: string): HTMLElement =>
-  screen.getByText(question, { exact: false }).closest('.tmui-metric-card') as HTMLElement
+const card = (question: string): HTMLElement => screen.getByRole('group', { name: question })
+
+/** Insights is busy until its first reads from main have answered. */
+const insightsRead = () =>
+  waitFor(() =>
+    expect(screen.getByRole('region', { name: 'Insights' }).getAttribute('aria-busy')).toBe('false')
+  )
 
 const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
@@ -106,11 +112,9 @@ describe('Insights: the cards', () => {
 
   it('shows how long agents waited, and that it rose from the range before', async () => {
     render(<Insights />)
-    const wait = await waitFor(() => {
-      const el = card('How long do agents wait on me?')
-      expect(within(el).getByText('6')).toBeTruthy()
-      return el
-    })
+    await insightsRead()
+    const wait = card('How long do agents wait on me?')
+    expect(within(wait).getByText('6')).toBeTruthy()
     expect(within(wait).getByText(/up from 4/)).toBeTruthy()
     expect(within(wait).getByText(/38 asks, 3 waited over 30 min/)).toBeTruthy()
   })
@@ -119,11 +123,9 @@ describe('Insights: the cards', () => {
 describe('Insights: agent time', () => {
   it('spends agent time from the attention measures, tokens and an estimated cost', async () => {
     render(<Insights />)
-    const spending = await waitFor(() => {
-      const el = card('How am I spending agent time?')
-      expect(within(el).getByText('21')).toBeTruthy()
-      return el
-    })
+    await insightsRead()
+    const spending = card('How am I spending agent time?')
+    expect(within(spending).getByText('21')).toBeTruthy()
     expect(within(spending).getByText('58%')).toBeTruthy()
     expect(within(spending).getByText('12M')).toBeTruthy()
     expect(within(spending).getByText('$12.40')).toBeTruthy()
@@ -205,7 +207,7 @@ describe('Insights: nothing made up, measures', () => {
     measuresCall.mockReset()
     measuresCall.mockRejectedValue(new Error('no'))
     render(<Insights />)
-    await waitFor(() => expect(measuresCall).toHaveBeenCalled())
+    await insightsRead()
     expect(
       within(card('How long do agents wait on me?')).getByText(
         'No agent has waited on you in this range'
@@ -226,12 +228,13 @@ function WithHeaderBar(): React.JSX.Element {
 
 describe('Insights: the window', () => {
   it('asks for a week first, and for 30 days, and the 30 before, after switching', async () => {
+    const user = userEvent.setup()
     render(<WithHeaderBar />)
     await waitFor(() => expect(measuresCall).toHaveBeenCalledTimes(2))
     const week = measuresCall.mock.calls[0][0].window
     expect(week.to - week.from).toBe(7 * DAY)
 
-    fireEvent.click(screen.getByRole('radio', { name: '30 days' }))
+    await user.click(screen.getByRole('radio', { name: '30 days' }))
     await waitFor(() => expect(measuresCall).toHaveBeenCalledTimes(4))
     const [current, previous] = measuresCall.mock.calls.slice(2).map((call) => call[0].window)
     expect(current.to - current.from).toBe(30 * DAY)
@@ -240,8 +243,9 @@ describe('Insights: the window', () => {
   })
 
   it('shows the Foundry measure once the window it covers is chosen', async () => {
+    const user = userEvent.setup()
     render(<WithHeaderBar />)
-    fireEvent.click(screen.getByRole('radio', { name: '30 days' }))
+    await user.click(screen.getByRole('radio', { name: '30 days' }))
     expect(within(card(firstPass.question)).getByText('71')).toBeTruthy()
   })
 })
@@ -281,11 +285,12 @@ const oldestReviewAsk = insightsFeedAsk({
 })
 
 describe('Insights: dismissing a looking-back row', () => {
-  it('dismisses the oldest review so a dead request leaves the card and stays gone', () => {
+  it('dismisses the oldest review so a dead request leaves the card and stays gone', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({ asks: [oldestReviewAsk] })
     render(<Insights />)
     const back = card('Looking back')
-    fireEvent.click(within(back).getByRole('button', { name: 'Dismiss Fluent #41' }))
+    await user.click(within(back).getByRole('button', { name: 'Dismiss Fluent #41' }))
     expect(within(back).queryByText(/Fluent #41/)).toBeNull()
     expect(useDismissalsStore.getState().entries['review:acme#41']?.kind).toBe('done')
   })
@@ -325,7 +330,7 @@ describe('Insights: looking back', () => {
     render(<Insights />)
     const back = card('Looking back')
     expect(within(back).getByText(/Fluent #41 · 3 h/)).toBeTruthy()
-    await waitFor(() => expect(within(back).getByText(/52 min/)).toBeTruthy())
+    expect(await within(back).findByText(/52 min/)).toBeTruthy()
   })
 
   it('says there is nothing to look back on when there is none', () => {

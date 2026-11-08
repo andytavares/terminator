@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { QueuedToast as Toast } from '@terminator/extension-ui'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { ToastContainer } from '../../../../src/renderer/components/ToastContainer'
@@ -20,7 +21,7 @@ afterEach(() => {
 describe('ToastContainer', () => {
   it('draws nothing when there is nothing to say', () => {
     const { container } = render(<ToastContainer />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('announces each message politely, with its tone', () => {
@@ -34,23 +35,25 @@ describe('ToastContainer', () => {
     expect(toasts.map((toast) => toast.getAttribute('data-tone'))).toEqual(['info', 'error'])
   })
 
-  it('removes the toast from the store when dismissed', () => {
+  it('removes the toast from the store when dismissed', async () => {
+    const user = userEvent.setup()
     withToasts([{ id: '5', type: 'info', message: 'Test' }])
     render(<ToastContainer />)
-    fireEvent.click(screen.getByLabelText('Dismiss'))
+    await user.click(screen.getByLabelText('Dismiss'))
     expect(useToastStore.getState().toasts).toEqual([])
     expect(screen.queryByText('Test')).toBeNull()
   })
 })
 
 describe('ToastContainer — action', () => {
-  it('draws the toast action and runs it when clicked', () => {
+  it('draws the toast action and runs it when clicked', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     withToasts([
       { id: '7', type: 'info', message: 'Dismissed', action: { label: 'Undo', onSelect } },
     ])
     render(<ToastContainer />)
-    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(onSelect).toHaveBeenCalledTimes(1)
   })
 })

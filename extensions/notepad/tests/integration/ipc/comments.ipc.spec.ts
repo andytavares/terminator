@@ -1,0 +1,300 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+
+vi.mock('electron', () => ({
+  ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
+  app: { getPath: vi.fn(() => '/tmp') },
+}))
+
+import { wrapDb } from '../../../../../src/main/db/index'
+import { applyNotepadSchema } from '../../../src/db/db'
+import {
+  listComments,
+  createComment,
+  replyComment,
+  updateComment,
+  deleteComment,
+  resolveComment,
+  updateAnchor,
+  markOrphaned,
+} from '../../../src/ipc/comments.ipc'
+import type { ExtensionDB } from '@terminator/extension-sdk'
+
+let db: ExtensionDB
+let noteId: string
+
+beforeEach(async () => {
+  db = wrapDb(new DatabaseSync(':memory:'))
+  await applyNotepadSchema(db)
+})
+
+beforeEach(async () => {
+  noteId = '00000000-0000-0000-0000-000000000001'
+  const now = new Date().toISOString()
+  await db.run(
+    'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+    [noteId, 'Test Note', 'Hello world this is test content', now, now]
+  )
+})
+
+describe('listComments', listCommentsTests)
+
+describe('createComment', () => {
+  it('creates a top-level comment with anchor fields', async () => {
+    const result = await createComment(db, {
+      noteId,
+      body: 'test comment',
+      startOffset: 6,
+      endOffset: 11,
+      quote: 'world',
+      prefix: 'Hello ',
+      suffix: ' this',
+    })
+    const id = (result as { data: { id: string } }).data.id
+
+    const listed = await listComments(db, { noteId })
+    expect((listed as { data: unknown[] }).data).toEqual([
+      expect.objectContaining({
+        id,
+        parentId: null,
+        body: 'test comment',
+        startOffset: 6,
+        endOffset: 11,
+        quote: 'world',
+        prefix: 'Hello ',
+        suffix: ' this',
+      }),
+    ])
+  })
+})
+
+describe('replyComment', replyCommentTests)
+
+describe('updateComment', () => {
+  it('updates the comment body', async () => {
+    const c = await createComment(db, {
+      noteId,
+      body: 'original',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const id = (c as { data: { id: string } }).data.id
+    await updateComment(db, { id, body: 'updated body' })
+
+    const listed = await listComments(db, { noteId })
+    expect((listed as { data: { body: string }[] }).data.map((c) => c.body)).toEqual([
+      'updated body',
+    ])
+  })
+})
+
+describe('deleteComment', () => {
+  it('removes the comment', async () => {
+    const c = await createComment(db, {
+      noteId,
+      body: 'to delete',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const id = (c as { data: { id: string } }).data.id
+    const result = await deleteComment(db, { id })
+    expect((result as { data: { ok: boolean } }).data.ok).toBe(true)
+
+    const listed = await listComments(db, { noteId })
+    expect((listed as { data: unknown[] }).data).toHaveLength(0)
+  })
+})
+
+describe('resolveComment', resolveCommentTests)
+
+describe('updateAnchor', () => {
+  it('updates start and end offsets', async () => {
+    const c = await createComment(db, {
+      noteId,
+      body: 'anchor test',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const id = (c as { data: { id: string } }).data.id
+    const result = await updateAnchor(db, { id, startOffset: 10, endOffset: 20 })
+    expect((result as { data: { ok: boolean } }).data.ok).toBe(true)
+
+    const row = await db.get<{ start_offset: number; end_offset: number }>(
+      'SELECT start_offset, end_offset FROM comments WHERE id = ?',
+      [id]
+    )
+    expect(Number(row?.start_offset)).toBe(10)
+    expect(Number(row?.end_offset)).toBe(20)
+  })
+})
+
+describe('markOrphaned', () => {
+  it('sets comment status to orphaned', async () => {
+    const c = await createComment(db, {
+      noteId,
+      body: 'to orphan',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const id = (c as { data: { id: string } }).data.id
+    const result = await markOrphaned(db, { id })
+    expect((result as { data: { ok: boolean } }).data.ok).toBe(true)
+
+    const row = await db.get<{ status: string }>('SELECT status FROM comments WHERE id = ?', [id])
+    expect(row?.status).toBe('orphaned')
+  })
+})
+
+function listCommentsTests() {
+  describe('nesting', listCommentsNestingTests)
+  describe('excluding resolved', listCommentsExcludingResolvedTests)
+  describe('including resolved', listCommentsIncludingResolvedTests)
+}
+
+function listCommentsNestingTests() {
+  it('returns empty array when no comments', async () => {
+    const result = await listComments(db, { noteId })
+    expect((result as { data: unknown[] }).data).toEqual([])
+  })
+
+  it('returns top-level comments with nested replies', async () => {
+    const parent = await createComment(db, {
+      noteId,
+      body: 'Top level',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: ' world',
+    })
+    const parentId = (parent as { data: { id: string } }).data.id
+
+    await replyComment(db, { noteId, parentId, body: 'Reply here' })
+
+    const result = await listComments(db, { noteId })
+    const comments = (result as { data: { id: string; replies: unknown[] }[] }).data
+    expect(comments).toHaveLength(1)
+    expect(comments[0].replies).toHaveLength(1)
+  })
+}
+
+function listCommentsExcludingResolvedTests() {
+  it('excludes resolved comments when includeResolved is false', async () => {
+    const c = await createComment(db, {
+      noteId,
+      body: 'will resolve',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const cId = (c as { data: { id: string } }).data.id
+    await resolveComment(db, { id: cId, resolved: true })
+
+    const result = await listComments(db, { noteId, includeResolved: false })
+    const comments = (result as { data: unknown[] }).data
+    expect(comments).toHaveLength(0)
+  })
+}
+
+function listCommentsIncludingResolvedTests() {
+  it('includes resolved comments when includeResolved is true', async () => {
+    const c = await createComment(db, {
+      noteId,
+      body: 'resolved',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const cId = (c as { data: { id: string } }).data.id
+    await resolveComment(db, { id: cId, resolved: true })
+
+    const result = await listComments(db, { noteId, includeResolved: true })
+    const comments = (result as { data: unknown[] }).data
+    expect(comments).toHaveLength(1)
+  })
+}
+
+function replyCommentTests() {
+  describe('depth and parents', replyCommentDepthParentsTests)
+}
+
+function replyCommentDepthParentsTests() {
+  it('returns MAX_DEPTH_EXCEEDED when replying to a reply', async () => {
+    const parent = await createComment(db, {
+      noteId,
+      body: 'parent',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const parentId = (parent as { data: { id: string } }).data.id
+    const reply = await replyComment(db, { noteId, parentId, body: 'reply' })
+    const replyId = (reply as { data: { id: string } }).data.id
+    const nested = await replyComment(db, { noteId, parentId: replyId, body: 'nested' })
+    expect((nested as { error: string }).error).toBe('MAX_DEPTH_EXCEEDED')
+  })
+
+  it('returns PARENT_NOT_FOUND for non-existent parentId', async () => {
+    const result = await replyComment(db, { noteId, parentId: 'non-existent-id', body: 'reply' })
+    expect((result as { error: string }).error).toBe('PARENT_NOT_FOUND')
+  })
+}
+
+function resolveCommentTests() {
+  describe('resolving', resolveCommentResolvingTests)
+  describe('reopening', resolveCommentReopeningTests)
+}
+
+function resolveCommentResolvingTests() {
+  it('sets status to resolved', async () => {
+    const c = await createComment(db, {
+      noteId,
+      body: 'to resolve',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const id = (c as { data: { id: string } }).data.id
+    const result = await resolveComment(db, { id, resolved: true })
+    expect((result as { data: { status: string } }).data.status).toBe('resolved')
+  })
+}
+
+function resolveCommentReopeningTests() {
+  it('sets status back to open', async () => {
+    const c = await createComment(db, {
+      noteId,
+      body: 'toggle',
+      startOffset: 0,
+      endOffset: 5,
+      quote: 'Hello',
+      prefix: '',
+      suffix: '',
+    })
+    const id = (c as { data: { id: string } }).data.id
+    await resolveComment(db, { id, resolved: true })
+
+    const result = await resolveComment(db, { id, resolved: false })
+    expect((result as { data: { status: string } }).data.status).toBe('open')
+  })
+}

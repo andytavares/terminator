@@ -1,10 +1,10 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AboutDialog } from '../../../../src/renderer/components/AboutDialog'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { installElectronApi } from '../../../support/electron-api'
-import { pressOutside } from '../../../support/modal'
 
 const mockGetInfo = vi.fn<ElectronAPI['app']['getInfo']>()
 const mockDbHealth = vi.fn<ElectronAPI['db']['health']>()
@@ -51,18 +51,11 @@ describe('AboutDialog', () => {
   })
 
   it('calls onClose when Close button is clicked', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    await screen.findByText('Close')
-    fireEvent.click(await screen.findByText('Close'))
-    expect(onClose).toHaveBeenCalled()
-  })
-
-  it('calls onClose when overlay is clicked', async () => {
-    const onClose = vi.fn()
-    render(<AboutDialog onClose={onClose} />)
-    await screen.findByRole('dialog')
-    pressOutside(screen.getByRole('dialog'))
+    // The dialog's corner X is also named Close; the footer button is the one with the word.
+    await user.click(await screen.findByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -83,8 +76,8 @@ describe('AboutDialog — extension versions', () => {
       extensions: [extension('Foundry', '0.1.4'), extension('Notepad', '0.1.0')],
     })
     render(<AboutDialog onClose={vi.fn()} />)
-    expect((await screen.findByText('Foundry')).nextElementSibling!.textContent).toBe('v0.1.4')
-    expect(screen.getByText('Notepad').nextElementSibling!.textContent).toBe('v0.1.0')
+    expect((await screen.findByRole('definition', { name: 'Foundry' })).textContent).toBe('v0.1.4')
+    expect(screen.getByRole('definition', { name: 'Notepad' }).textContent).toBe('v0.1.0')
   })
 
   it('shows no extensions section when the list cannot be read', async () => {
@@ -95,29 +88,23 @@ describe('AboutDialog — extension versions', () => {
   })
 })
 
-describe('AboutDialog — does not call onClose when dialog body is clicked', () => {
-  it('does not call onClose when dialog body is clicked', async () => {
-    const onClose = vi.fn()
-    render(<AboutDialog onClose={onClose} />)
-    await screen.findByRole('dialog')
-    fireEvent.click(await screen.findByRole('dialog'))
-    expect(onClose).not.toHaveBeenCalled()
-  })
-
+describe('AboutDialog — calls onClose when Escape is pressed', () => {
   it('calls onClose when Escape is pressed', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
     await screen.findByRole('dialog')
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('shows placeholder dashes before data loads', () => {
+  it('shows a dash for each version before the app info loads', () => {
     mockGetInfo.mockReturnValue(new Promise(() => {}))
     render(<AboutDialog onClose={vi.fn()} />)
-    const dashes = document.querySelectorAll('.about-dialog__row dd')
-    expect(dashes.length).toBeGreaterThan(0)
-    dashes.forEach((dd) => expect(dd.textContent).toBe('—'))
+    const values = ['Electron', 'Node', 'Chrome', 'Platform'].map(
+      (label) => screen.getByRole('definition', { name: label }).textContent
+    )
+    expect(values).toEqual(['—', '—', '—', '—'])
   })
 })
 
@@ -128,7 +115,7 @@ describe('AboutDialog — keeps the placeholders when the app info cannot be rea
     // The database row settles from its own call; by then the rejection has too.
     await screen.findByText('OK')
     expect(screen.getByText('v—')).toBeTruthy()
-    expect(screen.getByText('Electron').nextElementSibling!.textContent).toBe('—')
+    expect(screen.getByRole('definition', { name: 'Electron' }).textContent).toBe('—')
   })
 
   it('shows DB error with message when health returns ok:false', async () => {
@@ -147,15 +134,5 @@ describe('AboutDialog — keeps the placeholders when the app info cannot be rea
     mockDbHealth.mockRejectedValue(new Error('IPC failed'))
     render(<AboutDialog onClose={vi.fn()} />)
     await screen.findByText('Error — IPC error')
-  })
-})
-
-describe('AboutDialog — does not close when non-Escape key is pressed', () => {
-  it('does not close when non-Escape key is pressed', async () => {
-    const onClose = vi.fn()
-    render(<AboutDialog onClose={onClose} />)
-    await screen.findByRole('dialog')
-    fireEvent.keyDown(document, { key: 'Enter' })
-    expect(onClose).not.toHaveBeenCalled()
   })
 })

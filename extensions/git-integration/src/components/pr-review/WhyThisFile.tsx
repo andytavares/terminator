@@ -191,8 +191,8 @@ function Importers({ riskScore, repoRoot }: { riskScore: RiskScore; repoRoot: st
 function FactorRow({ factor, children }: { factor: Factor; children?: React.ReactNode }) {
   const Icon = factor.icon
   return (
-    <div className={`ri-factor ri-factor--${factor.severity}`}>
-      <Icon className="ri-factor-icon" aria-hidden="true" />
+    <div className={`ri-factor ri-factor--${factor.severity}`} data-testid="factor">
+      <Icon className="ri-factor-icon" aria-hidden="true" data-testid="factor-icon" />
       <div>
         <b>{factor.title}</b>
         <small>{factor.detail}</small>

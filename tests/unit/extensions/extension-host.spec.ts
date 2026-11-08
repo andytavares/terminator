@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import os from 'os'
-import { newExtensionHost, storedExtensionRecord, type FakeBackend } from './fake-backend-host'
+import {
+  newExtensionHost,
+  storedExtensionRecord,
+  type FakeBackend,
+} from '../../support/fake-backend-host'
 
 vi.mock('electron', () => ({
   app: {
@@ -353,21 +357,22 @@ describe('ExtensionHost tells the windows — not for unchanged statuses', () =>
 })
 
 describe('ExtensionHost tells the windows — install, failure, toggle and uninstall', () => {
-  it('when an extension is installed, fails to activate, is toggled or uninstalled', async () => {
+  type Host = Awaited<ReturnType<typeof watchedHost>>['host']
+  const loadToggle = (host: Host) => host.load(writeManifestOnly('com.toggle'))
+  const nothing = async () => {}
+  it.each([
+    ['is installed', nothing, loadToggle],
+    ['fails to activate', nothing, (host: Host) => host.load(writeManifestOnly('com.crash'))],
+    ['is disabled', loadToggle, (host: Host) => host.setEnabled('com.toggle', false)],
+    ['is uninstalled', loadToggle, (host: Host) => host.uninstallExtension('com.toggle')],
+  ])('when an extension %s', async (_, arrange, act) => {
     const { host, listChanges } = await watchedHost({ 'com.crash': failingBackend('boom') })
-    const counts: number[] = []
-    const countListChanges = async (action: () => Promise<unknown>) => {
-      const before = listChanges().length
-      await action()
-      counts.push(listChanges().length - before)
-    }
+    await arrange(host)
+    const before = listChanges().length
 
-    await countListChanges(() => host.load(writeManifestOnly('com.crash')))
-    await countListChanges(() => host.load(writeManifestOnly('com.toggle')))
-    await countListChanges(() => host.setEnabled('com.toggle', false))
-    await countListChanges(() => host.uninstallExtension('com.toggle'))
+    await act(host)
 
-    expect(counts.every((count) => count > 0)).toBe(true)
+    expect(listChanges().length).toBeGreaterThan(before)
   })
 })
 

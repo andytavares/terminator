@@ -46,14 +46,13 @@ import type { MonitorStatus } from './StationMonitor.js'
 import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
-import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { attachTo } from '../../renderer/attach-to-step.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
 import { DocumentChip, openDocument } from '../DocumentChip.js'
 import { OPEN_LABEL } from '../../line/document-kind.js'
 import type { DocumentLink } from '../../line/document-kind.js'
-import { Button, Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
+import { Button, usePolling, everyWhileVisible } from '@terminator/extension-ui'
 import { useFoundryQuery, ANY_RECORD } from '../../renderer/foundry-query.js'
 import './hall.css'
 import { foundryInvoke } from '../../renderer/foundry-invoke.js'
@@ -890,7 +889,11 @@ function HallStage({ hall, model, nav, overlayRef }: OverlayProps & { readonly n
 function HallFrame({ hall, model, overlayRef }: OverlayProps) {
   const { map, replay, selectedNode } = model
   return (
-    <div className="fdry-hall-frame" style={{ aspectRatio: `${map.width} / ${map.height}` }}>
+    <div
+      className="fdry-hall-frame"
+      data-testid="hall-frame"
+      style={{ aspectRatio: `${map.width} / ${map.height}` }}
+    >
       <HallScene
         map={map}
         worldRef={model.worldRef}
@@ -984,16 +987,17 @@ function StationButton({ hall, model, prop }: StageProps & { readonly prop: Hall
   if (node === undefined) return null
   const label = model.labels[node.id] ?? node.id
   const standing = model.orphaned.has(node.id) ? 'no agent' : stateWord(node.state)
+  const flagged = model.flaggedNodes.has(node.id)
   return (
     <button
       type="button"
       className="fdry-hall-station"
       title={`${label} · ${standing}${node.attempts > 1 ? ` · try ${node.attempts}` : ''}`}
       style={stationStyle(model.map, prop)}
-      aria-label={`${label}, ${node.role ?? 'unassigned'}, ${standing}, attempt ${node.attempts}`}
+      aria-label={`${label}, ${node.role ?? 'unassigned'}, ${standing}, attempt ${node.attempts}${flagged ? ', needs you' : ''}`}
       onClick={() => hall.station.openStation(node.id)}
     >
-      {model.flaggedNodes.has(node.id) ? (
+      {flagged ? (
         <span className="fdry-hall-flag" aria-hidden="true">
           <ShieldQuestion />
         </span>
@@ -1015,6 +1019,7 @@ function CalloutBubble({ callout, map, lift, pinned = false }: CalloutBubbleProp
   return (
     <div
       className="fdry-callout"
+      data-testid={pinned ? 'pinned-callout' : 'callout'}
       data-tone={callout.tone}
       data-pinned={pinned ? 'true' : undefined}
       data-callout-id={callout.id}
@@ -1245,7 +1250,7 @@ function HallHud(props: HallHudProps): JSX.Element {
   const { view, replaying, waitingCount, note } = props
   const standing = replaying ? undefined : view.standing
   return (
-    <div className="fdry-hall-hud">
+    <div className="fdry-hall-hud" role="group" aria-label="Order bar">
       <button type="button" className="fdry-hall-btn" onClick={props.onBack}>
         <ArrowLeft aria-hidden="true" /> All halls
       </button>
@@ -1434,17 +1439,7 @@ function AskInterruption(props: InterruptionCardProps & { readonly item: AskItem
 }
 
 function AskDetail({ item }: { readonly item: AskItem }) {
-  return (
-    <p className="fdry-card__detail">
-      {item.kind === 'ask' && item.prose ? (
-        <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
-          {item.detail}
-        </Markdown>
-      ) : (
-        item.detail
-      )}
-    </p>
-  )
+  return <p className="fdry-card__detail">{item.detail}</p>
 }
 
 function AskActions({ item, busy, onAllow, onDeny, onTerminal }: InterruptionCardProps) {

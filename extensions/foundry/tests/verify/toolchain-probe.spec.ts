@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { probeToolchain } from '../../src/verify/toolchain-probe.js'
-import { CHECK_NAMES } from '../../src/verify/check-names.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The probe is what makes "works in any repository, with nothing installed"
@@ -44,14 +43,15 @@ describe('probeToolchain', () => {
 })
 
 function emptyRepositoriesTests() {
-  it('reports every check as null in a repository with nothing in it', () => {
-    const t = probeToolchain(repo)
-    for (const name of CHECK_NAMES) expect(t[name]).toBeNull()
-  })
-
-  it('never counts an absent command as anything but absent', () => {
-    const t = probeToolchain(repo)
-    expect(Object.values(t).every((v) => v === null)).toBe(true)
+  it('reports every check as absent (null) in a repository with nothing in it', () => {
+    expect(probeToolchain(repo)).toEqual({
+      test: null,
+      lint: null,
+      format: null,
+      coverage: null,
+      e2e: null,
+      build: null,
+    })
   })
 }
 
@@ -222,7 +222,7 @@ function precedenceAndE2eTests() {
     write('package.json', JSON.stringify({ scripts: { test: 'vitest run' } }))
     write('vitest.config.ts', 'export default {}')
     write('.github/workflows/ci.yml', 'jobs:\n  a:\n    steps:\n      - run: bun test\n')
-    expect(probeToolchain(repo).test?.source).toBe('hint')
+    expect(probeToolchain(repo).test?.command).toBe('npm run test')
   })
 
   it('finds an end-to-end command distinct from the unit test command', () => {

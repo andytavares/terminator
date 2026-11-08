@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Frame } from '@playwright/test'
 import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
-import { extensionFrame } from './extension-page'
+import { extensionFrame, findExtensionFrame } from './extension-page'
 import { expectCentredInWindow } from './modal-centre'
 
-// Leaving an extension with the keyboard (feature 036, ADR 114). The keystroke has to start
-// inside the extension's frame, where the frame shim applies the double-Escape gesture and its
-// guards, so none of this can be a unit test.
+// Working an extension from the keyboard (feature 036, ADR 114). The double-Escape exit and its
+// guards are unit tests: tests/unit/extension-frame/frame-shim.spec.ts and
+// tests/unit/shared/double-escape.spec.ts.
 
 let handle: AppHandle
 
@@ -26,26 +26,7 @@ interface Surface {
 }
 
 const NOTES: Surface = { id: 'terminator.notepad', label: 'Notes', part: 'notepad' }
-const FOUNDRY: Surface = { id: 'terminator.foundry', label: 'Foundry', part: 'foundry' }
 const TASK_VAULT: Surface = { id: 'terminator.task-vault', label: 'Task Vault', part: 'task-vault' }
-const REMOTE_CONTROL: Surface = {
-  id: 'terminator.remote-control',
-  label: 'Remote Control',
-  part: 'remote-control',
-}
-
-/**
- * Moves on both clocks that pair double-Escape presses (frame-shim.ts, ExtensionPanelPortal.tsx),
- * which Playwright's page clock cannot reach, instead of waiting out DOUBLE_ESCAPE_WINDOW_MS. */
-async function advanceClocks(part: string, ms: number): Promise<void> {
-  const shift = (offset: number) => {
-    const now = performance.now.bind(performance)
-    performance.now = () => now() + offset
-  }
-  await handle.page.evaluate(shift, ms)
-  await inView(part, `(${shift})(${ms})`)
-}
-
 /** Run `script` inside the extension frame whose URL contains `part`. */
 async function inView<T>(part: string, script: string): Promise<T> {
   const frame = extensionFrame(handle, part)
@@ -60,24 +41,32 @@ async function viewReady(part: string): Promise<boolean> {
   return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
 }
 
-/** Sends a key into an extension's frame as a real key press. */
-async function key(part: string, keyCode: string): Promise<void> {
-  const frame = extensionFrame(handle, part)
-  if (!frame) return
-  // The frame's document must own focus for its listeners to see the key.
-  await frame.evaluate(() => (document.body as HTMLElement).focus())
-  await handle.page.keyboard.press(keyCode)
-  // Let React commit the resulting state before the next call reads the DOM.
-  // A key can legitimately exit the extension, detaching the frame mid-wait.
-  await frame
-    .evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
-    .catch(() => {})
+/** The extension's frame, once its document owns the keyboard: a key pressed before then
+ * lands on the host page, where the frame's listeners never see it. */
+async function focusedFrame(part: string): Promise<Frame> {
+  const frame = await findExtensionFrame(handle, part)
+  await frame.evaluate(() => window.focus())
+  await expect.poll(() => frame.evaluate(() => document.hasFocus())).toBe(true)
+  return frame
 }
 
-/** Two Escapes inside the gesture window. */
-async function pressEscapeTwice(part: string): Promise<void> {
-  await key(part, 'Escape')
-  await key(part, 'Escape')
+/** What the frame shim decided for the last Escape it read: 'pending', 'exit' or 'suppressed'. */
+function escapeDecision(frame: Frame): Promise<string | null> {
+  return frame.evaluate(() => document.documentElement.getAttribute('data-escape-gesture'))
+}
+
+/** Sends a key into an extension's frame as a real key press. */
+async function key(part: string, keyCode: string): Promise<void> {
+  await focusedFrame(part)
+  await handle.page.keyboard.press(keyCode)
+}
+
+/** Presses Escape in an extension's frame, and waits until the frame shim has decided on it. */
+async function pressEscape(part: string): Promise<void> {
+  const frame = await focusedFrame(part)
+  await frame.evaluate(() => document.documentElement.removeAttribute('data-escape-gesture'))
+  await handle.page.keyboard.press('Escape')
+  await expect.poll(() => escapeDecision(frame)).not.toBeNull()
 }
 
 /** The extension whose panel is on screen, or null. The panel div outlives the exit (it stays
@@ -101,211 +90,15 @@ async function showPanel({ id, label, part }: Surface): Promise<void> {
   await expect.poll(() => viewReady(part), { message: `${label} view never loaded` }).toBe(true)
 }
 
-/** Neither a text field nor a dialog holds the key, so only the gesture itself is tested. */
-async function nothingClaimsTheKey(part: string): Promise<void> {
-  await inView(
-    part,
-    `(() => {
-      const el = document.activeElement
-      if (el && typeof el.blur === 'function') el.blur()
-      document.querySelectorAll('[data-e2e-surface]').forEach((surface) => surface.remove())
-      return true
-    })()`
-  )
-}
-
+/** The last key asked for no exit, so the panel that shows now stays. */
 async function stillShowing(surface: Surface, why: string): Promise<void> {
-  // Two frames on the host: an exit the key requested would have reached the panel by now.
-  await handle.page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-  )
-  await expect.poll(() => activeExtensionPanel(), { message: why }).toBe(surface.id)
-}
-
-async function exitsToTheTerminal(surface: Surface, why: string): Promise<void> {
-  await expect.poll(activeExtensionPanel, { message: why }).not.toBe(surface.id)
-}
-
-/** Two Escapes, then the exit. The second key hides the frame it went to, and Chromium can drop
- * that key's acknowledgement (CI run 40594749096 waited out 180 s), so the exit is the signal. */
-async function leavesWithTwoEscapes(surface: Surface, why: string): Promise<void> {
-  await key(surface.part, 'Escape')
-  const frame = extensionFrame(handle, surface.part)
-  if (!frame) throw new Error(`${surface.id} has no frame to press Escape in`)
-  await frame.evaluate(() => (document.body as HTMLElement).focus())
-  const press = handle.page.keyboard.press('Escape')
-  const exited = exitsToTheTerminal(surface, why)
-  await Promise.race([Promise.all([press, exited]), exited])
-}
-
-// ── Leaving with two Escapes ─────────────────────────────────────────────────
-
-async function singleAndSlowEscapesStay(): Promise<void> {
-  await showPanel(NOTES)
-  await nothingClaimsTheKey(NOTES.part)
-  await key(NOTES.part, 'Escape')
-  await advanceClocks(NOTES.part, 900)
-  await stillShowing(NOTES, 'a single Escape closed the extension')
-  await key(NOTES.part, 'Escape')
-  await advanceClocks(NOTES.part, 600)
-  await stillShowing(NOTES, 'two Escapes further apart than the gesture window paired')
-}
-
-async function doubleEscapeReturnsToTerminal(): Promise<void> {
-  await showPanel(NOTES)
-  await leavesWithTwoEscapes(NOTES, 'the extension panel should be gone')
-}
-
-/** Opens real modal dialogs in the view. `cancel` is refused, so the Escape under test cannot
- * close one before the gesture reads the page. */
-function openDialogs(part: string, count: number): Promise<void> {
-  return inView(
-    part,
-    `(() => {
-      for (let i = 0; i < ${count}; i++) {
-        const dialog = document.createElement('dialog')
-        dialog.setAttribute('data-e2e-surface', '')
-        dialog.addEventListener('cancel', (event) => event.preventDefault())
-        document.body.appendChild(dialog)
-        dialog.showModal()
-      }
-      return true
-    })()`
-  )
-}
-
-async function openDialogsHoldTheKey(): Promise<void> {
-  await showPanel(FOUNDRY)
-  for (const depth of [1, 3]) {
-    await nothingClaimsTheKey(FOUNDRY.part)
-    await openDialogs(FOUNDRY.part, depth)
-    await pressEscapeTwice(FOUNDRY.part)
-    await stillShowing(FOUNDRY, `two Escapes with ${depth} dialog(s) open exited the extension`)
-  }
-  await nothingClaimsTheKey(FOUNDRY.part)
-}
-
-async function gestureWorksOnceNothingClaimsTheKey(): Promise<void> {
-  await showPanel(FOUNDRY)
-  await nothingClaimsTheKey(FOUNDRY.part)
-  await leavesWithTwoEscapes(FOUNDRY, 'the extension should have exited')
-}
-
-// ── A draft in a text field keeps the extension open ─────────────────────────
-
-/** Each extension opens on an empty state, so the field to type into is brought up first —
- * which is also the path a person takes. Foundry's is on the Forge, and Foundry goes last: its
- * dialog steps follow once the Forge has settled, as a fresh view re-reports its depth. */
-/** `inline`: the field is on the screen itself, not in a dialog Escape rightly closes, so the
- * draft must still be in it afterwards. */
-interface DraftSurface extends Surface {
-  open: string
-  inline?: boolean
-}
-
-const DRAFT_SURFACES: DraftSurface[] = [
-  { ...NOTES, open: 'new note' },
-  { ...TASK_VAULT, open: 'add task' },
-  { ...FOUNDRY, open: 'forge', inline: true },
-]
-
-const FIELD = `document.querySelector('input:not([type=hidden]),textarea')`
-
-/** Presses the control named `open`, and waits for a text field to show. */
-async function bringUpTextField({ label, part, open }: DraftSurface): Promise<void> {
-  // Polled: the view reports loaded before React has drawn the button.
-  const pressOpen = `(() => {
-    const b = [...document.querySelectorAll('button')].find((x) =>
-      (x.textContent || '').toLowerCase().includes(${JSON.stringify(open)}))
-    if (b) b.click()
-    return !!b
-  })()`
-  await expect
-    .poll(() => inView<boolean>(part, pressOpen), { message: `${label} never offered "${open}"` })
-    .toBe(true)
-  await expect
-    .poll(() => inView<boolean>(part, `!!${FIELD}`), {
-      message: `${label} never showed a text field after opening "${open}"`,
-    })
-    .toBe(true)
-}
-
-/** Run in a view: types an unsaved draft into its first text field, and says whether it has focus. */
-const TYPE_DRAFT = `(() => {
-  const el = ${FIELD}
-  if (!el) return false
-  el.focus()
-  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement
-  Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, 'UNSAVED DRAFT')
-  el.dispatchEvent(new Event('input', { bubbles: true }))
-  return document.activeElement === el
-})()`
-
-async function draftKeepsItOpen(surface: DraftSurface): Promise<void> {
-  const { label, part } = surface
-  await showPanel(surface)
-  await bringUpTextField(surface)
-  await expect
-    .poll(() => inView<boolean>(part, TYPE_DRAFT), {
-      message: `${label} offered no field to type in`,
-    })
-    .toBe(true)
-  await key(part, 'Escape')
-  await key(part, 'Escape')
-  await stillShowing(surface, `${label} was closed by Escape while a draft was unsaved`)
-  if (!surface.inline) return
-  await expect.poll(() => inView<string>(part, `${FIELD}?.value ?? '<gone>'`)).toBe('UNSAVED DRAFT')
-}
-
-/** Remote Control's screen has no text field and no dialog: nothing to protect, so the gesture
- * must still fire. A guard that only ever suppresses is a broken feature. */
-async function remoteControlLeavesOnTwoEscapes(): Promise<void> {
-  await showPanel(REMOTE_CONTROL)
-  const state = await inView<{ fields: number; surfaces: number }>(
-    REMOTE_CONTROL.part,
-    `(() => ({
-      fields: document.querySelectorAll('input:not([type=hidden]),textarea').length,
-      surfaces: document.querySelectorAll('[data-tmui-surface],[data-tmui-panel]').length,
-    }))()`
-  )
-  expect(state, 'this only means anything with no field and no surface open').toEqual({
-    fields: 0,
-    surfaces: 0,
-  })
-  await leavesWithTwoEscapes(REMOTE_CONTROL, 'with nothing at risk the exit gesture must fire')
+  const frame = await findExtensionFrame(handle, surface.part)
+  expect(await escapeDecision(frame), why).not.toBe('exit')
+  expect(await activeExtensionPanel(), why).toBe(surface.id)
 }
 
 /** A flow's steps in order, each titled for the behaviour it checks. */
 type Steps = Array<[title: string, body: () => Promise<void>]>
-
-const LEAVING_STEPS: Steps = [
-  [
-    'a single Escape, or two further apart than the gesture window, leave Notes open',
-    singleAndSlowEscapesStay,
-  ],
-  ['two quick Escapes inside Notes return to the terminal', doubleEscapeReturnsToTerminal],
-  ...DRAFT_SURFACES.map((surface): Steps[number] => [
-    `${surface.label}: two Escapes with a draft in a text field keep it open${surface.inline ? ', the draft intact' : ''}`,
-    () => draftKeepsItOpen(surface),
-  ]),
-  [
-    'two Escapes while a dialog, or nested dialogs, are open do not exit Foundry',
-    openDialogsHoldTheKey,
-  ],
-  [
-    'the exit gesture still works once nothing has claimed the key',
-    gestureWorksOnceNothingClaimsTheKey,
-  ],
-  [
-    'Remote Control: two Escapes still leave, because nothing is at risk',
-    remoteControlLeavesOnTwoEscapes,
-  ],
-]
-
-test('an extension is left with two quick Escapes, and only when nothing is at risk', async () => {
-  for (const [title, body] of LEAVING_STEPS) await test.step(title, body)
-})
-
 // ── Working an extension from the keyboard ───────────────────────────────────
 
 /** Run in a view: whether focus is inside its open dialog. */
@@ -349,7 +142,7 @@ async function dialogTrapsFocusAndClosesOnEscape(): Promise<void> {
       message: 'Tab never leaves the dialog',
     })
     .toBe(true)
-  await key(NOTES.part, 'Escape')
+  await pressEscape(NOTES.part)
   await expect
     .poll(() => inView<boolean>(NOTES.part, `!document.querySelector('dialog[open]')`))
     .toBe(true)

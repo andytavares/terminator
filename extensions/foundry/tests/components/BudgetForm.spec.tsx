@@ -109,12 +109,11 @@ function noCancelAndDisabledTests() {
 
   it('disables everything while disabled', () => {
     setup({ disabled: true })
-    for (const control of [
+    const controls = [
       ...screen.getAllByRole('checkbox'),
       ...screen.getAllByRole('spinbutton'),
       screen.getByRole('button', { name: 'Save budgets' }),
-    ]) {
-      expect((control as HTMLInputElement).disabled).toBe(true)
-    }
+    ]
+    expect(controls.filter((control) => !control.hasAttribute('disabled'))).toEqual([])
   })
 }

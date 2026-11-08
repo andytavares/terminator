@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { formatRelativeTime } from '../../../../packages/extension-ui/src/relative-time'
 import { RelativeTime } from '../../../../packages/extension-ui/src/RelativeTime'
 
@@ -66,8 +66,8 @@ describe('formatRelativeTime — looks forward as well as back', () => {
 describe('RelativeTime', () => {
   it('shows the sentence and keeps the exact moment for tools and tooltips', () => {
     const moment = new Date(NOW - 2 * HOUR)
-    const { container } = render(<RelativeTime value={moment} now={NOW} />)
-    const time = container.querySelector('time')!
+    render(<RelativeTime value={moment} now={NOW} />)
+    const time = screen.getByRole('time')
     expect(time.getAttribute('datetime')).toBe(moment.toISOString())
     expect(time.getAttribute('title')).toBe(moment.toLocaleString())
     expect(time.textContent).toBe(formatRelativeTime(moment, NOW))
@@ -83,6 +83,6 @@ describe('a time that does not parse', () => {
 
   it('renders nothing', () => {
     const { container } = render(<RelativeTime value="not a date" now={NOW} />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 })

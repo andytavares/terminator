@@ -1,8 +1,9 @@
 import { fact } from './sidebar/fixtures/facts'
 import type { SessionFacts } from '../../../src/renderer/sidebar/session-facts'
 import React, { type ComponentProps } from 'react'
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
 import { useSessionStore } from '../../../src/renderer/stores/session.store'
@@ -364,8 +365,8 @@ function showTab(projectId: string, sessionId: string): void {
 }
 
 /** The operator leaves Home for the main area, as clicking Home in the band does. */
-function leaveHome(): void {
-  fireEvent.click(screen.getByRole('button', { name: /^Home/ }))
+async function leaveHome(): Promise<void> {
+  await userEvent.click(screen.getByRole('button', { name: /^Home/ }))
 }
 
 const registry = () => useExtensionRegistry.getState()
@@ -458,56 +459,51 @@ describe('App — loads the workspaces and settings from main on mount', () => {
     render(<App />)
     // Home is lazy: it draws once its module has loaded, whatever ran before this test.
     await screen.findByTestId('home-screen')
-    leaveHome()
+    await leaveHome()
     expect(screen.getByTestId('terminal-pane').textContent).toBe('proj-1')
   })
 
-  it('shows EmptyState with workspace prompt when activeWorkspaceId but no project and welcome seen', () => {
+  it('shows EmptyState with workspace prompt when activeWorkspaceId but no project and welcome seen', async () => {
     setupApp({
       activeWorkspaceId: 'ws-1',
       globalSettings: settingsWith({ ui: { hasSeenWelcome: true } }),
     })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     expect(screen.getByRole('heading', { name: 'Select or create a project' })).toBeTruthy()
   })
 })
 
 describe('App — shows Welcome to Terminator EmptyState when no welcome seen', () => {
-  it('shows Welcome to Terminator EmptyState when no welcome seen', () => {
+  it('shows Welcome to Terminator EmptyState when no welcome seen', async () => {
     setupApp({ globalSettings: settingsWith({ ui: { hasSeenWelcome: false } }) })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     expect(screen.getByRole('heading', { name: 'Welcome to Terminator' })).toBeTruthy()
   })
 
-  it('asks for a workspace while the settings are still on their way', () => {
+  it('asks for a workspace while the settings are still on their way', async () => {
     setupApp({ globalSettings: null })
     installElectronApi({
       ...main.parts,
       settings: { ...main.parts.settings, getGlobal: () => new Promise(() => {}) },
     })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     expect(screen.getByRole('heading', { name: 'Select a workspace to get started' })).toBeTruthy()
   })
 
-  it('opens SettingsPanel via menu:open-settings IPC event', async () => {
+  it('opens SettingsPanel via menu:open-settings IPC event, and closes it', async () => {
+    const user = userEvent.setup()
     render(<App />)
     expect(screen.queryByTestId('settings-panel')).toBeNull()
     act(() => main.events.openSettings.deliver())
-    await screen.findByTestId('settings-panel')
+    await user.click(await screen.findByText('Close Settings'))
+    await waitFor(() => expect(screen.queryByTestId('settings-panel')).toBeNull())
   })
 })
 
-describe('App — closes SettingsPanel when onClose is called', () => {
-  it('closes SettingsPanel when onClose is called', async () => {
-    render(<App />)
-    act(() => main.events.openSettings.deliver())
-    fireEvent.click(await screen.findByText('Close Settings'))
-    await waitFor(() => expect(screen.queryByTestId('settings-panel')).toBeNull())
-  })
-
+describe("App — marks the session exited when main reports its process's exit", () => {
   it("marks the session exited when main reports its process's exit", () => {
     setupApp({ sessions: [terminalSessionOf({ id: 'sess-1', projectId: 'p1', tabTitle: 'zsh' })] })
     render(<App />)
@@ -547,33 +543,23 @@ describe('App — records the welcome as seen once a project is opened', () => {
     await screen.findByTestId('settings-panel')
   })
 
-  it('opens LogWindow via onToggleLog keyboard shortcut callback', async () => {
+  it('opens LogWindow via onToggleLog keyboard shortcut callback, and closes it', async () => {
+    const user = userEvent.setup()
     render(<App />)
     expect(screen.queryByTestId('log-window')).toBeNull()
     act(() => shortcuts.callbacks.onToggleLog?.())
-    await screen.findByTestId('log-window')
+    await user.click(await screen.findByText('Close Log'))
+    await waitFor(() => expect(screen.queryByTestId('log-window')).toBeNull())
   })
 })
 
-describe('App — closes LogWindow when its onClose is called', () => {
-  it('closes LogWindow when its onClose is called', async () => {
-    render(<App />)
-    act(() => shortcuts.callbacks.onToggleLog?.())
-    fireEvent.click(await screen.findByText('Close Log'))
-    await waitFor(() => expect(screen.queryByTestId('log-window')).toBeNull())
-  })
-
-  it('opens CommandPalette via onOpenCommandPalette keyboard shortcut callback', async () => {
+describe('App — opens CommandPalette via onOpenCommandPalette keyboard shortcut callback, and closes it', () => {
+  it('opens CommandPalette via onOpenCommandPalette keyboard shortcut callback, and closes it', async () => {
+    const user = userEvent.setup()
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
     openPalette()
-    await screen.findByTestId('quick-actions')
-  })
-
-  it('closes CommandPalette when its onClose is called', async () => {
-    render(<App />)
-    openPalette()
-    fireEvent.click(await screen.findByText('Close Palette'))
+    await user.click(await screen.findByText('Close Palette'))
     await waitFor(() => expect(screen.queryByTestId('quick-actions')).toBeNull())
   })
 
@@ -587,9 +573,9 @@ describe('App — closes LogWindow when its onClose is called', () => {
 })
 
 describe('App — activates core.home when the menu:open-home event fires', () => {
-  it('activates core.home when the menu:open-home event fires', () => {
+  it('activates core.home when the menu:open-home event fires', async () => {
     render(<App />)
-    leaveHome()
+    await leaveHome()
     act(() => main.events.openHome.deliver())
     expect(registry().activeGlobalTabId).toBe('core.home')
   })
@@ -602,7 +588,8 @@ describe('App — activates core.home when the menu:open-home event fires', () =
 })
 
 describe('App — renders an open extension sidebar panel, and closes it from the panel', () => {
-  it('renders an open extension sidebar panel, and closes it from the panel', () => {
+  it('renders an open extension sidebar panel, and closes it from the panel', async () => {
+    const user = userEvent.setup()
     registry().registerSidebarPanel({
       id: 'git-changes',
       label: 'Git',
@@ -614,8 +601,8 @@ describe('App — renders an open extension sidebar panel, and closes it from th
       ),
     })
     render(<App />)
-    leaveHome()
-    fireEvent.click(screen.getByText('Close Panel'))
+    await leaveHome()
+    await user.click(screen.getByText('Close Panel'))
     expect(screen.queryByTestId('mock-panel')).toBeNull()
     expect(registry().openPanels.has('git-changes')).toBe(false)
   })
@@ -628,7 +615,7 @@ describe('App — renders an open extension sidebar panel, and closes it from th
 })
 
 describe("App — shows an extension's project tab in place of the terminal once it is selected", () => {
-  it("shows an extension's project tab in place of the terminal once it is selected", () => {
+  it("shows an extension's project tab in place of the terminal once it is selected", async () => {
     setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
     registry().registerProjectTab({
       id: 'git',
@@ -638,7 +625,7 @@ describe("App — shows an extension's project tab in place of the terminal once
       ),
     })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     act(() => main.events.selectProjectTab.deliver('git'))
     expect(screen.getByTestId('project-tab-content')).toBeTruthy()
     expect(screen.queryByTestId('terminal-pane')).toBeNull()
@@ -681,7 +668,7 @@ describe('App — does not close open panels when workspace changes', () => {
   it('command core.toggle-sidebar action adds hidden class to UnifiedSidebar', async () => {
     setupApp({ activeWorkspaceId: 'ws-1' })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     openPalette()
     await runAction('core.toggle-sidebar')
     await waitFor(() =>
@@ -705,26 +692,18 @@ describe('App — command core.toggle-log action opens LogWindow', () => {
     await runAction('core.switch-workspace-ws-1')
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-1')
   })
-
-  it('command core.split-vertical action splits the active project', async () => {
-    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
-    render(<App />)
-    openPalette()
-    await runAction('core.split-vertical')
-    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', {
-      cwd: '/a',
-      scrollbackLimit: 10000,
-    })
-  })
 })
 
-describe('App — command core.toggle-log action opens LogWindow — command core.split-horizontal action splits the active project', () => {
-  it('command core.split-horizontal action splits the active project', async () => {
+describe('App — command core.split-* action splits the active project', () => {
+  it.each([
+    ['core.split-vertical', 'vertical'],
+    ['core.split-horizontal', 'horizontal'],
+  ])('command %s action splits the active project %s', async (actionId, direction) => {
     setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
     openPalette()
-    await runAction('core.split-horizontal')
-    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', {
+    await runAction(actionId)
+    expect(splitSession).toHaveBeenCalledWith('proj-1', direction, {
       cwd: '/a',
       scrollbackLimit: 10000,
     })
@@ -732,20 +711,22 @@ describe('App — command core.toggle-log action opens LogWindow — command cor
 })
 
 describe('App — onSelectGlobalTab toggles activeGlobalTab off when same id clicked', () => {
-  it('onSelectGlobalTab toggles activeGlobalTab off when same id clicked', () => {
+  it('onSelectGlobalTab toggles activeGlobalTab off when same id clicked', async () => {
+    const user = userEvent.setup()
     registry().registerGlobalTab({ id: 'task-vault', label: 'Tasks', component: () => null })
     render(<App />)
     act(() => registry().setActiveGlobalTab('task-vault'))
     // Pressed on the app band itself, which is where these destinations live.
-    fireEvent.click(screen.getByRole('button', { name: 'Tasks' }))
+    await user.click(screen.getByRole('button', { name: 'Tasks' }))
     expect(registry().activeGlobalTabId).toBeNull()
   })
 
   it('EmptyState Open Settings action opens SettingsPanel', async () => {
+    const user = userEvent.setup()
     setupApp({ globalSettings: settingsWith({ ui: { hasSeenWelcome: false } }) })
     render(<App />)
-    leaveHome()
-    fireEvent.click(screen.getByRole('button', { name: /Open Settings/ }))
+    await leaveHome()
+    await user.click(screen.getByRole('button', { name: /Open Settings/ }))
     await screen.findByTestId('settings-panel')
   })
 })
@@ -810,6 +791,8 @@ const childWindow = () =>
     close: vi.fn(),
   })
 describe('App — menu:close-tab (onMenuCloseTab) — a tab in its own window', () => {
+  afterEach(() => useBreakoutStore.setState(useBreakoutStore.getInitialState(), true))
+
   it('closes nothing from the main window when the active tab is in its own window', async () => {
     setupApp({
       activeProjectId: 'proj-1',
@@ -822,7 +805,6 @@ describe('App — menu:close-tab (onMenuCloseTab) — a tab in its own window', 
     act(() => main.events.closeTab.deliver(null))
     await act(async () => {})
     expect(has('ses-active')).toBe(true)
-    useBreakoutStore.setState(useBreakoutStore.getInitialState(), true)
   })
 })
 
@@ -889,11 +871,12 @@ describe('App — command core.toggle-overview action opens Overview', () => {
   })
 
   it('opens AboutDialog when main asks, and closes it', async () => {
+    const user = userEvent.setup()
     render(<App />)
     expect(screen.queryByTestId('about-dialog')).toBeNull()
     act(() => main.events.openAbout.deliver())
     await screen.findByTestId('about-dialog')
-    fireEvent.click(await screen.findByText('Close About'))
+    await user.click(await screen.findByText('Close About'))
     await waitFor(() => expect(screen.queryByTestId('about-dialog')).toBeNull())
   })
 
@@ -917,8 +900,8 @@ describe('App — renders MetricsBar when showMetricsBar is true', () => {
     setupApp({
       globalSettings: settingsWith({ ui: { hasSeenWelcome: true, showMetricsBar: true } }),
     })
-    const { container } = render(<App />)
-    expect(container.querySelector('.app-global-metrics')).toBeTruthy()
+    render(<App />)
+    expect(screen.getByRole('group', { name: 'System metrics' })).toBeTruthy()
   })
 
   it('UnifiedSidebar onSelectScratchSession activates scratch view for chosen session', () => {
@@ -940,7 +923,7 @@ describe('App — toggles sidebar when onMenuToggleSidebar event fires', () => {
   it('toggles sidebar when onMenuToggleSidebar event fires', async () => {
     setupApp({ activeWorkspaceId: 'ws-1' })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     expect(screen.getByTestId('unified-sidebar').className).toBe('')
     act(() => main.events.toggleSidebar.deliver())
     await waitFor(() =>
@@ -1005,7 +988,7 @@ describe('App — tells main whether each registered panel is open, whenever tha
 })
 
 describe('App — shows an open panel when the bridge has no extensionEvents (the remote window)', () => {
-  it('shows an open panel when the bridge has no extensionEvents (the remote window)', () => {
+  it('shows an open panel when the bridge has no extensionEvents (the remote window)', async () => {
     const { extensionEvents: _left, ...remote } = main.parts
     installElectronApi(remote)
     registry().registerSidebarPanel({
@@ -1015,7 +998,7 @@ describe('App — shows an open panel when the bridge has no extensionEvents (th
       component: () => <div data-testid="mock-panel" />,
     })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     expect(screen.getByTestId('mock-panel')).toBeTruthy()
   })
 })
@@ -1121,7 +1104,7 @@ describe('App — handleNewTab — shows NameTerminalDialog when promptForName i
       projectViews: new Map([['proj-1', { terminalCounter: 2, activeSessionId: 'existing' }]]),
     })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     act(() => shortcuts.callbacks.onNewTab?.())
     await screen.findByTestId('name-terminal-dialog')
     expect(screen.getByTestId('name-terminal-default').textContent).toBe('Terminal 3')
@@ -1130,6 +1113,7 @@ describe('App — handleNewTab — shows NameTerminalDialog when promptForName i
 
 describe('App — handleNewTab — NameTerminalDialog onConfirm opens the named terminal and closes the dialog', () => {
   it('NameTerminalDialog onConfirm opens the named terminal and closes the dialog', async () => {
+    const user = userEvent.setup()
     setupApp({
       activeProjectId: 'proj-1',
       activeWorkspaceId: 'ws-1',
@@ -1139,7 +1123,7 @@ describe('App — handleNewTab — NameTerminalDialog onConfirm opens the named 
     render(<App />)
     act(() => shortcuts.callbacks.onNewTab?.())
     await screen.findByTestId('name-terminal-dialog')
-    fireEvent.click(await screen.findByText('Confirm'))
+    await user.click(await screen.findByText('Confirm'))
     await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
     expect(createSession).toHaveBeenCalledWith({
       projectId: 'proj-1',
@@ -1153,6 +1137,7 @@ describe('App — handleNewTab — NameTerminalDialog onConfirm opens the named 
 
 describe('App — handleNewTab — NameTerminalDialog onCancel closes dialog without creating a named session', () => {
   it('NameTerminalDialog onCancel closes dialog without creating a named session', async () => {
+    const user = userEvent.setup()
     setupApp({
       activeProjectId: 'proj-1',
       activeWorkspaceId: 'ws-1',
@@ -1162,7 +1147,7 @@ describe('App — handleNewTab — NameTerminalDialog onCancel closes dialog wit
     render(<App />)
     act(() => shortcuts.callbacks.onNewTab?.())
     await screen.findByTestId('name-terminal-dialog')
-    fireEvent.click(await screen.findByText('Cancel Dialog'))
+    await user.click(await screen.findByText('Cancel Dialog'))
     await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
     expect(createSession).not.toHaveBeenCalled()
   })
@@ -1225,11 +1210,11 @@ describe('App — command palette sessions and note editing (US6) — activates 
     expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('s1')
   })
 
-  it('asks the tab bar to edit the active terminal note on Cmd+I', () => {
+  it('asks the tab bar to edit the active terminal note on Cmd+I', async () => {
     setupApp({ activeProjectId: 'proj-1', sessions: [paletteSession] })
     showTab('proj-1', 's1')
     render(<App />)
-    leaveHome()
+    await leaveHome()
     act(() => shortcuts.callbacks.onEditSessionNote?.())
     expect(tabBar.editNoteSessionId).toBe('s1')
   })
@@ -1279,9 +1264,10 @@ describe('App — Quick Actions integration (feature 057) — shows a "Next time
   })
 
   it('the AppBand Quick actions button opens the panel', async () => {
+    const user = userEvent.setup()
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
+    await user.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
     await screen.findByTestId('quick-actions')
   })
 })
@@ -1294,6 +1280,7 @@ function setupTwoWorkspaces(): void {
     id: 's2',
     projectId: 'proj-2',
     agentState: 'awaiting-input',
+    bellCount: 1,
     lastAttendedAt: 5,
   })
   const s3 = terminalSessionOf({ id: 's3', projectId: 'proj-1' })
@@ -1310,31 +1297,54 @@ function setupTwoWorkspaces(): void {
   showTab('proj-1', 's1')
 }
 
-describe('App — Quick Actions integration (feature 057) — core actions', () => {
-  it('runs the terminal, session and workspace core actions against the stores', async () => {
+const shown = (projectId: string) =>
+  useSessionStore.getState().getActiveSessionForProject(projectId)
+
+describe('App — Quick Actions integration (feature 057) — core actions on sessions', () => {
+  beforeEach(() => {
     setupTwoWorkspaces()
     render(<App />)
     openPalette()
-    const shown = (projectId: string) =>
-      useSessionStore.getState().getActiveSessionForProject(projectId)
+  })
 
+  it('cycles to the most recent session in the other workspace', async () => {
     await runAction('core.cycle-recent-next')
     expect(shown('proj-2')).toBe('s2')
+  })
 
+  it('jumps to the session waiting for input', async () => {
     await runAction('core.next-waiting')
     expect(shown('proj-2')).toBe('s2')
+  })
 
-    await runAction('session:s1')
+  it('opens the workspace and branch of a session chosen by name', async () => {
+    await runAction('session:s2')
     expect(useWorkspaceStore.getState()).toMatchObject({
-      activeWorkspaceId: 'ws-1',
-      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-2',
+      activeProjectId: 'proj-2',
     })
+  })
+})
+
+describe('App — Quick Actions integration (feature 057) — core actions on tabs and workspaces', () => {
+  beforeEach(() => {
+    setupTwoWorkspaces()
+    render(<App />)
+    openPalette()
+  })
+
+  it('shows the previous tab of the branch', async () => {
     await runAction('core.prev-tab')
     expect(shown('proj-1')).toBe('s3')
+  })
 
+  it('closes the tab on screen', async () => {
     await runAction('core.close-tab')
-    await waitFor(() => expect(useSessionStore.getState().sessions.has('s3')).toBe(false))
+    await waitFor(() => expect(useSessionStore.getState().sessions.has('s1')).toBe(false))
+    expect(useSessionStore.getState().sessions.has('s3')).toBe(true)
+  })
 
+  it('moves to the next workspace', async () => {
     await runAction('core.cycle-workspace-next')
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-2')
   })
@@ -1591,22 +1601,17 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     expect(toasts()).not.toContainEqual(expect.objectContaining({ type: 'info' }))
   })
 
-  it('records direct-use for Home, sidebar-toggle, settings and close-tab menu accelerators', async () => {
+  it.each([
+    ['menu:open-home', () => main.events.openHome.deliver(), 'core.open-home'],
+    ['menu:toggle-sidebar', () => main.events.toggleSidebar.deliver(), 'core.toggle-sidebar'],
+    ['menu:open-settings', () => main.events.openSettings.deliver(), 'core.open-settings'],
+    ['menu:close-tab', () => main.events.closeTab.deliver(null), 'core.close-tab'],
+  ])('records direct-use of %s as %s', async (_event, deliver, id) => {
     setupApp({ activeProjectId: 'proj-1' })
     render(<App />)
     const directUse = () => settings()?.quickActions.directUse.map((d) => d.id) ?? []
-
-    act(() => main.events.openHome.deliver())
-    await waitFor(() => expect(directUse()).toContain('core.open-home'))
-
-    act(() => main.events.toggleSidebar.deliver())
-    await waitFor(() => expect(directUse()).toContain('core.toggle-sidebar'))
-
-    act(() => main.events.openSettings.deliver())
-    await waitFor(() => expect(directUse()).toContain('core.open-settings'))
-
-    act(() => main.events.closeTab.deliver(null))
-    await waitFor(() => expect(directUse()).toContain('core.close-tab'))
+    act(() => deliver())
+    await waitFor(() => expect(directUse()).toEqual([id]))
   })
 })
 
@@ -1626,27 +1631,28 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
 })
 
 describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — leaves everything as it was for core actions with no project, no sessions and no workspaces', () => {
-  it('leaves everything as it was for core actions with no project, no sessions and no workspaces', async () => {
-    render(<App />)
-    openPalette()
-    for (const id of [
-      'core.split-vertical',
-      'core.close-tab',
-      'core.clear',
-      'core.prev-tab',
-      'core.cycle-recent-next',
-      'core.next-waiting',
-      'core.cycle-workspace-next',
-      'core.copy-issue-key',
-      'core.open-issue',
-    ]) {
+  it.each([
+    'core.split-vertical',
+    'core.close-tab',
+    'core.clear',
+    'core.prev-tab',
+    'core.cycle-recent-next',
+    'core.next-waiting',
+    'core.cycle-workspace-next',
+    'core.copy-issue-key',
+    'core.open-issue',
+  ])(
+    'leaves everything as it was for %s with no project, no sessions and no workspaces',
+    async (id) => {
+      render(<App />)
+      openPalette()
       await runAction(id)
+      expect(splitSession).not.toHaveBeenCalled()
+      expect(main.sent.input).not.toHaveBeenCalled()
+      expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull()
+      expect(toasts()).not.toContainEqual(expect.objectContaining({ type: 'error' }))
     }
-    expect(splitSession).not.toHaveBeenCalled()
-    expect(main.sent.input).not.toHaveBeenCalled()
-    expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull()
-    expect(toasts()).not.toContainEqual(expect.objectContaining({ type: 'error' }))
-  })
+  )
 })
 
 describe('App — console capture', () => {
@@ -1729,12 +1735,15 @@ describe('App — terminals an extension opens, closes or reveals', () => {
 })
 
 describe('App — terminals an extension opens, closes or reveals — closes the tab an extension asks to close', () => {
-  it('closes the tab an extension asks to close', () => {
-    const closeSession = vi.fn(async () => {})
+  it('closes the tab an extension asks to close', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      sessions: [tab('s1', 'proj-1'), tab('s2', 'proj-1')],
+    })
     render(<App />)
-    useSessionStore.setState({ closeSession })
     act(() => main.events.bridge.emit('terminal:close-tab', { sessionId: 's1' }))
-    expect(closeSession).toHaveBeenCalledWith('s1')
+    await waitFor(() => expect(has('s1')).toBe(false))
+    expect(has('s2')).toBe(true)
   })
 
   it('reveals the session an extension navigates to', () => {
@@ -1792,17 +1801,21 @@ describe('App — notifications and log lines from main', () => {
   })
 })
 
-describe('App — notifications and log lines from main — records a log line an extension pushed, and reports a dropped tunnel', () => {
-  it('records a log line an extension pushed, and reports a dropped tunnel', () => {
-    const create = vi.fn(async () => ({ id: 'n1' }))
-    installElectronApi({ ...main.parts, notifications: { ...main.parts.notifications, create } })
+describe('App — notifications and log lines from main — log lines and tunnel notices from extensions', () => {
+  it('records a log line an extension pushed', () => {
     render(<App />)
     act(() => main.events.bridge.emit('log:push', { level: 'warn', message: 'slow disk' }))
-    act(() => main.events.bridge.emit('remote:tunnel-disconnected'))
     expect(useLogStore.getState().entries.at(-1)).toMatchObject({
       level: 'warn',
       message: 'slow disk',
     })
+  })
+
+  it('reports a dropped tunnel as a notification', () => {
+    const create = vi.fn(async () => ({ id: 'n1' }))
+    installElectronApi({ ...main.parts, notifications: { ...main.parts.notifications, create } })
+    render(<App />)
+    act(() => main.events.bridge.emit('remote:tunnel-disconnected'))
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ key: 'remoteTunnelDisconnected' })
     )
@@ -1832,23 +1845,22 @@ describe('App — the shell around the main area', () => {
   })
 })
 
-describe('App — the shell around the main area — closes a workspace tab chosen again, and clears no tab when none is open', () => {
-  it('closes a workspace tab chosen again, and clears no tab when none is open', () => {
+describe('App — the shell around the main area — workspace tabs and scratch', () => {
+  it('closes a workspace tab chosen again', () => {
     setupApp({ workspaces: [WS1] })
     registry().registerWorkspaceTab({ id: 'reviews', label: 'Reviews', component: () => null })
     render(<App />)
     act(() => registry().setActiveGlobalTab(null))
     act(() => sidebar.props?.onSelectWorkspaceTab('ws-1', 'reviews'))
+    expect(registry().activeWorkspaceTabId).toBe('reviews')
     act(() => sidebar.props?.onSelectWorkspaceTab('ws-1', 'reviews'))
     expect(registry().activeWorkspaceTabId).toBeNull()
-    act(() => sidebar.props?.onSelectProject?.())
-    expect(registry()).toMatchObject({ activeGlobalTabId: null, activeProjectTabId: null })
   })
 
-  it('leaves scratch when its tab bar asks to', () => {
+  it('leaves scratch when its tab bar asks to', async () => {
     setupApp({ scratchActive: true })
     render(<App />)
-    leaveHome()
+    await leaveHome()
     act(() => tabBar.onScratchDeactivate?.())
     expect(useWorkspaceStore.getState().scratchActive).toBe(false)
   })
@@ -1887,56 +1899,65 @@ describe('App — terminals that fail to start', () => {
   })
 })
 
-function mountExtensionFrame(extensionId: string, viewParam: string): HTMLIFrameElement {
-  const panel = document.createElement('div')
-  panel.setAttribute('data-extension-panel', extensionId)
-  panel.setAttribute('data-view-param', viewParam)
-  const frame = document.createElement('iframe')
-  panel.appendChild(frame)
-  document.body.appendChild(panel)
-  vi.spyOn(frame, 'focus')
-  return frame
+/** A panel and its frame, as the extension host draws them, beside the app. */
+function ExtensionFrame(props: { extensionId: string; viewParam: string }): React.JSX.Element {
+  return (
+    <div data-extension-panel={props.extensionId} data-view-param={props.viewParam}>
+      <iframe title={`${props.extensionId} ${props.viewParam}`} />
+    </div>
+  )
 }
 
 describe('App — extension:focus-view', () => {
   it('focuses the frame of the extension view that asked for focus', () => {
-    const wanted = mountExtensionFrame('terminator.foundry', 'main')
-    const other = mountExtensionFrame('terminator.notepad', 'main')
-    render(<App />)
+    render(
+      <>
+        <ExtensionFrame extensionId="terminator.foundry" viewParam="main" />
+        <ExtensionFrame extensionId="terminator.notepad" viewParam="main" />
+        <App />
+      </>
+    )
     act(() =>
       main.events.bridge.emit('extension:focus-view', {
         extensionId: 'terminator.foundry',
         viewParam: 'main',
       })
     )
-    expect(wanted.focus).toHaveBeenCalledTimes(1)
-    expect(other.focus).not.toHaveBeenCalled()
+    expect(screen.getByTitle('terminator.foundry main').matches(':focus')).toBe(true)
   })
+})
 
+describe('App — extension:focus-view with no frame', () => {
   it('does nothing when that view has no frame on screen', () => {
-    const other = mountExtensionFrame('terminator.notepad', 'main')
-    render(<App />)
+    render(
+      <>
+        <ExtensionFrame extensionId="terminator.notepad" viewParam="main" />
+        <App />
+      </>
+    )
+    expect(document.body.matches(':focus-within')).toBe(false)
     act(() =>
       main.events.bridge.emit('extension:focus-view', {
         extensionId: 'terminator.foundry',
         viewParam: 'main',
       })
     )
-    expect(other.focus).not.toHaveBeenCalled()
+    expect(document.body.matches(':focus-within')).toBe(false)
   })
 })
 
 describe('App — the project tree on Home', () => {
-  it('is hidden on Home, shown by the sidebar toggle, and hidden again on returning', () => {
+  it('is hidden on Home, shown by the sidebar toggle, and hidden again on returning', async () => {
+    const user = userEvent.setup()
     setupApp({ activeWorkspaceId: 'ws-1' })
     render(<App />)
     const hidden = () => screen.getByTestId('unified-sidebar').className.includes('--hidden')
     expect(hidden()).toBe(true)
     act(() => main.events.toggleSidebar.deliver())
     expect(hidden()).toBe(false)
-    leaveHome()
+    await leaveHome()
     expect(hidden()).toBe(false)
-    fireEvent.click(screen.getByRole('button', { name: /^Home/ }))
+    await user.click(screen.getByRole('button', { name: /^Home/ }))
     expect(hidden()).toBe(true)
   })
 

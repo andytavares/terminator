@@ -133,15 +133,16 @@ const DEPLOY_TF_FILE = changedFileWithPatch(
 )
 
 describe('computeInsights() — complexity of skipped, removed and unparsed code', () => {
-  it('skips files with no patch or no path, and accounts for a removed function', async () => {
-    const files = [
-      { path: 'src/nopatch.ts', additions: 0, deletions: 0 },
-      { additions: 1, deletions: 0, patch: '@@ -0,0 +1,1 @@\n+x' },
-      SHRINK_FILE,
-    ]
-    const insights = await insightsOf(files, baseOpts)
-    // The whole function was removed — its branches subtract from the total delta.
-    expect(insights.complexity.branchDelta).toBeLessThan(0)
+  it('subtracts the branches of a removed function (an if and an &&) from the branch delta', async () => {
+    const insights = await insightsOf([SHRINK_FILE], baseOpts)
+    expect(insights.complexity.branchDelta).toBe(-2)
+  })
+
+  it('measures the same complexity with a file that has no patch beside it', async () => {
+    const noPatch = { path: 'src/nopatch.ts', additions: 0, deletions: 0 }
+    const alone = await insightsOf([SHRINK_FILE], baseOpts)
+    const beside = await insightsOf([noPatch, SHRINK_FILE], baseOpts)
+    expect(beside.complexity).toEqual(alone.complexity)
   })
 
   it('measures nothing for a file with no grammar', async () => {

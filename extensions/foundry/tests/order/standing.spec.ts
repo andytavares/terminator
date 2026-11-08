@@ -179,20 +179,11 @@ const CHECK_FAILED: RunNode['feedback'][number] = {
 }
 
 function standingOrdinaryWorkTests() {
-  it('leaves the ordinary working detail alone when nothing has been sent back', () => {
-    const standing = standingOf(
-      input({ graph: graph([node({ id: 'a', state: 'running' }), node({ id: 'b' })]) })
-    )
-    expect(standing.detail).not.toContain('Reworking')
-  })
-
   // The defect this whole module exists for. A running order's row read
   // "ready to hand off" from a draft-time compile result, which is 0 for every
   // running order for ever, so the badge was a constant wearing a status.
-  it('never calls a running order ready to hand off', () => {
-    const standing = standingOf(input())
-    expect(standing.kind).not.toBe('done')
-    expect(standing.label).not.toContain('hand off')
+  it('never calls a running order ready to hand off: it is working between steps', () => {
+    expect(standingOf(input())).toMatchObject({ kind: 'working', label: 'building 0/2' })
   })
 }
 
@@ -316,11 +307,6 @@ function stoppedForNoReasonTests() {
 }
 
 function betweenStepsAndDraftsTests() {
-  it('leaves a running order between steps when nothing has failed', () => {
-    const standing = standingOf(input({ runFailure: null }))
-    expect(standing.kind).toBe('working')
-  })
-
   // Only a running order's run can have failed; a draft's compile checks are
   // a different thing entirely and this field means nothing there.
   it('ignores runFailure on a draft', () => {
@@ -579,29 +565,29 @@ function answeredShippedGatesTests() {
 function alwaysSaysSomethingTests() {
   // Every kind carries a sentence and a badge. A standing that renders as an
   // empty band is the defect all over again.
-  it('always says something', () => {
-    const cases: StandingInput[] = [
-      input(),
-      input({ gates: [gate()] }),
-      input({ asks: 1 }),
-      input({ stranded: 1 }),
-      input({ orphaned: ['build'] }),
-      input({ stalls: 1 }),
-      input({ graph: graph([node({ id: 'a', state: 'failed' })]) }),
-      input({ runFailure: 'boom' }),
-      input({ status: 'draft', graph: null, openQuestions: 2 }),
-      input({ status: 'draft', graph: null }),
-      input({ status: 'draft', graph: null, intakeRefused: 'acceptance.5: Invalid enum value.' }),
-      input({ status: 'agreed', graph: null }),
-      input({ status: 'shipped' }),
-    ]
-    expect(cases).toHaveLength(13)
-    for (const one of cases) {
-      const standing = standingOf(one)
-      expect(standing.label.trim()).not.toBe('')
-      expect(standing.headline.trim()).not.toBe('')
-      expect(standing.detail.trim()).not.toBe('')
-    }
+  it.each<[string, () => StandingInput]>([
+    ['a plain run', () => input()],
+    ['an open gate', () => input({ gates: [gate()] })],
+    ['an ask', () => input({ asks: 1 })],
+    ['a stranded step', () => input({ stranded: 1 })],
+    ['an orphaned step', () => input({ orphaned: ['build'] })],
+    ['a stall', () => input({ stalls: 1 })],
+    ['a failed step', () => input({ graph: graph([node({ id: 'a', state: 'failed' })]) })],
+    ['a run failure', () => input({ runFailure: 'boom' })],
+    ['a draft with questions', () => input({ status: 'draft', graph: null, openQuestions: 2 })],
+    ['a plain draft', () => input({ status: 'draft', graph: null })],
+    [
+      'a refused intake',
+      () =>
+        input({ status: 'draft', graph: null, intakeRefused: 'acceptance.5: Invalid enum value.' }),
+    ],
+    ['an agreed order', () => input({ status: 'agreed', graph: null })],
+    ['a shipped order', () => input({ status: 'shipped' })],
+  ])('says something for %s', (_case, one) => {
+    const standing = standingOf(one())
+    expect(standing.label.trim()).not.toBe('')
+    expect(standing.headline.trim()).not.toBe('')
+    expect(standing.detail.trim()).not.toBe('')
   })
 }
 
@@ -630,22 +616,19 @@ function standingDoneTests() {
 }
 
 function notRunningTests() {
-  it('is not read for an order that is not running', async () => {
-    const sources = {
-      graphFor: async () => finished,
-      documentReadyFor: async () => 'outputs: a.md',
-    }
-    const running = await readStanding({ id: 'WO-1', status: 'running' } as WorkOrder, sources)
-    expect(running.kind).toBe('done')
-    const draft = await readStanding(
-      partialFake<WorkOrder>({ id: 'WO-1', status: 'draft', openQuestions: [] }),
-      sources
-    )
-    expect(draft.kind).toBe('shaping')
+  const documentSources = {
+    graphFor: async () => finished,
+    documentReadyFor: async () => 'outputs: a.md',
+  }
+
+  it('is read for a running order, which then stands done', async () => {
+    const running = partialFake<WorkOrder>({ id: 'WO-1', status: 'running' })
+    expect((await readStanding(running, documentSources)).kind).toBe('done')
   })
 
-  it('is working as before when no document is ready', () => {
-    expect(standingOf(input({ documentReady: null })).kind).toBe('working')
+  it('is not read for a draft order, which stands shaping', async () => {
+    const draft = partialFake<WorkOrder>({ id: 'WO-1', status: 'draft', openQuestions: [] })
+    expect((await readStanding(draft, documentSources)).kind).toBe('shaping')
   })
 }
 

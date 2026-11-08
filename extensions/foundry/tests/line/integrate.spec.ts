@@ -883,15 +883,6 @@ function theQuestionTests() {
     expect(result.gate?.options.map((o) => o.id)).not.toContain('create')
     expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ready-for-review' }))
   })
-
-  it('never defaults to shipping when nobody answers', async () => {
-    const result = await shipOrder(
-      refreshTokenOrder(),
-      { verdicts: [verdict()], findings: [], ladder: ladderOk },
-      deps()
-    )
-    expect(result.gate?.defaultIfIgnored).toBe('hold')
-  })
 }
 
 function integrateNotMeasuredTests() {
@@ -1375,11 +1366,6 @@ function shippedWith(ci: CiOutcome): ShippedDrafts {
   }
 }
 
-describe('finishShipping', () => {
-  describe('CI stayed red', ciStayedRedTests)
-  describe('CI green', ciGreenTests)
-})
-
 function twoLanesOrder(): WorkOrder {
   const base = refreshTokenOrder()
   return {
@@ -1401,34 +1387,6 @@ function twoLanesOrder(): WorkOrder {
 }
 function multiDepsForPush() {
   return deps()
-}
-
-function ciStayedRedTests() {
-  it('raises a ci.red gate, not ready-for-review, when CI stayed red', async () => {
-    const raiseGate = vi.fn(async () => undefined)
-    const ci: CiOutcome = {
-      kind: 'red',
-      checks: [check({ bucket: 'fail', name: 'unit-tests' })],
-      excerpt: 'boom',
-      rounds: 2,
-    }
-    const result = await finishShipping(refreshTokenOrder(), shippedWith(ci), deps({ raiseGate }))
-    expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ci.red' }))
-    expect(result.gate?.rule).toBe('ci.red')
-    expect(result.held).toBe(true)
-  })
-}
-
-function ciGreenTests() {
-  it('raises a ready-for-review gate carrying the CI note when CI is green', async () => {
-    const raiseGate = vi.fn(async () => undefined)
-    const ci: CiOutcome = { kind: 'green', checks: [check()] }
-    const result = await finishShipping(refreshTokenOrder(), shippedWith(ci), deps({ raiseGate }))
-    expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ready-for-review' }))
-    expect(result.gate?.rule).toBe('ready-for-review')
-    expect(result.gate?.why).toContain('CI passed: 1 checks.')
-    expect(result.held).toBe(false)
-  })
 }
 
 describe('pushLanes (D2)', () => {

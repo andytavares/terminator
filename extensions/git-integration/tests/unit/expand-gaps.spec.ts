@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EXPAND_STEP, gapsFor, reveal, splitLines } from '../../src/review/expand-gaps'
+import { gapsFor, reveal, splitLines } from '../../src/review/expand-gaps'
 import type { DiffHunk } from '../../src/schemas/git.schema'
 
 const hunk = (header: string): DiffHunk => ({ header, lines: [] })
@@ -86,10 +86,6 @@ describe('splitLines', () => {
 const file = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`)
 
 describe('reveal', () => {
-  it('uses a step of 20', () => {
-    expect(EXPAND_STEP).toBe(20)
-  })
-
   it('shows the first and last lines of a gap with old numbers from the offset', () => {
     const gap = { key: 'g', newStart: 11, newEnd: 30, oldOffset: 3 }
     const r = reveal(gap, file, { fromTop: 2, fromBottom: 1 })

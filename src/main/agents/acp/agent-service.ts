@@ -130,6 +130,8 @@ interface Session {
   hasTab: boolean
   /** A resumed session replays its history, which the log already holds. */
   replaying: boolean
+  /** How many updates its history holds: the position the next one takes. */
+  logged: number
   ended: boolean
   configOptions: AgentConfigOption[]
   asks: Map<string, OpenAsk>
@@ -242,6 +244,7 @@ function newSession(
     ...fields,
     hasTab: false,
     replaying: false,
+    logged: 0,
     ended: false,
     configOptions: [],
     asks: new Map(),
@@ -366,7 +369,9 @@ class AcpAgentService implements AgentService {
       logger.error('agent log write failed', { error: String(error) })
     }
     notify(session.updateListeners, update)
-    this.deps.broadcast('agents:update', { sessionId: session.id, update })
+    // A window reads the history and hears pushes down two pipes; the position joins them.
+    const position = session.logged++
+    this.deps.broadcast('agents:update', { sessionId: session.id, update, position })
   }
 
   private settle(session: Session, requestId: string, outcome: RequestPermissionOutcome): boolean {
@@ -456,6 +461,7 @@ class AcpAgentService implements AgentService {
     this.sessions.set(session.id, session)
     const loaded = await agent.loadSession({ ...request, sessionId: input.resume })
     session.replaying = false
+    session.logged = this.deps.log.readHistory(session.id).length
     return toConfigOptions(loaded?.configOptions)
   }
 

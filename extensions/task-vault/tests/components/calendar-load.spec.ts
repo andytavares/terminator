@@ -52,10 +52,6 @@ describe('isOverdue', () => {
 })
 
 describe('weekOf', () => {
-  it('returns seven days', () => {
-    expect(weekOf('2026-09-05')).toHaveLength(7)
-  })
-
   it('starts on the Sunday containing the date', () => {
     // 2026-09-05 is a Saturday, so its week starts 2026-08-30.
     expect(weekOf('2026-09-05')[0]).toBe('2026-08-30')

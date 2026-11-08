@@ -156,13 +156,4 @@ describe('MergeFlowView — calls onExit when listConflicts returns no files', (
     render(<MergeFlowView repoRoot="/repo" onExit={onExit} />)
     await waitFor(() => expect(onExit).toHaveBeenCalledOnce())
   })
-
-  it('calls onExit when user aborts', () => {
-    // onExit passed through to child; test at ConflictHub level
-    const onExit = vi.fn()
-    mockStoreState = { ...mockStoreState, session: null }
-    render(<MergeFlowView repoRoot="/repo" onExit={onExit} />)
-    // Loading state — just verify it renders without crash
-    expect(document.body).toBeTruthy()
-  })
 })

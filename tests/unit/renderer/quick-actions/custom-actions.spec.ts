@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   planCustomAction,
   MAX_TYPED_LINE_BYTES,
+  type CustomRunEnv,
 } from '../../../../src/renderer/quick-actions/custom-actions'
 import type { CustomAction } from '../../../../src/shared/types'
 
@@ -35,35 +36,6 @@ describe('planCustomAction — variable expansion', () => {
       vars: {},
     })
     expect(plan).toEqual({ ok: false, reason: 'No working directory' })
-  })
-})
-
-describe('planCustomAction — prompt actions', () => {
-  it('refuses a prompt targeting the focused terminal when nothing is focused', () => {
-    const plan = planCustomAction(promptAction({ target: 'focused' }), {
-      focused: null,
-      projectId: null,
-      vars: {},
-    })
-    expect(plan).toEqual({ ok: false, reason: 'Focused terminal is not an agent session' })
-  })
-
-  it('refuses a prompt when the focused terminal is not an agent', () => {
-    const plan = planCustomAction(promptAction({ target: 'focused' }), {
-      focused: { sessionId: 's1', isAgent: false, agentState: 'idle' },
-      projectId: null,
-      vars: {},
-    })
-    expect(plan).toEqual({ ok: false, reason: 'Focused terminal is not an agent session' })
-  })
-
-  it('refuses a prompt when the agent is mid-turn', () => {
-    const plan = planCustomAction(promptAction({ target: 'agent' }), {
-      focused: { sessionId: 's1', isAgent: true, agentState: 'working' },
-      projectId: null,
-      vars: {},
-    })
-    expect(plan).toEqual({ ok: false, reason: 'The agent is mid-turn' })
   })
 })
 
@@ -109,46 +81,74 @@ describe('planCustomAction — prompt actions on an agent tab', () => {
       text: 'review main',
     })
   })
-
-  it('refuses while the agent is mid-turn', () => {
-    const plan = planCustomAction(promptAction(), {
-      focused: { ...tab, agentState: 'working' },
-      projectId: null,
-      vars: {},
-    })
-    expect(plan).toEqual({ ok: false, reason: 'The agent is mid-turn' })
-  })
 })
 
-describe('planCustomAction — shell actions', () => {
-  it('refuses a shell action targeting the agent', () => {
-    const plan = planCustomAction(shellAction({ target: 'agent' }), {
-      focused: { sessionId: 's1', isAgent: true, agentState: 'idle' },
-      projectId: null,
-      vars: {},
-    })
-    expect(plan).toEqual({ ok: false, reason: 'Shell actions cannot target an agent session' })
-  })
+const idle = { sessionId: 's1', isAgent: true, agentState: 'idle' } as const
 
-  it('refuses a shell action targeting focused with no session focused', () => {
-    const plan = planCustomAction(shellAction({ target: 'focused' }), {
-      focused: null,
+const REFUSALS: { refused: string; action: CustomAction; env: CustomRunEnv; reason: string }[] = [
+  {
+    refused: 'a prompt for the focused terminal with nothing focused',
+    action: promptAction({ target: 'focused' }),
+    env: { focused: null, projectId: null, vars: {} },
+    reason: 'Focused terminal is not an agent session',
+  },
+  {
+    refused: 'a prompt for a focused terminal that is not an agent',
+    action: promptAction({ target: 'focused' }),
+    env: { focused: { ...idle, isAgent: false }, projectId: null, vars: {} },
+    reason: 'Focused terminal is not an agent session',
+  },
+  {
+    refused: 'a prompt while the agent is mid-turn',
+    action: promptAction({ target: 'agent' }),
+    env: { focused: { ...idle, agentState: 'working' }, projectId: null, vars: {} },
+    reason: 'The agent is mid-turn',
+  },
+  {
+    refused: 'a prompt while the agent tab is mid-turn',
+    action: promptAction(),
+    env: {
+      focused: { sessionId: 'tab1', isAgent: true, isAgentTab: true, agentState: 'working' },
       projectId: null,
       vars: {},
-    })
-    expect(plan).toEqual({ ok: false, reason: 'No terminal focused' })
-  })
+    },
+    reason: 'The agent is mid-turn',
+  },
+  {
+    refused: 'a shell action for the agent',
+    action: shellAction({ target: 'agent' }),
+    env: { focused: idle, projectId: null, vars: {} },
+    reason: 'Shell actions cannot target an agent session',
+  },
+  {
+    refused: 'a shell action for the focused terminal with nothing focused',
+    action: shellAction({ target: 'focused' }),
+    env: { focused: null, projectId: null, vars: {} },
+    reason: 'No terminal focused',
+  },
+  {
+    refused: 'a shell action for a focused agent session',
+    action: shellAction({ target: 'focused' }),
+    env: { focused: idle, projectId: null, vars: {} },
+    reason: 'Focused terminal is running an agent, use a new tab',
+  },
+  {
+    refused: 'a new-tab shell action with no branch focused',
+    action: shellAction({ target: 'new-tab' }),
+    env: { focused: null, projectId: null, vars: {} },
+    reason: 'No branch focused',
+  },
+  {
+    refused: 'a shell body over 1024 bytes after expansion',
+    action: shellAction({ target: 'new-tab', body: 'x'.repeat(1025) }),
+    env: { focused: null, projectId: 'p1', vars: {} },
+    reason: 'Command is longer than 1024 bytes',
+  },
+]
 
-  it('refuses a shell action targeting a focused agent session', () => {
-    const plan = planCustomAction(shellAction({ target: 'focused' }), {
-      focused: { sessionId: 's1', isAgent: true, agentState: 'idle' },
-      projectId: null,
-      vars: {},
-    })
-    expect(plan).toEqual({
-      ok: false,
-      reason: 'Focused terminal is running an agent, use a new tab',
-    })
+describe('planCustomAction — refusals', () => {
+  it.each(REFUSALS)('refuses $refused', ({ action, env, reason }) => {
+    expect(planCustomAction(action, env)).toEqual({ ok: false, reason })
   })
 })
 
@@ -162,15 +162,6 @@ describe('planCustomAction — shell actions — plans an input on the focused n
     expect(plan).toEqual({ ok: true, kind: 'input', sessionId: 's1', data: 'ls\r' })
   })
 
-  it('refuses a new-tab shell action with no branch focused', () => {
-    const plan = planCustomAction(shellAction({ target: 'new-tab' }), {
-      focused: null,
-      projectId: null,
-      vars: {},
-    })
-    expect(plan).toEqual({ ok: false, reason: 'No branch focused' })
-  })
-
   it('plans a new-tab shell action', () => {
     const plan = planCustomAction(shellAction({ target: 'new-tab', body: 'echo {branch}' }), {
       focused: null,
@@ -181,17 +172,7 @@ describe('planCustomAction — shell actions — plans an input on the focused n
   })
 })
 
-describe('planCustomAction — shell actions — refuses a shell body over 1024 bytes after expansion', () => {
-  it('refuses a shell body over 1024 bytes after expansion', () => {
-    const long = 'x'.repeat(MAX_TYPED_LINE_BYTES + 1)
-    const plan = planCustomAction(shellAction({ target: 'new-tab', body: long }), {
-      focused: null,
-      projectId: 'p1',
-      vars: {},
-    })
-    expect(plan).toEqual({ ok: false, reason: 'Command is longer than 1024 bytes' })
-  })
-
+describe('planCustomAction — shell actions — accepts a shell body of exactly 1024 bytes', () => {
   it('accepts a shell body of exactly 1024 bytes', () => {
     const exact = 'x'.repeat(MAX_TYPED_LINE_BYTES)
     const plan = planCustomAction(shellAction({ target: 'new-tab', body: exact }), {

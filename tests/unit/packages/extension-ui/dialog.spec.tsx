@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Dialog } from '../../../../packages/extension-ui/src/Dialog'
 import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDialog'
 import { isSurfaceOpen } from '../../../../src/shared/double-escape'
@@ -29,9 +30,9 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof Dialog>> = 
 }
 
 describe('Dialog — announces itself', () => {
-  it('exposes a dialog role', () => {
+  it('exposes one dialog role', () => {
     renderDialog()
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
   })
 
   // A native dialog opened as a modal is announced as one; the attribute is not needed.
@@ -43,14 +44,17 @@ describe('Dialog — announces itself', () => {
 
   it('takes its accessible name from the title', () => {
     renderDialog({ title: 'Remove branch?' })
-    expect(screen.getByRole('dialog', { name: 'Remove branch?' })).toBeTruthy()
+    expect(screen.getByRole('dialog').getAttribute('aria-labelledby')).toBe(
+      screen.getByRole('heading', { name: 'Remove branch?' }).id
+    )
   })
 })
 
 describe('Dialog — dismissal', () => {
-  it('closes on Escape', () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderDialog()
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
@@ -60,15 +64,20 @@ describe('Dialog — dismissal', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
-  it('does not close on a press inside the panel', () => {
+  it('does not close on a press inside the panel', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderDialog()
-    fireEvent.mouseDown(screen.getByRole('heading', { name: 'Remove branch?' }))
+    await user.pointer({
+      keys: '[MouseLeft>]',
+      target: screen.getByRole('heading', { name: 'Remove branch?' }),
+    })
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
-  it('offers a close control that dismisses', () => {
+  it('offers a close control that dismisses', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderDialog()
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: 'Close' }))
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 })
@@ -77,9 +86,10 @@ describe('Dialog — dismissal', () => {
 // the two implicit routes only — the explicit close control still works, or
 // the dialog would be a trap.
 describe('Dialog — dismissal — when dismissible is false', () => {
-  it('ignores Escape', () => {
+  it('ignores Escape', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderDialog({ dismissible: false })
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
@@ -89,9 +99,10 @@ describe('Dialog — dismissal — when dismissible is false', () => {
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
-  it('still offers the explicit close control', () => {
+  it('still offers the explicit close control', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderDialog({ dismissible: false })
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: 'Close' }))
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 })
@@ -118,7 +129,7 @@ describe('Dialog — focus', () => {
         </>
       ),
     })
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Name' }))
+    expect(screen.getByRole('textbox', { name: 'Name' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -150,44 +161,49 @@ describe('Dialog — actions', () => {
         { label: 'Save brief', tone: 'primary', onSelect: noop },
       ],
     })
-    expect(screen.getByRole('button', { name: /Cancel/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Save brief/ })).toBeTruthy()
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Cancel',
+      'Save brief',
+      '',
+    ])
   })
 
-  it('invokes the action that was chosen', () => {
+  it('invokes the action that was chosen', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     renderDialog({ actions: [{ label: 'Remove', onSelect }] })
-    fireEvent.click(screen.getByRole('button', { name: /Remove/ }))
+    await user.click(screen.getByRole('button', { name: /Remove/ }))
     expect(onSelect).toHaveBeenCalledTimes(1)
   })
 
   it('shows a shortcut hint when one is given', () => {
     renderDialog({ actions: [{ label: 'Save', onSelect: noop, shortcut: '⌘↵' }] })
-    expect(screen.getByText('⌘↵')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Save/ }).textContent).toBe('Save⌘↵')
   })
 })
 
 describe('Dialog — renders the body it was given', () => {
   it('renders the body it was given', () => {
     renderDialog({ children: <p>This cannot be undone.</p> })
-    expect(screen.getByText('This cannot be undone.')).toBeTruthy()
+    expect(screen.getByRole('dialog').textContent).toContain('This cannot be undone.')
   })
 
   // The scrim dims what is behind; it must never remove it. Hiding the content
   // is what a core-hosted dialog would have had to do, and is why dialogs render
   // in the calling view instead (ADR 038).
   it('keeps the content behind it in the document', () => {
-    render(<p data-testid="behind">the board</p>)
+    render(<p>the board</p>)
     renderDialog()
-    expect(screen.getByTestId('behind')).toBeTruthy()
+    expect(document.body.contains(screen.getByText('the board'))).toBe(true)
   })
 })
 
 describe('ConfirmDialog', () => {
-  it('confirms', () => {
+  it('confirms', async () => {
+    const user = userEvent.setup()
     const onConfirm = vi.fn()
     render(<ConfirmDialog title="Remove branch?" onConfirm={onConfirm} onClose={noop} />)
-    fireEvent.click(screen.getByRole('button', { name: /Confirm/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm/ }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
@@ -195,20 +211,22 @@ describe('ConfirmDialog', () => {
     render(
       <ConfirmDialog title="Remove branch?" confirmLabel="Remove" onConfirm={noop} onClose={noop} />
     )
-    expect(screen.getByRole('button', { name: /Remove/ })).toBeTruthy()
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toContain('Remove')
   })
 
-  it('cancels', () => {
+  it('cancels', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<ConfirmDialog title="Remove branch?" onConfirm={noop} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('button', { name: /Cancel/ }))
+    await user.click(screen.getByRole('button', { name: /Cancel/ }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('closes on Escape, like every other surface', () => {
+  it('closes on Escape, like every other surface', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<ConfirmDialog title="Remove branch?" onConfirm={noop} onClose={onClose} />)
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -223,7 +241,7 @@ describe('ConfirmDialog — shows the description when given one', () => {
         onClose={noop}
       />
     )
-    expect(screen.getByText('Its worktree stays on disk.')).toBeTruthy()
+    expect(screen.getByRole('dialog').textContent).toContain('Its worktree stays on disk.')
   })
 
   // Focus opens on the first control, so the safe choice comes first.
@@ -249,12 +267,15 @@ function DialogInADialog({ onOuter, onInner }: { onOuter: () => void; onInner: (
 }
 
 describe('nested surfaces', () => {
-  it('dismisses only the dialog opened from inside another on Escape', () => {
+  it('dismisses only the dialog opened from inside another on Escape', async () => {
+    const user = userEvent.setup()
     const onOuter = vi.fn()
     const onInner = vi.fn()
     render(<DialogInADialog onOuter={onOuter} onInner={onInner} />)
-    fireEvent.click(screen.getByRole('button', { name: /Open inner/ }))
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Ok' }), { key: 'Escape' })
+    await user.click(screen.getByRole('button', { name: /Open inner/ }))
+    await user.click(screen.getByRole('button', { name: 'Ok' }))
+    expect(screen.getByRole('button', { name: 'Ok' }).matches(':focus')).toBe(true)
+    await user.keyboard('{Escape}')
     expect(onInner).toHaveBeenCalledTimes(1)
     expect(onOuter).not.toHaveBeenCalled()
   })
@@ -275,19 +296,6 @@ describe('a disabled action', () => {
     expect((screen.getByRole('button', { name: /Create PR/ }) as HTMLButtonElement).disabled).toBe(
       true
     )
-  })
-
-  it('does not fire when clicked', () => {
-    const onSelect = vi.fn()
-    render(
-      <Dialog
-        title="Open Pull Request"
-        actions={[{ label: 'Create PR', disabled: true, onSelect }]}
-        onDismiss={() => {}}
-      />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /Create PR/ }))
-    expect(onSelect).not.toHaveBeenCalled()
   })
 })
 
@@ -325,29 +333,33 @@ function renderForm(onSelect: () => void, disabled = false) {
 }
 
 describe('a submitting action', () => {
-  it('runs once when Enter is pressed in a field', () => {
+  it('runs once when Enter is pressed in a field', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     renderForm(onSelect)
-    fireEvent.submit(screen.getByRole('textbox', { name: 'Name' }))
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), '{Enter}')
     expect(onSelect).toHaveBeenCalledTimes(1)
   })
 
-  it('runs once when clicked', () => {
+  it('runs once when clicked', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     renderForm(onSelect)
-    fireEvent.click(screen.getByRole('button', { name: /Open/ }))
+    await user.click(screen.getByRole('button', { name: /Open/ }))
     expect(onSelect).toHaveBeenCalledTimes(1)
   })
 
-  it('does not run on Enter while disabled', () => {
+  it('does not run on Enter while disabled', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     renderForm(onSelect, true)
-    fireEvent.submit(screen.getByRole('textbox', { name: 'Name' }))
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), '{Enter}')
     expect(onSelect).not.toHaveBeenCalled()
   })
 
   it('puts the dialog content in a form', () => {
     renderForm(() => {})
-    expect(screen.getByRole('dialog').querySelector('form')).toBeTruthy()
+    const nameField = screen.getByRole('textbox', { name: 'Name' }) as HTMLInputElement
+    expect(screen.getByRole('dialog').contains(nameField.form)).toBe(true)
   })
 })

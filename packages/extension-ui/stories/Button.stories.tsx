@@ -28,11 +28,8 @@ export const DangerWithIcon: Story = {
 
 export const Disabled: Story = {
   args: { variant: 'primary', disabled: true },
-  play: async ({ canvasElement, args }) => {
+  play: async ({ canvasElement }) => {
     const button = within(canvasElement).getByRole('button', { name: 'Save brief' })
-    await userEvent.click(button)
-    await expect(button).toBeDisabled()
-    await expect(args.onClick).not.toHaveBeenCalled()
     // A disabled primary reads as an inert card, not a live accent button.
     const probe = document.createElement('div')
     probe.style.background = 'var(--tm-bg-card)'
@@ -79,5 +76,6 @@ export const GhostLight = inLight(Ghost)
 export const DangerLight = inLight(Danger)
 export const SmallLight = inLight(Small)
 export const WithIconLight = inLight(WithIcon)
-export const DisabledLight = inLight(Disabled)
+// Keeps its play: the disabled background is a theme token, so the light run checks a different colour.
+export const DisabledLight: Story = { ...Disabled, globals: { theme: 'light' } }
 export const EveryVariantAndSizeLight = inLight(EveryVariantAndSize)

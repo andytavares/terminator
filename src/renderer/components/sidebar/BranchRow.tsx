@@ -130,7 +130,7 @@ function BranchRowContent(props: BranchRowProps & { rename: Rename }): React.JSX
       </span>
 
       <span className="branch-row__kind">
-        {!row.isWorktree && <GitBranch aria-hidden="true" data-kind="branch" />}
+        {!row.isWorktree && <GitBranch role="img" aria-label="Plain checkout" data-kind="branch" />}
       </span>
 
       {rename.renaming ? (
@@ -218,6 +218,7 @@ function RenameInput({ rename }: { rename: Rename }): React.JSX.Element {
   return (
     <input
       className="tmui-inline-edit branch-row__rename"
+      aria-label="Branch name"
       value={rename.draft}
       autoFocus
       onChange={(e) => rename.setDraft(e.target.value)}

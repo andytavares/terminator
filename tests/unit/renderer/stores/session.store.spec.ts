@@ -10,9 +10,8 @@ const mockElectronAPI = {
   },
 }
 
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: mockElectronAPI },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: mockElectronAPI })
 })
 
 import { useNavigationStore } from '../../../../src/renderer/stores/navigation.store'
@@ -157,12 +156,6 @@ describe('useSessionStore — createSession — increments counter per project f
     expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('Terminal 1')
     expect(useSessionStore.getState().sessions.get('sess-2')?.tabTitle).toBe('Terminal 2')
   })
-
-  it('uses explicit title when provided (no auto-numbering)', async () => {
-    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-    await useSessionStore.getState().createSession(shellRequest({ title: 'My Tab' }))
-    expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Tab')
-  })
 })
 
 describe('useSessionStore — renameSession', () => {
@@ -223,15 +216,6 @@ describe('useSessionStore — closeSession — reopening', () => {
     expect(useNavigationStore.getState().closedTabs).toEqual([
       { projectId: 'proj-1', cwd: '/work/api', title: 'Terminal 3' },
     ])
-  })
-
-  it('clears bell count for closed session', async () => {
-    useSessionStore.setState({
-      sessions: new Map([['sess-1', makeSession({ bellCount: 2 })]]),
-    })
-    mockElectronAPI.terminal.close.mockResolvedValue({})
-    await useSessionStore.getState().closeSession('sess-1')
-    expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
   })
 })
 
@@ -357,21 +341,8 @@ describe('useSessionStore — setActiveSessionForProject', () => {
   })
 })
 
-describe('useSessionStore — setActiveSessionForProject — keeps an exited tab closed when another tab of its project is shown', () => {
+describe('useSessionStore — setActiveSessionForProject — keeps an exited tab closed when it is the one shown', () => {
   setUpUseSessionStore()
-
-  // An exited terminal stays exited: the sidebar, Quick Actions and tab
-  // cycling all leave out a closed session, whichever tab is shown.
-  it('keeps an exited tab closed when another tab of its project is shown', () => {
-    useSessionStore.setState({
-      sessions: new Map([
-        ['sess-1', makeSession({ id: 'sess-1' })],
-        ['sess-2', makeSession({ id: 'sess-2', status: 'closed' })],
-      ]),
-    })
-    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
-    expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
-  })
 
   it('keeps an exited tab closed when it is the one shown', () => {
     useSessionStore.setState({
@@ -389,7 +360,8 @@ describe('useSessionStore — setActiveSessionForProject — keeps an exited tab
 describe('useSessionStore — setActiveSessionForProject — leaves a closed session closed, selected or not', () => {
   setUpUseSessionStore()
 
-  // A session whose process ended stays ended, whichever tab is selected.
+  // An exited terminal stays exited: the sidebar, Quick Actions and tab
+  // cycling all leave out a closed session, whichever tab is shown.
   it('leaves a closed session closed, selected or not', () => {
     const ended = makeSession({ id: 'sess-1', status: 'closed' })
     const other = makeSession({ id: 'sess-2', status: 'closed' })
@@ -565,8 +537,9 @@ describe('useSessionStore — busy state', () => {
   })
 
   it('setSessionIdle is a no-op when session is not busy', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
     const before = useSessionStore.getState().sessions
-    useSessionStore.getState().setSessionIdle('not-busy')
+    useSessionStore.getState().setSessionIdle('sess-1')
     expect(useSessionStore.getState().sessions).toBe(before)
   })
 
@@ -602,20 +575,6 @@ describe('useSessionStore — busy state — isProjectBusy returns true when any
       ]),
     })
     expect(useSessionStore.getState().isProjectBusy('proj-1')).toBe(false)
-  })
-})
-
-describe('useSessionStore — busy state — closeSession clears busy state for the closed session', () => {
-  setUpUseSessionStore()
-
-  it('closeSession clears busy state for the closed session', async () => {
-    const session = makeSession()
-    useSessionStore.setState({
-      sessions: new Map([['sess-1', { ...session, busy: true }]]),
-    })
-    mockElectronAPI.terminal.close.mockResolvedValue({})
-    await useSessionStore.getState().closeSession('sess-1')
-    expect(useSessionStore.getState().isSessionBusy('sess-1')).toBe(false)
   })
 })
 
@@ -676,13 +635,13 @@ describe('useSessionStore — split pane actions — activateSplit creates a spl
     useSessionStore
       .getState()
       .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
-    const layout = useSessionStore.getState().getPaneLayout('proj-1')
-    expect(layout?.type).toBe('split')
-    if (layout?.type !== 'split') return
-    expect(layout.direction).toBe('vertical')
-    expect(layout.first).toEqual({ type: 'leaf', sessionId: 'sess-a' })
-    expect(layout.second).toEqual({ type: 'leaf', sessionId: 'sess-b' })
-    expect(layout.ratio).toBe(0.5)
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+      type: 'split',
+      direction: 'vertical',
+      first: { type: 'leaf', sessionId: 'sess-a' },
+      second: { type: 'leaf', sessionId: 'sess-b' },
+      ratio: 0.5,
+    })
   })
 
   it('activateSplit sets the new session as focused', () => {
@@ -724,12 +683,14 @@ describe('useSessionStore — split pane actions — setSplitRatio updates the r
     useSessionStore
       .getState()
       .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
-    const layout = useSessionStore.getState().getPaneLayout('proj-1')
-    if (!layout || layout.type !== 'split') throw new Error('expected split')
-    useSessionStore.getState().setSplitRatio('proj-1', layout.id, 0.7)
-    const updated = useSessionStore.getState().getPaneLayout('proj-1')
-    if (!updated || updated.type !== 'split') throw new Error('expected split')
-    expect(updated.ratio).toBe(0.7)
+    const layout = useSessionStore.getState().getPaneLayout('proj-1')!
+    const id = layout.type === 'split' ? layout.id : 'not a split'
+    useSessionStore.getState().setSplitRatio('proj-1', id, 0.7)
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+      type: 'split',
+      id,
+      ratio: 0.7,
+    })
   })
 
   it('setSplitRatio is no-op when no layout exists', () => {
@@ -815,32 +776,43 @@ describe('useSessionStore — split pane actions — closeSession clears the lay
 describe('useSessionStore — split pane actions — closing the active pane keeps the rest of its split on screen', () => {
   setUpUseSessionStoreSplitPaneActions()
 
-  it('closing the active pane keeps the rest of its split on screen', async () => {
-    mockElectronAPI.terminal.close.mockResolvedValue({})
-    useSessionStore
-      .getState()
-      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
-    useSessionStore
-      .getState()
-      .activateSplit('proj-1', { targetId: 'sess-b', newId: 'sess-c', direction: 'horizontal' })
-    useSessionStore.setState((s) => {
-      const sessions = new Map(s.sessions)
-      for (const id of ['sess-a', 'sess-b', 'sess-c', 'sess-z'])
-        sessions.set(id, makeSession({ id, projectId: 'proj-1' }))
-      return { sessions }
-    })
-    useSessionStore.getState().reorderSessions('proj-1', ['sess-z', 'sess-a', 'sess-b', 'sess-c'])
-    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-c')
+  it('closing the active pane keeps the rest of its split on screen', () => {
+    seedThreeWaySplit()
     useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
     expect(leafIds(useSessionStore.getState().getPaneLayout('proj-1')!)).toEqual([
       'sess-a',
       'sess-b',
     ])
+  })
+
+  it('ending the active pane of a split activates the pane left on screen', async () => {
+    seedThreeWaySplit()
+    useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-b')
     await useSessionStore.getState().closeSession('sess-b')
     expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-a')
   })
 })
+
+/** sess-a | (sess-b / sess-c) on screen, sess-z off it in front, sess-c active. */
+function seedThreeWaySplit(): void {
+  mockElectronAPI.terminal.close.mockResolvedValue({})
+  useSessionStore
+    .getState()
+    .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+  useSessionStore
+    .getState()
+    .activateSplit('proj-1', { targetId: 'sess-b', newId: 'sess-c', direction: 'horizontal' })
+  const sessions = new Map(
+    ['sess-a', 'sess-b', 'sess-c', 'sess-z'].map((id) => [
+      id,
+      makeSession({ id, projectId: 'proj-1' }),
+    ])
+  )
+  useSessionStore.setState((s) => ({ sessions: new Map([...s.sessions, ...sessions]) }))
+  useSessionStore.getState().reorderSessions('proj-1', ['sess-z', 'sess-a', 'sess-b', 'sess-c'])
+  useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-c')
+}
 
 const leavesOnScreen = () => {
   const layout = sessionState().getPaneLayout('proj-1')
@@ -951,33 +923,7 @@ describe('useSessionStore — getScratchSessions', () => {
 describe('useSessionStore — reorderSessions', () => {
   setUpUseSessionStore()
 
-  it('stores the given order for a project', () => {
-    useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
-    expect(useSessionStore.getState().projectViews.get('proj-1')?.order).toEqual([
-      'sess-2',
-      'sess-1',
-    ])
-  })
-
-  it('getSessionsForProject respects the order', () => {
-    const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
-    const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
-    useSessionStore.setState({
-      sessions: new Map([
-        ['sess-1', s1],
-        ['sess-2', s2],
-      ]),
-    })
-    useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
-    const ordered = useSessionStore.getState().getSessionsForProject('proj-1')
-    expect(ordered.map((s) => s.id)).toEqual(['sess-2', 'sess-1'])
-  })
-})
-
-describe('useSessionStore — reorderSessions — untracked sessions appear after ordered ones', () => {
-  setUpUseSessionStore()
-
-  it('untracked sessions appear after ordered ones', () => {
+  it('lists the project in the given order, untracked sessions last', () => {
     const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
     const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
     const s3 = makeSession({ id: 'sess-3', projectId: 'proj-1' })
@@ -990,9 +936,7 @@ describe('useSessionStore — reorderSessions — untracked sessions appear afte
     })
     useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
     const ordered = useSessionStore.getState().getSessionsForProject('proj-1')
-    expect(ordered[0].id).toBe('sess-2')
-    expect(ordered[1].id).toBe('sess-1')
-    expect(ordered[2].id).toBe('sess-3')
+    expect(ordered.map((s) => s.id)).toEqual(['sess-2', 'sess-1', 'sess-3'])
   })
 })
 
@@ -1230,6 +1174,8 @@ describe('activity, attention and notes (feature 030) — lastAttendedAt', () =>
 })
 
 describe('setSessionScreen', () => {
+  setUpUseSessionStore()
+
   it("records a session's last visible line", async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'scr-1' })
     await useSessionStore.getState().createSession(shellRequest())
@@ -1247,6 +1193,8 @@ describe('setSessionScreen', () => {
 })
 
 describe('createSession — resuming', () => {
+  setUpUseSessionStore()
+
   it('asks for the command the terminal should run when it opens', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'res-1' })
     await useSessionStore

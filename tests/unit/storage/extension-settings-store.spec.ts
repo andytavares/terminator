@@ -44,6 +44,20 @@ describe('extension-settings-store', () => {
   })
 })
 
+describe('extension-settings-store — a restart', () => {
+  it('reads after a restart every value written before it', async () => {
+    const before = await import('../../../src/main/storage/extension-settings-store')
+    before.setExtensionSetting('com.restart.limit', 13)
+    before.setExtensionSetting('com.restart.paths', ['src/auth/**'])
+
+    vi.resetModules()
+    const after = await import('../../../src/main/storage/extension-settings-store')
+
+    expect(after.getExtensionSetting('com.restart.limit')).toBe(13)
+    expect(after.getExtensionSetting('com.restart.paths')).toEqual(['src/auth/**'])
+  })
+})
+
 describe('extension-settings-store — listing and overwriting', () => {
   it('getAllExtensionSettings returns all stored key-value pairs', async () => {
     const { setExtensionSetting, getAllExtensionSettings } =

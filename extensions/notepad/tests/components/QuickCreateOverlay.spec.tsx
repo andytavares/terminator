@@ -1,20 +1,19 @@
 import React from 'react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, fireEvent, screen, cleanup, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 
-const mockInvoke = vi.fn().mockResolvedValue({
-  data: { id: 'n1', title: 'Test', createdAt: '2026-01-01T00:00:00Z' },
-})
+const CREATED = { data: { id: 'n1', title: 'Test', createdAt: '2026-01-01T00:00:00Z' } }
+const mockInvoke = vi.fn()
 const mockRecord = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: {
+beforeEach(() => {
+  mockInvoke.mockResolvedValue(CREATED)
+  vi.stubGlobal('electronAPI', {
     extensionBridge: { invoke: mockInvoke },
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
     usage: { record: mockRecord },
-  },
-  writable: true,
-  configurable: true,
+  })
 })
 
 import { QuickCreateOverlay } from '../../src/components/QuickCreateOverlay'
@@ -22,37 +21,32 @@ import { useNotesStore } from '../../src/stores/notes.store'
 
 afterEach(() => {
   cleanup()
-  mockInvoke.mockClear()
-  mockRecord.mockClear()
   useNotesStore.setState({ showQuickCreate: false })
 })
 
 describe('QuickCreateOverlay', () => {
   it('renders title input and editor container', () => {
     useNotesStore.setState({ showQuickCreate: true })
-    const { container } = render(<QuickCreateOverlay />)
+    render(<QuickCreateOverlay />)
     expect(screen.getByPlaceholderText(/title/i)).toBeTruthy()
     // Body is now a CodeMirror editor (NoteEditor), not a textarea
-    expect(container.querySelector('.notepad-quick-create__body')).toBeTruthy()
+    expect(screen.getByTestId('editor')).toBeTruthy()
   })
 
-  it('Esc key closes the overlay via store', () => {
+  it('Esc key closes the overlay via store', async () => {
+    const user = userEvent.setup()
     useNotesStore.setState({ showQuickCreate: true })
     render(<QuickCreateOverlay />)
-    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByPlaceholderText('Title').matches(':focus')).toBe(true)
+    await user.keyboard('{Escape}')
     expect(useNotesStore.getState().showQuickCreate).toBe(false)
   })
 
-  it('renders a Save button', () => {
+  it('Cancel button closes the overlay via store', async () => {
+    const user = userEvent.setup()
     useNotesStore.setState({ showQuickCreate: true })
     render(<QuickCreateOverlay />)
-    expect(screen.getByRole('button', { name: /save/i })).toBeTruthy()
-  })
-
-  it('Cancel button closes the overlay via store', () => {
-    useNotesStore.setState({ showQuickCreate: true })
-    render(<QuickCreateOverlay />)
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
     expect(useNotesStore.getState().showQuickCreate).toBe(false)
   })
 })
@@ -63,7 +57,7 @@ describe('QuickCreateOverlay focus', () => {
   it('puts focus in the title as it opens', () => {
     useNotesStore.setState({ showQuickCreate: true })
     render(<QuickCreateOverlay />)
-    expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
+    expect(screen.getByPlaceholderText('Title').matches(':focus')).toBe(true)
   })
 
   // A late focus() would take the keyboard back from whatever the user went to since,
@@ -76,7 +70,7 @@ describe('QuickCreateOverlay focus', () => {
     document.body.appendChild(elsewhere)
     elsewhere.focus()
     vi.advanceTimersByTime(1000)
-    expect(document.activeElement).toBe(elsewhere)
+    expect(elsewhere.matches(':focus')).toBe(true)
     elsewhere.remove()
   })
 })
@@ -89,23 +83,23 @@ describe('QuickCreateOverlay kind', () => {
     expect(screen.getByRole('radio', { name: 'Note' }).getAttribute('aria-checked')).toBe('true')
   })
 
-  it('moves to the next kind with the arrow keys, and drops the note body for it', () => {
+  it('moves to the next kind with the arrow keys, and drops the note body for it', async () => {
+    const user = userEvent.setup()
     useNotesStore.setState({ showQuickCreate: true })
-    const { container } = render(<QuickCreateOverlay />)
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Note' }), { key: 'ArrowRight' })
+    render(<QuickCreateOverlay />)
+    const note = screen.getByRole('radio', { name: 'Note' })
+    await user.click(note)
+    expect(note.matches(':focus')).toBe(true)
+    await user.keyboard('{ArrowRight}')
     expect(screen.getByRole('radio', { name: 'Diagram' }).getAttribute('aria-checked')).toBe('true')
-    expect(container.querySelector('.notepad-quick-create__body')).toBeNull()
+    expect(screen.queryByTestId('editor')).toBeNull()
   })
 })
 
-function openWithKind(kind: 'Note' | 'Diagram' | 'Folder') {
+async function openWithKind(user: UserEvent, kind: 'Note' | 'Diagram' | 'Folder') {
   useNotesStore.setState({ showQuickCreate: true })
   render(<QuickCreateOverlay />)
-  fireEvent.click(screen.getByRole('radio', { name: kind }))
-}
-
-function typeTitle(title: string) {
-  fireEvent.change(screen.getByPlaceholderText(/title/i), { target: { value: title } })
+  await user.click(screen.getByRole('radio', { name: kind }))
 }
 
 function invokedWith(channel: string) {
@@ -114,10 +108,11 @@ function invokedWith(channel: string) {
 
 describe('QuickCreateOverlay saving a note', () => {
   it('creates the note with the typed title and a tag still in the input, then closes', async () => {
-    openWithKind('Note')
-    typeTitle('Plan')
-    fireEvent.change(screen.getByPlaceholderText('# add tag…'), { target: { value: 'Big Idea' } })
-    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    const user = userEvent.setup()
+    await openWithKind(user, 'Note')
+    await user.type(screen.getByPlaceholderText(/title/i), 'Plan')
+    await user.type(screen.getByPlaceholderText('# add tag…'), 'Big Idea')
+    await user.click(screen.getByRole('button', { name: /save/i }))
     await waitFor(() => expect(useNotesStore.getState().showQuickCreate).toBe(false))
     expect(invokedWith('terminator.notepad:notes.create')).toEqual([
       { title: 'Plan', body: '', tags: ['big-idea'] },
@@ -129,9 +124,9 @@ describe('QuickCreateOverlay saving a note', () => {
   it('stays open and can save again when creating fails', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockInvoke.mockRejectedValueOnce(new Error('disk full'))
-    openWithKind('Note')
-    typeTitle('Plan')
-    fireEvent.keyDown(screen.getByPlaceholderText(/title/i), { key: 'Enter' })
+    const user = userEvent.setup()
+    await openWithKind(user, 'Note')
+    await user.type(screen.getByPlaceholderText(/title/i), 'Plan{Enter}')
     await waitFor(() => expect(error).toHaveBeenCalled())
     expect(useNotesStore.getState().showQuickCreate).toBe(true)
     const save = screen.getByRole('button', { name: /save/i }) as HTMLButtonElement
@@ -140,25 +135,42 @@ describe('QuickCreateOverlay saving a note', () => {
   })
 })
 
+describe('QuickCreateOverlay default tags', () => {
+  it('starts with the default tags from Settings, before anything is typed', async () => {
+    window.electronAPI.extension.getSettingsValues = vi
+      .fn()
+      .mockResolvedValue({ values: { 'terminator.notepad.defaultTags': 'e2e-tag, Deep Work' } })
+    useNotesStore.setState({ showQuickCreate: true })
+    render(<QuickCreateOverlay />)
+    expect(await screen.findByRole('button', { name: 'Remove tag e2e-tag' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Remove tag deep work' })).toBeTruthy()
+  })
+})
+
 describe('QuickCreateOverlay usage', () => {
-  it('counts a tag added with Enter, not an empty one', () => {
-    openWithKind('Note')
-    const tagInput = screen.getByPlaceholderText('# add tag…')
-    fireEvent.keyDown(tagInput, { key: 'Enter' })
+  it('does not count Enter in an empty tag input', async () => {
+    const user = userEvent.setup()
+    await openWithKind(user, 'Note')
+    await user.type(screen.getByPlaceholderText('# add tag…'), '{Enter}')
     expect(mockRecord).not.toHaveBeenCalled()
-    fireEvent.change(tagInput, { target: { value: 'idea' } })
-    fireEvent.keyDown(tagInput, { key: 'Enter' })
+  })
+
+  it('counts a tag added with Enter', async () => {
+    const user = userEvent.setup()
+    await openWithKind(user, 'Note')
+    await user.type(screen.getByPlaceholderText('# add tag…'), 'idea{Enter}')
     expect(mockRecord).toHaveBeenCalledWith('tag')
   })
 })
 
-describe('QuickCreateOverlay saving a diagram or folder', () => {
+describe('QuickCreateOverlay saving a diagram', () => {
   it('creates an untitled diagram, refreshes the list and selects it', async () => {
+    const user = userEvent.setup()
     mockInvoke.mockImplementation(async (channel: string) =>
       channel === 'terminator.notepad:diagrams.list' ? { data: [] } : { data: { id: 'd1' } }
     )
-    openWithKind('Diagram')
-    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    await openWithKind(user, 'Diagram')
+    await user.click(screen.getByRole('button', { name: /save/i }))
     await waitFor(() => expect(useNotesStore.getState().showQuickCreate).toBe(false))
     expect(invokedWith('terminator.notepad:diagrams.create')).toEqual([
       { title: 'Untitled diagram', tags: [] },
@@ -166,16 +178,25 @@ describe('QuickCreateOverlay saving a diagram or folder', () => {
     expect(useNotesStore.getState().selectedDiagramId).toBe('d1')
     expect(mockRecord).toHaveBeenCalledWith('diagram-create')
   })
+})
 
-  it('creates a named folder, and does nothing for a folder without a name', async () => {
+describe('QuickCreateOverlay saving a folder', () => {
+  it('creates a named folder with its name trimmed, then closes', async () => {
+    const user = userEvent.setup()
     mockInvoke.mockResolvedValue({ data: [] })
-    openWithKind('Folder')
-    fireEvent.click(screen.getByRole('button', { name: /save/i }))
-    expect(invokedWith('terminator.notepad:folders.create')).toEqual([])
-    typeTitle('  Work  ')
-    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    await openWithKind(user, 'Folder')
+    await user.type(screen.getByPlaceholderText(/title/i), '  Work  ')
+    await user.click(screen.getByRole('button', { name: /save/i }))
     await waitFor(() => expect(useNotesStore.getState().showQuickCreate).toBe(false))
     expect(invokedWith('terminator.notepad:folders.create')).toEqual([{ name: 'Work' }])
     expect(invokedWith('terminator.notepad:folders.list')).toEqual([{}])
+  })
+
+  it('creates nothing and stays open for a folder without a name', async () => {
+    const user = userEvent.setup()
+    await openWithKind(user, 'Folder')
+    await user.click(screen.getByRole('button', { name: /save/i }))
+    expect(invokedWith('terminator.notepad:folders.create')).toEqual([])
+    expect(useNotesStore.getState().showQuickCreate).toBe(true)
   })
 })

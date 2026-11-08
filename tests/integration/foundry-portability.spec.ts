@@ -135,30 +135,18 @@ describe('Foundry in a repository it has never seen: the recipes on offer', () =
 })
 
 describe('Foundry in a repository it has never seen: the repository stays untouched', () => {
-  it('leaves the repository exactly as it found it', async () => {
-    await forge().create({ source: { kind: 'typed', text: 'x' }, repoPaths: [repo] })
-    probeToolchain(repo)
-
-    expect(git(repo, 'status', '--porcelain').trim()).toBe('')
-    expect(fs.existsSync(path.join(repo, '.foundry'))).toBe(false)
-  })
-
-  it('never touches the repository .gitignore', async () => {
-    const before = fs.existsSync(path.join(repo, '.gitignore'))
-    await forge().create({ source: { kind: 'typed', text: 'x' }, repoPaths: [repo] })
-    expect(fs.existsSync(path.join(repo, '.gitignore'))).toBe(before)
-  })
-
-  it('runs a complete intake without the repository ever being written to', async () => {
+  it('runs a complete intake and a toolchain probe without the repository ever being written to', async () => {
     const head = git(repo, 'rev-parse', 'HEAD').trim()
     const seeded = (await forge().create({
       source: { kind: 'typed', text: 'add a docstring' },
       repoPaths: [repo],
     })) as { order: WorkOrder }
     await forge().compile({ id: seeded.order.id, commit: false, automatic: false })
+    probeToolchain(repo)
 
     expect(git(repo, 'rev-parse', 'HEAD').trim()).toBe(head)
     expect(git(repo, 'status', '--porcelain').trim()).toBe('')
+    expect(fs.existsSync(path.join(repo, '.foundry'))).toBe(false)
   })
 })
 

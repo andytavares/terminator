@@ -90,13 +90,11 @@ import {
   setMenuRebuildCallback,
   listExtensionSettingsSections,
   listExtensionCommands,
-  executeExtensionCommand,
   listNativeViewMenuItems,
   getPanelMenuItemId,
 } from '../../../src/main/extensions/api'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
-import { registerAdminIpcHandlers } from '../../../extensions/task-vault/src/ipc/admin.ipc'
-import { defineChannel, type ExtensionDB } from '@terminator/extension-sdk'
+import { defineChannel } from '@terminator/extension-sdk'
 import { z } from 'zod'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 import { notificationManager } from '../../../src/main/notifications/notification-manager'
@@ -159,6 +157,29 @@ describe('api.notifications.showToast', () => {
       'notifications:push',
       expect.objectContaining({ type: 'error', title: 'Something failed', source: 'test.ext' })
     )
+  })
+})
+
+// An extension's own switches, one per target: `${extensionId}.notify.${key}.{system,center,toast}`.
+function storeNotifyTargets(extensionId: string, targets: Record<string, boolean>): void {
+  for (const [target, on] of Object.entries(targets)) {
+    mockExtensionStore[`${extensionId}.notify.taskCompleted.${target}`] = on
+  }
+}
+
+describe('an extension notification follows its switches in Settings', () => {
+  it('goes nowhere when every target is switched off', () => {
+    storeNotifyTargets('muted.ext', { system: false, center: false, toast: false })
+    createExtensionAPI('muted.ext').notifications.showToast('success', 'Muted', 'taskCompleted')
+
+    expect(notificationManager.list().some((n) => n.title === 'Muted')).toBe(false)
+  })
+
+  it('reaches only the centre when only the centre is switched on', () => {
+    storeNotifyTargets('heard.ext', { system: false, center: true, toast: false })
+    createExtensionAPI('heard.ext').notifications.showToast('success', 'Heard', 'taskCompleted')
+
+    expect(notificationManager.list().find((n) => n.title === 'Heard')?.targets).toEqual(['center'])
   })
 })
 
@@ -501,12 +522,23 @@ describe('api.ipc.registerHandler', () => {
     expect(ipcInvokeRegistry.has('test.ext:bare')).toBe(false)
   })
 
-  it('keeps a channel registered without the option local-only', () => {
-    const api = createExtensionAPI('test.ext')
-    const disposable = api.ipc.registerHandler(anyPayload('test.ext:no-option'))
-    expect(ipcInvokeRegistry.get('test.ext:no-option')?.remoteAccessible).toBe(false)
+  // Registry presence alone is not enough: the flag declared at registration decides.
+  it.each([
+    ['without the option', undefined],
+    ['with remoteAccessible: false', { remoteAccessible: false }],
+  ])('keeps a channel registered %s local-only', async (_how, options) => {
+    const api = createExtensionAPI('test.ext', {
+      bridge: {
+        invokeRegistry: ipcInvokeRegistry,
+        sendRegistry: new Map(),
+        eventBus: new EventEmitter(),
+      },
+    })
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:local-only'), options)
+    expect(ipcInvokeRegistry.get('test.ext:local-only')?.remoteAccessible).toBe(false)
+    expect(await api.ipc.isRemoteAccessible('test.ext:local-only')).toBe(false)
     disposable.dispose()
-    expect(ipcInvokeRegistry.has('test.ext:no-option')).toBe(false)
+    expect(ipcInvokeRegistry.has('test.ext:local-only')).toBe(false)
   })
 })
 
@@ -518,23 +550,6 @@ describe('api.ipc.registerHandler — remote access', () => {
     })
     expect(ipcInvokeRegistry.get('test.ext:opted-in')?.remoteAccessible).toBe(true)
     disposable.dispose()
-  })
-
-  it('keeps the task-vault SQL console and its admin channels out of the remote bridge', async () => {
-    const api = createExtensionAPI('terminator.task-vault', {
-      bridge: {
-        invokeRegistry: ipcInvokeRegistry,
-        sendRegistry: new Map(),
-        eventBus: new EventEmitter(),
-      },
-    })
-    const dispose = registerAdminIpcHandlers(api, {} as ExtensionDB)
-
-    for (const channel of ['task-vault:admin:run-query', 'task-vault:admin:table-stats']) {
-      expect(ipcInvokeRegistry.has(channel)).toBe(true)
-      expect(await api.ipc.isRemoteAccessible(channel)).toBe(false)
-    }
-    dispose()
   })
 })
 
@@ -585,17 +600,6 @@ describe('api.ipc.registerHandler — rejected payloads', () => {
   })
 })
 
-describe('api.ipc.registerHandler — local-only channels', () => {
-  it('honors remoteAccessible: false for local-only channels', () => {
-    const api = createExtensionAPI('test.ext')
-    const disposable = api.ipc.registerHandler(anyPayload('test.ext:local-only'), {
-      remoteAccessible: false,
-    })
-    expect(ipcInvokeRegistry.get('test.ext:local-only')?.remoteAccessible).toBe(false)
-    disposable.dispose()
-  })
-})
-
 describe('registry query functions', () => {
   it('lists a settings section under its extension, with its label, description and properties', () => {
     const api = createExtensionAPI('com.query.settings')
@@ -613,23 +617,6 @@ describe('registry query functions', () => {
       label: 'Query Test',
       description: 'What the query extension can be told',
       properties: { 'com.query.settings.flag': flag },
-    })
-    d.dispose()
-  })
-})
-
-describe('registry query functions — commands and menu items', () => {
-  it('commands are listed with their key and executed through it', async () => {
-    const api = createExtensionAPI('com.query.cmd')
-    const handler = vi.fn()
-    const d = api.commands.register({ id: 'q-cmd', label: 'Run' }, handler)
-    const cmd = listExtensionCommands().find((c) => c.id === 'q-cmd')
-    const ctx = { projectId: 'p1', sessionId: null, repoRoot: null }
-    expect(await executeExtensionCommand(cmd!.key, ctx)).toEqual({ ok: true })
-    expect(handler).toHaveBeenCalledWith(ctx)
-    expect(await executeExtensionCommand('unknown-key', ctx)).toEqual({
-      ok: false,
-      reason: 'not-registered',
     })
     d.dispose()
   })

@@ -1,19 +1,22 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, act, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ModalShell } from '../../../../packages/extension-ui/src/ModalShell'
 import { Toast, ToastRegion } from '../../../../packages/extension-ui/src/Toast'
 
-beforeEach(() => vi.useFakeTimers())
-afterEach(() => vi.useRealTimers())
-
 describe('Toast', () => {
+  // Scoped here: Testing Library's async wrapper waits on a real setTimeout, which a fake clock
+  // never fires, so user-event clicks in the other blocks would hang.
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
   it('announces politely rather than taking focus', () => {
     render(<Toast message="Saved" onDismiss={vi.fn()} />)
     // role="status" is what lets a toast appear over an open dialog without
     // interrupting whoever is typing in it.
-    expect(screen.getByRole('status')).toBeTruthy()
-    expect(document.activeElement).toBe(document.body)
+    expect(screen.getByRole('status').textContent).toContain('Saved')
+    expect(document.body.matches(':focus-within')).toBe(false)
   })
 
   it('dismisses itself after its duration', () => {
@@ -45,7 +48,8 @@ describe('Toast — offers somewhere to go as a named button', () => {
    * nothing on screen to say so — an affordance the reader cannot see is one
    * they will not use, and one they will hit reaching for the dismiss.
    */
-  it('offers somewhere to go as a named button', () => {
+  it('offers somewhere to go as a named button', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     render(
       <Toast
@@ -54,11 +58,12 @@ describe('Toast — offers somewhere to go as a named button', () => {
         onDismiss={vi.fn()}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'View' }))
+    await user.click(screen.getByRole('button', { name: 'View' }))
     expect(onSelect).toHaveBeenCalledOnce()
   })
 
-  it('closes once its action has run, as an Undo has nothing left to offer', () => {
+  it('closes once its action has run, as an Undo has nothing left to offer', async () => {
+    const user = userEvent.setup()
     const onDismiss = vi.fn()
     render(
       <Toast
@@ -67,10 +72,12 @@ describe('Toast — offers somewhere to go as a named button', () => {
         onDismiss={onDismiss}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(onDismiss).toHaveBeenCalledOnce()
   })
+})
 
+describe('Toast — with no action', () => {
   it('has no action button when there is nowhere to go', () => {
     render(<Toast message="Saved" onDismiss={vi.fn()} />)
     expect(screen.getAllByRole('button')).toHaveLength(1) // dismiss only
@@ -80,10 +87,11 @@ describe('Toast — offers somewhere to go as a named button', () => {
 describe('ToastRegion', () => {
   it('renders nothing when there is nothing to say', () => {
     const { container } = render(<ToastRegion toasts={[]} onDismiss={vi.fn()} />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
-  it('dismisses the toast that was closed, not the first one', () => {
+  it('dismisses the toast that was closed, not the first one', async () => {
+    const user = userEvent.setup()
     const onDismiss = vi.fn()
     render(
       <ToastRegion
@@ -94,7 +102,7 @@ describe('ToastRegion', () => {
         onDismiss={onDismiss}
       />
     )
-    fireEvent.click(screen.getAllByRole('button', { name: 'Dismiss' })[1])
+    await user.click(screen.getAllByRole('button', { name: 'Dismiss' })[1])
     expect(onDismiss).toHaveBeenCalledWith('b')
   })
 
@@ -102,6 +110,7 @@ describe('ToastRegion', () => {
     const { container } = render(
       <ToastRegion toasts={[{ id: 'a', message: 'Saved' }]} onDismiss={vi.fn()} />
     )
+    // eslint-disable-next-line testing-library/no-node-access -- the region is a plain wrapper with no role; its z-index is what this test checks
     const region = container.querySelector('.tmui-toast-region') as HTMLElement
     expect(Number(region.style.zIndex)).toBe(400)
   })
@@ -122,23 +131,27 @@ function AppWithToast({ modals }: { modals: string[] }): React.JSX.Element {
 
 // Everything outside an open modal dialog is inert and painted over, a toast included.
 describe('ToastRegion — while a modal shell is open', () => {
-  const holderOf = (toast: HTMLElement) => toast.closest('dialog')?.getAttribute('aria-label')
+  const holderOf = (): (string | null)[] =>
+    screen
+      .queryAllByRole('dialog')
+      .filter((dialog) => within(dialog).queryByRole('status') !== null)
+      .map((dialog) => dialog.getAttribute('aria-label'))
 
   it('renders in the page when none is open', () => {
     render(<AppWithToast modals={[]} />)
-    expect(screen.getByRole('status').closest('dialog')).toBeNull()
+    expect(holderOf()).toEqual([])
   })
 
   it('renders inside the shell opened last', () => {
     render(<AppWithToast modals={['Settings', 'Reset']} />)
-    expect(holderOf(screen.getByRole('status'))).toBe('Reset')
+    expect(holderOf()).toEqual(['Reset'])
   })
 
   it('moves to the shell beneath, then back to the page, as they close', () => {
     const { rerender } = render(<AppWithToast modals={['Settings', 'Reset']} />)
     rerender(<AppWithToast modals={['Settings']} />)
-    expect(holderOf(screen.getByRole('status'))).toBe('Settings')
+    expect(holderOf()).toEqual(['Settings'])
     rerender(<AppWithToast modals={[]} />)
-    expect(screen.getByRole('status').closest('dialog')).toBeNull()
+    expect(holderOf()).toEqual([])
   })
 })

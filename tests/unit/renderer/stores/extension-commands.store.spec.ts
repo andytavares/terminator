@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getCommands = vi.fn()
 const list = vi.fn()
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: { extension: { getCommands, list } } },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: { extension: { getCommands, list } } })
 })
 
 import { useExtensionCommandsStore } from '../../../../src/renderer/stores/extension-commands.store'

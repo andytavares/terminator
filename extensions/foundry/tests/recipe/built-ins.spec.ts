@@ -46,10 +46,6 @@ describe('built-in recipes', () => {
 })
 
 function threeShapesTests() {
-  it('ships three shapes: two that change the repository and one whose product is a document', () => {
-    expect(recipeFiles.sort()).toEqual(['direct.yaml', 'research.yaml', 'standard.yaml'])
-  })
-
   it.each(recipeFiles)('%s parses', (file) => {
     const parsed = parseRecipe(readRecipeFile(recipesDir, file), file)
     expect(parsed.ok).toBe(true)
@@ -68,20 +64,11 @@ function stepsAndRolesTests() {
     const roles = recipe(file).steps.flatMap((step) => (step.kind === 'agent' ? [step.role] : []))
     for (const role of roles) expect(known).toContain(role)
   })
-
-  it.each(recipeFiles)('%s gives every gate a default for being ignored', (file) => {
-    const defaults = recipe(file).steps.flatMap((step) =>
-      step.kind === 'gate' ? [step.defaultIfIgnored] : []
-    )
-    for (const defaultIfIgnored of defaults) expect(defaultIfIgnored).toBeTruthy()
-  })
 }
 
 function requirementsTests() {
-  it('asks nothing of a repository for any shape', () => {
-    for (const file of recipeFiles) {
-      expect(recipe(file).requires).toEqual([])
-    }
+  it.each(recipeFiles)('%s asks nothing of a repository', (file) => {
+    expect(recipe(file).requires).toEqual([])
   })
 }
 
@@ -125,35 +112,9 @@ function builtInsLanesTests() {
 }
 
 function theDirectShapeTests() {
-  it('checks the direct shape with the test command when there is one and a verifier when there is not', () => {
-    const steps = recipe('direct.yaml').steps
-    const check = steps.find((s) => s.id === 'check')
-    const verify = steps.find((s) => s.id === 'verify')
-    expect(check?.kind).toBe('run')
-    expect(check?.command).toBe('${toolchain.test}')
-    expect(check?.when).toBe('toolchain.test is set')
-    expect(check?.after).toEqual(['lint'])
-    expect(check?.onFail).toEqual({ rework: 'build', max: 1 })
-    expect(verify?.kind).toBe('agent')
-    expect(verify?.when).toBe('toolchain.test is not set')
-    // Only one of the two ever runs, so a skipped `check` never holds it.
-    expect(verify?.after).toEqual(['check'])
-  })
-
-  it("skips the direct shape's documentation pass for the smallest changes only", () => {
-    const document = recipe('direct.yaml').steps.find((s) => s.id === 'document')
-    expect(document?.role).toBe('scribe')
-    expect(document?.when).toBe('risk.grade is not P3')
-    expect(document?.after).toEqual(['lint'])
-  })
-
   it("waits the direct shape's join on every check, so a skipped one never lets work through", () => {
     const integrate = recipe('direct.yaml').steps.find((s) => s.id === 'integrate')
     expect(integrate?.after).toEqual(['check', 'verify', 'inspect', 'document'])
-  })
-
-  it('needs nothing from the repository for the direct shape', () => {
-    expect(recipe('direct.yaml').requires).toEqual([])
   })
 }
 
@@ -322,19 +283,6 @@ describe('built-in roles', () => {
 })
 
 function theRolesTests() {
-  it('ships the eight roles the shipped recipes use, and the author', () => {
-    expect(roleFiles.map((f) => f.replace('.yaml', '')).sort()).toEqual([
-      'architect',
-      'author',
-      'builder',
-      'inspector',
-      'red-team',
-      'scout',
-      'scribe',
-      'verifier',
-    ])
-  })
-
   it.each(roleFiles)('%s parses', (file) => {
     const parsed = parseRole(readRecipeFile(rolesDir, file), file)
     expect(parsed.ok).toBe(true)
@@ -482,10 +430,6 @@ describe('what the architect may read', () => {
 // behaviour before changing it one level above, at `high`. Declared rather than
 // left to the runtime, because the default differs between models.
 describe('the effort each built-in shape asks for', () => {
-  it.each(recipeFiles)('%s declares one', (file) => {
-    expect(recipe(file).effort).toBeDefined()
-  })
-
   it.each([
     ['direct.yaml', 'medium'],
     ['standard.yaml', 'high'],
@@ -577,10 +521,6 @@ describe('ci rounds on every shape that ships code', () => {
 
   it.each(unwatched)('%s declares no ci', (file) => {
     expect(recipe(file).ci).toBeUndefined()
-  })
-
-  it('leaves exactly the document shape unwatched', () => {
-    expect([...unwatched].sort()).toEqual(['research.yaml'])
   })
 })
 

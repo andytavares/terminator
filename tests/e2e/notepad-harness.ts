@@ -72,9 +72,16 @@ export function noteRow(notepad: ExtensionView, title: string) {
     .filter({ has: notepad.locator('.notepad-note-row__title').getByText(title, { exact: true }) })
 }
 
+/** Clicks into the open note and waits until it owns the keyboard. */
+export async function focusEditor(notepad: ExtensionView): Promise<void> {
+  const editor = notepad.locator('.notepad-view__editor .cm-content')
+  await editor.click()
+  await expect(editor).toBeFocused()
+}
+
 /** Types `text` at the end of the open note, as a user does. */
 export async function typeInEditor(notepad: ExtensionView, text: string): Promise<void> {
-  await notepad.locator('.notepad-view__editor .cm-content').click()
+  await focusEditor(notepad)
   await notepad.keyboard.press('ControlOrMeta+End')
   await notepad.keyboard.type(text)
 }

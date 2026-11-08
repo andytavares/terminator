@@ -1,6 +1,6 @@
 # ADR 123: Tests run once, sealed, and only the ones a change can reach
 
-**Status**: Accepted, amended by ADR 124 and ADR 132
+**Status**: Accepted, amended by ADR 124, ADR 132 and ADR 150; its selection and `ci:local` are superseded by ADR 151
 
 **Date**: 2026-10-22
 

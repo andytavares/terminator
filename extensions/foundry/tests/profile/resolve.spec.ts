@@ -131,10 +131,11 @@ describe('readRepositoryProfile', () => {
     expect(fs.readdirSync(path.join(repo, '.foundry'))).toEqual(before)
   })
 
-  it('reads as none when absent, malformed or from a newer schema', () => {
-    expect(readRepositoryProfile(repoWith({}))).toBeNull()
-    expect(readRepositoryProfile(repoWith({ '.foundry/profile.yaml': 'checks: [' }))).toBeNull()
-    const newer = repoWith({ '.foundry/profile.yaml': 'schemaVersion: 2\n' })
-    expect(readRepositoryProfile(newer)).toBeNull()
+  it.each([
+    ['absent', {}],
+    ['malformed', { '.foundry/profile.yaml': 'checks: [' }],
+    ['from a newer schema', { '.foundry/profile.yaml': 'schemaVersion: 2\n' }],
+  ])('reads as none when the profile is %s', (_case, files: Record<string, string>) => {
+    expect(readRepositoryProfile(repoWith(files))).toBeNull()
   })
 })

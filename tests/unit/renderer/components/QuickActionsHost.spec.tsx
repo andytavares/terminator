@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // This spec checks the IPC payload, so it runs the real recorder (tests/setup.ts mocks it).
 vi.unmock('../../../../src/renderer/usage/record')
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import {
   QuickActionsHost,
   paletteFeature,
@@ -52,7 +53,12 @@ const api = {
   input: vi.fn(),
 }
 const recordUse = vi.fn<ElectronAPI['usage']['recordUse']>(async () => ({ data: true as const }))
-const updateQuickActions = vi.fn(async () => {})
+/** Main's answer to a settings save: the stored settings with the quick actions patch applied. */
+const updateGlobal = vi.fn<ElectronAPI['settings']['updateGlobal']>(async (patch) => {
+  const current = useSettingsStore.getState().globalSettings ?? DEFAULT_GLOBAL_SETTINGS
+  const { quickActions } = patch as { quickActions: Partial<typeof current.quickActions> }
+  return { settings: { ...current, quickActions: { ...current.quickActions, ...quickActions } } }
+})
 const onClose = vi.fn()
 
 function withCustom(custom: CustomAction[], pins: string[] = []): void {
@@ -61,7 +67,6 @@ function withCustom(custom: CustomAction[], pins: string[] = []): void {
       ...DEFAULT_GLOBAL_SETTINGS,
       quickActions: { pins, usage: [], directUse: [], custom },
     },
-    updateQuickActions,
   })
 }
 
@@ -78,6 +83,7 @@ beforeEach(() => {
     },
     terminal: { input: api.input },
     usage: { recordUse, declare: vi.fn() },
+    settings: { updateGlobal },
   })
   resetStore(useSettingsStore)
   withCustom([])
@@ -106,11 +112,18 @@ function renderHost(): void {
   )
 }
 
-/** Searches the open palette and runs the first match, as Enter would. */
-function runFound(label: string): void {
-  fireEvent.keyDown(window, { key: '/' })
-  fireEvent.change(screen.getByRole('combobox'), { target: { value: label } })
-  fireEvent.keyDown(window, { key: 'Enter' })
+/** Presses / to search the open palette and types `label` there. */
+async function search(user: UserEvent, label: string): Promise<void> {
+  await user.keyboard('/')
+  await user.type(screen.getByRole('combobox'), label)
+}
+
+/** Searches the open palette and runs the first match with Enter. */
+async function runFound(label: string): Promise<void> {
+  const user = userEvent.setup()
+  await search(user, label)
+  expect(screen.getByRole('combobox').matches(':focus')).toBe(true)
+  await user.keyboard('{Enter}')
 }
 
 describe('QuickActionsHost — extension commands', () => {
@@ -120,26 +133,27 @@ describe('QuickActionsHost — extension commands', () => {
       .getState()
       .registerCommand({ id: 'x.ping', label: 'Ping the thing', category: 'X', action })
     renderHost()
-    runFound('Ping the thing')
+    await runFound('Ping the thing')
     expect(onClose).toHaveBeenCalled()
     await waitFor(() => expect(action).toHaveBeenCalled())
   })
 
-  it('asks main to run a command an extension registered, with where it was run', async () => {
+  it('asks main to run a command an extension registered, with where it was run, and leaves its count to main', async () => {
     api.getCommands.mockResolvedValue({
       commands: [{ key: 'ext:hello', extensionId: 'ext', id: 'hello', label: 'Say hello' }],
     })
+    const user = userEvent.setup()
     renderHost()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Say hello' } })
+    await search(user, 'Say hello')
     await screen.findByText('Say hello')
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await user.keyboard('{Enter}')
     await waitFor(() =>
       expect(api.executeCommand).toHaveBeenCalledWith(
         'ext:hello',
         expect.objectContaining({ projectId: 'p1', via: 'palette' })
       )
     )
+    expect(recorded().map((r) => r.feature)).not.toContain('ext:ext.command.hello')
   })
 })
 
@@ -169,7 +183,7 @@ describe('QuickActionsHost — custom actions', () => {
   it('opens a new terminal on the branch for a new-tab action, then types into it', async () => {
     withCustom([runTests])
     renderHost()
-    runFound('Run the tests')
+    await runFound('Run the tests')
     await waitFor(() => expect(api.input).toHaveBeenCalledWith('new-session', expect.any(String)))
     expect(createSession).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: 'p1', type: 'human', title: '' })
@@ -178,13 +192,13 @@ describe('QuickActionsHost — custom actions', () => {
 })
 
 describe('QuickActionsHost — pins', () => {
-  it('pins an action from its row', () => {
+  it('pins an action from its row', async () => {
+    const user = userEvent.setup()
     withCustom([runTests])
     renderHost()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Run the tests' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Pin Run the tests' }))
-    expect(updateQuickActions).toHaveBeenCalledWith({ pins: ['custom:c1'] })
+    await search(user, 'Run the tests')
+    await user.click(screen.getByRole('button', { name: 'Pin Run the tests' }))
+    expect(await screen.findByRole('button', { name: 'Unpin Run the tests' })).toBeTruthy()
   })
 })
 
@@ -202,7 +216,7 @@ describe('QuickActionsHost — usage', () => {
 
   it('counts a core action run from the palette, with its label', async () => {
     renderHost()
-    runFound('Toggle sidebar')
+    await runFound('Toggle sidebar')
     await waitFor(() =>
       expect(recorded()).toContainEqual({
         feature: 'core.toggle-sidebar',
@@ -223,25 +237,12 @@ describe('QuickActionsHost — usage of runs', () => {
       },
     })
     renderHost()
-    runFound('Boom now')
+    await runFound('Boom now')
     await waitFor(() =>
       expect(recorded()).toContainEqual(
         expect.objectContaining({ feature: 'renderer:x.boom', via: 'palette', failed: true })
       )
     )
-  })
-
-  it('leaves an extension command to main', async () => {
-    api.getCommands.mockResolvedValue({
-      commands: [{ key: 'ext:hello', extensionId: 'ext', id: 'hello', label: 'Say hello' }],
-    })
-    renderHost()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Say hello' } })
-    await screen.findByText('Say hello')
-    fireEvent.keyDown(window, { key: 'Enter' })
-    await waitFor(() => expect(api.executeCommand).toHaveBeenCalled())
-    expect(recorded().map((r) => r.feature)).not.toContain('ext:ext.command.hello')
   })
 })
 
@@ -249,7 +250,7 @@ describe('QuickActionsHost — usage of custom actions and pins', () => {
   it('counts every custom action as one feature, without its name', async () => {
     withCustom([runTests])
     renderHost()
-    runFound('Run the tests')
+    await runFound('Run the tests')
     await waitFor(() => expect(api.input).toHaveBeenCalled())
     expect(recorded()).toContainEqual({
       feature: 'core.custom-action',
@@ -259,36 +260,85 @@ describe('QuickActionsHost — usage of custom actions and pins', () => {
     expect(JSON.stringify(recorded())).not.toContain('Run the tests')
   })
 
-  it('counts a pin', () => {
+  it('counts a pin', async () => {
+    const user = userEvent.setup()
     withCustom([runTests])
     renderHost()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Run the tests' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Pin Run the tests' }))
+    await search(user, 'Run the tests')
+    await user.click(screen.getByRole('button', { name: 'Pin Run the tests' }))
     expect(recorded().map((r) => r.feature)).toContain('core.quick-actions.pin')
   })
 })
 
 describe('paletteFeature', () => {
-  it('counts a session under one fixed id, without its title', () => {
-    expect(paletteFeature({ id: 'session:abc123', label: 'fix login bug' })).toEqual([
-      'core.go-to-session',
-      'Go to session',
-    ])
+  it.each([
+    ['session:abc123', 'fix login bug', ['core.go-to-session', 'Go to session']],
+    ['core.switch-workspace-ws9', 'Acme', ['core.switch-workspace', 'Switch workspace']],
+    ['ext:terminator.notepad.command.x', 'New', null],
+    ['core.split-vertical', 'Split', ['core.split-vertical', 'Split']],
+  ])('counts the palette item %s (%s) as %j', (id, label, feature) => {
+    expect(paletteFeature({ id, label })).toEqual(feature)
   })
+})
 
-  it('counts a workspace switch under one fixed id', () => {
-    expect(paletteFeature({ id: 'core.switch-workspace-ws9', label: 'Acme' })).toEqual([
-      'core.switch-workspace',
-      'Switch workspace',
-    ])
+const gitPush = {
+  key: 'terminator.git-integration:push',
+  extensionId: 'terminator.git-integration',
+  id: 'push',
+  label: 'Push',
+  category: 'Git',
+  requires: 'repo' as const,
+}
+
+describe('QuickActionsHost — a command that needs a repository', () => {
+  it('is dimmed with "No repository focused" when no workspace is open, and does not run', async () => {
+    resetStore(useWorkspaceStore)
+    api.getCommands.mockResolvedValue({ commands: [gitPush] })
+    const user = userEvent.setup()
+    renderHost()
+    await search(user, 'Push')
+    const row = await screen.findByRole('option', { name: /Push/ })
+    expect(row.textContent).toContain('No repository focused')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('status').textContent).toContain('No repository focused')
+    expect(screen.getByRole('dialog', { name: 'Quick actions' })).toBeTruthy()
+    expect(api.executeCommand).not.toHaveBeenCalled()
   })
+})
 
-  it('leaves extension commands to main and keeps a core action as it is', () => {
-    expect(paletteFeature({ id: 'ext:terminator.notepad.command.x', label: 'New' })).toBeNull()
-    expect(paletteFeature({ id: 'core.split-vertical', label: 'Split' })).toEqual([
-      'core.split-vertical',
-      'Split',
-    ])
+describe('QuickActionsHost — a command that needs a repository, with a branch focused', () => {
+  it("runs in the focused branch's worktree", async () => {
+    resetStore(useWorkspaceStore, {
+      workspaces: [workspaceFixture({ id: 'ws-1', folderPath: '/repo' })],
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [projectFixture({ id: 'p1', workspaceId: 'ws-1', worktreePath: '/repo-main' })]],
+      ]),
+      activeWorkspaceId: 'ws-1',
+      activeProjectId: 'p1',
+    })
+    api.getCommands.mockResolvedValue({ commands: [gitPush] })
+    const user = userEvent.setup()
+    renderHost()
+    await search(user, 'Push')
+    await screen.findByRole('option', { name: /Push/ })
+    await user.keyboard('{Enter}')
+    await waitFor(() =>
+      expect(api.executeCommand).toHaveBeenCalledWith(
+        gitPush.key,
+        expect.objectContaining({ repoRoot: '/repo-main' })
+      )
+    )
+  })
+})
+
+describe('QuickActionsHost — recent actions', () => {
+  it('lists an action run from the palette under Pinned & recent the next time it opens', async () => {
+    renderHost()
+    await runFound('Toggle sidebar')
+    await waitFor(() => expect(updateGlobal).toHaveBeenCalled())
+    cleanup()
+    renderHost()
+    const recent = screen.getByRole('listbox', { name: 'Pinned & recent' })
+    expect(within(recent).getByRole('option', { name: /Toggle sidebar/ })).toBeTruthy()
   })
 })

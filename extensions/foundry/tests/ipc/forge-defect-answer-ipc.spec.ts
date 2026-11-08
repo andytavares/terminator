@@ -14,7 +14,7 @@ import * as path from 'node:path'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
+import { execSucceeded, fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -71,7 +71,7 @@ function forgeDefectGate(): Gate {
 
 beforeAll(async () => {
   host = fakeHost(() => dataDir)
-  host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+  host.exec.mockResolvedValue(execSucceeded(''))
   await activateFoundry(host)
 })
 
@@ -83,6 +83,8 @@ afterAll(async () => {
 })
 
 beforeEach(() => {
+  // mockReset clears what beforeAll set: no real git in a unit spec.
+  host.exec.mockResolvedValue(execSucceeded(''))
   theRunner.start.mockReset()
   theRunner.start.mockImplementation(async (...args: unknown[]) => {
     const input = args[0] as StartInput
@@ -136,16 +138,24 @@ function cleanOrder(): WorkOrder {
     redTeam: [regression('RT-inspector-6', 'footnote links stop working')],
   }
 }
-function architectAmends(): void {
+function eachTurnRegisters(): void {
   theRunner.start.mockImplementation(async (...args: unknown[]) => {
     const input = args[0] as StartInput
     const sessionId = `${input.phase}-session`
     input.onRegistered?.({ sessionId })
-    if (input.phase === 'architect') {
-      setTimeout(() => input.onStructuredOutput?.(AMENDMENT), 0)
-    }
     return { sessionId }
   })
+}
+/** Once the architect's turn has started, it answers with the amended plan. */
+async function architectAmends(): Promise<void> {
+  const architect = await eventually(() => {
+    const started = theRunner.start.mock.calls
+      .map((call) => call[0] as StartInput)
+      .find((input) => input.phase === 'architect')
+    if (started === undefined) throw new Error('the architect has not started yet')
+    return started
+  })
+  architect.onStructuredOutput?.(AMENDMENT)
 }
 async function seed(released: boolean): Promise<void> {
   dataDir = makeTempDir('fdry-amended-')
@@ -163,7 +173,7 @@ async function seed(released: boolean): Promise<void> {
     })
   }
   await saveGate(forgeDefectGate())
-  architectAmends()
+  eachTurnRegisters()
 }
 
 function startingTheArchitectTests() {
@@ -224,7 +234,6 @@ function resumeFailuresTests() {
 describe('after the architect amends an answered defect', () => {
   describe('agreeing again', agreeingAgainTests)
   describe('the inbox', theInboxTests)
-  describe('the order before', theOrderBeforeTests)
 })
 
 /** Waits for the run's last write: the builder never finishes here, and the verifier and scribe
@@ -239,19 +248,29 @@ async function untilRunSettles(): Promise<void> {
 }
 
 function agreeingAgainTests() {
-  it('agrees the released order again and starts its run', async () => {
+  // Recording which conversation wrote the plan loads the whole order and saves it back. Unordered,
+  // that save could land after the amendment's and put the old plan back: the finding open again,
+  // and the restart refused with "the adversarial pass left 1 blocking finding unresolved".
+  it('agrees the released order again and starts its run, never on the order from before', async () => {
     await seed(true)
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await architectAmends()
 
-    await eventually(() => expect(ledgerFileText(dataDir)).toContain('"action":"run.started"'))
+    await eventually(() =>
+      expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/)
+    )
+    await untilRunSettles()
     const lines = ledgerFileText(dataDir)
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l) as { action: string; actor: string })
+    const actions = lines.map((l) => l.action)
+    expect(actions).not.toContain('run.refused')
+    expect(actions).toEqual(expect.arrayContaining(['converge.started', 'run.started']))
     expect(lines.filter((l) => l.action === 'order.agreed').at(-1)?.actor).toBe('rule:forge')
-    expect(lines.some((l) => l.action === 'converge.started')).toBe(true)
-    expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
-    await untilRunSettles()
+    const saved = await createOrderStore(dataDir).load('WO-1')
+    expect(saved?.status).toBe('running')
+    expect(saved?.redTeam.find((f) => f.id === 'RT-inspector-6')?.status).toBe('resolved')
   })
 }
 
@@ -259,6 +278,7 @@ function theInboxTests() {
   it('lists an order nobody released on the Inbox, and counts it on the badge', async () => {
     await seed(false)
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await architectAmends()
 
     await eventually(() => expect(ledgerFileText(dataDir)).toContain('order.redrafted'))
     await eventually(async () => {
@@ -272,26 +292,5 @@ function theInboxTests() {
     expect(((await host.call('foundry:attention')) as { inbox: number }).inbox).toBe(1)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('draft')
     expect(ledgerFileText(dataDir)).not.toContain('run.started')
-  })
-}
-
-function theOrderBeforeTests() {
-  // Recording which conversation wrote the plan loads the whole order and
-  // saves it back. Unordered, that save could land after the amendment's and
-  // put the old plan back: the answered finding open again, and the restart
-  // refused with "the adversarial pass left 1 blocking finding unresolved".
-  // Seen in CI as the test above timing out.
-  it('never puts the order from before the amendment back', async () => {
-    await seed(true)
-    await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
-    await eventually(() =>
-      expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/)
-    )
-    await untilRunSettles()
-
-    expect(ledgerFileText(dataDir)).not.toContain('run.refused')
-    expect(ledgerFileText(dataDir)).toContain('"action":"run.started"')
-    const saved = await createOrderStore(dataDir).load('WO-1')
-    expect(saved?.redTeam.find((f) => f.id === 'RT-inspector-6')?.status).toBe('resolved')
   })
 }

@@ -18,13 +18,6 @@ function useFilterStoreTests() {
 }
 
 function useFilterStoreQueryTests() {
-  it('initializes with empty query, no active tags, archived off', () => {
-    const state = useFilterStore.getState()
-    expect(state.searchQuery).toBe('')
-    expect(state.activeTagIds).toEqual([])
-    expect(state.includeArchived).toBe(false)
-  })
-
   it('setQuery updates searchQuery', () => {
     useFilterStore.getState().setQuery('rust lang')
     expect(useFilterStore.getState().searchQuery).toBe('rust lang')
@@ -32,21 +25,16 @@ function useFilterStoreQueryTests() {
 }
 
 function useFilterStoreTagsTests() {
-  it('toggleTag adds a tag id', () => {
+  it('toggleTag adds each tag id, keeping the earlier ones active', () => {
     useFilterStore.getState().toggleTag('tag-abc')
-    expect(useFilterStore.getState().activeTagIds).toEqual(['tag-abc'])
+    useFilterStore.getState().toggleTag('tag-xyz')
+    expect(useFilterStore.getState().activeTagIds).toEqual(['tag-abc', 'tag-xyz'])
   })
 
   it('toggleTag removes a tag id that is already active', () => {
     useFilterStore.getState().toggleTag('tag-abc')
     useFilterStore.getState().toggleTag('tag-abc')
     expect(useFilterStore.getState().activeTagIds).toEqual([])
-  })
-
-  it('toggleTag supports multiple active tags', () => {
-    useFilterStore.getState().toggleTag('tag-abc')
-    useFilterStore.getState().toggleTag('tag-xyz')
-    expect(useFilterStore.getState().activeTagIds).toEqual(['tag-abc', 'tag-xyz'])
   })
 
   it('clearTags empties activeTagIds', () => {

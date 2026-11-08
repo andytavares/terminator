@@ -14,7 +14,7 @@ import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { ResumeForbiddenError, createRoleRegistry } from '../../src/line/roles.js'
+import { createRoleRegistry } from '../../src/line/roles.js'
 import { makeVerdict, SelfVerificationError } from '../../src/verify/verdict.js'
 import { decide, raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
@@ -97,6 +97,13 @@ function recipe(text = RECIPE): Recipe {
   const parsed = parseRecipe(text, 'direct.yaml')
   if (!parsed.ok) throw new Error(parsed.reason)
   return parsed.value
+}
+
+/** The gate a test goes on to decide, or a failure naming the question that was not asked. */
+function gateWhere(gates: readonly Gate[], matches: (gate: Gate) => boolean, what: string): Gate {
+  const gate = gates.find(matches)
+  if (gate === undefined) throw new Error(`expected ${what} to be asked about`)
+  return gate
 }
 
 function unit(id: string, over: Record<string, unknown> = {}) {
@@ -185,7 +192,6 @@ afterEach(() => {
 describe('execute', () => {
   describe('running units', runningUnitsTests)
   describe('sessions and read-only roles', sessionsAndReadOnlyRolesTests)
-  describe('a change of role', aChangeOfRoleTests)
   describe('the prompt and the verdict', thePromptAndTheVerdictTests)
   describe('who checks the work', whoChecksTheWorkTests)
   describe('failures', executorFailuresTests)
@@ -239,16 +245,6 @@ async function agentBudgetTest(): Promise<void> {
 }
 
 function sessionsAndReadOnlyRolesTests() {
-  it('never hands a role a session to resume', async () => {
-    const run = vi.fn(ok)
-    const o = order()
-    await execute(planOf(o), deps(run))
-    expect(run.mock.calls.length).toBeGreaterThan(0)
-    for (const call of run.mock.calls) {
-      expect(call[0].resumeSessionId).toBeUndefined()
-    }
-  })
-
   it('marks a read-only role read-only, so the hook can refuse its writes', async () => {
     const run = vi.fn(ok)
     const verifying = RECIPE.replace('role: builder', 'role: verifier')
@@ -265,45 +261,7 @@ function sessionsAndReadOnlyRolesTests() {
   })
 }
 
-function aChangeOfRoleTests() {
-  it("starts a fresh conversation rather than inheriting the last role's", async () => {
-    const run = vi.fn(ok)
-    const o = order([unit('U-1')])
-    // The architect has a conversation open in this lane. Nothing else does,
-    // which is exactly what the real map looks like at this point.
-    const open = new Map([['1:architect', 'sess-architect']])
-    await execute(planOf(o, recipe(CHECKED)), {
-      ...deps(run),
-      sessionFor: (lane, role) => open.get(`${lane}:${role ?? 'command'}`),
-    })
-    expect(run.mock.calls.length).toBeGreaterThan(0)
-    for (const call of run.mock.calls) {
-      expect(call[0].resumeSessionId).toBeUndefined()
-    }
-  })
-
-  it('resumes where the role is carrying on its own work, which is where the saving was', async () => {
-    const run = vi.fn(ok)
-    // Two units for one builder: the second keeps everything the first
-    // learned about this repository.
-    const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
-    await execute(planOf(o), {
-      ...deps(run),
-      sessionFor: (_lane, role) => (role === 'builder' ? 'sess-builder' : undefined),
-    })
-    const second = run.mock.calls.find((c) => c[0].node.id.includes('U-2'))
-    expect(second?.[0].resumeSessionId).toBe('sess-builder')
-  })
-}
-
 function thePromptAndTheVerdictTests() {
-  it('gives each run the role prompt rather than an empty instruction', async () => {
-    const run = vi.fn(ok)
-    const o = order()
-    await execute(planOf(o), deps(run))
-    expect(run.mock.calls[0][0].prompt).toContain('Build one unit')
-  })
-
   it('takes the verdict from the exit status', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
@@ -483,13 +441,6 @@ function anEmptyGraphTests() {
     expect(outcome.verdicts).toEqual([])
   })
 }
-
-describe('the resume rule', () => {
-  it('is enforced by refusing, not by asking', () => {
-    const roles = createRoleRegistry({ dataRoot, repoPaths: [repo], builtInDir })
-    expect(() => roles.assertResumable('verifier', 'sess-1')).toThrow(ResumeForbiddenError)
-  })
-})
 
 // The regrade and the inspection answer for "the change the work turned out to
 // be" — and they were handed `plan.units.flatMap(touches)`, the files the plan
@@ -674,59 +625,37 @@ function verdictsPerCriterionTests() {
   })
 }
 
-describe('what the agent is actually told', () => {
-  describe('the order and the unit', theOrderAndTheUnitTests)
-  describe('house rules', houseRulesTests)
-})
+const noStubs = {
+  schemaVersion: 1 as const,
+  id: 'no-stubs',
+  scope: 'universal' as const,
+  rung: 'L3' as const,
+  asserts: 'No TODO and no function that throws instead of doing the thing.',
+  appliesWhen: 'always' as const,
+  origin: 'built-in' as const,
+}
 
-function theOrderAndTheUnitTests() {
-  it('carries the order, not just the role prompt', async () => {
+describe('what the agent is actually told', () => {
+  // brief() owns the wording (brief.spec.ts); this proves the executor hands
+  // the node that brief, built from the role, the order, the unit and the rules.
+  it('launches the node with the brief: role prompt, order, unit, touches, criteria and house rules', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')], {
       title: 'Refuse an expired refresh token',
       intent: { problem: 'expired tokens are accepted', outcome: 'they are refused', nonGoals: [] },
     })
-    await execute(planOf(o), deps(run))
+    await execute(planOf(o), { ...deps(run), rules: [noStubs] })
 
     const prompt = run.mock.calls[0][0].prompt
-    expect(prompt).toContain('Build one unit') // the role's own words
+    expect(prompt).toContain('Build one unit')
     expect(prompt).toContain('Refuse an expired refresh token')
     expect(prompt).toContain('expired tokens are accepted')
-  })
-
-  it('names the unit, what it may touch, and what makes it done', async () => {
-    const run = vi.fn(ok)
-    const o = order([unit('U-1')])
-    await execute(planOf(o), deps(run))
-
-    const prompt = run.mock.calls[0][0].prompt
     expect(prompt).toContain('U-1')
     expect(prompt).toContain('src/U-1.ts')
     expect(prompt).toContain('AC-1')
+    expect(prompt).toContain('no-stubs')
   })
-}
-
-function houseRulesTests() {
-  it('carries the house rules it was given', async () => {
-    const run = vi.fn(ok)
-    const o = order([unit('U-1')])
-    await execute(planOf(o), {
-      ...deps(run),
-      rules: [
-        {
-          schemaVersion: 1,
-          id: 'no-stubs',
-          scope: 'universal',
-          rung: 'L3',
-          asserts: 'No TODO and no function that throws instead of doing the thing.',
-          appliesWhen: 'always',
-          origin: 'built-in',
-        },
-      ],
-    })
-    expect(run.mock.calls[0][0].prompt).toContain('no-stubs')
-  })
-}
+})
 
 describe('the budget is part of the agreement', () => {
   describe('a breach', aBreachTests)
@@ -1398,7 +1327,7 @@ steps:
 `
 
 function resumableRolesTests() {
-  it('carries a resumable role on in the session the lane already has', async () => {
+  it('carries a resumable role on in the session the lane already has, where its own work is', async () => {
     const run = vi.fn(ok)
     // Two units for the one role. The builder declares `allowResume: true`, so
     // its second unit continues where its first left off rather than being a
@@ -1412,13 +1341,14 @@ function resumableRolesTests() {
     expect(second?.[0].resumeSessionId).toBe('sess-lane-1')
   })
 
-  it("asks for its own role's conversation, not the lane's last one", async () => {
+  it("asks for its own role's conversation, and never inherits the last role's", async () => {
     // The role is half the key, so a node cannot be handed a conversation that
     // belonged to somebody else — there is nothing under its own name to give.
+    // The architect has a conversation open in this lane. Nothing else does,
+    // which is exactly what the real map looks like at this point.
     const run = vi.fn(ok)
     const asked: (string | null)[] = []
-    const o = order([unit('U-1')])
-    await execute(planOf(o), {
+    await execute(planOf(order([unit('U-1')]), recipe(CHECKED)), {
       ...deps(run),
       sessionFor: (_lane, role) => {
         asked.push(role)
@@ -1426,7 +1356,7 @@ function resumableRolesTests() {
       },
     })
     expect(asked).toContain('builder')
-    expect(run.mock.calls[0][0].resumeSessionId).toBeUndefined()
+    expect(new Set(run.mock.calls.map((c) => c[0].resumeSessionId))).toEqual(new Set([undefined]))
   })
 }
 
@@ -1454,9 +1384,8 @@ steps:
 
   it('starts fresh when the lane has no conversation yet', async () => {
     const run = vi.fn(ok)
-    const o = order([unit('U-1')])
-    await execute(planOf(o), deps(run))
-    expect(run.mock.calls[0][0].resumeSessionId).toBeUndefined()
+    await execute(planOf(order([unit('U-1')])), deps(run))
+    expect(run.mock.calls.map((c) => c[0].resumeSessionId)).toEqual([undefined])
   })
 }
 
@@ -1660,8 +1589,7 @@ function anApprovedRegradeTests() {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    const asked = first.gates.find((g) => g.rule === 'risk.p0')
-    if (asked === undefined) throw new Error('expected the regrade to be asked about')
+    const asked = gateWhere(first.gates, (g) => g.rule === 'risk.p0', 'the regrade')
     const approved = decide(asked, { option: 'approve', note: '', at: '2026-09-28T19:12:26.193Z' })
 
     const resumed = await execute(
@@ -1686,8 +1614,7 @@ function aHeldRegradeTests() {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    const asked = first.gates.find((g) => g.rule === 'risk.p0')
-    if (asked === undefined) throw new Error('expected the regrade to be asked about')
+    const asked = gateWhere(first.gates, (g) => g.rule === 'risk.p0', 'the regrade')
     const held = decide(asked, { option: 'hold', note: '', at: '2026-09-28T19:12:26.193Z' })
 
     const resumed = await execute(
@@ -1720,21 +1647,18 @@ function anOrdinaryChangeTests() {
 }
 
 describe('a graph that cannot move on its own', () => {
-  it('says so, rather than reporting a run waiting on a gate that does not exist', async () => {
+  it('says so on every pass, naming the failed node with a dependant so Send back retries something', async () => {
     // U-2 depends on U-1; U-1 fails twice, so nothing is runnable and nothing
     // is finished.
     const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
     const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
-    let graph = buildRunGraph(o, recipe())
-    graph = (await execute({ order: o, recipe: recipe(), graph }, failing)).graph
-    const stalled = await execute({ order: o, recipe: recipe(), graph }, failing)
+    const first = await execute(planOf(o), failing)
+    const stalled = await execute({ order: o, recipe: recipe(), graph: first.graph }, failing)
 
+    const isStall = (g: Gate) => g.summary.endsWith('cannot go any further on its own')
+    expect(first.gates.find(isStall)?.nodeId).toBe('build:U-1')
     expect(stalled.shippable).toBe(false)
-    const gate = stalled.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
-    expect(gate).toBeDefined()
-    // Names the failed node, so the Inbox's "Send back" retries something
-    // rather than nothing.
-    expect(gate?.nodeId).toBe('build:U-1')
+    expect(stalled.gates.find(isStall)?.nodeId).toBe('build:U-1')
   })
 
   it('does not call a finished run stalled', async () => {
@@ -2872,27 +2796,16 @@ function slashCommandsStayWithAgentsTests() {
   })
 }
 
-describe('the stalled gate names what it would retry', () => {
-  it("names the failed node with a dependant, so the Inbox's Send back retries something", async () => {
-    const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
-    const outcome = await execute(
-      planOf(o),
-      deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
-    )
-    const stalled = outcome.gates.find((g) =>
-      g.summary.endsWith('cannot go any further on its own')
-    )
-    expect(stalled?.nodeId).toBe('build:U-1')
-  })
-})
-
 describe('an accepted debt on a node', () => {
   it('still stops a stalled run, because only a final check takes a debt as settled', async () => {
     const o = order([unit('U-1')])
     const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     const first = await execute(planOf(o), failing)
-    const asked = first.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
-    if (asked === undefined) throw new Error('expected the stall to be asked about')
+    const asked = gateWhere(
+      first.gates,
+      (g) => g.summary.endsWith('cannot go any further on its own'),
+      'the stall'
+    )
     const accepted = decide(asked, {
       option: 'accept_debt',
       note: '',
@@ -2938,7 +2851,7 @@ describe('skillsFor', () => {
 
 function unionOfSkillsTests() {
   it("is the union of the role's and the step's skills, de-duplicated", () => {
-    const withStep = parseRecipe(
+    const withStep = recipe(
       `
 schemaVersion: 1
 id: direct
@@ -2947,20 +2860,18 @@ steps:
     kind: agent
     role: builder
     skills: [ci-fix, extra]
-`,
-      'direct.yaml'
+`
     )
-    if (!withStep.ok) throw new Error(withStep.reason)
-    const graph = buildRunGraph(order([unit('U-1')]), withStep.value)
+    const graph = buildRunGraph(order([unit('U-1')]), withStep)
     const node = graph.nodes.find((n) => n.id === 'build')!
     // The builder role already declares `ci-fix`; the step adds `extra`.
-    expect(skillsFor(withStep.value, node, roles).sort()).toEqual(['ci-fix', 'extra'])
+    expect(skillsFor(withStep, node, roles).sort()).toEqual(['ci-fix', 'extra'])
   })
 }
 
 function innerStepsAndNoneTests() {
   it('reads a skill declared on a fan-out’s inner step', () => {
-    const fanned = parseRecipe(
+    const fanned = recipe(
       `
 schemaVersion: 1
 id: direct
@@ -2969,13 +2880,11 @@ steps:
     kind: fanout
     over: plan.units
     step: { kind: agent, role: builder, skills: [extra] }
-`,
-      'direct.yaml'
+`
     )
-    if (!fanned.ok) throw new Error(fanned.reason)
-    const graph = buildRunGraph(order([unit('U-1')]), fanned.value)
+    const graph = buildRunGraph(order([unit('U-1')]), fanned)
     const node = graph.nodes.find((n) => n.id === 'build:U-1')!
-    expect(skillsFor(fanned.value, node, roles).sort()).toEqual(['ci-fix', 'extra'])
+    expect(skillsFor(fanned, node, roles).sort()).toEqual(['ci-fix', 'extra'])
   })
 
   it('is empty for a role and a step that declare none', () => {

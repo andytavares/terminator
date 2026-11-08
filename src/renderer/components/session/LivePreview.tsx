@@ -57,5 +57,11 @@ function MountedPreview({ sessionId, className }: Props): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
 
-  return <div ref={ref} className={`live-preview${className ? ` ${className}` : ''}`} />
+  return (
+    <div
+      ref={ref}
+      data-testid="live-preview"
+      className={`live-preview${className ? ` ${className}` : ''}`}
+    />
+  )
 }

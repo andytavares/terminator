@@ -17,37 +17,9 @@ vi.mock('electron-store', () => ({
 
 import { activateCapturingChannels } from './support/activate'
 
-describe('the remote browser client', () => {
-  // A logged-in remote browser reaches only what is opted in (ADR 094); a
-  // channel added here is a decision, so the list is spelled out.
-  it('may call exactly these read-only channels, and nothing that writes or runs', () => {
-    const remote = activateCapturingChannels()
-      .channels.filter((c) => c.remoteAccessible)
-      .map((c) => c.spec.channel)
-    expect(remote.sort()).toEqual([
-      'git:conflicts-list',
-      'git:pr-status',
-      'git:status',
-      'github:accessible-repos',
-      'github:active-reviews-for-repo',
-      'github:current-user',
-      'github:dashboard-search',
-      'github:list-open-prs',
-      'github:pr-compare',
-      'github:pr-inline-comments',
-      'github:pr-issue-comments',
-      'github:pr-review-detail',
-      'github:review-settings',
-      'github:session-get',
-      'github:sessions-for-repo',
-      'review-agent:list',
-      'review-agent:settings',
-    ])
-  })
-})
-
-// A valid payload for each remote channel, naming `root` as its checkout; null
-// for a channel that takes no directory.
+// A logged-in remote browser reaches only what is opted in (ADR 094); a channel
+// added here is a decision, so the list is spelled out. A valid payload for each
+// remote channel, naming `root` as its checkout; null for one that takes no directory.
 const PAYLOAD_AT: Record<string, ((root: string) => unknown) | null> = {
   'git:conflicts-list': (root) => ({ repoRoot: root }),
   'git:pr-status': (root) => ({ repoRoot: root }),
@@ -68,6 +40,15 @@ const PAYLOAD_AT: Record<string, ((root: string) => unknown) | null> = {
   'review-agent:list': (root) => ({ repoRoot: root, prNumber: 7, headSHA: 'abc' }),
   'review-agent:settings': null,
 }
+
+describe('the remote browser client', () => {
+  it('may call exactly the read-only channels PAYLOAD_AT lists, and nothing that writes or runs', () => {
+    const remote = activateCapturingChannels()
+      .channels.filter((c) => c.remoteAccessible)
+      .map((c) => c.spec.channel)
+    expect(remote.sort()).toEqual(Object.keys(PAYLOAD_AT).sort())
+  })
+})
 
 interface ScratchDirs {
   scratch: string
@@ -105,48 +86,51 @@ function remoteChannelsIn(dirs: ScratchDirs) {
     .map((c) => c.spec)
 }
 
+/** Each remote channel that takes a directory, with the payload naming it. */
+const DIRECTORY_CHANNELS = Object.entries(PAYLOAD_AT).flatMap(([channel, payloadAt]) =>
+  payloadAt ? [{ channel, payloadAt }] : []
+)
+
+/** The registered spec of `channel`, with `run` replaced by a spy. */
+function spiedSpec(dirs: ScratchDirs, channel: string) {
+  const spec = remoteChannelsIn(dirs).find((s) => s.channel === channel)!
+  return { ...spec, run: vi.fn() }
+}
+
 describe("a remote-accessible channel's repoRoot", () => {
   const dirs = useScratchDirs()
-  const remoteChannels = () => remoteChannelsIn(dirs)
 
-  it('is checked for every remote channel that takes a directory', () => {
-    expect(Object.keys(PAYLOAD_AT).sort()).toEqual(
-      remoteChannels()
-        .map((s) => s.channel)
-        .sort()
-    )
-  })
-
-  it('is refused outside the workspace, even through a symlink, before the channel runs', async () => {
-    for (const spec of remoteChannels()) {
-      const payloadAt = PAYLOAD_AT[spec.channel]
-      if (!payloadAt) continue
-      const run = vi.fn()
-      const refused = await dispatchChannel({ ...spec, run }, 42)
-      for (const root of [dirs.outside, join(dirs.project, 'escape'), '/']) {
-        const answer = await dispatchChannel({ ...spec, run }, payloadAt(root))
-        expect(answer).toEqual(refused)
-      }
-      expect(run).not.toHaveBeenCalled()
+  it.each(DIRECTORY_CHANNELS)(
+    '$channel is refused outside the workspace, even through a symlink, before it runs',
+    async ({ channel, payloadAt }) => {
+      const spec = spiedSpec(dirs, channel)
+      const refused = await dispatchChannel(spec, 42)
+      const roots = [dirs.outside, join(dirs.project, 'escape'), '/']
+      const answers = await Promise.all(roots.map((root) => dispatchChannel(spec, payloadAt(root))))
+      expect(answers).toEqual([refused, refused, refused])
+      expect(spec.run).not.toHaveBeenCalled()
     }
-  })
+  )
 })
 
 describe("a remote-accessible channel's repoRoot — inside the workspace", () => {
   const dirs = useScratchDirs()
-  const remoteChannels = () => remoteChannelsIn(dirs)
 
-  it('is accepted at a project, the workspace folder, a worktree inside one, or a gh: repository', async () => {
-    const { project, workspaceFolder } = dirs
-    const roots = [project, workspaceFolder, join(project, '.worktrees', 'fix'), 'gh:acme/widgets']
-    for (const spec of remoteChannels()) {
-      const payloadAt = PAYLOAD_AT[spec.channel]
-      if (!payloadAt) continue
-      const run = vi.fn()
-      for (const root of roots) await dispatchChannel({ ...spec, run }, payloadAt(root))
-      expect(run).toHaveBeenCalledTimes(roots.length)
+  it.each(DIRECTORY_CHANNELS)(
+    '$channel is accepted at a project, the workspace folder, a worktree inside one, or a gh: repository',
+    async ({ channel, payloadAt }) => {
+      const { project, workspaceFolder } = dirs
+      const roots = [
+        project,
+        workspaceFolder,
+        join(project, '.worktrees', 'fix'),
+        'gh:acme/widgets',
+      ]
+      const spec = spiedSpec(dirs, channel)
+      await Promise.all(roots.map((root) => dispatchChannel(spec, payloadAt(root))))
+      expect(spec.run).toHaveBeenCalledTimes(roots.length)
     }
-  })
+  )
 })
 
 describe("a remote-accessible channel's repoRoot — outside the workspace", () => {

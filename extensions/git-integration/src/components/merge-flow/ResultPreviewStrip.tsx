@@ -11,10 +11,11 @@ export function ResultPreviewStrip({ resolvedText, blockId, isExistingResolution
   const lang = blockId ? extensionOfBlock(blockId) : undefined
   const html = resolvedText !== null ? highlight(resolvedText, lang) : null
 
+  const label = isExistingResolution ? 'Current resolution' : 'Preview'
   return (
-    <div className="result-preview-strip">
+    <div className="result-preview-strip" role="group" aria-label={label}>
       <div className="result-preview-strip__label">
-        {isExistingResolution ? 'Current resolution' : 'Preview'}
+        {label}
         {isExistingResolution && (
           <span className="result-preview-strip__resolved-badge">resolved</span>
         )}

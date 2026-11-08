@@ -43,6 +43,7 @@ function HeatmapGrid(props: { weeks: ContributionsDay[][]; total: number }): Rea
           <MonthRow weeks={props.weeks} />
           <div
             className="ct-weeks"
+            data-testid="heatmap-weeks"
             style={{ gridTemplateColumns: `repeat(${props.weeks.length}, minmax(0, 1fr))` }}
           >
             {props.weeks.map((week, index) => (
@@ -84,6 +85,7 @@ function MonthRow({ weeks }: { weeks: ContributionsDay[][] }): React.JSX.Element
       {monthLabels(weeks).map((month) => (
         <span
           key={month.column}
+          data-testid="heatmap-month"
           style={
             { '--ct-month-at': `${(month.column / weeks.length) * 100}%` } as React.CSSProperties
           }
@@ -98,11 +100,12 @@ function MonthRow({ weeks }: { weeks: ContributionsDay[][] }): React.JSX.Element
 /** A week column; the first row's month joins the label row above when it changes. */
 function WeekColumn(props: { week: ContributionsDay[] }): React.JSX.Element {
   return (
-    <div className="ct-week">
+    <div className="ct-week" data-testid="heatmap-week">
       {props.week.map((day) => (
         <div
           key={day.date}
           className="ct-day"
+          data-testid="heatmap-day"
           style={chooseStyle(day)}
           title={day.future ? undefined : dayTitle(day)}
         />

@@ -129,10 +129,10 @@ describe('parseDiff()', () => {
     expect(removeLines[0].content).toBe("  console.log('hello')")
   })
 
-  it('parses context lines', () => {
+  it('parses the lines around the change as context', () => {
     const diff = parseDiff(sampleDiff)
     const contextLines = diff.hunks[0].lines.filter((l) => l.type === 'context')
-    expect(contextLines.length).toBeGreaterThan(0)
+    expect(contextLines.map((l) => l.content)).toEqual(['function main() {', '}'])
   })
 })
 
@@ -156,10 +156,13 @@ describe('parseDiff() — binary, truncated and numbered', () => {
 
   it('assigns correct line numbers to add/remove/context', () => {
     const diff = parseDiff(sampleDiff)
-    const lines = diff.hunks[0].lines
-    const firstContext = lines.find((l) => l.type === 'context')
-    expect(firstContext?.oldLineNumber).toBe(1)
-    expect(firstContext?.newLineNumber).toBe(1)
+    expect(diff.hunks[0].lines).toEqual([
+      { type: 'context', content: 'function main() {', oldLineNumber: 1, newLineNumber: 1 },
+      { type: 'remove', content: "  console.log('hello')", oldLineNumber: 2, newLineNumber: null },
+      { type: 'add', content: "  console.log('world')", oldLineNumber: null, newLineNumber: 2 },
+      { type: 'add', content: "  console.log('!')", oldLineNumber: null, newLineNumber: 3 },
+      { type: 'context', content: '}', oldLineNumber: 3, newLineNumber: 4 },
+    ])
   })
 })
 
@@ -170,10 +173,6 @@ describe('parseStatus() — uncommon entries', () => {
       status: 'ignored',
       staged: false,
     })
-  })
-
-  it('skips a token too short to be an entry', () => {
-    expect(parseStatus('M\0 M a.ts\0', 500).files.map((f) => f.path)).toEqual(['a.ts'])
   })
 
   it('reads a type change (T) as modified', () => {

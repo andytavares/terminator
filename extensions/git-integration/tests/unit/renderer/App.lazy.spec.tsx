@@ -22,16 +22,8 @@ vi.mock('../../../src/components/pr-review/ReviewDashboard', () => {
 })
 
 beforeEach(() => {
-  Object.defineProperty(window, 'location', {
-    value: { search: '?view=project&repoRoot=%2Fmy%2Frepo' },
-    configurable: true,
-    writable: true,
-  })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { on: vi.fn(() => vi.fn()) } },
-    configurable: true,
-    writable: true,
-  })
+  vi.stubGlobal('location', { search: '?view=project&repoRoot=%2Fmy%2Frepo' })
+  vi.stubGlobal('electronAPI', { extensionBridge: { on: vi.fn(() => vi.fn()) } })
 })
 
 describe('git-integration renderer App code splitting', () => {

@@ -48,9 +48,15 @@ async function commandsAndSettings(page: AppHandle['page']) {
   return { commands, settings }
 }
 
-test('record the features the running app offers', async () => {
+/** The file to write; the tool fails, not skips, when it is not named. */
+function inventoryFile(): string {
   const output = process.env.FEATURE_INVENTORY
-  test.skip(!output, 'FEATURE_INVENTORY names the file to write')
+  if (!output) throw new Error('Set FEATURE_INVENTORY to the file the inventory is written to')
+  return output
+}
+
+test('record the features the running app offers', async () => {
+  const output = inventoryFile()
   handle = await launchApp()
   const { app, page } = handle
   const ids: string[] = bundledExtensionIds(join(REPO_ROOT, 'extensions'))
@@ -61,8 +67,5 @@ test('record the features the running app offers', async () => {
     send: ipcMain.eventNames().filter((name): name is string => typeof name === 'string'),
   }))
   const { commands, settings } = await commandsAndSettings(page)
-  writeFileSync(
-    output as string,
-    JSON.stringify({ extensions: ids, channels, commands, settings }, null, 2)
-  )
+  writeFileSync(output, JSON.stringify({ extensions: ids, channels, commands, settings }, null, 2))
 })

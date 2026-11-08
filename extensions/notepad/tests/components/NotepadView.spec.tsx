@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import {
   installNotepadBridge,
   listItem,
@@ -18,7 +19,7 @@ vi.mock('../../src/components/DiagramView', () => ({
   DiagramView: ({ diagramId }: { diagramId: string }) => <div>diagram {diagramId}</div>,
 }))
 
-const bridge = installNotepadBridge()
+let bridge: ReturnType<typeof installNotepadBridge>
 
 import { NotepadView } from '../../src/components/NotepadView'
 import { useNotesStore } from '../../src/stores/notes.store'
@@ -31,8 +32,7 @@ import { notepadSettingsFrom } from '../../src/notepad-settings'
 const BODY = '# Plan\nhello world'
 
 beforeEach(() => {
-  for (const key of Object.keys(bridge.responses)) delete bridge.responses[key]
-  bridge.invoke.mockClear()
+  bridge = installNotepadBridge()
   useNotesStore.setState({
     notes: [],
     diagrams: [],
@@ -59,6 +59,14 @@ async function openNote(comments = [anchoredComment('c1', 'hello', [7, 12])]) {
   await eventually(() => expect(mountedEditorView().state.doc.toString()).toBe(BODY))
 }
 
+/** Opens the panel on a list of one note with none selected, once the lists have loaded. */
+async function openPanelWithNoNoteOpen() {
+  bridge.responses['terminator.notepad:notes.list'] = { data: [listItem('n1', 'Plan', [])] }
+  useNotesStore.setState({ notes: [listItem('n1', 'Plan', [])], showQuickCreate: false })
+  render(<NotepadView />)
+  await eventually(() => expect(bridge.calls('terminator.notepad:folders.list')).toHaveLength(1))
+}
+
 describe('NotepadView loading', () => {
   it('loads the note, diagram and folder lists, and offers to start when there are none', async () => {
     render(<NotepadView />)
@@ -66,14 +74,6 @@ describe('NotepadView loading', () => {
     await eventually(() => expect(bridge.calls('terminator.notepad:folders.list')).toHaveLength(1))
     expect(bridge.calls('terminator.notepad:notes.list')).toEqual([{ includeArchived: true }])
     expect(bridge.calls('terminator.notepad:diagrams.list')).toEqual([{ includeArchived: true }])
-  })
-
-  it('invites the reader to pick or start a note when none is open, and the action opens the composer', () => {
-    useNotesStore.setState({ notes: [listItem('n1', 'Plan', [])], showQuickCreate: false })
-    render(<NotepadView />)
-    expect(screen.getByRole('heading', { name: 'No note open' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'New note' }))
-    expect(useNotesStore.getState().showQuickCreate).toBe(true)
   })
 
   it('opens the selected note with its comments', async () => {
@@ -92,6 +92,20 @@ describe('NotepadView loading', () => {
   })
 })
 
+describe('NotepadView with no note open', () => {
+  it('invites the reader to pick or start a note when none is open', async () => {
+    await openPanelWithNoNoteOpen()
+    expect(screen.getByRole('heading', { name: 'No note open' }).textContent).toBe('No note open')
+  })
+
+  it('opens the composer from New note when no note is open', async () => {
+    const user = userEvent.setup()
+    await openPanelWithNoNoteOpen()
+    await user.click(screen.getByRole('button', { name: 'New note' }))
+    expect(useNotesStore.getState().showQuickCreate).toBe(true)
+  })
+})
+
 describe('NotepadView opening a note', () => {
   // An editor mounted before the body arrives is thrown away when it does: what
   // was typed into it is lost, and anything holding its DOM holds a dead node.
@@ -103,7 +117,7 @@ describe('NotepadView opening a note', () => {
     render(<NotepadView />)
     await eventually(() => expect(bridge.calls('terminator.notepad:notes.get')).toHaveLength(1))
     await act(async () => undefined)
-    expect(document.querySelector('.cm-editor')).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
 
     await act(async () => answerBody({ data: { body: BODY } }))
     await eventually(() => expect(mountedEditorView().state.doc.toString()).toBe(BODY))
@@ -177,11 +191,11 @@ describe('NotepadView changes from another surface', () => {
   })
 
   it('toggles the comment margin with Cmd+Alt+M', async () => {
+    const user = userEvent.setup()
     await openNote()
-    const margin = document.querySelector<HTMLElement>('.notepad-view__comments')!
-    expect(margin.hidden).toBe(false)
-    fireEvent.keyDown(document, { metaKey: true, altKey: true, code: 'KeyM' })
-    expect(margin.hidden).toBe(true)
+    expect(screen.getByRole('complementary', { name: 'Comments' })).toBeDefined()
+    await user.keyboard('{Meta>}{Alt>}[KeyM]{/Alt}{/Meta}')
+    expect(screen.queryByRole('complementary', { name: 'Comments' })).toBeNull()
   })
 })
 
@@ -209,7 +223,7 @@ describe('NotepadView with Notepad settings changed', () => {
   it('draws the editor at the configured font size', async () => {
     storeSettings({ 'terminator.notepad.editorFontSize': 20 })
     await openNote()
-    const editor = document.querySelector<HTMLElement>('.notepad-editor-cm')!
+    const editor = screen.getByTestId('editor')
     await eventually(() =>
       expect(editor.style.getPropertyValue('--notepad-editor-font-size')).toBe('20px')
     )
@@ -227,23 +241,33 @@ describe('NotepadView toolbar view modes', () => {
     expect(viewMode('Read').getAttribute('aria-checked')).toBe('false')
     expect(editor().state.readOnly).toBe(false)
   })
+})
 
-  it('Read makes the rendered note read-only; Source shows editable markdown', async () => {
+describe('NotepadView toolbar Read mode', () => {
+  it('Read makes the rendered note read-only', async () => {
+    const user = userEvent.setup()
     await openNote()
-    fireEvent.click(viewMode('Read'))
+    await user.click(viewMode('Read'))
     await eventually(() => expect(editor().state.readOnly).toBe(true))
     expect(useEditorStore.getState().previewMode).toBe(true)
+  })
 
-    fireEvent.click(viewMode('Source'))
+  it('Source after Read shows editable markdown', async () => {
+    const user = userEvent.setup()
+    await openNote()
+    await user.click(viewMode('Read'))
+    await eventually(() => expect(editor().state.readOnly).toBe(true))
+    await user.click(viewMode('Source'))
     await eventually(() => expect(editor().state.readOnly).toBe(false))
     expect(useEditorStore.getState().previewMode).toBe(false)
     expect(viewMode('Source').getAttribute('aria-checked')).toBe('true')
   })
 
   it('Read from Source renders the note rather than reading raw markdown', async () => {
+    const user = userEvent.setup()
     useEditorStore.setState({ previewMode: false })
     await openNote()
-    fireEvent.click(viewMode('Read'))
+    await user.click(viewMode('Read'))
     await eventually(() => expect(editor().state.readOnly).toBe(true))
     expect(useEditorStore.getState().previewMode).toBe(true)
   })
@@ -252,25 +276,28 @@ describe('NotepadView toolbar view modes', () => {
 describe('NotepadView toolbar panel buttons', () => {
   it('the rail holds the outline above the comments', async () => {
     await openNote()
-    const rail = document.querySelector('.notepad-view__rail')!
-    expect([...rail.children].map((panel) => panel.className)).toEqual([
-      'notepad-outline',
-      'notepad-view__comments',
-    ])
+    const outline = screen.getByRole('navigation', { name: 'Outline' })
+    const comments = screen.getByRole('complementary', { name: 'Comments' })
+    expect(outline.compareDocumentPosition(comments)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
-  it('outline and comments are pressed toggles that hide and show their panels', async () => {
+  it('outline is a pressed toggle that hides the outline when pressed', async () => {
+    const user = userEvent.setup()
     await openNote()
     const outline = screen.getByRole('button', { name: 'Outline' })
-    const comments = screen.getByRole('button', { name: 'Comments' })
     expect(outline.getAttribute('aria-pressed')).toBe('true')
-    expect(comments.getAttribute('aria-pressed')).toBe('true')
-
-    fireEvent.click(outline)
-    fireEvent.click(comments)
+    await user.click(outline)
     expect(outline.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.queryByRole('navigation', { name: 'Outline' })).toBeNull()
+  })
+
+  it('comments is a pressed toggle that hides the comment margin when pressed', async () => {
+    const user = userEvent.setup()
+    await openNote()
+    const comments = screen.getByRole('button', { name: 'Comments' })
+    expect(comments.getAttribute('aria-pressed')).toBe('true')
+    await user.click(comments)
     expect(comments.getAttribute('aria-pressed')).toBe('false')
-    expect(document.querySelector('.notepad-outline')).toBeNull()
-    expect(document.querySelector<HTMLElement>('.notepad-view__comments')?.hidden).toBe(true)
+    expect(screen.queryByRole('complementary', { name: 'Comments' })).toBeNull()
   })
 })

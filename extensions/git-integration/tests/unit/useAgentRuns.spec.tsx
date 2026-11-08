@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useAgentRuns } from '../../src/hooks/useAgentRuns'
+import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 import { eventually } from '../../../../tests/support/eventually'
@@ -13,18 +14,6 @@ vi.mock('../../src/api/review-agent', () => ({
   reviewAgentAPI: {
     list: (...args: unknown[]) => mockList(...args),
     onEvent: (...args: unknown[]) => mockOnEvent(...args),
-  },
-}))
-
-const mockSetAgentRuns = vi.fn()
-const mockUpsertAgentRun = vi.fn()
-
-vi.mock('../../src/stores/review-ui.store', () => ({
-  useReviewUiStore: {
-    getState: () => ({
-      setAgentRuns: mockSetAgentRuns,
-      upsertAgentRun: mockUpsertAgentRun,
-    }),
   },
 }))
 
@@ -95,6 +84,7 @@ beforeEach(() => {
   listedRun = makeRun()
   mockList.mockResolvedValue({ runs: [listedRun] })
   mockOnEvent.mockReturnValue(mockUnsubscribe)
+  useReviewUiStore.setState(useReviewUiStore.getInitialState(), true)
 })
 
 afterEach(() => {
@@ -110,27 +100,31 @@ describe('useAgentRuns', () => {
       expect(mockList).toHaveBeenCalledWith('/repo', 42, 'abc123')
     })
     await eventually(() => {
-      expect(mockSetAgentRuns).toHaveBeenCalledWith([listedRun])
+      expect(useReviewUiStore.getState().agentRuns).toEqual([listedRun])
     })
   })
 })
 
-describe('useAgentRuns — applies events only for this pr', () => {
-  it('applies events only for this pr', () => {
-    const pr = makePr()
-    renderHook(() => useAgentRuns('/repo', pr))
+/** The listener the hook subscribed to live agent events with. */
+function sendLiveEvent(run: AgentRun): void {
+  const handler = mockOnEvent.mock.calls[0][0] as (payload: { run: AgentRun }) => void
+  handler({ run })
+}
 
-    expect(mockOnEvent).toHaveBeenCalledTimes(1)
-    const handler = mockOnEvent.mock.calls[0][0] as (payload: { run: AgentRun }) => void
-
+describe('useAgentRuns — live events', () => {
+  it('stores a live run of this pull request', () => {
+    mockList.mockReturnValue(new Promise(() => {}))
+    renderHook(() => useAgentRuns('/repo', makePr()))
     const matching = makeRun({ id: 'run-2' })
-    handler({ run: matching })
-    expect(mockUpsertAgentRun).toHaveBeenCalledWith(matching)
+    sendLiveEvent(matching)
+    expect(useReviewUiStore.getState().agentRuns).toEqual([matching])
+  })
 
-    mockUpsertAgentRun.mockClear()
-    const otherPr = makeRun({ id: 'run-3', prNumber: 999 })
-    handler({ run: otherPr })
-    expect(mockUpsertAgentRun).not.toHaveBeenCalled()
+  it('ignores a live run of another pull request', () => {
+    mockList.mockReturnValue(new Promise(() => {}))
+    renderHook(() => useAgentRuns('/repo', makePr()))
+    sendLiveEvent(makeRun({ id: 'run-3', prNumber: 999 }))
+    expect(useReviewUiStore.getState().agentRuns).toEqual([])
   })
 
   it('unsubscribes on unmount', () => {

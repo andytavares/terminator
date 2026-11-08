@@ -12,20 +12,12 @@ import { makeTempDir } from '../../support/temp-dir'
 // ─── assertCommandAllowed ─────────────────────────────────────────────────────
 
 describe('assertCommandAllowed', () => {
-  it('allows git', () => {
-    expect(() => assertCommandAllowed('git')).not.toThrow()
+  it.each(['git', 'gh'])('allows %s', (command) => {
+    expect(() => assertCommandAllowed(command)).not.toThrow()
   })
 
-  it('allows gh', () => {
-    expect(() => assertCommandAllowed('gh')).not.toThrow()
-  })
-
-  it('throws CommandNotAllowedError for rm', () => {
-    expect(() => assertCommandAllowed('rm')).toThrow(CommandNotAllowedError)
-  })
-
-  it('throws CommandNotAllowedError for curl', () => {
-    expect(() => assertCommandAllowed('curl')).toThrow(CommandNotAllowedError)
+  it.each(['rm', 'curl'])('throws CommandNotAllowedError for %s', (command) => {
+    expect(() => assertCommandAllowed(command)).toThrow(CommandNotAllowedError)
   })
 
   /** What assertCommandAllowed throws for `command`; undefined when it lets it through. */

@@ -47,16 +47,20 @@ const allowOf = (facts: RoleFacts) => roleSettings(facts).settings.permissions.a
 const denyOf = (facts: RoleFacts) => roleSettings(facts).settings.permissions.deny
 const askOf = (facts: RoleFacts) => roleSettings(facts).settings.permissions.ask
 
-describe('the permission mode of a role', () => {
+describe.each([
+  ['read-only', readOnly],
+  ['documentation-only', docsOnly],
+  ['restricted', restricted],
+] as const)('the permission mode of a %s role', (_role, facts) => {
   it.each(['escorted', 'standard', 'lights-out'] as const)(
-    'is default, never dontAsk, for read-only, documentation-only and restricted roles at %s',
+    'is default, never dontAsk, at %s',
     (autonomy) => {
-      for (const facts of [readOnly, docsOnly, restricted]) {
-        expect(roleSettings({ ...facts, autonomy }).permissionMode).toBe('default')
-      }
+      expect(roleSettings({ ...facts, autonomy }).permissionMode).toBe('default')
     }
   )
+})
 
+describe('the permission mode of a role', () => {
   it.each([
     ['escorted', true, 'default'],
     ['standard', true, 'auto'],
@@ -207,14 +211,11 @@ describe('a documentation-only role', () => {
     expect(ruleCovers(allow, 'Write', 'package.json')).toBe(false)
   })
 
-  it.each(DOCUMENTATION_CASES)(
-    'has write globs that agree with isDocumentationRelative on %s',
-    (relative) => {
-      for (const tool of ['Edit', 'Write']) {
-        expect(ruleCovers(allow, tool, relative)).toBe(isDocumentationRelative(relative))
-      }
-    }
-  )
+  describe.each(['Edit', 'Write'])('its %s globs', (tool) => {
+    it.each(DOCUMENTATION_CASES)('agree with isDocumentationRelative on %s', (relative) => {
+      expect(ruleCovers(allow, tool, relative)).toBe(isDocumentationRelative(relative))
+    })
+  })
 
   it('may write its output file and its outputs directory', () => {
     expect(allow).toEqual(

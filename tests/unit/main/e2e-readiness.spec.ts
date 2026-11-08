@@ -13,15 +13,16 @@ async function freshReadiness(): Promise<void> {
 class FakeWindow extends EventEmitter {
   id = 7
   debuggerCommands: Array<[string, unknown]> = []
-  webContents = {
+  webContents = Object.assign(new EventEmitter(), {
     debugger: {
       isAttached: () => false,
       attach: vi.fn(),
-      sendCommand: vi.fn(async (method: string, params: unknown) => {
+      sendCommand: vi.fn(async (method: string, params: unknown): Promise<unknown> => {
         this.debuggerCommands.push([method, params])
+        return {}
       }),
     },
-  }
+  })
 }
 
 async function settles(promise: Promise<void>): Promise<boolean> {
@@ -55,10 +56,14 @@ describe('the e2e readiness announcer', () => {
 describe('the e2e readiness of a window', () => {
   beforeEach(freshReadiness)
 
-  it('announces a window drawn at its first frame and focused once emulation is on', async () => {
+  it('announces a window drawn at its first frame and focused once its page has loaded', async () => {
     const window = new FakeWindow()
     readiness.announceWindowReadiness(window as never)
     expect(await settles(readiness.whenAnnounced('drawn', '7'))).toBe(false)
+    // A focus command sent before the page has navigated can go unanswered.
+    expect(await settles(readiness.whenAnnounced('focused', '7'))).toBe(false)
+    expect(window.debuggerCommands).toEqual([])
+    window.webContents.emit('did-finish-load')
     window.emit('ready-to-show')
     await readiness.whenAnnounced('drawn', '7')
     await readiness.whenAnnounced('focused', '7')
@@ -80,12 +85,24 @@ describe('the e2e readiness of a window', () => {
 describe('the e2e readiness of a window whose focus emulation fails', () => {
   beforeEach(freshReadiness)
 
+  it('fails the wait for focus, with the reason, when focus emulation never answers', async () => {
+    vi.useFakeTimers()
+    const window = new FakeWindow()
+    window.webContents.debugger.sendCommand.mockImplementation(() => new Promise(() => {}))
+    readiness.announceWindowReadiness(window as never)
+    window.webContents.emit('did-finish-load')
+    const waiting = readiness.whenAnnounced('focused', '7')
+    await vi.advanceTimersByTimeAsync(30_000)
+    await expect(waiting).rejects.toThrow('Emulation.setFocusEmulationEnabled did not answer')
+  })
+
   it('fails the wait for focus, with the reason, when focus emulation cannot start', async () => {
     const window = new FakeWindow()
     window.webContents.debugger.attach.mockImplementation(() => {
       throw new Error('Another debugger is already attached')
     })
     readiness.announceWindowReadiness(window as never)
+    window.webContents.emit('did-finish-load')
     await expect(readiness.whenAnnounced('focused', '7')).rejects.toThrow('Another debugger')
   })
 })

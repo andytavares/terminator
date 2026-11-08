@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Menu, MenuItem } from '../../../../packages/extension-ui/src/Menu'
 
@@ -25,13 +25,13 @@ const names = () => screen.getAllByRole('menuitem').map((item) => item.textConte
 describe('Menu', () => {
   it('is a menu of menuitems', () => {
     renderMenu()
-    expect(screen.getByRole('menu', { name: 'Actions' })).toBeTruthy()
+    expect(screen.getByRole('menu').getAttribute('aria-label')).toBe('Actions')
     expect(names()).toEqual(['Rename', 'Move', 'Delete'])
   })
 
   it('opens on its first item', () => {
     renderMenu()
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+    expect(screen.getByRole('menuitem', { name: 'Rename' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -40,20 +40,20 @@ describe('Menu — keys', () => {
     renderMenu()
     const user = userEvent.setup()
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Move' }))
+    expect(screen.getByRole('menuitem', { name: 'Move' }).matches(':focus')).toBe(true)
     await user.keyboard('{ArrowUp}{ArrowUp}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(screen.getByRole('menuitem', { name: 'Delete' }).matches(':focus')).toBe(true)
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+    expect(screen.getByRole('menuitem', { name: 'Rename' }).matches(':focus')).toBe(true)
   })
 
   it('jumps to the first and last item with Home and End', async () => {
     renderMenu()
     const user = userEvent.setup()
     await user.keyboard('{End}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(screen.getByRole('menuitem', { name: 'Delete' }).matches(':focus')).toBe(true)
     await user.keyboard('{Home}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+    expect(screen.getByRole('menuitem', { name: 'Rename' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -67,9 +67,9 @@ describe('Menu — keys from outside the items', () => {
         <button role="menuitem">Three</button>
       </Menu>
     )
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Filter' }))
+    expect(screen.getByRole('textbox', { name: 'Filter' }).matches(':focus')).toBe(true)
     await userEvent.setup().keyboard('{ArrowUp}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Three' }))
+    expect(screen.getByRole('menuitem', { name: 'Three' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -82,13 +82,22 @@ describe('Menu — activation and dismissal', () => {
     expect(onSelect.mock.calls).toEqual([['move'], ['delete']])
   })
 
-  it('closes on Escape and on a click outside', () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderMenu()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    fireEvent.click(document.body)
+    await user.keyboard('{Escape}')
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
+  it('closes on a click outside it', async () => {
+    const user = userEvent.setup()
+    const { onDismiss } = renderMenu()
+    await user.click(document.body)
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Menu — disabled items', () => {
   it('skips a disabled item', async () => {
     render(
       <Menu label="Actions" onDismiss={vi.fn()}>
@@ -100,6 +109,6 @@ describe('Menu — activation and dismissal', () => {
       </Menu>
     )
     await userEvent.setup().keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Three' }))
+    expect(screen.getByRole('menuitem', { name: 'Three' }).matches(':focus')).toBe(true)
   })
 })

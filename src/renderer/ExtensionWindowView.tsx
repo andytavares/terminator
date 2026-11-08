@@ -33,7 +33,12 @@ export function ExtensionWindowView({ view }: { view: string }): React.JSX.Eleme
       <div
         style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
       >
-        {accentColor && <div style={{ height: 3, background: accentColor, flexShrink: 0 }} />}
+        {accentColor && (
+          <div
+            data-testid="window-accent-bar"
+            style={{ height: 3, background: accentColor, flexShrink: 0 }}
+          />
+        )}
         {ViewComponent ? (
           createElement(ViewComponent, { repoRoot })
         ) : (

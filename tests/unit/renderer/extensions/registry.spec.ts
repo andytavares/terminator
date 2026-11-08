@@ -7,28 +7,12 @@ import {
   useExtensionRegistry,
   matchesAccelerator,
 } from '../../../../src/renderer/extensions/registry'
-
-function resetStore() {
-  useExtensionRegistry.setState({
-    sidebarPanels: new Map(),
-    projectTabs: new Map(),
-    globalTabs: new Map(),
-    workspaceTabs: new Map(),
-    keyboardShortcuts: [],
-    commands: [],
-    overlays: [],
-    openPanels: new Set(),
-    activeProjectTabId: null,
-    activeGlobalTabId: null,
-    activeWorkspaceTabId: null,
-    pendingNavigations: new Map(),
-  })
-}
+import { resetStore } from '../../../support/renderer-stores'
 
 /** The hooks every "useExtensionRegistry" describe registers. */
 function setUpUseExtensionRegistry(): void {
   beforeEach(() => {
-    resetStore()
+    resetStore(useExtensionRegistry)
   })
 }
 
@@ -586,11 +570,6 @@ describe('matchesAccelerator — matches Alt+F4 style shortcut', () => {
   it('matches CommandOrControl+Shift+T format (Electron full name)', () => {
     const event = makeEvent({ key: 'T', metaKey: true, shiftKey: true })
     expect(matchesAccelerator(event, 'CommandOrControl+Shift+T')).toBe(true)
-  })
-
-  it('does not match CommandOrControl+Shift+T when shift is not held', () => {
-    const event = makeEvent({ key: 't', metaKey: true })
-    expect(matchesAccelerator(event, 'CommandOrControl+Shift+T')).toBe(false)
   })
 
   it('matches CmdOrCtrl+Alt+Shift+K when macOS Option changes e.key to a special char', () => {

@@ -141,7 +141,7 @@ describe('buildReadingOrder() — acceptance', () => {
     expect(byPath.get(reviewDiffPaneFile.path)?.reason).toBe('Renders HealthChips (step 5)')
 
     // Steps are 1-based and match the array position.
-    steps.forEach((s, i) => expect(s.step).toBe(i + 1))
+    expect(steps.map((s) => s.step)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
   })
 })
 

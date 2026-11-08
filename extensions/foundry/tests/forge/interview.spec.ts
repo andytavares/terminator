@@ -30,10 +30,6 @@ describe('surfacedQuestions', () => {
     expect(surfacedQuestions(many)).toHaveLength(QUESTION_BUDGET)
   })
 
-  it('budgets three, not some other number', () => {
-    expect(QUESTION_BUDGET).toBe(3)
-  })
-
   it('shows the questions that change the most first', () => {
     const many = [
       q({ id: 'Q-low', rank: 1 }),
@@ -65,9 +61,9 @@ describe('answerQuestion', () => {
     expect(after[0].answer).toBe('No')
   })
 
-  it('accepts an option index and stores the option it names', () => {
+  it('accepts an option index, storing the option it names and which index chose it', () => {
     const after = answerQuestion([q({ id: 'Q-1', options: ['No', 'Yes'] })], 'Q-1', 1)
-    expect(after[0].answer).toBe('Yes')
+    expect(after[0]).toMatchObject({ answer: 'Yes', chosen: [1] })
   })
 
   it('leaves other questions untouched', () => {
@@ -84,7 +80,7 @@ describe('answerQuestion', () => {
 
   it('ignores an answer to a question that does not exist rather than throwing', () => {
     const before = [q({ id: 'Q-1' })]
-    expect(() => answerQuestion(before, 'Q-9', 'No')).not.toThrow()
+    expect(answerQuestion(before, 'Q-9', 'No')).toEqual(before)
   })
 
   it('ignores an option index that is out of range', () => {
@@ -94,11 +90,6 @@ describe('answerQuestion', () => {
 })
 
 describe('answerQuestion with options chosen', () => {
-  it('records which option an index chose', () => {
-    const after = answerQuestion([q({ options: ['No', 'Yes'] })], 'Q-1', 1)
-    expect(after[0].chosen).toEqual([1])
-  })
-
   it('joins several chosen options in option order, however they were given', () => {
     const question = q({ options: ['api', 'web', 'cli'], multiple: true })
     const after = answerQuestion([question], 'Q-1', [2, 0])

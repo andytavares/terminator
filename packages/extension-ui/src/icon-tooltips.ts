@@ -41,27 +41,49 @@ function createTip(doc: Document): HTMLElement {
   return tip
 }
 
+/** A title the tooltip took off a control, and the aria-label it lent so the name stays. */
+interface Held {
+  control: HTMLElement
+  title: string | null
+  lentLabel: string | null
+}
+
+/** Takes the title off so the native tooltip does not draw the same name a second time, late. A
+ * control that only its title names (no label, no text) keeps that name as an aria-label meanwhile. */
+function holdTitle(control: HTMLElement): Held {
+  const title = control.getAttribute('title')
+  const named = control.hasAttribute('aria-label') || control.hasAttribute('aria-labelledby')
+  const lentLabel = title !== null && !named && !control.textContent?.trim() ? title : null
+  control.removeAttribute('title')
+  if (lentLabel !== null) control.setAttribute('aria-label', lentLabel)
+  return { control, title, lentLabel }
+}
+
+/** Puts back what holdTitle took. A title set meanwhile is the page's newer one, since React reuses
+ * a button for its next state, so it stays. */
+function giveTitleBack({ control, title, lentLabel }: Held): void {
+  if (title !== null && !control.hasAttribute('title')) control.setAttribute('title', title)
+  if (lentLabel !== null && control.getAttribute('aria-label') === lentLabel) {
+    control.removeAttribute('aria-label')
+  }
+}
+
 /** Shows and hides the tooltip for one control at a time. */
 function tooltipController(doc: Document) {
   const tip = createTip(doc)
-  let current: HTMLElement | null = null
-  let heldTitle: string | null = null
+  let held: Held | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const hide = (): void => {
     clearTimeout(timer)
-    if (current && heldTitle !== null) current.setAttribute('title', heldTitle)
-    current = null
-    heldTitle = null
+    if (held) giveTitleBack(held)
+    held = null
     tip.hidden = true
     tip.hidePopover()
   }
   const show = ({ control, text }: { control: HTMLElement; text: string }): void => {
     hide()
-    current = control
-    // The native tooltip would draw the same name a second time, late.
-    heldTitle = control.getAttribute('title')
-    control.removeAttribute('title')
+    held = holdTitle(control)
     tip.textContent = text
     tip.hidden = false
     tip.showPopover()
@@ -71,7 +93,7 @@ function tooltipController(doc: Document) {
     hide()
     timer = setTimeout(() => show(named), TOOLTIP_DELAY_MS)
   }
-  return { tip, show, showLater, hide, isOn: (control: Element) => control === current }
+  return { tip, show, showLater, hide, isOn: (control: Element) => control === held?.control }
 }
 
 type Tips = ReturnType<typeof tooltipController>

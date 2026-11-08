@@ -10,20 +10,16 @@ const changeListeners = new Set<() => void>()
 beforeEach(() => {
   vi.clearAllMocks()
   changeListeners.clear()
-  Object.defineProperty(window, 'electronAPI', {
-    value: {
-      // The section's own load never answers: these tests are about whether it shows at all.
-      extensionBridge: { invoke: vi.fn(() => new Promise(() => {})) },
-      extension: {
-        getSettingsValues,
-        onSettingsChanged: (handler: () => void) => {
-          changeListeners.add(handler)
-          return () => void changeListeners.delete(handler)
-        },
+  vi.stubGlobal('electronAPI', {
+    // The section's own load never answers: these tests are about whether it shows at all.
+    extensionBridge: { invoke: vi.fn(() => new Promise(() => {})) },
+    extension: {
+      getSettingsValues,
+      onSettingsChanged: (handler: () => void) => {
+        changeListeners.add(handler)
+        return () => void changeListeners.delete(handler)
       },
     },
-    configurable: true,
-    writable: true,
   })
 })
 
@@ -41,8 +37,8 @@ describe('ContributionsOnHome', () => {
   it('shows nothing when "Show contributions on Insights" is off', async () => {
     getSettingsValues.mockResolvedValue({ values: { [SHOW_KEY]: false } })
     const { container } = render(<ContributionsOnHome />)
-    await waitFor(() => expect(getSettingsValues).toHaveBeenCalled())
-    await act(async () => {})
+    // The component reads the setting in a .then on this promise, registered before this await.
+    await act(() => getSettingsValues.mock.results[0].value)
     expect(container.innerHTML).toBe('')
   })
 })

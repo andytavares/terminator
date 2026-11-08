@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { fact } from '../../sidebar/fixtures/facts'
 import { installElectronApi } from '../../../../support/electron-api'
 import type { SessionFacts } from '../../../../../src/renderer/sidebar/session-facts'
@@ -105,6 +106,13 @@ beforeEach(() => {
 
 const home = () => screen.getByRole('region', { name: 'Home' })
 
+/** Presses `key` with the Home screen focused, as its shortcuts need. */
+async function pressOnHome(user: ReturnType<typeof userEvent.setup>, key: string): Promise<void> {
+  home().focus()
+  expect(home().matches(':focus')).toBe(true)
+  await user.keyboard(key)
+}
+
 const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../../src/renderer/usage/record', () => ({ recordUse }))
 
@@ -161,24 +169,26 @@ describe('Home — the pulse line', () => {
 })
 
 describe('Home — the pulse line as a filter', () => {
-  it('narrows to one state when its count is pressed, and back when pressed again', () => {
+  it('narrows to one state when its count is pressed, and back when pressed again', async () => {
+    const user = userEvent.setup()
     state.facts = [asking()]
     state.threads = [thread('a', 'running', 'working')]
     render(<HomeScreen />)
     const running = screen.getByRole('button', { name: '1 running' })
-    fireEvent.click(running)
+    await user.click(running)
     expect(running.getAttribute('aria-pressed')).toBe('true')
     expect(screen.queryByRole('region', { name: 'Needs you' })).toBeNull()
     expect(screen.getByRole('region', { name: 'Tasks' })).toBeTruthy()
-    fireEvent.click(running)
+    await user.click(running)
     expect(screen.getByRole('region', { name: 'Needs you' })).toBeTruthy()
   })
 
-  it('narrows to the queue when Needs you is pressed', () => {
+  it('narrows to the queue when Needs you is pressed', async () => {
+    const user = userEvent.setup()
     state.facts = [asking()]
     state.threads = [thread('a', 'running', 'working')]
     render(<HomeScreen />)
-    fireEvent.click(screen.getByRole('button', { name: '1 need you' }))
+    await user.click(screen.getByRole('button', { name: '1 need you' }))
     expect(screen.getByRole('region', { name: 'Needs you' })).toBeTruthy()
     expect(screen.queryByRole('region', { name: 'Tasks' })).toBeNull()
   })
@@ -204,14 +214,17 @@ describe('Home — Needs you, the reasons and the calm line', () => {
   it('draws a reported ask without a reason', () => {
     state.facts = [asking()]
     render(<HomeScreen />)
+    expect(screen.getByRole('heading', { name: 'Needs you · 1' })).not.toBeNull()
     expect(screen.queryByText(/on screen|rang its bell/)).toBeNull()
   })
 
-  it('opens the first ask with its answers and lists the rest on one line', () => {
+  it('opens the first ask with its answers and lists the rest on one line', async () => {
+    const user = userEvent.setup()
     state.facts = [asking(), asking({ sessionId: 'b', lastActivityAt: NOW - 60_000 })]
     render(<HomeScreen />)
+    expect(screen.getByRole('heading', { name: 'Needs you · 2' })).not.toBeNull()
     expect(screen.getAllByLabelText('Terminal excerpt')).toHaveLength(1)
-    fireEvent.keyDown(home(), { key: 'j' })
+    await pressOnHome(user, 'j')
     expect(screen.getAllByLabelText('Terminal excerpt')).toHaveLength(1)
   })
 
@@ -225,30 +238,34 @@ describe('Home — Needs you, the reasons and the calm line', () => {
 })
 
 describe('Home — the plan', () => {
-  it('shows the plan strip, and Skip today takes it away', () => {
+  it('shows the plan strip, and Skip today takes it away', async () => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    expect(document.body.textContent).toContain('Plan today · pick up to 3 to focus on')
-    expect(document.body.textContent).not.toContain('0 tasks carried over')
-    fireEvent.click(screen.getByRole('button', { name: 'Skip today' }))
-    expect(document.body.textContent).not.toContain('pick up to 3 to focus on')
+    expect(screen.getByText(/pick up to 3 to focus on/)).not.toBeNull()
+    expect(screen.queryByText(/0 tasks carried over/)).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Skip today' }))
+    expect(screen.queryByText(/pick up to 3 to focus on/)).toBeNull()
   })
 })
 
 describe('Home — the plan sheet', () => {
   it('opens the plan sheet with P and closes it with Escape', async () => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
     expect(screen.queryByRole('dialog', { name: 'Plan today' })).toBeNull()
-    fireEvent.keyDown(home(), { key: 'p' })
+    await pressOnHome(user, 'p')
     const sheet = await screen.findByRole('dialog', { name: 'Plan today' })
     expect(within(sheet).getByText(/Today's focus/i)).toBeTruthy()
     within(sheet).getAllByRole('button')[0].focus()
-    fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' })
+    expect(sheet.matches(':focus-within')).toBe(true)
+    await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Plan today' })).toBeNull())
   })
 
   it('opens the plan sheet from the Plan button', async () => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    fireEvent.click(screen.getByRole('button', { name: /^Plan/ }))
+    await user.click(screen.getByRole('button', { name: /^Plan/ }))
     expect(await screen.findByRole('dialog', { name: 'Plan today' })).toBeTruthy()
   })
 })
@@ -260,8 +277,9 @@ describe('Home — the plan sheet picks tasks', () => {
       thread('Billing page copy', 'quiet'),
       thread('Shipped already', 'done'),
     ]
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'p' })
+    await pressOnHome(user, 'p')
     const sheet = await screen.findByRole('dialog', { name: 'Plan today' })
     const open = within(sheet).getByRole('list', { name: 'Open tasks' })
     expect(
@@ -290,8 +308,9 @@ describe('Home — the plan sheet offers to archive', () => {
       { ...thread('Rate-limit docs', 'quiet'), lastActivity: NOW - 3 * DAY - 1 },
       { ...thread('Billing page copy', 'quiet'), lastActivity: NOW - DAY },
     ]
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'p' })
+    await pressOnHome(user, 'p')
     const sheet = await screen.findByRole('dialog', { name: 'Plan today' })
     expect(within(sheet).getByText('quiet 3 days')).toBeTruthy()
     expect(within(sheet).getAllByRole('button', { name: /^Archive/ })).toHaveLength(1)
@@ -301,8 +320,9 @@ describe('Home — the plan sheet offers to archive', () => {
 
 describe('Home — the plan sheet and trackers', () => {
   it('leaves out the tickets column when no tracker is connected', async () => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'p' })
+    await pressOnHome(user, 'p')
     const sheet = await screen.findByRole('dialog', { name: 'Plan today' })
     expect(within(sheet).queryByText('Tickets column')).toBeNull()
     expect(within(sheet).getByText(/Connect Linear/)).toBeTruthy()
@@ -312,8 +332,9 @@ describe('Home — the plan sheet and trackers', () => {
     useIntegrationsStore.setState({
       connections: [{ tracker: 'linear', connected: true } as never],
     })
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'p' })
+    await pressOnHome(user, 'p')
     const sheet = await screen.findByRole('dialog', { name: 'Plan today' })
     expect(within(sheet).getByText('Tickets column')).toBeTruthy()
     expect(within(sheet).queryByText(/Connect Linear/)).toBeNull()
@@ -323,17 +344,19 @@ describe('Home — the plan sheet and trackers', () => {
 describe('Home — the plan sheet, continued', () => {
   it('says how many agents already run across how many tasks', async () => {
     state.threads = [thread('a', 'running', 'working'), thread('b', 'running', 'working')]
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'p' })
+    await pressOnHome(user, 'p')
     expect(await screen.findByText('Already running: 2 agents across 2 tasks.')).toBeTruthy()
   })
 })
 
 describe('Home — the footer', () => {
-  it('links to Insights and offers the archived tasks', () => {
+  it('links to Insights and offers the archived tasks', async () => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
     expect(screen.getByRole('button', { name: 'Archived tasks (0)' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /Open Insights/ }))
+    await user.click(screen.getByRole('button', { name: /Open Insights/ }))
     expect(useHomeView.getState().view).toBe('insights')
   })
 })

@@ -131,10 +131,7 @@ describe('electron-api-shim connection edge cases', () => {
     global.fetch = mockFetch
     // Stub out location.replace so jsdom doesn't throw
     const replace = vi.fn()
-    Object.defineProperty(window, 'location', {
-      value: { ...window.location, replace },
-      writable: true,
-    })
+    vi.stubGlobal('location', { ...window.location, replace })
     await import('../../../src/renderer-remote/electron-api-shim')
     await eventually(() => expect(replace).toHaveBeenCalledWith('/'))
     // No WebSocket should be created — the shim returned early after redirect

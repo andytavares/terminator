@@ -1,18 +1,23 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
 import type { Notification } from '../../../../src/renderer/stores/notification.store'
 
-const mockTriggerAction = vi.fn().mockResolvedValue({ ok: true })
-const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
+const mockTriggerAction = vi.fn()
+const mockDismiss = vi.fn()
 
-// In jsdom, globalThis === window, so setting globalThis.electronAPI sets window.electronAPI
-installElectronApi({
-  notifications: {
-    dismiss: mockDismiss,
-    triggerAction: mockTriggerAction,
-  },
+// Per test: vitest.config.ts unstubs globals and resets mocks after each one.
+beforeEach(() => {
+  mockTriggerAction.mockResolvedValue({ ok: true })
+  mockDismiss.mockResolvedValue({ ok: true })
+  installElectronApi({
+    notifications: {
+      dismiss: mockDismiss,
+      triggerAction: mockTriggerAction,
+    },
+  })
 })
 
 import { NotificationPanel } from '../../../../src/renderer/components/NotificationPanel'
@@ -55,7 +60,7 @@ describe('NotificationPanel', () => {
 
   it('renders nothing when panelOpen is false', () => {
     const { container } = render(<NotificationPanel />)
-    expect(container.firstChild).toBeNull()
+    expect(container.innerHTML).toBe('')
   })
 
   it('renders the panel, a named region beside the app, when panelOpen is true', () => {
@@ -85,29 +90,21 @@ describe('NotificationPanel', () => {
   })
 })
 
-describe('NotificationPanel — close button calls closePanel', () => {
+type User = ReturnType<typeof userEvent.setup>
+
+describe('NotificationPanel — closing', () => {
   setUpNotificationPanel()
 
-  it('close button calls closePanel', () => {
+  it.each([
+    ['the close button', (user: User) => user.click(screen.getByTitle('Close'))],
+    // eslint-disable-next-line testing-library/no-node-access -- the backdrop is a bare div with no role, label or text
+    ['a backdrop click', (user: User) => user.click(document.querySelector('.notif-backdrop')!)],
+    ['Escape', (user: User) => user.keyboard('{Escape}')],
+  ])('closes the panel on %s', async (_case, close) => {
+    const user = userEvent.setup()
     useNotificationStore.setState({ panelOpen: true })
     render(<NotificationPanel />)
-    const closeBtn = screen.getByTitle('Close')
-    fireEvent.click(closeBtn)
-    expect(useNotificationStore.getState().panelOpen).toBe(false)
-  })
-
-  it('backdrop click calls closePanel', () => {
-    useNotificationStore.setState({ panelOpen: true })
-    render(<NotificationPanel />)
-    const backdrop = document.querySelector('.notif-backdrop')!
-    fireEvent.click(backdrop)
-    expect(useNotificationStore.getState().panelOpen).toBe(false)
-  })
-
-  it('ESC key closes the panel', () => {
-    useNotificationStore.setState({ panelOpen: true })
-    render(<NotificationPanel />)
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await close(user)
     expect(useNotificationStore.getState().panelOpen).toBe(false)
   })
 })
@@ -115,30 +112,30 @@ describe('NotificationPanel — close button calls closePanel', () => {
 describe('NotificationPanel — "Mark all read" button marks all notifications as read', () => {
   setUpNotificationPanel()
 
-  it('"Mark all read" button marks all notifications as read', () => {
+  it('"Mark all read" button marks all notifications as read', async () => {
     const n = makeNotif()
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
     const btn = screen.getByText('Mark all read')
-    fireEvent.click(btn)
+    await userEvent.click(btn)
     expect(useNotificationStore.getState().unreadCount).toBe(0)
     expect(useNotificationStore.getState().notifications[0].read).toBe(true)
   })
 
-  it('"Clear all" button removes all notifications', () => {
+  it('"Clear all" button removes all notifications', async () => {
     const notifications = [makeNotif({ id: 'a' }), makeNotif({ id: 'b' })]
     useNotificationStore.setState({ notifications, panelOpen: true, unreadCount: 2 })
     render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Clear all'))
+    await userEvent.click(screen.getByText('Clear all'))
     expect(useNotificationStore.getState().notifications).toHaveLength(0)
   })
 
-  it('dismiss button removes the notification', () => {
+  it('dismiss button removes the notification', async () => {
     const n = makeNotif({ id: 'n1', title: 'Dismissable' })
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
     const dismissBtn = screen.getByTitle('Dismiss')
-    fireEvent.click(dismissBtn)
+    await userEvent.click(dismissBtn)
     expect(useNotificationStore.getState().notifications).toHaveLength(0)
     expect(mockDismiss).toHaveBeenCalledWith('n1')
   })
@@ -147,7 +144,8 @@ describe('NotificationPanel — "Mark all read" button marks all notifications a
 describe('NotificationPanel — renders action buttons and calls triggerAction on click', () => {
   setUpNotificationPanel()
 
-  it('renders action buttons and calls triggerAction on click', () => {
+  it('renders action buttons and calls triggerAction on click', async () => {
+    const user = userEvent.setup()
     const n = makeNotif({
       id: 'n-action',
       actions: [{ id: 'do-it', label: 'Do it' }],
@@ -155,22 +153,18 @@ describe('NotificationPanel — renders action buttons and calls triggerAction o
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
     const actionBtn = screen.getByText('Do it')
-    fireEvent.click(actionBtn)
+    await user.click(actionBtn)
     expect(mockTriggerAction).toHaveBeenCalledWith('n-action', 'do-it')
   })
 
-  it('renders source badge when source is not "core"', () => {
-    const n = makeNotif({ source: 'task-vault' })
+  it.each([
+    ['task-vault', 1],
+    ['core', 0],
+  ])('draws a source badge for source "%s" %i time(s)', (source, badges) => {
+    const n = makeNotif({ source })
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
-    expect(screen.getByText('task-vault')).toBeTruthy()
-  })
-
-  it('does not render source badge when source is "core"', () => {
-    const n = makeNotif({ source: 'core' })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
-    render(<NotificationPanel />)
-    expect(screen.queryByText('core')).toBeNull()
+    expect(screen.queryAllByText(source)).toHaveLength(badges)
   })
 })
 
@@ -185,35 +179,21 @@ describe('NotificationPanel — draws each type as its own shape', () => {
       panelOpen: true,
       unreadCount: 4,
     })
-    const { container } = render(<NotificationPanel />)
-    const shapes = [...container.querySelectorAll('.notif-item__type-icon')].map((icon) =>
-      icon.getAttribute('class')
-    )
-    expect(shapes).toHaveLength(4)
-    expect(new Set(shapes).size).toBe(4)
-  })
-
-  it('clicking a notification with onClick calls it and closes panel', () => {
-    const onClick = vi.fn()
-    const n = makeNotif({ onClick })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Test notification'))
-    expect(onClick).toHaveBeenCalled()
-    expect(useNotificationStore.getState().panelOpen).toBe(false)
+    const icons = screen.getAllByRole('img', { name: /^(Info|Success|Warning|Error)$/ })
+    expect(icons.map((icon) => icon.getAttribute('aria-label'))).toEqual([
+      'Info',
+      'Success',
+      'Warning',
+      'Error',
+    ])
+    const shapes = icons.map((icon) => icon.getAttribute('class'))
+    expect(new Set(shapes).size).toBe(4)
   })
 })
 
-describe('NotificationPanel — clicking a notification without onClick does not close panel', () => {
+describe('NotificationPanel — says when it happened', () => {
   setUpNotificationPanel()
-
-  it('clicking a notification without onClick does not close panel', () => {
-    const n = makeNotif()
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
-    render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Test notification'))
-    expect(useNotificationStore.getState().panelOpen).toBe(true)
-  })
 
   it('says how long ago it happened, keeping the exact moment', () => {
     const timestamp = Date.now() - 2 * 60 * 1000
@@ -246,26 +226,28 @@ describe('taking you to the thing a notification is about', () => {
     const n = makeNotif({ clickable: true })
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Test notification'))
+    await userEvent.click(screen.getByText('Test notification'))
     expect(mockTriggerAction).toHaveBeenCalledWith(n.id, '__open__')
   })
 
-  it('prefers a local handler, for a notification raised in this renderer', () => {
+  it('prefers a local handler, for a notification raised in this renderer, and closes the panel', async () => {
     const onClick = vi.fn()
     const n = { ...makeNotif(), onClick }
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Test notification'))
+    await userEvent.click(screen.getByText('Test notification'))
     expect(onClick).toHaveBeenCalled()
     expect(mockTriggerAction).not.toHaveBeenCalled()
+    expect(useNotificationStore.getState().panelOpen).toBe(false)
   })
 
-  it('does nothing for a bare report, which is a link to nowhere', () => {
+  it('does nothing for a bare report, which is a link to nowhere, and keeps the panel open', async () => {
     const n = makeNotif()
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Test notification'))
+    await userEvent.click(screen.getByText('Test notification'))
     expect(mockTriggerAction).not.toHaveBeenCalled()
+    expect(useNotificationStore.getState().panelOpen).toBe(true)
   })
 })
 
@@ -273,10 +255,11 @@ describe('taking you to the thing a notification is about — closes the drawer 
   setUpTakingYouToThe()
 
   it('closes the drawer on the way, so it does not cover where you landed', async () => {
+    const user = userEvent.setup()
     const n = makeNotif({ clickable: true })
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Test notification'))
+    await user.click(screen.getByText('Test notification'))
     expect(useNotificationStore.getState().panelOpen).toBe(false)
   })
 })
@@ -294,33 +277,25 @@ function setUpActingOnANotification(): void {
 describe('acting on a notification settles it', () => {
   setUpActingOnANotification()
 
-  it('takes the row away once its action has fired', async () => {
-    // Approve a phase and the request to approve that phase should not still be
-    // sitting in the list.
-    const n = makeNotif({ actions: [{ id: 'approve', label: 'Approve' }] })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
-    render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Approve'))
-    await eventually(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
-  })
-
   it('does not ask main to forget an id it has already forgotten', async () => {
+    const user = userEvent.setup()
     const n = makeNotif({ actions: [{ id: 'approve', label: 'Approve' }] })
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Approve'))
+    await user.click(screen.getByText('Approve'))
     await eventually(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
     expect(mockDismiss).not.toHaveBeenCalled()
   })
 
   it('still takes the row away when main says it was already answered', async () => {
+    const user = userEvent.setup()
     // The same decision made somewhere else — the extension's own UI, most
     // likely. Still not something to keep showing.
     mockTriggerAction.mockResolvedValueOnce({ error: 'UNKNOWN_NOTIFICATION' })
     const n = makeNotif({ actions: [{ id: 'approve', label: 'Approve' }] })
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
-    fireEvent.click(screen.getByText('Approve'))
+    await user.click(screen.getByText('Approve'))
     await eventually(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
   })
 })

@@ -76,22 +76,6 @@ beforeEach(() => {
 })
 
 describe('git:conflicts-list', () => {
-  it('returns ConflictSession on success', async () => {
-    const bridge = makeRegister()
-    const fakeSession = {
-      repoRoot: '/repo',
-      files: [],
-      totalConflicts: 0,
-      totalResolved: 0,
-      isRebase: false,
-      startedAt: '',
-    }
-    mockBuildConflictSession.mockResolvedValueOnce(fakeSession)
-
-    const result = await bridge.invoke('git:conflicts-list', { repoRoot: '/repo' })
-    expect(result).toEqual(fakeSession)
-  })
-
   it('returns error string on exception', async () => {
     const bridge = makeRegister()
     mockBuildConflictSession.mockRejectedValueOnce(new Error('git failed'))
@@ -103,11 +87,10 @@ describe('git:conflicts-list', () => {
 })
 
 describe('git:resolve-conflict', () => {
-  it('writes resolved text to file and returns success', async () => {
+  it('writes the resolution over the block at its index when the payload names no text to replace', async () => {
     const bridge = makeRegister()
     const originalConflictText = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch'
-    const fileContent = `${originalConflictText}\n`
-    mockReadFile.mockResolvedValueOnce(fileContent)
+    mockReadFile.mockResolvedValueOnce(`${originalConflictText}\n`)
     mockReadConflictBlocks.mockReturnValueOnce([
       {
         blockId: 'src/foo.ts#0',
@@ -128,8 +111,9 @@ describe('git:resolve-conflict', () => {
       resolvedText: 'resolved',
       strategy: 'ours',
     })
+
     expect(result).toEqual({ success: true })
-    expect(mockWriteFile).toHaveBeenCalledOnce()
+    expect(mockWriteFile).toHaveBeenCalledWith('/repo/src/foo.ts', 'resolved\n')
   })
 })
 
@@ -169,22 +153,6 @@ describe('git:undo-resolve — returns error when resolved text not found in fil
   })
 })
 
-describe('git:merge-commit', () => {
-  it('runs git add + git commit and returns commitHash', async () => {
-    const bridge = makeRegister()
-    mockExecFile
-      .mockReturnValueOnce('') // git add
-      .mockReturnValueOnce('[main abc1234] merge commit\n') // git commit
-
-    const result = (await bridge.invoke('git:merge-commit', {
-      repoRoot: '/repo',
-      resolvedFilePaths: ['src/foo.ts'],
-      commitMessage: 'Resolved conflicts',
-    })) as { commitHash: string }
-    expect(result.commitHash).toBeTruthy()
-  })
-})
-
 describe('git:merge-commit — includes push error when push fails but commit succeeds', () => {
   it('includes push error when push fails but commit succeeds', async () => {
     const bridge = makeRegister()
@@ -203,8 +171,8 @@ describe('git:merge-commit — includes push error when push fails but commit su
   })
 })
 
-describe('git:merge-commit — resolves upstream and pushes when upstream is configured', () => {
-  it('resolves upstream and pushes when upstream is configured', async () => {
+describe('git:merge-commit — commits and pushes to the configured upstream', () => {
+  it('returns the commit hash git printed and pushes HEAD to the upstream branch', async () => {
     const bridge = makeRegister()
     mockExecFile
       .mockReturnValueOnce('') // git add
@@ -212,16 +180,19 @@ describe('git:merge-commit — resolves upstream and pushes when upstream is con
       .mockReturnValueOnce('origin/feature/branch') // rev-parse upstream
       .mockReturnValueOnce('') // git push
 
-    const result = (await bridge.invoke('git:merge-commit', {
+    const result = await bridge.invoke('git:merge-commit', {
       repoRoot: '/repo',
       resolvedFilePaths: ['src/foo.ts'],
       commitMessage: 'Resolved conflicts',
-    })) as { commitHash: string; pushError?: string }
-    expect(result.commitHash).toBeTruthy()
-    expect(result.pushError).toBeUndefined()
-    // push call should use force-with-lease
-    const pushCall = mockExecFile.mock.calls[3]
-    expect(pushCall[1]).toContain('--force-with-lease')
+    })
+
+    expect(result).toEqual({ commitHash: 'abc1234', pushError: undefined })
+    expect(mockExecFile.mock.calls[3][1]).toEqual([
+      'push',
+      '--force-with-lease',
+      'origin',
+      'HEAD:refs/heads/feature/branch',
+    ])
   })
 })
 
@@ -260,37 +231,6 @@ describe('git:resolve-conflict — branch paths', () => {
     const written = mockWriteFile.mock.calls.at(-1)?.[1] as string
     expect(written).toContain('new resolution')
     expect(written).not.toContain(currentResolvedText)
-  })
-})
-
-describe('git:resolve-conflict — branch paths — falls back to index-based lookup when neither text found', () => {
-  it('falls back to index-based lookup when neither text found', async () => {
-    const bridge = makeRegister()
-    const fileContent = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n'
-    mockReadFile.mockResolvedValueOnce(fileContent)
-    // readConflictBlocks returns a block at index 0
-    mockReadConflictBlocks.mockReturnValueOnce([
-      {
-        blockId: 'src/foo.ts#0',
-        index: 0,
-        oursText: 'ours',
-        theirsText: 'theirs',
-        baseText: '',
-        contextBefore: [],
-        contextAfter: [],
-        originalConflictText: '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch',
-        isResolved: false,
-      },
-    ])
-
-    const result = await bridge.invoke('git:resolve-conflict', {
-      repoRoot: '/repo',
-      blockId: 'src/foo.ts#0',
-      resolvedText: 'resolved via index',
-      strategy: 'theirs',
-      // no originalConflictText, no currentResolvedText — forces fallback
-    })
-    expect(result).toEqual({ success: true })
   })
 })
 
@@ -441,7 +381,7 @@ describe('git:session-persist', () => {
     }
     const result = await bridge.invoke('git:session-persist', { repoRoot: '/repo', session })
     expect(result).toEqual({ success: true })
-    expect(mockStoreSet).toHaveBeenCalledOnce()
+    expect(mockStoreSet.mock.calls).toEqual([['mergeflow:session:/repo', session]])
   })
 })
 
@@ -451,7 +391,7 @@ describe('git:session-clear', () => {
     mockStoreDel.mockReturnValueOnce(undefined)
     const result = await bridge.invoke('git:session-clear', { repoRoot: '/repo' })
     expect(result).toEqual({ success: true })
-    expect(mockStoreDel).toHaveBeenCalledOnce()
+    expect(mockStoreDel.mock.calls).toEqual([['mergeflow:session:/repo']])
   })
 
   it('returns success even when store.delete throws', async () => {
@@ -474,7 +414,7 @@ describe('git:session-reset', () => {
       files: [{ filePath: 'src/foo.ts' }, { filePath: 'src/bar.ts' }],
     })
     expect(result).toEqual({ success: true })
-    expect(mockStoreDel).toHaveBeenCalledOnce()
+    expect(mockStoreDel.mock.calls).toEqual([['mergeflow:session:/repo']])
     // git called twice — once per file
     expect(mockExecFile).toHaveBeenCalledTimes(2)
     const firstCall = mockExecFile.mock.calls[0]

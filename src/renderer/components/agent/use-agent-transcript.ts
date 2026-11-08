@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AgentPermissionAsk } from '@terminator/extension-sdk'
+import type { AgentPermissionAsk, AgentUpdate } from '@terminator/extension-sdk'
 import { emptyTranscript, foldUpdates, type Transcript } from './fold-updates'
 
 export interface AgentTranscriptState {
@@ -13,16 +13,25 @@ function useTranscript(sessionId: string): Transcript {
   const [transcript, setTranscript] = useState(emptyTranscript)
   useEffect(() => {
     const api = window.electronAPI.agents
-    let loaded = false
-    // Main logs an update before it broadcasts it, and its messages arrive in order: one that
-    // arrives before the history is already in it.
+    // Electron sends a push and the history's reply down two pipes, so either can arrive first.
+    // An update's position in the history says whether the history holds it.
+    let next: number | null = null
+    const early: Array<{ update: AgentUpdate; position: number }> = []
+    const fold = ({ update, position }: { update: AgentUpdate; position: number }): void => {
+      if (next === null || position < next) return
+      next = position + 1
+      setTranscript((current) => foldUpdates(current, update))
+    }
     const unsubscribe = api.onUpdate((payload) => {
-      if (loaded && payload.sessionId === sessionId)
-        setTranscript((current) => foldUpdates(current, payload.update))
+      if (payload.sessionId !== sessionId) return
+      if (next === null) early.push(payload)
+      else fold(payload)
     })
     void api.history({ sessionId }).then((reply) => {
-      loaded = true
-      setTranscript(('data' in reply ? reply.data : []).reduce(foldUpdates, emptyTranscript))
+      const history = 'data' in reply ? reply.data : []
+      next = history.length
+      setTranscript(history.reduce(foldUpdates, emptyTranscript))
+      early.forEach(fold)
     })
     return unsubscribe
   }, [sessionId])

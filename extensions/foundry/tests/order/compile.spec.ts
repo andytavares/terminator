@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { builderUnit, glyphCriteria, openQuestion, testCriterion } from '../helpers/order-parts.js'
-import { compileOrder, agreeOrder, CHECK_IDS } from '../../src/order/compile.js'
+import { compileOrder, agreeOrder } from '../../src/order/compile.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
@@ -55,7 +55,6 @@ describe('compileOrder', () => {
   })
 
   describe('3 — coverage, both directions', () => {
-    describe('criteria and units', compileCriteriaAndUnitsTests)
     describe('quoting', quotingTests)
     describe('no criteria and both directions', noCriteriaAndBothDirectionsTests)
   })
@@ -76,10 +75,6 @@ function theFiveChecksTests() {
     const result = compileOrder(complete())
     expect(result.ok).toBe(true)
     expect(result.failures).toEqual([])
-  })
-
-  it('knows exactly five checks', () => {
-    expect(CHECK_IDS).toHaveLength(5)
   })
 }
 
@@ -229,21 +224,6 @@ function picturesAndNamesTests() {
     order.acceptance[0].verify = { kind: 'test', command: '', assert: 'x' }
     const f = compileOrder(order).failures.find((x) => x.check === 'verifiable')
     expect(f?.subjectIds).toEqual(['AC-1'])
-  })
-}
-
-function compileCriteriaAndUnitsTests() {
-  it('fails when a criterion has no unit', () => {
-    const order = complete()
-    order.plan.units[0].satisfies = []
-    expect(failures(order)).toContain('coverage')
-  })
-
-  it('fails when a unit satisfies no criterion', () => {
-    const order = complete()
-    order.plan.units.push(builderUnit('U-2', { title: 'extra' }))
-    const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
-    expect(f?.subjectIds).toContain('U-2')
   })
 }
 

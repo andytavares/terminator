@@ -207,7 +207,11 @@ function BlockRow(props: BlockRowProps) {
 function MergedPreview(props: { preview: string; lang: string | undefined }) {
   const lineCount = props.preview.split('\n').length
   return (
-    <div className="keep-both-modal__preview-section">
+    <div
+      className="keep-both-modal__preview-section"
+      role="group"
+      aria-label="Merged result preview"
+    >
       <div className="keep-both-modal__preview-label">
         <ArrowDown aria-hidden="true" /> Merged result preview
       </div>

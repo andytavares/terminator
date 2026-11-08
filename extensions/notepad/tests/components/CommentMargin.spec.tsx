@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { useCommentsStore } from '../../src/stores/comments.store'
 import type { Comment } from '../../src/db/types'
 
-const mockInvoke = vi.fn().mockResolvedValue({ data: { ok: true, status: 'resolved' } })
+const mockInvoke = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke } },
-  writable: true,
-  configurable: true,
+beforeEach(() => {
+  mockInvoke.mockResolvedValue({ data: { ok: true, status: 'resolved' } })
+  vi.stubGlobal('electronAPI', { extensionBridge: { invoke: mockInvoke } })
 })
 
 import { CommentMargin } from '../../src/components/CommentMargin'
@@ -47,12 +47,13 @@ const resolvedComment: Comment = {
 describe('CommentMargin', commentMarginTests)
 
 describe('CommentMargin resolved section', () => {
-  it('says whether the resolved comments are shown', () => {
+  it('says whether the resolved comments are shown', async () => {
+    const user = userEvent.setup()
     useCommentsStore.setState({ comments: [resolvedComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
     const toggle = screen.getByRole('button', { name: /1 resolved/ })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(toggle)
+    await user.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
   })
 })
@@ -71,13 +72,8 @@ function commentMarginTests() {
 
 function commentMarginHeaderEmptyStateTests() {
   it('shows hint when no comments', () => {
-    const { container } = render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    expect(container.querySelector('.notepad-comment-margin--empty')).toBeTruthy()
-  })
-
-  it('renders Comments header', () => {
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    expect(screen.getByText('Comments')).toBeDefined()
+    expect(screen.getByText('Select text and click + to add a comment')).toBeDefined()
   })
 
   it('shows open count badge when there are open comments', () => {
@@ -107,20 +103,20 @@ function commentMarginCommentCardsTests() {
     expect(screen.getByText('Andrew')).toBeDefined()
   })
 
-  it('shows orphaned comment with orphaned class', () => {
+  it('lists an orphaned comment under the Orphaned heading', () => {
     useCommentsStore.setState({ comments: [orphanedComment], loading: false })
-    const { container } = render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    expect(container.querySelector('.notepad-comment--orphaned')).toBeTruthy()
-    expect(container.querySelector('.notepad-comment-orphaned-section')).toBeTruthy()
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    expect(screen.getByText('Orphaned (1)')).toBeDefined()
+    expect(screen.getByText(orphanedComment.body)).toBeDefined()
   })
 }
 
 function commentMarginThreadActionsTests() {
   it('Resolve button calls comments.resolve IPC', async () => {
+    const user = userEvent.setup()
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    const resolveBtn = screen.getByText('Resolve')
-    fireEvent.click(resolveBtn)
+    await user.click(screen.getByRole('button', { name: 'Resolve' }))
     await eventually(() =>
       expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.resolve', {
         id: 'c1',
@@ -130,10 +126,10 @@ function commentMarginThreadActionsTests() {
   })
 
   it('Delete button calls comments.delete IPC', async () => {
+    const user = userEvent.setup()
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    const deleteBtn = screen.getByTitle('Delete comment')
-    fireEvent.click(deleteBtn)
+    await user.click(screen.getByTitle('Delete comment'))
     await eventually(() =>
       expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.delete', { id: 'c1' })
     )
@@ -160,10 +156,11 @@ function commentMarginRepliesTests() {
     expect(screen.getByText('Reply body text')).toBeDefined()
   })
 
-  it('Reply text link opens reply form', () => {
+  it('Reply text link opens reply form', async () => {
+    const user = userEvent.setup()
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    fireEvent.click(screen.getByText('Reply'))
-    expect(screen.getByPlaceholderText('Write a reply…')).toBeDefined()
+    await user.click(screen.getByText('Reply'))
+    expect(screen.getByPlaceholderText('Write a reply…')).toBeTruthy()
   })
 }

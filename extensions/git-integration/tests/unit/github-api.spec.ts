@@ -36,17 +36,7 @@ describe('githubAPI bridge', () => {
   })
 })
 
-describe('githubAPI bridge — prFileDiff calls correct channel', () => {
-  it('prFileDiff calls correct channel', async () => {
-    const { githubAPI } = await import('../../src/api/github')
-    await githubAPI.prFileDiff({ repoRoot: '/repo', prNumber: 42, path: 'src/foo.ts' })
-    expect(mockInvoke).toHaveBeenCalledWith('github:pr-file-diff', {
-      repoRoot: '/repo',
-      prNumber: 42,
-      path: 'src/foo.ts',
-    })
-  })
-
+describe('githubAPI bridge — prFileContent calls correct channel', () => {
   it('prFileContent calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.prFileContent({
@@ -301,7 +291,7 @@ describe('githubAPI bridge — leaves nodeId out of a batch viewed mark when the
       paths: ['a.ts'],
       viewed: false,
     })
-    expect(mockInvoke.mock.calls).toEqual([
+    expect(mockInvoke.mock.calls).toStrictEqual([
       [
         'github:files-viewed-set',
         { repoRoot: '/repo', prNumber: 211, paths: ['a.ts'], viewed: false },

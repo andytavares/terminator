@@ -36,7 +36,7 @@ function toneClass(part: MetaPart): string | undefined {
 function RowMeta({ parts }: { parts: (MetaPart | null | false)[] }): JSX.Element {
   const shown = parts.filter((p): p is MetaPart => Boolean(p))
   return (
-    <small>
+    <small data-testid="pr-meta">
       {shown.map((part, i) => (
         <React.Fragment key={part.text}>
           {i > 0 && ' · '}
@@ -79,6 +79,8 @@ export function PrRow({ pr, meta, action, onOpen, testId, children }: PrRowProps
   return (
     <div
       className="rd-row rd-row--clickable"
+      role="group"
+      aria-label={`#${pr.number} ${pr.title}`}
       tabIndex={0}
       data-testid={testId}
       onClick={onOpen}

@@ -135,11 +135,9 @@ function ngrokIsInstalledTests() {
   })
 
   it("looks in the person's own PATH before the usual install folders", async () => {
-    const own = process.env.PATH
-    process.env.PATH = '/home/me/bin'
+    vi.stubEnv('PATH', '/home/me/bin')
     vi.resetModules()
     const { NgrokManager: Fresh } = await import('../../src/server/ngrok-manager')
-    process.env.PATH = own
     mockExecSync.mockReturnValueOnce('')
     Fresh.isInstalled()
     const { env } = mockExecSync.mock.calls.at(-1)![1] as { env: NodeJS.ProcessEnv }
@@ -164,7 +162,7 @@ function ngrokStartResolveTests() {
     await vi.runAllTimersAsync()
     const url = await urlPromise
 
-    expect(mockSpawn.mock.calls[0][1].slice(0, 2)).toEqual(['http', '7681'])
+    expect(mockSpawn.mock.calls.at(-1)![1].slice(0, 2)).toEqual(['http', '7681'])
     expect(url).toBe('https://abc.ngrok.io')
   })
 }

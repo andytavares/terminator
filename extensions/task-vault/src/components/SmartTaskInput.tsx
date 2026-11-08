@@ -294,6 +294,7 @@ function OptionButton(props: OptionProps): React.JSX.Element {
   const { opt, triggerChar } = props
   return (
     <button
+      aria-current={props.selected}
       className={dropdownOptionClass(opt, props.selected)}
       onClick={props.onChoose}
       onMouseEnter={props.onHover}
@@ -350,7 +351,7 @@ function TriggerDropdown({ t }: DropdownProps): React.JSX.Element | null {
   const { active } = t
   if (!active) return null
   return (
-    <div className="smart-input__dropdown">
+    <div className="smart-input__dropdown" role="group" aria-label="Suggestions">
       {active.type === 'date' ? <DatePane t={t} /> : <SuggestionList t={t} active={active} />}
     </div>
   )

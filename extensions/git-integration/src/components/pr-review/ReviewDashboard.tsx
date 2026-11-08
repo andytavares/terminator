@@ -443,7 +443,7 @@ function DashboardSection(props: { spec: SectionSpec; ctx: RowContext; capped: s
   const { spec, ctx, capped } = props
   if (spec.rows.length === 0) return null
   return (
-    <section className="rd-sec">
+    <section className="rd-sec" aria-label={spec.title}>
       <div className="rd-grp">
         <span>{spec.title}</span>
         <span className="rd-ct">{sectionCount(capped, spec.rows, spec.sections)}</span>
@@ -592,7 +592,7 @@ interface BarProps {
 function DashboardBar({ dash, settings, openPicker }: BarProps) {
   const scopeLabel = scopeLabelOf(settings.selectedRepos.length, dash.data.scopedTo)
   return (
-    <div className="rd-bar">
+    <div className="rd-bar" data-testid="dashboard-bar">
       <span className="rd-t">Reviews</span>
       <span className="rd-sp" />
       <span className="rd-note">{updatedText(dash.data.fetchedAt)}</span>

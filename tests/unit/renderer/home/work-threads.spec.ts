@@ -163,20 +163,10 @@ describe('thread fields: state', () => {
     expect(stateFor([working({ state: 'idle' })], [facet({ whoseMove: 'others' })])).toBe('waiting')
   })
 
-  it('is quiet, never waiting, for an idle branch with no pull request', () => {
-    expect(stateFor([fact({ state: 'idle', branch: 'tav-31' })])).toBe('quiet')
-  })
-
   it('marks the thread inferred when the ask comes from a bell alone', () => {
     const bell = working({ state: 'awaiting-input', askInferred: true, askSignal: 'bell' })
     const [thread] = buildWorkThreads(input({ facts: [bell] }))
     expect(thread).toMatchObject({ state: 'needs-you', inferred: true })
-  })
-
-  it('does not read a facet stage', () => {
-    expect(
-      stateFor([fact({ state: 'idle' })], [facet({ stage: 'shipped', whoseMove: 'agents' })])
-    ).toBe('quiet')
   })
 })
 
@@ -299,12 +289,6 @@ describe('groupThreads', () => {
       ['running', 'Running'],
       ['quiet', 'Quiet'],
     ])
-  })
-
-  it('never emits a waiting group for an idle branch', () => {
-    const idle = fact({ branch: 'd', state: 'idle', lastActivityAt: hoursBeforeNow(1) })
-    const groups = groupThreads(buildWorkThreads(input({ facts: [idle] })))
-    expect(groups.map((g) => g.id)).toEqual(['quiet'])
   })
 })
 

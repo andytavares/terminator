@@ -122,7 +122,7 @@ interface GridProps {
 
 function HallGrid({ rows, onOpen }: GridProps): React.JSX.Element {
   return (
-    <div className="fdry-hall-grid">
+    <div className="fdry-hall-grid" role="list">
       {rows.map((row) => (
         <HallCard key={row.id} row={row} onOpen={onOpen} />
       ))}
@@ -139,7 +139,7 @@ function refreshKeyOf(row: FactoryOrderRow): string {
 // the button opens the order, and the document's link sits below it.
 function HallCard({ row, onOpen }: { readonly row: FactoryOrderRow } & Pick<GridProps, 'onOpen'>) {
   return (
-    <div className={isCompleted(row) ? 'fdry-hall-card is-done' : 'fdry-hall-card'}>
+    <div className={isCompleted(row) ? 'fdry-hall-card is-done' : 'fdry-hall-card'} role="listitem">
       <HallCardButton row={row} onOpen={onOpen} />
       {row.document ? (
         <span className="fdry-order-links fdry-hall-card-links">
@@ -157,7 +157,7 @@ function HallCardButton({
   return (
     <button type="button" className="fdry-hall-card-open" onClick={() => onOpen(row)}>
       {row.standing?.turn === 'you' ? (
-        <span className="fdry-hall-card-beacon" aria-hidden="true" />
+        <span className="fdry-hall-card-beacon" role="img" aria-label="Needs you" />
       ) : null}
       <HallThumbnail orderId={row.id} title={row.title} refreshKey={refreshKeyOf(row)} />
       <b className="fdry-hall-card-title">{row.title}</b>

@@ -54,35 +54,17 @@ function buildDecorationsTablesTests() {
 }
 
 function buildDecorationsTablesRenderingTests() {
-  it('replaces the whole table with a table widget', () => {
+  it('replaces the whole table, first character to last, with a block table widget', () => {
     const doc = `${TABLE}\n\ntrailing paragraph`
     const state = makeState(doc)
     const decos = collect(buildDecorations(state, { anchor: doc.length }), doc.length)
+    const table = decos.find((d) => d.spec.widget?.constructor.name === 'TableWidget')
 
-    expect(widgetNames(decos)).toContain('TableWidget')
-  })
-
-  it('spans the table from its first character to its last', () => {
-    const doc = `${TABLE}\n\ntrailing paragraph`
-    const state = makeState(doc)
-    const decos = collect(buildDecorations(state, { anchor: doc.length }), doc.length)
-    const table = decos.find((d) => d.spec.widget?.constructor.name === 'TableWidget')!
-
-    expect(table.from).toBe(0)
-    expect(table.to).toBe(TABLE.length)
+    expect(table).toMatchObject({ from: 0, to: TABLE.length, spec: { block: true } })
   })
 }
 
 function buildDecorationsTablesBlockWidgetTests() {
-  it('renders as a block widget when the table occupies whole lines', () => {
-    const doc = `${TABLE}\n\ntrailing paragraph`
-    const state = makeState(doc)
-    const decos = collect(buildDecorations(state, { anchor: doc.length }), doc.length)
-    const table = decos.find((d) => d.spec.widget?.constructor.name === 'TableWidget')!
-
-    expect(table.spec.block).toBe(true)
-  })
-
   it('shows raw markdown while the cursor is inside the table', () => {
     const state = makeState(`${TABLE}\n`)
     const decos = collect(buildDecorations(state, { anchor: 3 }, true), state.doc.length)

@@ -249,14 +249,14 @@ async function threadsByPath(result: { comments: unknown[]; resolvedCommentIds?:
   return byPath
 }
 
-export function useLoadInlineComments(repoRoot: string | null) {
+export function useLoadInlineComments(repoRoot: string) {
   const { activePr, setThreads } = usePrReviewStore()
   // Depend on the number, not the object: every file open patches activePr.
   const activeNumber = activePr?.number
 
   return useCallback(async () => {
     const current = usePrReviewStore.getState().activePr
-    if (!repoRoot || !current) return
+    if (!current) return
     try {
       const result = await githubAPI.prInlineComments(repoRoot, current.number)
       if ('error' in result) return

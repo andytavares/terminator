@@ -1,3 +1,4 @@
+import { vi } from 'vitest'
 import type { ElectronAPI } from '../../src/shared/electron-api/api-type'
 import { partialFake } from './fakes'
 
@@ -15,10 +16,10 @@ export function electronApiOf(parts: ElectronApiParts): ElectronAPI {
   return partialFake<ElectronAPI>(parts as Partial<ElectronAPI>)
 }
 
-/** Installs `electronApiOf(parts)` as `window.electronAPI` and returns it. */
+/** Installs `electronApiOf(parts)` as `window.electronAPI` until the test ends, and returns it. */
 export function installElectronApi(parts: ElectronApiParts): ElectronAPI {
   const api = electronApiOf(parts)
-  Object.defineProperty(window, 'electronAPI', { value: api, writable: true, configurable: true })
+  vi.stubGlobal('electronAPI', api)
   return api
 }
 

@@ -100,26 +100,6 @@ describe('listWorkspaces', () => {
   })
 })
 
-describe('listProjects', () => {
-  it('GET /api/projects?workspaceId=... returns project array', async () => {
-    const projects = [{ id: 'p1', workspaceId: 'w1', name: 'Project' }]
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => projects })
-    const { listProjects } = await import('../../../src/renderer-remote/api/remote-client')
-    const result = await listProjects('w1')
-    expect(result).toEqual(projects)
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('workspaceId=w1'),
-      expect.anything()
-    )
-  })
-
-  it('throws when response is not ok', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 })
-    const { listProjects } = await import('../../../src/renderer-remote/api/remote-client')
-    await expect(listProjects('w1')).rejects.toThrow('listProjects failed')
-  })
-})
-
 describe('listTerminals', () => {
   it('GET /api/terminals returns terminal session array', async () => {
     const terminals = [{ sessionId: 's1', cwd: '/tmp', createdAt: '2026-06-19T10:00:00.000Z' }]
@@ -128,13 +108,6 @@ describe('listTerminals', () => {
     const result = await listTerminals()
     expect(result).toEqual(terminals)
     expect(mockFetch).toHaveBeenCalledWith('/api/terminals', expect.anything())
-  })
-
-  it('returns empty array when no terminals are active', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [] })
-    const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')
-    const result = await listTerminals()
-    expect(result).toEqual([])
   })
 
   it('throws when response is not ok', async () => {
@@ -190,10 +163,7 @@ describe('credentials', () => {
 
   it('sends the user back to the login page on 401', async () => {
     const replace = vi.fn()
-    Object.defineProperty(window, 'location', {
-      value: { ...window.location, replace },
-      writable: true,
-    })
+    vi.stubGlobal('location', { ...window.location, replace })
     const { listWorkspaces } = await import('../../../src/renderer-remote/api/remote-client')
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
     await expect(listWorkspaces()).rejects.toThrow('401')

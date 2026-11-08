@@ -89,7 +89,7 @@ describe('Claude Code over ACP — cancel and resume', () => {
     const running = new Promise<void>((resolve) => {
       service.onUpdate(sessionId, (update) => update.sessionUpdate === 'tool_call' && resolve())
     })
-    const turn = service.prompt(sessionId, 'Run `sleep 20` with the Bash tool and wait for it.')
+    const turn = service.prompt(sessionId, 'Run `tail -f /dev/null` with the Bash tool, and wait.')
     await running
     service.cancel(sessionId)
     expect(await turn).toEqual({ stopReason: 'cancelled' })
@@ -132,7 +132,11 @@ describe('Claude Code over ACP — a prompt right after a cancel', () => {
     await service.answer(sessionId, ask.requestId, reject!.optionId)
     if (afterTurnEnds) await turn
     service.cancel(sessionId)
-    const told = await service.prompt(sessionId, 'That was refused. Reply with the word PONG only.')
+    // The cancelled turn is awaited beside the next prompt, so it ends inside the test.
+    const [, told] = await Promise.all([
+      turn,
+      service.prompt(sessionId, 'That was refused. Reply with the word PONG only.'),
+    ])
     return { told, reply: text.join('') }
   }
 

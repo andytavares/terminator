@@ -206,20 +206,10 @@ describe('git:commit-output-poll', () => {
 })
 
 describe('git:push handler (lines 96-110)', () => {
-  it('delegates to pushBranch with the repo root', async () => {
-    vi.mocked(gitService.pushBranch).mockResolvedValue({
-      success: true,
-      branch: 'main',
-      remote: 'origin',
-    })
+  it('pushes the repo root and answers what pushBranch answered', async () => {
+    vi.mocked(gitService.pushBranch).mockResolvedValue({ error: 'NO_UPSTREAM' })
     const result = await getHandler('git:push')({ repoRoot: '/repo' })
     expect(gitService.pushBranch).toHaveBeenCalledWith('/repo')
-    expect(result).toEqual({ success: true, branch: 'main', remote: 'origin' })
-  })
-
-  it('returns pushBranch errors unchanged', async () => {
-    vi.mocked(gitService.pushBranch).mockResolvedValue({ error: 'NO_UPSTREAM' })
-    const result = (await getHandler('git:push')({ repoRoot: '/repo' })) as { error: string }
-    expect(result.error).toBe('NO_UPSTREAM')
+    expect(result).toEqual({ error: 'NO_UPSTREAM' })
   })
 })

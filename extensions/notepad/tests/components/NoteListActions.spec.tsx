@@ -1,10 +1,11 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, createEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, createEvent, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installNotepadBridge, listItem, eventually } from './helpers/note-surface'
 import type { DiagramListItem, Folder, NoteListItem } from '../../src/db/types'
 
-const bridge = installNotepadBridge()
+let bridge: ReturnType<typeof installNotepadBridge>
 
 import { NoteList } from '../../src/components/NoteList'
 import { useNotesStore } from '../../src/stores/notes.store'
@@ -34,8 +35,7 @@ function folder(id: string, name: string): Folder {
 }
 
 beforeEach(() => {
-  for (const key of Object.keys(bridge.responses)) delete bridge.responses[key]
-  bridge.invoke.mockClear()
+  bridge = installNotepadBridge()
   useNotesStore.setState({
     notes: [],
     diagrams: [],
@@ -52,13 +52,13 @@ function rowTitled(title: string): HTMLElement {
   return screen.getByText(title).closest('button')!
 }
 
-function openNoteRowMenu(title: string) {
-  fireEvent.contextMenu(rowTitled(title))
+async function openRowMenu(user: UserEvent, row: Element): Promise<void> {
+  await user.pointer({ keys: '[MouseRight]', target: row })
 }
 
 const RELOAD = 'terminator.notepad:folders.list'
 
-describe('NoteList ordering and opening', () => {
+describe('NoteList ordering', () => {
   it('lists notes and diagrams together by sort order, then most recently updated', () => {
     useNotesStore.setState({
       notes: [
@@ -68,21 +68,31 @@ describe('NoteList ordering and opening', () => {
       diagrams: [diagram('d1', 'Flow', { sortOrder: 0, updatedAt: '2026-02-01' })],
     })
     render(<NoteList />)
-    const titles = [...document.querySelectorAll('.notepad-note-row__title')].map(
-      (el) => el.textContent
-    )
+    const isRowTitle = (_: string, element: Element | null) =>
+      /^(New|Flow|Old)$/.test(element?.textContent ?? '')
+    const titles = screen.getAllByText(isRowTitle).map((el) => el.textContent)
     expect(titles).toEqual(['New', 'Flow', 'Old'])
   })
+})
 
-  it('selects a diagram on click and opens either kind in a window on double-click', () => {
+describe('NoteList opening', () => {
+  it('selects a diagram on click', async () => {
+    const user = userEvent.setup()
+    useNotesStore.setState({ diagrams: [diagram('d1', 'Flow')] })
+    render(<NoteList />)
+    await user.click(rowTitled('Flow'))
+    expect(useNotesStore.getState().selectedDiagramId).toBe('d1')
+  })
+
+  it.each([
+    { title: 'Plan', channel: 'terminator.notepad:notes.openWindow', id: 'n1' },
+    { title: 'Flow', channel: 'terminator.notepad:diagrams.openWindow', id: 'd1' },
+  ])('opens $title in a window on double-click', async ({ title, channel, id }) => {
+    const user = userEvent.setup()
     useNotesStore.setState({ notes: [noteItem('n1', 'Plan')], diagrams: [diagram('d1', 'Flow')] })
     render(<NoteList />)
-    fireEvent.click(rowTitled('Flow'))
-    expect(useNotesStore.getState().selectedDiagramId).toBe('d1')
-    fireEvent.doubleClick(rowTitled('Flow'))
-    fireEvent.doubleClick(rowTitled('Plan'))
-    expect(bridge.calls('terminator.notepad:diagrams.openWindow')).toEqual([{ id: 'd1' }])
-    expect(bridge.calls('terminator.notepad:notes.openWindow')).toEqual([{ id: 'n1' }])
+    await user.dblClick(rowTitled(title))
+    expect(bridge.calls(channel)).toEqual([{ id }])
   })
 })
 
@@ -133,7 +143,7 @@ function drag(kind: DragKind, target: Element, clientY = 0) {
 }
 
 beforeEach(() => {
-  Object.defineProperty(window, 'DragEvent', { value: TestDragEvent, configurable: true })
+  vi.stubGlobal('DragEvent', TestDragEvent)
 })
 
 describe('NoteList drag and drop', noteListDragDropTests)
@@ -151,12 +161,13 @@ function noteListFoldersTests() {
 }
 
 function noteListFoldersSectionsTests() {
-  it('groups items under their folder, and collapses a folder', () => {
+  it('groups items under their folder, and collapses a folder', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    const work = screen.getByText('Work').closest('.notepad-folder-section')!
-    expect(work.textContent).toContain('Filed')
+    const work = screen.getByRole('group', { name: 'Work' })
+    expect(within(work).getByText('Filed')).toBeDefined()
     expect(screen.getByText('Empty')).toBeTruthy()
-    fireEvent.click(screen.getByLabelText('Collapse Work'))
+    await user.click(screen.getByLabelText('Collapse Work'))
     expect(screen.queryByText('Filed')).toBeNull()
     expect(screen.getByLabelText('Expand Work')).toBeTruthy()
   })
@@ -164,12 +175,13 @@ function noteListFoldersSectionsTests() {
 
 function noteListFoldersRenamingDeletingTests() {
   it('renames a folder from its context menu', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    fireEvent.contextMenu(screen.getByText('Work').closest('.notepad-folder-header')!)
-    fireEvent.click(screen.getByText('Rename'))
+    await openRowMenu(user, screen.getByRole('button', { name: 'Collapse Work' }))
+    await user.click(screen.getByText('Rename'))
     const input = screen.getByDisplayValue('Work')
-    fireEvent.change(input, { target: { value: 'Office' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await user.clear(input)
+    await user.type(input, 'Office{Enter}')
     await eventually(() => expect(bridge.calls(RELOAD).length).toBeGreaterThan(0))
     expect(bridge.calls('terminator.notepad:folders.rename')).toContainEqual({
       id: 'f1',
@@ -178,10 +190,11 @@ function noteListFoldersRenamingDeletingTests() {
   })
 
   it('deletes a folder once confirmed', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    fireEvent.contextMenu(screen.getByText('Home').closest('.notepad-folder-header')!)
-    fireEvent.click(screen.getByText('Delete folder'))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await openRowMenu(user, screen.getByRole('button', { name: 'Collapse Home' }))
+    await user.click(screen.getByText('Delete folder'))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
     await eventually(() =>
       expect(bridge.calls('terminator.notepad:folders.delete')).toEqual([{ id: 'f2' }])
     )
@@ -190,65 +203,96 @@ function noteListFoldersRenamingDeletingTests() {
 
 function noteListItemContextMenuTests() {
   describe('archiving', noteListItemContextMenuArchivingTests)
+  describe('restoring', noteListItemContextMenuRestoringTests)
   describe('deleting', noteListItemContextMenuDeletingTests)
   describe('moving', noteListItemContextMenuMovingTests)
 }
 
 function noteListItemContextMenuArchivingTests() {
-  it('archives a note and a diagram', async () => {
+  it.each([
+    { title: 'Plan', channel: 'terminator.notepad:notes.archive', id: 'n1' },
+    { title: 'Flow', channel: 'terminator.notepad:diagrams.archive', id: 'd1' },
+  ])('archives $title from its context menu', async ({ title, channel, id }) => {
+    const user = userEvent.setup()
     useNotesStore.setState({ notes: [noteItem('n1', 'Plan')], diagrams: [diagram('d1', 'Flow')] })
     render(<NoteList />)
-    openNoteRowMenu('Plan')
-    fireEvent.click(screen.getByText('Archive'))
-    openNoteRowMenu('Flow')
-    fireEvent.click(screen.getByText('Archive'))
+    await openRowMenu(user, rowTitled(title))
+    await user.click(screen.getByText('Archive'))
+    await eventually(() => expect(bridge.calls(channel)).toEqual([{ id }]))
+  })
+}
+
+function selectArchivedNote(): void {
+  useNotesStore.setState({
+    notes: [noteItem('n1', 'Old', { archivedAt: '2026-01-01' })],
+    selectedNoteId: 'n1',
+  })
+}
+
+function noteListItemContextMenuRestoringTests() {
+  beforeEach(selectArchivedNote)
+
+  it('restores an archived note from its context menu', async () => {
+    const user = userEvent.setup()
+    render(<NoteList />)
+    await user.click(screen.getByRole('button', { name: /Archived/ }))
+    await openRowMenu(user, rowTitled('Old'))
+    await user.click(screen.getByText('Unarchive'))
     await eventually(() =>
-      expect(bridge.calls('terminator.notepad:diagrams.archive')).toEqual([{ id: 'd1' }])
+      expect(bridge.calls('terminator.notepad:notes.restore')).toEqual([{ id: 'n1' }])
     )
-    expect(bridge.calls('terminator.notepad:notes.archive')).toEqual([{ id: 'n1' }])
   })
 }
 
 function noteListItemContextMenuDeletingTests() {
-  it('restores, and permanently deletes once confirmed, an archived note', async () => {
+  beforeEach(selectArchivedNote)
+
+  it('permanently deletes an archived note once confirmed, and clears the selection', async () => {
+    const user = userEvent.setup()
     // happy-dom has no window.confirm to spy on, so the test provides one.
     vi.stubGlobal(
       'confirm',
       vi.fn(() => true)
     )
-    useNotesStore.setState({
-      notes: [noteItem('n1', 'Old', { archivedAt: '2026-01-01' })],
-      selectedNoteId: 'n1',
-    })
     render(<NoteList />)
-    fireEvent.click(screen.getByRole('button', { name: /Archived/ }))
-    openNoteRowMenu('Old')
-    fireEvent.click(screen.getByText('Unarchive'))
-    openNoteRowMenu('Old')
-    fireEvent.click(screen.getByText('Delete'))
+    await user.click(screen.getByRole('button', { name: /Archived/ }))
+    await openRowMenu(user, rowTitled('Old'))
+    await user.click(screen.getByText('Delete'))
     await eventually(() => expect(useNotesStore.getState().selectedNoteId).toBeNull())
     expect(bridge.calls('terminator.notepad:notes.hardDelete')).toEqual([{ id: 'n1' }])
-    expect(bridge.calls('terminator.notepad:notes.restore')).toEqual([{ id: 'n1' }])
-    vi.unstubAllGlobals()
   })
 }
 
 function noteListItemContextMenuMovingTests() {
-  it('moves an item into a folder and back out', async () => {
+  beforeEach(() => {
     useNotesStore.setState({
       notes: [noteItem('n1', 'Plan'), noteItem('n2', 'Filed', { folderId: 'f1' })],
       folders: [folder('f1', 'Work')],
     })
+  })
+
+  it('moves an item into a folder', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    openNoteRowMenu('Plan')
-    fireEvent.click(screen.getByText('Move to Work'))
-    openNoteRowMenu('Filed')
-    fireEvent.click(screen.getByText('Remove from folder'))
-    await eventually(() => expect(bridge.calls('terminator.notepad:folders.move')).toHaveLength(2))
-    expect(bridge.calls('terminator.notepad:folders.move')).toEqual([
-      { items: [{ id: 'n1', type: 'note' }], folderId: 'f1' },
-      { items: [{ id: 'n2', type: 'note' }], folderId: null },
-    ])
+    await openRowMenu(user, rowTitled('Plan'))
+    await user.click(screen.getByText('Move to Work'))
+    await eventually(() =>
+      expect(bridge.calls('terminator.notepad:folders.move')).toEqual([
+        { items: [{ id: 'n1', type: 'note' }], folderId: 'f1' },
+      ])
+    )
+  })
+
+  it('takes an item out of its folder', async () => {
+    const user = userEvent.setup()
+    render(<NoteList />)
+    await openRowMenu(user, rowTitled('Filed'))
+    await user.click(screen.getByText('Remove from folder'))
+    await eventually(() =>
+      expect(bridge.calls('terminator.notepad:folders.move')).toEqual([
+        { items: [{ id: 'n2', type: 'note' }], folderId: null },
+      ])
+    )
   })
 }
 
@@ -317,7 +361,9 @@ function noteListDragDropDroppingAmongFolderTests() {
 function noteListDragDropDroppingHeaderTests() {
   it('moves an item into a folder dropped on its header', async () => {
     render(<NoteList />)
-    const header = screen.getByText('Work').closest('.notepad-folder-header')!
+    const header = within(screen.getByRole('group', { name: 'Work' })).getByTestId(
+      'notepad-folder-header'
+    )
     drag('dragStart', rowTitled('Second'))
     drag('dragOver', header)
     expect(header.className).toContain('notepad-folder-header--drop-target')
@@ -333,7 +379,7 @@ function noteListDragDropDroppingHeaderTests() {
 function noteListDragDropOutFoldersTests() {
   it('takes an item out of its folder when dropped on the list itself', async () => {
     render(<NoteList />)
-    const list = document.querySelector('.notepad-note-list__notes')!
+    const list = screen.getByTestId('notepad-note-list-drop-zone')
     drag('dragStart', rowTitled('Filed'))
     drag('dragOver', list)
     drag('drop', list)

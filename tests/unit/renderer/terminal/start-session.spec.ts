@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const create = vi.hoisted(() => vi.fn().mockResolvedValue('new-session'))
+const create = vi.hoisted(() => vi.fn())
 const navigate = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../../src/renderer/terminal/session-controller', () => ({
@@ -87,7 +87,7 @@ function seedSettings(): void {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  create.mockResolvedValue('new-session')
   seedWorkspaces()
   seedSettings()
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)

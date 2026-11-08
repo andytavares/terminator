@@ -47,6 +47,7 @@ function indexOverFakeDisk() {
 
 describe('the Foundry index', () => {
   describe('reading from disk', readingFromDiskTests)
+  describe('answering from memory', answeringFromMemoryTests)
   describe('orders', ordersTests)
   describe('gates', foundryIndexGatesTests)
   describe('ledgers', ledgersTests)
@@ -74,15 +75,19 @@ function readingFromDiskTests() {
     fail = false
     expect((await index.orders()).map((o) => o.id)).toEqual(['WO-1'])
   })
+}
 
+function answeringFromMemoryTests() {
   it('reads each kind from disk once and then answers from memory', async () => {
     const { source, index } = indexOverFakeDisk()
-    for (let i = 0; i < 3; i++) {
+    const readEveryKind = async () => {
       await index.orders()
       await index.gates()
       await index.ledger('WO-1')
       await index.graph('WO-1')
     }
+    await readEveryKind()
+    await readEveryKind()
     expect(source.reads).toEqual({ orders: 1, gates: 1, graph: 1, ledger: 1 })
   })
 }

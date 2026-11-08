@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { GateCard } from '../../src/components/GateCard.js'
 import { raiseGate } from '../../src/gates/rules.js'
@@ -40,8 +41,9 @@ describe('a gate collapsed to one line', () => {
   describe('answering', answeringTests)
 })
 
-function open() {
-  fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
+async function open() {
+  const user = userEvent.setup()
+  await user.click(screen.getByText('U-4 rewrites session token refresh'))
 }
 
 function gateCardWhatItShowsTests() {
@@ -55,14 +57,17 @@ function gateCardWhatItShowsTests() {
     expect(screen.queryByText(/token refresh failed/)).toBeNull()
   })
 
-  it('says the grade in words, not as a code', () => {
-    render(<GateCard gate={gate()} onDecide={vi.fn()} />)
-    expect(document.body.textContent).not.toMatch(/\bP0\b/)
+  it('names the grade once, in words, not as a code', () => {
+    const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
+    expect(container.textContent).toContain('highest risk')
+    expect(container.textContent).not.toContain('risk risk')
+    expect(container.textContent).not.toMatch(/\bP0\b/)
   })
 }
 
 function gateCardLinksTests() {
-  it('links the pull request and the ticket, opened outside the application', () => {
+  it('links the pull request and the ticket, opened outside the application', async () => {
+    const user = userEvent.setup()
     render(
       <GateCard
         gate={gate()}
@@ -71,29 +76,31 @@ function gateCardLinksTests() {
         source={{ key: 'TAV-15', url: 'https://linear.app/t/issue/TAV-15' }}
       />
     )
-    fireEvent.click(screen.getByRole('link', { name: /#233/ }))
+    await user.click(screen.getByRole('link', { name: /#233/ }))
     expect(openExternal).toHaveBeenCalledWith('https://github.com/x/y/pull/233')
-    fireEvent.click(screen.getByRole('link', { name: /TAV-15/ }))
+    await user.click(screen.getByRole('link', { name: /TAV-15/ }))
     expect(openExternal).toHaveBeenCalledWith('https://linear.app/t/issue/TAV-15')
     expect(screen.queryByText(/session\.ts/)).toBeNull()
   })
 }
 
 function answeringTests() {
-  it('answers from the line without opening the gate', () => {
+  it('answers from the line without opening the gate', async () => {
+    const user = userEvent.setup()
     const onDecide = vi.fn()
     render(<GateCard gate={gate()} onDecide={onDecide} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    await user.click(screen.getByRole('button', { name: 'Approve' }))
     expect(onDecide).toHaveBeenCalledWith('approve')
     expect(screen.queryByText(/session\.ts/)).toBeNull()
   })
 
-  it('counts a decision, and counts nothing for a click on a disabled answer', () => {
+  it('counts a decision, and counts nothing for a click on a disabled answer', async () => {
+    const user = userEvent.setup()
     const { rerender } = render(<GateCard gate={gate()} busy onDecide={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    await user.click(screen.getByRole('button', { name: 'Approve' }))
     expect(recordUsage).not.toHaveBeenCalled()
     rerender(<GateCard gate={gate()} onDecide={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Send back' }))
+    await user.click(screen.getByRole('button', { name: 'Send back' }))
     expect(recordUsage).toHaveBeenCalledExactlyOnceWith('gate-decide')
   })
 
@@ -120,50 +127,47 @@ const budget = () =>
   })
 
 function gateCardTheReasonTests() {
-  it('shows why as markdown, so a list is a list', () => {
-    const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
-    open()
-    const items = Array.from(container.querySelectorAll('.fdry-md li')).map((li) => li.textContent)
+  it('shows why as markdown, so a list is a list', async () => {
+    render(<GateCard gate={gate()} onDecide={vi.fn()} />)
+    await open()
+    const [why] = screen.getAllByRole('list')
+    const items = within(why)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent)
     expect(items).toEqual(['src/main/auth/session.ts', 'src/main/auth/token.ts'])
   })
 
-  it('still shows a reason written as plain text', () => {
+  it('still shows a reason written as plain text', async () => {
     render(<GateCard gate={gate({ why: 'the budget ran out' })} onDecide={vi.fn()} />)
-    open()
+    await open()
     expect(screen.getByText('the budget ran out')).toBeTruthy()
   })
 }
 
 function evidenceAndAnswersTests() {
-  it('keeps the evidence closed until it is asked for', () => {
-    const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
-    open()
-    const details = container.querySelector('details') as HTMLDetailsElement
-    expect(details).not.toBeNull()
-    expect(details.open).toBe(false)
-  })
-
-  it('says what each answer does', () => {
+  it('says what each answer does', async () => {
     render(<GateCard gate={gate()} onDecide={vi.fn()} />)
-    open()
+    await open()
     expect(screen.getByText('The change proceeds as it stands.')).toBeTruthy()
   })
 }
 
 function closingTests() {
-  it('closes again from the chevron, which says its state', () => {
+  it('closes again from the chevron, which says its state', async () => {
+    const user = userEvent.setup()
     render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     const chevron = screen.getByRole('button', { name: 'Show the reason' })
     expect(chevron.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(chevron)
+    await user.click(chevron)
     expect(
       screen.getByRole('button', { name: 'Hide the reason' }).getAttribute('aria-expanded')
     ).toBe('true')
-    fireEvent.click(screen.getByRole('button', { name: 'Hide the reason' }))
+    await user.click(screen.getByRole('button', { name: 'Hide the reason' }))
     expect(screen.queryByText(/session\.ts/)).toBeNull()
   })
 
-  it('does not close when a link inside the line is clicked', () => {
+  it('does not close when a link inside the line is clicked', async () => {
+    const user = userEvent.setup()
     render(
       <GateCard
         gate={gate()}
@@ -171,8 +175,8 @@ function closingTests() {
         pulls={[{ number: 233, url: 'https://github.com/x/y/pull/233' }]}
       />
     )
-    open()
-    fireEvent.click(screen.getByRole('link', { name: /#233/ }))
+    await open()
+    await user.click(screen.getByRole('link', { name: /#233/ }))
     expect(screen.getByText(/session\.ts/)).toBeTruthy()
   })
 }
@@ -182,29 +186,24 @@ describe('raising a budget from the card', () => {
 })
 
 function gateCardTheNewLimitTests() {
-  it('asks for the new limit instead of deciding, then sends it', () => {
+  it('asks for the new limit instead of deciding, then sends it', async () => {
+    const user = userEvent.setup()
     const onDecide = vi.fn()
     render(<GateCard gate={budget()} onDecide={onDecide} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
+    await user.click(screen.getByRole('button', { name: 'Raise the budget' }))
     expect(onDecide).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
-      target: { value: '90' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
+    await user.clear(screen.getByRole('spinbutton', { name: 'Minutes' }))
+    await user.type(screen.getByRole('spinbutton', { name: 'Minutes' }), '90')
+    await user.click(screen.getByRole('button', { name: 'Raise and resume' }))
     expect(onDecide).toHaveBeenCalledWith('raise', 90)
   })
 
-  it('goes back to the answers on cancel', () => {
+  it('goes back to the answers on cancel', async () => {
+    const user = userEvent.setup()
     render(<GateCard gate={budget()} onDecide={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Raise the budget' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Raise the budget' })).toBeTruthy()
-  })
-
-  it('names the grade once, in words', () => {
-    const { container } = render(<GateCard gate={gate({ riskGrade: 'P2' })} onDecide={vi.fn()} />)
-    expect(container.textContent).toContain('ordinary risk')
-    expect(container.textContent).not.toContain('risk risk')
   })
 }

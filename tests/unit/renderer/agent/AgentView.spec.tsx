@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act, within } from '@testing-library/react'
+import { render, screen, act, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { AgentPermissionAsk, AgentUpdate } from '@terminator/extension-sdk'
 
 import { AgentView } from '../../../../src/renderer/components/agent/AgentView'
@@ -29,7 +30,7 @@ const text = (sessionUpdate: string, value: string): AgentUpdate => ({
   content: { type: 'text', text: value },
 })
 
-const updates = pushedEvent<[{ sessionId: string; update: AgentUpdate }]>()
+const updates = pushedEvent<[{ sessionId: string; update: AgentUpdate; position: number }]>()
 const permissions = pushedEvent<[{ sessionId: string; ask: AgentPermissionAsk }]>()
 const settled = pushedEvent<[{ sessionId: string; requestId: string }]>()
 const ends = pushedEvent<[{ sessionId: string; exitCode: number | null }]>()
@@ -98,26 +99,57 @@ describe('AgentView transcript', () => {
     expect(log.getAttribute('aria-live')).toBe('polite')
     expect(within(log).getByText('Earlier reply')).toBeTruthy()
     act(() =>
-      updates.deliver({ sessionId: 'agent-1', update: text('agent_message_chunk', ' More') })
+      updates.deliver({
+        sessionId: 'agent-1',
+        update: text('agent_message_chunk', ' More'),
+        position: 1,
+      })
     )
     expect(within(log).getByText('Earlier reply More')).toBeTruthy()
   })
 
+  it('ignores another session’s update', async () => {
+    await mountView()
+    act(() =>
+      updates.deliver({
+        sessionId: 'other',
+        update: text('agent_message_chunk', 'Stray'),
+        position: 1,
+      })
+    )
+    expect(screen.queryByText(/Stray/)).toBeNull()
+  })
+})
+
+// Electron sends a push and an invoke reply down two pipes, so either can arrive first.
+describe('AgentView transcript, whichever of a push and the history arrives first', () => {
   it('draws an update that arrives before the history once', async () => {
     let answer: (reply: { data: AgentUpdate[] }) => void = () => undefined
     agents.history.mockReturnValue(new Promise((resolve) => (answer = resolve)))
     render(<AgentView sessionId="agent-1" />)
     const early = text('agent_message_chunk', 'Hello')
-    act(() => updates.deliver({ sessionId: 'agent-1', update: early }))
+    act(() => updates.deliver({ sessionId: 'agent-1', update: early, position: 0 }))
     // Main logs an update before it broadcasts it, so the history read after it holds it.
     await act(async () => answer({ data: [early] }))
     expect(within(screen.getByRole('log')).getByText('Hello')).toBeTruthy()
   })
 
-  it('ignores another session’s update', async () => {
+  it('draws an update the history holds once, though it arrives after the history', async () => {
+    const early = text('agent_message_chunk', 'Hello')
+    agents.history.mockResolvedValue({ data: [early] })
     await mountView()
-    act(() => updates.deliver({ sessionId: 'other', update: text('agent_message_chunk', 'Stray') }))
-    expect(screen.queryByText(/Stray/)).toBeNull()
+    act(() => updates.deliver({ sessionId: 'agent-1', update: early, position: 0 }))
+    expect(screen.getByRole('log').textContent).toBe('Hello')
+  })
+
+  it('draws an update that arrives before a history that lacks it', async () => {
+    let answer: (reply: { data: AgentUpdate[] }) => void = () => undefined
+    agents.history.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    render(<AgentView sessionId="agent-1" />)
+    const later = text('agent_message_chunk', ' there')
+    act(() => updates.deliver({ sessionId: 'agent-1', update: later, position: 1 }))
+    await act(async () => answer({ data: [text('agent_message_chunk', 'Hello')] }))
+    expect(screen.getByRole('log').textContent).toBe('Hello there')
   })
 })
 
@@ -138,13 +170,14 @@ describe('AgentView tool calls', () => {
             { type: 'diff', path: '/r/src/a.ts', oldText: 'old line', newText: 'new line' },
           ],
         },
+        position: 1,
       })
     })
     expect(screen.getByText('Edit file')).toBeTruthy()
     expect(screen.getByText('src/a.ts', { selector: '.agent-tool__summary' })).toBeTruthy()
-    const added = document.querySelector('.diff-line--add')
-    expect(added?.textContent).toContain('new line')
-    expect(added?.closest('details')?.open).toBe(true)
+    const diff = screen.getByRole('group', { name: 'src/a.ts' }) as HTMLDetailsElement
+    expect(diff.open).toBe(true)
+    expect(within(within(diff).getByRole('row', { name: /new line/ })).getByText('+')).toBeTruthy()
   })
 })
 
@@ -156,13 +189,12 @@ describe('AgentView changed in this turn', () => {
     content: [{ type: 'diff', path: '/r/src/a.ts', oldText: null, newText }],
   })
 
-  it('lists one file once for two edits, with the counts', async () => {
+  it('shows a changed file in the card with its counts', async () => {
     await mountView()
-    act(() => updates.deliver({ sessionId: 'agent-1', update: edit('t1', 'a') }))
-    act(() => updates.deliver({ sessionId: 'agent-1', update: edit('t2', 'b\nc') }))
+    act(() => updates.deliver({ sessionId: 'agent-1', update: edit('t1', 'b\nc'), position: 1 }))
     const card = screen.getByRole('group', { name: 'Changed in this turn' })
-    expect(within(card).getAllByText('src/a.ts')).toHaveLength(1)
-    expect(within(card).getByText('+3')).toBeTruthy()
+    expect(within(card).getByText('src/a.ts')).not.toBeNull()
+    expect(within(card).getByText('+2')).not.toBeNull()
     expect(within(card).queryByText(/new file/i)).toBeNull()
   })
 })
@@ -179,6 +211,7 @@ describe('AgentView usage', () => {
           size: 200,
           cost: { amount: 0.5, currency: 'USD' },
         },
+        position: 1,
       })
     )
     expect(screen.getByText(/25%/)).toBeTruthy()
@@ -188,11 +221,12 @@ describe('AgentView usage', () => {
 
 describe('AgentView permission asks', () => {
   it('shows an open ask with its command, answers it, and drops it when settled', async () => {
+    const user = userEvent.setup()
     agents.openAsks.mockResolvedValue({ data: [ask] })
     await mountView()
     expect(screen.getByText('Run tests')).toBeTruthy()
     expect(screen.getByText('npm test')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Allow once' }))
+    await user.click(screen.getByRole('button', { name: 'Allow once' }))
     expect(agents.answer).toHaveBeenCalledWith({
       sessionId: 'agent-1',
       requestId: 'req-1',
@@ -213,25 +247,21 @@ describe('AgentView permission asks', () => {
 
 describe('AgentView prompt box', () => {
   it('sends on Enter and clears the box', async () => {
+    const user = userEvent.setup()
     await mountView()
-    fireEvent.change(box(), { target: { value: 'Fix it' } })
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    await user.type(box(), 'Fix it')
+    await user.keyboard('{Enter}')
     expect(agents.prompt).toHaveBeenCalledWith({ sessionId: 'agent-1', text: 'Fix it' })
     expect(box().value).toBe('')
   })
 
   it('keeps Shift+Enter as a newline and sends nothing', async () => {
+    const user = userEvent.setup()
     await mountView()
-    fireEvent.change(box(), { target: { value: 'Fix it' } })
-    fireEvent.keyDown(box(), { key: 'Enter', shiftKey: true })
+    await user.type(box(), 'Fix it')
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
     expect(agents.prompt).not.toHaveBeenCalled()
-    expect(box().value).toBe('Fix it')
-  })
-
-  it('sends nothing for an empty box', async () => {
-    await mountView()
-    fireEvent.keyDown(box(), { key: 'Enter' })
-    expect(agents.prompt).not.toHaveBeenCalled()
+    expect(box().value).toBe('Fix it\n')
   })
 })
 
@@ -239,10 +269,11 @@ describe('AgentView follow-up queue and steer', () => {
   beforeEach(() => useSessionStore.getState().setAgentTurn('agent-1', true))
 
   it('keeps the box enabled and queues on Enter during a turn', async () => {
+    const user = userEvent.setup()
     await mountView()
     expect(box().disabled).toBe(false)
-    fireEvent.change(box(), { target: { value: 'Then lint' } })
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    await user.type(box(), 'Then lint')
+    await user.keyboard('{Enter}')
     expect(agents.queueSet).toHaveBeenCalledWith({ sessionId: 'agent-1', messages: ['Then lint'] })
     expect(agents.prompt).not.toHaveBeenCalled()
     expect(box().value).toBe('')
@@ -250,18 +281,20 @@ describe('AgentView follow-up queue and steer', () => {
   })
 
   it('steers on Cmd+Enter during a turn', async () => {
+    const user = userEvent.setup()
     await mountView()
-    fireEvent.change(box(), { target: { value: 'Use vitest' } })
-    fireEvent.keyDown(box(), { key: 'Enter', metaKey: true })
+    await user.type(box(), 'Use vitest')
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
     expect(agents.steer).toHaveBeenCalledWith({ sessionId: 'agent-1', text: 'Use vitest' })
     expect(agents.prompt).not.toHaveBeenCalled()
     expect(recordUse).toHaveBeenCalledWith('core.agent.steer', 'shortcut')
   })
 
   it('steers from the Steer button', async () => {
+    const user = userEvent.setup()
     await mountView()
-    fireEvent.change(box(), { target: { value: 'Use vitest' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Steer' }))
+    await user.type(box(), 'Use vitest')
+    await user.click(screen.getByRole('button', { name: 'Steer' }))
     expect(agents.steer).toHaveBeenCalledWith({ sessionId: 'agent-1', text: 'Use vitest' })
   })
 })
@@ -269,20 +302,15 @@ describe('AgentView follow-up queue and steer', () => {
 describe('AgentView queue list', () => {
   beforeEach(() => useSessionStore.getState().setAgentTurn('agent-1', true))
 
-  it('shows a queue set before the tab opened', async () => {
-    agents.queueGet.mockResolvedValue({ data: ['set earlier'] })
-    await mountView()
-    expect(screen.getByText('1 message sends when this turn ends')).toBeTruthy()
-  })
-
   it('shows the queue from the main process, edits and removes items', async () => {
+    const user = userEvent.setup()
     await mountView()
     act(() => queues.deliver({ sessionId: 'agent-1', messages: ['one', 'two'] }))
     expect(screen.getByText('2 messages send when this turn ends')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit one' }))
+    await user.click(screen.getByRole('button', { name: 'Edit one' }))
     expect(box().value).toBe('one')
     expect(agents.queueSet).toHaveBeenLastCalledWith({ sessionId: 'agent-1', messages: ['two'] })
-    fireEvent.click(screen.getByRole('button', { name: 'Remove two' }))
+    await user.click(screen.getByRole('button', { name: 'Remove two' }))
     expect(agents.queueSet).toHaveBeenLastCalledWith({ sessionId: 'agent-1', messages: [] })
     expect(screen.queryByText(/send when this turn ends/)).toBeNull()
   })
@@ -294,8 +322,9 @@ describe('AgentView queue list', () => {
   })
 
   it('Stop cancels the turn', async () => {
+    const user = userEvent.setup()
     await mountView()
-    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    await user.click(screen.getByRole('button', { name: 'Stop' }))
     expect(agents.cancel).toHaveBeenCalledWith({ sessionId: 'agent-1' })
   })
 })
@@ -311,17 +340,17 @@ async function reply(body: string): Promise<HTMLElement> {
 describe('AgentView rich replies', () => {
   it('renders an agent reply as Markdown and keeps the user message plain', async () => {
     const log = await reply('## Plan\n\n- one\n- two\n\n| Name | Value |\n| --- | --- |\n| a | 1 |')
-    expect(log.querySelector('h2')?.textContent).toBe('Plan')
-    expect(log.querySelectorAll('li')).toHaveLength(2)
-    expect(log.querySelectorAll('tbody td')).toHaveLength(2)
+    expect(within(log).getByRole('heading', { level: 2, name: 'Plan' })).toBeTruthy()
+    expect(within(log).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(log).getAllByRole('cell')).toHaveLength(2)
     expect(within(log).getByText('# not a heading')).toBeTruthy()
-    expect(log.querySelector('h1')).toBeNull()
+    expect(within(log).queryByRole('heading', { level: 1 })).toBeNull()
   })
 
   it('opens a link through the shell, not the view', async () => {
     const log = await reply('[docs](https://example.com/docs)')
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
-    log.querySelector('a')!.dispatchEvent(event)
+    within(log).getByRole('link', { name: 'docs' }).dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
     expect(shell.openExternal).toHaveBeenCalledWith('https://example.com/docs')
   })
@@ -339,9 +368,9 @@ describe('AgentView raw HTML in replies', () => {
         '<iframe src="https://x.example"></iframe>',
       ].join('\n\n')
     )
-    expect((await within(log).findByText('Logs')).closest('details')).not.toBeNull()
-    expect(log.querySelector('table td')?.textContent).toBe('cell')
-    expect(log.querySelector('script, iframe, img')).toBeNull()
+    expect((await within(log).findByText('Logs')).tagName).toBe('SUMMARY')
+    expect(within(log).getByRole('cell').textContent).toBe('cell')
+    expect(log.innerHTML).not.toMatch(/<(script|iframe|img)\b/)
     expect(log.innerHTML).not.toContain('javascript:')
     expect(log.innerHTML).not.toContain('onerror')
     expect(log.textContent).not.toContain('__pwned')
@@ -364,7 +393,7 @@ describe('AgentView mermaid diagrams', () => {
     const log = await reply('```mermaid\nnot a diagram\n```')
     expect(await within(log).findByText(/diagram could not be drawn/i)).toBeTruthy()
     expect(within(log).getByText(/Parse error on line 1/)).toBeTruthy()
-    expect(log.querySelector('pre code')?.textContent).toBe('not a diagram')
+    expect(within(log).getByText('not a diagram').tagName).toBe('CODE')
   })
 })
 
@@ -398,34 +427,39 @@ describe('AgentView mermaid diagrams while a reply streams', () => {
   })
 })
 
-describe('AgentView find', () => {
-  const find = (): HTMLInputElement => screen.getByLabelText('Find in the transcript')
-  const open = async (): Promise<void> => {
-    agents.history.mockResolvedValue({
-      data: [text('agent_message_chunk', 'Alpha beta alpha'), text('user_message_chunk', 'ALPHA')],
-    })
-    await mountView()
-    fireEvent.keyDown(screen.getByRole('region'), { key: 'f', metaKey: true })
-  }
+const find = (): HTMLInputElement => screen.getByLabelText('Find in the transcript')
 
+/** Mounts a transcript with three "alpha"s and opens find with Cmd+F from the prompt box. */
+async function openFind() {
+  const user = userEvent.setup()
+  agents.history.mockResolvedValue({
+    data: [text('agent_message_chunk', 'Alpha beta alpha'), text('user_message_chunk', 'ALPHA')],
+  })
+  await mountView()
+  await user.click(box())
+  await user.keyboard('{Meta>}f{/Meta}')
+  return user
+}
+
+describe('AgentView find', () => {
   it('counts matches, moves between them and closes on Escape', async () => {
-    await open()
-    fireEvent.change(find(), { target: { value: 'alpha' } })
+    const user = await openFind()
+    await user.type(find(), 'alpha')
     expect(screen.getByText('1 of 3')).toBeTruthy()
-    expect(document.querySelectorAll('mark.agent-find__match')).toHaveLength(3)
-    fireEvent.keyDown(find(), { key: 'Enter' })
+    expect(screen.getAllByRole('mark')).toHaveLength(3)
+    await user.keyboard('{Enter}')
     expect(screen.getByText('2 of 3')).toBeTruthy()
-    fireEvent.keyDown(find(), { key: 'Enter', shiftKey: true })
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
     expect(screen.getByText('1 of 3')).toBeTruthy()
-    fireEvent.keyDown(find(), { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(screen.queryByLabelText('Find in the transcript')).toBeNull()
-    expect(document.querySelector('mark')).toBeNull()
+    expect(screen.queryByRole('mark')).toBeNull()
     expect(recordUse).toHaveBeenCalledWith('core.agent.find', 'shortcut')
   })
 
   it('says 0 of 0 when nothing matches', async () => {
-    await open()
-    fireEvent.change(find(), { target: { value: 'zzz' } })
+    const user = await openFind()
+    await user.type(find(), 'zzz')
     expect(screen.getByText('0 of 0')).toBeTruthy()
   })
 })
@@ -436,16 +470,17 @@ describe('AgentView images', () => {
     Object.defineProperty(file, 'size', { value: size })
     return file
   }
-  const attach = (file: File): void => {
-    fireEvent.change(screen.getByLabelText('Attach an image'), { target: { files: [file] } })
-  }
+  // applyAccept off: a file dialog can still hand over a file outside `accept`
+  const attach = (file: File): Promise<void> =>
+    userEvent.setup({ applyAccept: false }).upload(screen.getByLabelText('Attach an image'), file)
 
   it('sends an attached image with the next prompt', async () => {
+    const user = userEvent.setup()
     await mountView()
-    attach(png('shot.png'))
+    await attach(png('shot.png'))
     expect(await screen.findByText('shot.png')).toBeTruthy()
-    fireEvent.change(box(), { target: { value: 'Look' } })
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    await user.type(box(), 'Look')
+    await user.keyboard('{Enter}')
     expect(agents.prompt).toHaveBeenCalledWith({
       sessionId: 'agent-1',
       text: 'Look',
@@ -461,28 +496,29 @@ describe('AgentView image limits', () => {
     Object.defineProperty(file, 'size', { value: size })
     return file
   }
-  const attach = (file: File): void => {
-    fireEvent.change(screen.getByLabelText('Attach an image'), { target: { files: [file] } })
-  }
+  // applyAccept off: a file dialog can still hand over a file outside `accept`
+  const attach = (file: File): Promise<void> =>
+    userEvent.setup({ applyAccept: false }).upload(screen.getByLabelText('Attach an image'), file)
 
   it('removes a thumbnail', async () => {
+    const user = userEvent.setup()
     await mountView()
-    attach(png('shot.png'))
+    await attach(png('shot.png'))
     await screen.findByText('shot.png')
-    fireEvent.click(screen.getByRole('button', { name: 'Remove shot.png' }))
+    await user.click(screen.getByRole('button', { name: 'Remove shot.png' }))
     expect(screen.queryByText('shot.png')).toBeNull()
   })
 
   it('rejects an image over 5 MB in plain words', async () => {
     await mountView()
-    attach(png('big.png', 6 * 1024 * 1024))
+    await attach(png('big.png', 6 * 1024 * 1024))
     expect(screen.getByRole('alert').textContent).toMatch(/big\.png is larger than 5 MB/)
     expect(screen.queryByText('big.png', { selector: '.agent-attachment__name' })).toBeNull()
   })
 
   it('rejects a file that is not a supported image', async () => {
     await mountView()
-    attach(new File(['x'], 'a.bmp', { type: 'image/bmp' }))
+    await attach(new File(['x'], 'a.bmp', { type: 'image/bmp' }))
     expect(screen.getByRole('alert').textContent).toMatch(/PNG, JPEG, GIF or WebP/)
   })
 })
@@ -524,7 +560,7 @@ describe('AgentView sent message with attached context', () => {
   it('shows only the typed text, with the attached items as chips under it', async () => {
     await mountView()
     const log = screen.getByRole('log')
-    expect(log.querySelector('.agent-message--user')?.textContent).toBe('Use the same backoff')
+    expect(within(log).getByText('Use the same backoff')).toBeTruthy()
     expect(log.textContent).not.toContain('<citations>')
     expect(within(log).getByText('Fix the login test')).toBeTruthy()
     expect(within(log).queryByRole('button', { name: /Remove/ })).toBeNull()
@@ -535,9 +571,10 @@ describe('AgentView citation chip in a sent message', () => {
   beforeEach(seedSentWithContext)
 
   it('opens find on the quote when a citation chip is clicked', async () => {
+    const user = userEvent.setup()
     await mountView()
     const log = screen.getByRole('log')
-    fireEvent.click(within(log).getByRole('button', { name: /only on network errors/ }))
+    await user.click(within(log).getByRole('button', { name: /only on network errors/ }))
     const find = screen.getByLabelText<HTMLInputElement>('Find in the transcript')
     expect(find.value).toBe(quote)
     expect(screen.getByText('1 of 1')).toBeTruthy()

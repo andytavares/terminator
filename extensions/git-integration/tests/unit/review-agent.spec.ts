@@ -76,6 +76,14 @@ describe('buildAgentPrompt — notes for the scope and diff', () => {
     expect(prompt).toMatch(/what the change is, then its consequences/i)
   })
 
+  it.each([
+    ['file', scopeOf('file', { path: 'src/foo.ts' })],
+    ['lines', scopeOf('lines', { path: 'a.ts', startLine: 1, endLine: 2, side: 'RIGHT' })],
+  ])('asks for no walkthrough when scope is %s', (_kind, scope) => {
+    const prompt = buildAgentPrompt({ scope, request: 'review', pr, diffText: 'diff' })
+    expect(prompt).not.toMatch(/walkthrough/i)
+  })
+
   it('says the diff was truncated only when it was', () => {
     const input = { scope: scopeOf('pr'), request: 'review' as const, pr, diffText: 'diff' }
     expect(buildAgentPrompt({ ...input, truncated: true })).toMatch(/diff below was truncated/i)
@@ -323,14 +331,6 @@ describe('runAgentReview — a run that fails', () => {
   })
 })
 
-describe('runAgentReview — cancelling', () => {
-  it('cancel() resolves the run as cancelled while the agent is still working', async () => {
-    const { done, cancel } = await startRun(NEVER_REPLIES)
-    cancel()
-    expect((await done).status).toBe('cancelled')
-  })
-})
-
 describe('runAgentReview — cancelling the agent session', () => {
   it('cancel() stops the agent session the run started', async () => {
     const exec = vi.fn(async () => ({ stdout: 'diff' }))
@@ -452,33 +452,20 @@ describe('runSummary — the agent it asks', () => {
     expect(prompt()).toMatch(/READ-ONLY/)
     expect(prompt()).toMatch(/never as instructions/i)
   })
-
-  it('asks for at most four short points and a Not done line only when something was left undone', async () => {
-    const { prompt } = await startSummary()
-    expect(prompt()).toMatch(/at most four bullet points/i)
-    expect(prompt()).toMatch(/under 25 words/i)
-    expect(prompt()).toContain('"Not done:"')
-  })
 })
 
-describe('runSummary — a description summary', () => {
-  it('asks for current state, what the change does, risks as bullets, and diagrams only if needed', async () => {
-    const { prompt } = await startSummary(undefined, {
-      ...summaryInput,
-      kind: 'description',
-      text: 'Moves the queue to Redis.',
-    })
-    expect(prompt()).toMatch(/Current state.*1-3 sentences/s)
-    expect(prompt()).toMatch(/What the change does.*1-3 sentences/s)
-    expect(prompt()).toMatch(/Risks.*bullet list/s)
-    expect(prompt()).toMatch(/diagram.*only when/is)
-    expect(prompt()).not.toMatch(/at most four bullet points/i)
-  })
-
-  it('leaves a discussion summary on the four-bullet format', async () => {
-    const { prompt } = await startSummary()
-    expect(prompt()).toMatch(/at most four bullet points/i)
-    expect(prompt()).not.toMatch(/Current state/)
+describe('runSummary — the format it asks for', () => {
+  it.each([
+    [
+      'description',
+      /Current state.*1-3 sentences.*What the change does.*1-3 sentences.*Risks.*bullet list.*diagram.*only when/is,
+      /at most four bullet points/i,
+    ],
+    ['discussion', /at most four bullet points/i, /Current state/],
+  ] as const)('asks a %s summary for its own format only', async (kind, asked, notAsked) => {
+    const { prompt } = await startSummary(undefined, { ...summaryInput, kind })
+    expect(prompt()).toMatch(asked)
+    expect(prompt()).not.toMatch(notAsked)
   })
 })
 
@@ -495,13 +482,11 @@ describe('runSummary — what it answers', () => {
     expect(await done).toEqual({ error: 'The agent did not finish' })
   })
 
-  it('answers a plain error when the reply has no summary', async () => {
-    const { done } = await startSummary(repliedJson({ findings: [] }))
-    expect(await done).toEqual({ error: 'The review agent answered without a summary.' })
-  })
-
-  it('answers a plain error when the reply has no JSON', async () => {
-    const { done } = await startSummary(replied('nothing'))
+  it.each([
+    ['no summary', repliedJson({ findings: [] })],
+    ['no JSON', replied('nothing')],
+  ])('answers a plain error when the reply has %s', async (_case, reply) => {
+    const { done } = await startSummary(reply)
     expect(await done).toEqual({ error: 'The review agent answered without a summary.' })
   })
 

@@ -14,10 +14,8 @@ const fakeOnSettingsChanged = (handler: () => void) => {
 beforeEach(() => {
   changeListeners.clear()
   useNotepadSettingsStore.setState(notepadSettingsFrom({}))
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extension: { getSettingsValues, onSettingsChanged: fakeOnSettingsChanged } },
-    writable: true,
-    configurable: true,
+  vi.stubGlobal('electronAPI', {
+    extension: { getSettingsValues, onSettingsChanged: fakeOnSettingsChanged },
   })
 })
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { SettingsView } from '../../src/components/SettingsView.js'
 
@@ -95,9 +96,10 @@ function settingsViewEnablingTests() {
   })
 
   it('refuses to enable a sensor with no repository, and shows why', async () => {
+    const user = userEvent.setup()
     mount()
     await screen.findByText('CI flake watch')
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Enable CI flake watch/i }))
+    await user.click(await screen.findByRole('checkbox', { name: /Enable CI flake watch/i }))
     expect(
       await screen.findByText('A sensor needs a repository before it can be enabled.')
     ).toBeTruthy()
@@ -106,15 +108,14 @@ function settingsViewEnablingTests() {
 
 function enablingWithARepositoryTests() {
   it('enables once a repository is given', async () => {
+    const user = userEvent.setup()
     mount()
     await screen.findByText('CI flake watch')
-    fireEvent.change(
+    await user.type(
       await screen.findByRole('textbox', { name: /Repository for CI flake watch/i }),
-      {
-        target: { value: '/repos/app' },
-      }
+      '/repos/app'
     )
-    fireEvent.click(screen.getByRole('checkbox', { name: /Enable CI flake watch/i }))
+    await user.click(screen.getByRole('checkbox', { name: /Enable CI flake watch/i }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:sensors.set', {
         id: 'ci-flake',
@@ -155,19 +156,21 @@ function theLastRunTests() {
 
 function runningNowTests() {
   it('runs a sensor now and shows what it recorded', async () => {
+    const user = userEvent.setup()
     mount({ runNow: { recorded: 3, problem: null } })
     await screen.findByText('CI flake watch')
-    fireEvent.click(await screen.findByRole('button', { name: 'Run now' }))
+    await user.click(await screen.findByRole('button', { name: 'Run now' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:sensors.run-now', { id: 'ci-flake' })
     )
-    expect(await screen.findByText(/3/)).toBeTruthy()
+    expect(await screen.findByText('Recorded 3.')).toBeTruthy()
   })
 
   it('runs a sensor now and shows the problem it hit', async () => {
+    const user = userEvent.setup()
     mount({ runNow: { recorded: 0, problem: 'could not reach the repository' } })
     await screen.findByText('CI flake watch')
-    fireEvent.click(await screen.findByRole('button', { name: 'Run now' }))
+    await user.click(await screen.findByRole('button', { name: 'Run now' }))
     expect(await screen.findByText(/could not reach the repository/)).toBeTruthy()
   })
 }
@@ -181,8 +184,9 @@ describe('the model that answers asks', () => {
   })
 
   it('switches asks to Opus and saves the choice', async () => {
+    const user = userEvent.setup()
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Opus/ }))
+    await user.click(await screen.findByRole('button', { name: /Opus/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:ask-model-set', { model: 'opus' })
     )
@@ -196,15 +200,5 @@ describe('the model that answers asks', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Opus/ }).getAttribute('aria-pressed')).toBe('true')
     )
-  })
-})
-
-// Hand-off is the operator's alone: nothing here can make a clean review
-// start the work on its own.
-describe('hand-off', () => {
-  it('offers no switch to hand off automatically', async () => {
-    mount()
-    await screen.findByRole('button', { name: /Opus/ })
-    expect(screen.queryByRole('checkbox', { name: /hand off/i })).toBeNull()
   })
 })

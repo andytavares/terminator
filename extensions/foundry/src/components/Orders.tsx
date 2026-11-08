@@ -10,8 +10,6 @@ import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
 import type { Standing } from '../order/standing.js'
-import { statusInWords } from '../order/render.js'
-import type { OrderStatus } from '../order/schema.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import type { RiskGrade } from '../runtime/review/risk-grade.js'
 import { foundryInvoke, refusalOf } from '../renderer/foundry-invoke.js'
@@ -783,11 +781,7 @@ function OrderMain({ row }: { readonly row: OrderRow }) {
     <span className="fdry-order-main">
       <b>{row.title}</b>
       <small>
-        {row.id} ·{' '}
-        {/* The pill on the right says where the order stands; only a
-          row from an older shape, with no standing, needs it here. */}
-        {row.standing === undefined ? `${statusInWords(row.status as OrderStatus)} · ` : ''}
-        {gradeInWords(row.risk as RiskGrade)}
+        {row.id} · {gradeInWords(row.risk as RiskGrade)}
         {row.source.key !== null ? ` · ${row.source.tracker} ${row.source.key}` : ''}
       </small>
     </span>
@@ -808,7 +802,6 @@ function OrderState({ row }: { readonly row: OrderRow }) {
       </span>
     )
   }
-  if (standing === undefined) return null
   return (
     <span className={`fdry-order-state${standing.turn === 'you' ? ' is-waiting' : ''}`}>
       {standing.label}

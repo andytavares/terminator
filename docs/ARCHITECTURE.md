@@ -422,7 +422,7 @@ Each row is handed one `RowContext` with those actions, the collapse state and t
 
 ### The view-model layer
 
-`src/renderer/sidebar/` holds the pure core. **These modules import nothing but types**: no React, no store, no `Date.now()`. `now` is always a parameter. `tests/unit/renderer/sidebar/purity.spec.ts` guards the directory and not any one module, so a file added here inherits the rule.
+`src/renderer/sidebar/` holds the pure core. **These modules import nothing but types**: no React, no store, no `Date.now()`. `now` is always a parameter. `npm run lint` guards the directory and not any one module (`pureLayers` in `eslint.config.mjs`), so a file added here inherits the rule.
 
 | Module                                                    | Role                                                                                     |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -976,11 +976,12 @@ Every function in the extension, its specs included, is within the size limits t
 - [ADR-049: an accidental question costs five minutes](adr/049-an-accidental-question-costs-five-minutes.md) — why a policy that asks by accident is a latency defect, and the eight changes measured against one live run.
 - [ADR-131: agents' permissions are Claude Code settings](adr/131-agents-permissions-are-claude-code-settings.md) — each role's mode and rules come from `runtime/role-settings.ts`; supersedes ADR-049 and ADR-077.
 - [ADR-056: a file count is not a budget](adr/056-a-file-count-is-not-a-budget.md) — budgets are agents and minutes; the files budget and the `budgets` check are gone.
-- [ADR-132: CI finishes in five minutes](adr/132-ci-finishes-in-five-minutes.md) — at most five macOS jobs per run, nothing waits on E2E, quarantined tests run nightly, and `ci:local` runs its jobs at once.
+- [ADR-132: CI finishes in five minutes](adr/132-ci-finishes-in-five-minutes.md) — superseded by ADR-151.
 - [ADR-133: paved-path cleanup](adr/133-paved-path-cleanup.md) — `codecov/patch` is the one outside gate, the seed is Vitest's, the database console is an exception to Principle II, and Jira is removed.
 - [ADR-134: CI releases each merge](adr/134-ci-releases-each-merge.md) — the release is the last job of `ci.yml` on a push to `main`, after the checks that push ran; `release.yml` and its full test run are gone.
-- [ADR-136: a real order runs before Foundry changes ship](adr/136-a-real-order-runs-before-foundry-changes-ship.md) — `npm run canary` runs one real order on this repository; a push that changes Foundry's integration points needs a pass.
-- [ADR-070: E2E is deterministic and selective](adr/070-e2e-is-deterministic-and-selective.md) — no retries, flakes fixed at their cause, and a PR runs only the specs its diff selects.
+- [ADR-136: a real order runs before Foundry changes ship](adr/136-a-real-order-runs-before-foundry-changes-ship.md) — superseded by ADR-151: the canary is removed.
+- [ADR-151: CI runs everything, once, with nothing fancy](adr/151-ci-runs-everything-once-with-nothing-fancy.md) — every run tests everything once; only the app, the story screenshots and the release run on macOS; the pre-commit hook runs `npm run check`, the scripts CI runs.
+- [ADR-070: E2E is deterministic and selective](adr/070-e2e-is-deterministic-and-selective.md) — no retries and flakes fixed at their cause; its selection is superseded by ADR-151.
 - [ADR-072: a review reads definitions before their callers](adr/072-a-review-reads-definitions-before-callers.md) — tree-sitter orders a PR's files so a function comes before the code that calls it.
 - [ADR-073: the review agent reads, and never writes](adr/073-the-review-agent-reads-and-never-writes.md) — headless `claude -p` with Read, Grep and Glob only, in a worktree at the PR head; findings stay private until posted.
 

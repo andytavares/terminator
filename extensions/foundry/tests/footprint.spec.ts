@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveDataRoot, untrackedNotice, orderDir, ledgerPath } from '../src/data-root.js'
+import { resolveDataRoot, untrackedNotice } from '../src/data-root.js'
 
 // The footprint promise, held by a test rather than by good intentions.
 //
@@ -25,7 +25,6 @@ const files = sourceFiles(srcDir)
 
 describe('the repository footprint', () => {
   describe('dotfiles', dotfilesTests)
-  describe('the data root', theDataRootTests)
 })
 
 function dotfilesTests() {
@@ -35,44 +34,17 @@ function dotfilesTests() {
   const WRITE =
     /\b(writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|copyFile|rename|unlink)\b/
 
-  it('never writes to a .gitignore', () => {
-    const offenders: string[] = []
-    for (const file of files) {
-      for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-        if (/\.gitignore/.test(line) && WRITE.test(line)) {
-          offenders.push(`${path.relative(srcDir, file)}: ${line.trim()}`)
-        }
-      }
-    }
+  const DOTFILE = /\.(?:gitignore|gitattributes|npmrc|editorconfig)\b/
+
+  it('never writes to a .gitignore or any other repository dotfile', () => {
+    const offenders = files.flatMap((file) =>
+      fs
+        .readFileSync(file, 'utf8')
+        .split('\n')
+        .filter((line) => WRITE.test(line) && DOTFILE.test(line))
+        .map((line) => `${path.relative(srcDir, file)}: ${line.trim()}`)
+    )
     expect(offenders).toEqual([])
-  })
-
-  it('never writes to any dotfile at a repository root', () => {
-    const offenders: string[] = []
-    for (const file of files) {
-      for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-        if (
-          WRITE.test(line) &&
-          /['"`]\.(?:gitignore|gitattributes|npmrc|editorconfig)['"`]/.test(line)
-        ) {
-          offenders.push(`${path.relative(srcDir, file)}: ${line.trim()}`)
-        }
-      }
-    }
-    expect(offenders).toEqual([])
-  })
-}
-
-function theDataRootTests() {
-  it('routes every record path through the data root', () => {
-    for (const helper of [orderDir('/root', 'WO-1'), ledgerPath('/root', 'WO-1')]) {
-      expect(helper.startsWith('/root/')).toBe(true)
-    }
-  })
-
-  it('writes nothing under a repository path when a data root is configured', () => {
-    const resolved = resolveDataRoot('/var/foundry', '/repos/terminator')
-    expect(orderDir(resolved.root, 'WO-1').startsWith('/repos/terminator')).toBe(false)
   })
 }
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { isSurfaceOpen } from '../../../../src/shared/double-escape'
 
@@ -21,7 +22,7 @@ function renderPopover(onDismiss = vi.fn()) {
 describe('Popover', () => {
   it('takes an accessible name', () => {
     renderPopover()
-    expect(screen.getByRole('group', { name: 'Pick a date' })).toBeTruthy()
+    expect(screen.getByRole('group').getAttribute('aria-label')).toBe('Pick a date')
   })
 
   it('is a native popover, shown as soon as it mounts', () => {
@@ -33,21 +34,24 @@ describe('Popover', () => {
 })
 
 describe('Popover — light dismiss', () => {
-  it('closes on Escape', () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderPopover()
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
-  it('closes on a click outside it', () => {
+  it('closes on a click outside it', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderPopover()
-    fireEvent.click(document.body)
+    await user.click(document.body)
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
-  it('does not close on a click inside it', () => {
+  it('does not close on a click inside it', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderPopover()
-    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+    await user.click(screen.getByRole('button', { name: 'Today' }))
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
@@ -65,10 +69,10 @@ describe('Popover — focus', () => {
     opener.focus()
 
     const { unmount } = renderPopover()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Today' }))
+    expect(screen.getByRole('button', { name: 'Today' }).matches(':focus')).toBe(true)
 
     unmount()
-    expect(document.activeElement).toBe(opener)
+    expect(opener.matches(':focus')).toBe(true)
     opener.remove()
   })
 
@@ -81,12 +85,12 @@ describe('Popover — focus', () => {
     expect(surface.getAttribute('role')).not.toBe('dialog')
   })
 
-  it('does not trap Tab, because the view behind it is still usable', () => {
+  it('does not trap Tab, because the view behind it is still usable', async () => {
+    const user = userEvent.setup()
     renderPopover()
-    const buttons = screen.getAllByRole('button')
-    buttons[buttons.length - 1].focus()
-    fireEvent.keyDown(screen.getByRole('group'), { key: 'Tab' })
-    expect(document.activeElement).toBe(buttons[buttons.length - 1])
+    screen.getByRole('button', { name: 'Tomorrow' }).focus()
+    await user.tab()
+    expect(document.body.matches(':focus-within')).toBe(false)
   })
 })
 
@@ -151,27 +155,30 @@ describe('Popover opened at a point', () => {
 // A press the window never saw released (a drag let go outside it) must not leave every later
 // surface waiting for a release that will not come.
 describe('Popover after a press whose release was missed', () => {
-  it('opens at once from a context menu sent with no button held', () => {
-    fireEvent.pointerDown(document.body)
+  it('opens at once from a context menu sent with no button held', async () => {
+    await userEvent.setup().pointer({ keys: '[MouseLeft>]', target: document.body })
     fireEvent.contextMenu(document.body, { buttons: 0 })
     renderPopover()
     expect(screen.getByRole('group').matches(':popover-open')).toBe(true)
   })
 
-  it('opens at once after a click, which only comes once the button is up', () => {
-    fireEvent.pointerDown(document.body)
+  it('opens at once after a click, which only comes once the button is up', async () => {
+    const user = userEvent.setup()
+    await user.pointer({ keys: '[MouseLeft>]', target: document.body })
+    // eslint-disable-next-line testing-library/prefer-user-event -- a click with no press before it: a release the window never saw
     fireEvent.click(document.body)
     renderPopover()
     expect(screen.getByRole('group').matches(':popover-open')).toBe(true)
   })
 
-  it('still waits for the release when a context menu comes mid-press, as on macOS', () => {
-    fireEvent.pointerDown(document.body)
+  it('still waits for the release when a context menu comes mid-press, as on macOS', async () => {
+    const user = userEvent.setup()
+    await user.pointer({ keys: '[MouseLeft>]', target: document.body })
     fireEvent.contextMenu(document.body, { buttons: 2 })
     renderPopover()
     const surface = screen.getByRole('group', { hidden: true })
     expect(surface.matches(':popover-open')).toBe(false)
-    fireEvent.pointerUp(document.body)
-    return expect.poll(() => surface.matches(':popover-open')).toBe(true)
+    await user.pointer({ keys: '[/MouseLeft]', target: document.body })
+    await expect.poll(() => surface.matches(':popover-open')).toBe(true)
   })
 })

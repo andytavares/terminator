@@ -32,7 +32,7 @@ export type Autonomy = (typeof AUTONOMY_LEVELS)[number]
  * default.
  * @internal
  */
-export const UNCONDITIONAL: readonly GateRuleId[] = [
+const UNCONDITIONAL: readonly GateRuleId[] = [
   'risk.p0',
   'budget.exceeded',
   'ready-for-review',

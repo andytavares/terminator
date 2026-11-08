@@ -180,11 +180,10 @@ export async function restartFoundry(handle: AppHandle, workspaceName: string): 
  *  lazy activation. */
 export async function openFoundry(handle: AppHandle): Promise<void> {
   const panel = handle.page.locator('[data-extension-panel="terminator.foundry"]')
-  if ((await panel.count()) === 0) {
-    const button = handle.page.locator('button[aria-label="Foundry"]')
-    await expect(button).toBeVisible()
-    await button.click()
-  }
+  const button = handle.page.locator('button[aria-label="Foundry"]')
+  // The band draws its buttons before any panel it restores; wait for it before reading the panel.
+  await expect(button).toBeVisible()
+  if ((await panel.count()) === 0) await button.click()
   await expect(panel).toHaveCount(1)
   // The channel answers through the main window's own bridge, which needs
   // nothing from the extension's frame — so it is checked first, exactly as

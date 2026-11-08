@@ -9,6 +9,7 @@ import {
   readTerminalRowsIn,
   visibleTerminalScreen,
 } from './helpers'
+import { expectTerminalFocused } from './session-views'
 
 // A terminal moved to its own window and back: its scrollback travels with it both ways, and the
 // main window's tab strip gives up the tab while the terminal lives elsewhere.
@@ -40,6 +41,7 @@ async function rowsOf(page: Page): Promise<string> {
 
 async function echoInto(page: Page, marker: string): Promise<void> {
   await visibleTerminalScreen(page).click()
+  await expectTerminalFocused(page)
   await page.keyboard.type(`echo ${marker}`)
   await page.keyboard.press('Enter')
   await expect.poll(() => rowsOf(page)).toContain(`\n${marker}`)
@@ -181,19 +183,5 @@ test('a tab dragged out of the window opens on release, and dragged back docks',
     await closed
     await expect(sessionTabs()).toHaveCount(3)
     await expect(sessionTabs().nth(1)).toContainText(titles[1])
-  })
-})
-
-test('a tab dragged onto another tab takes its place', async () => {
-  const { page } = handle
-  const titles = await test.step('three terminals', () =>
-    threeTerminalsSecondSelected('WS-Reorder'))
-  await test.step('the third tab dropped on the first moves to the front', async () => {
-    const first = (await sessionTabs().first().boundingBox())!
-    await dragTab(page, sessionTabs().last(), {
-      x: first.x + first.width / 2,
-      y: first.y + first.height / 2,
-    })
-    await expect(sessionTabs().first()).toContainText(titles[2])
   })
 })

@@ -87,16 +87,10 @@ function namesTests() {
 }
 
 function theRepositoryTests() {
-  it('never requires a repository to carry a .foundry directory', () => {
-    put(builtIn, 'recipes/direct', recipe('direct'))
-    expect(resolveFile('recipes', 'direct', sources())).not.toBeNull()
-    expect(fs.existsSync(path.join(repo, '.foundry'))).toBe(false)
-  })
-
-  it('creates nothing in the repository while resolving', () => {
+  it('resolves without a .foundry directory and creates nothing in the repository', () => {
     put(builtIn, 'recipes/direct', recipe('direct'))
     const before = fs.readdirSync(repo)
-    resolveFile('recipes', 'direct', sources())
+    expect(resolveFile('recipes', 'direct', sources())).not.toBeNull()
     expect(fs.readdirSync(repo)).toEqual(before)
   })
 }

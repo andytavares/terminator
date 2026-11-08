@@ -45,17 +45,15 @@ function headingTextStartTests() {
 }
 
 function headingTextStartFindingTextTests() {
-  it('points just past the marker and its space', () => {
-    const state = makeState('# Hello', 0)
-    expect(headingTextStart(state, 0)).toBe(2)
-  })
-
-  it('handles every heading level', () => {
-    for (let level = 1; level <= 6; level++) {
-      const marker = '#'.repeat(level)
-      const state = makeState(`${marker} Title`, 0)
-      expect(headingTextStart(state, 0)).toBe(level + 1)
-    }
+  it.each([
+    { line: '# Title', textStart: 2 },
+    { line: '## Title', textStart: 3 },
+    { line: '### Title', textStart: 4 },
+    { line: '#### Title', textStart: 5 },
+    { line: '##### Title', textStart: 6 },
+    { line: '###### Title', textStart: 7 },
+  ])('finds the text after the marker in "$line"', ({ line, textStart }) => {
+    expect(headingTextStart(makeState(line, 0), 0)).toBe(textStart)
   })
 
   it('handles multiple spaces after the marker', () => {

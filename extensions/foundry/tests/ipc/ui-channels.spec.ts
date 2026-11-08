@@ -22,6 +22,7 @@ beforeAll(() => {
 beforeEach(() => {
   host.settings.clear()
   host.broadcast.mockClear()
+  vi.mocked(host.api.window.showSelf).mockClear()
   clearPendingNewOrder()
   create.mockReset()
 })
@@ -43,12 +44,21 @@ describe('which view draws the Forge', () => {
     expect(host.broadcast).toHaveBeenCalledWith('foundry:ui.view-changed', { view: 'factory' })
   })
 
-  it('flips each time the palette command runs', async () => {
+  it('flips each time the palette command runs, bringing Foundry forward', async () => {
     host.commands.get('toggle-view')?.()
     expect(await host.call('foundry:ui.view')).toEqual({ view: 'factory' })
+    expect(host.api.window.showSelf).toHaveBeenCalledWith('main')
     host.commands.get('toggle-view')?.()
     expect(await host.call('foundry:ui.view')).toEqual({ view: 'list' })
     expect(host.broadcast).toHaveBeenLastCalledWith('foundry:ui.view-changed', { view: 'list' })
+  })
+
+  it('keeps the earlier view when asked for one that is not known', async () => {
+    await host.call('foundry:ui.set-view', { view: 'factory' })
+    expect(await host.call('foundry:ui.set-view', { view: 'grid' })).toEqual({
+      error: 'Malformed request.',
+    })
+    expect(await host.call('foundry:ui.view')).toEqual({ view: 'factory' })
   })
 })
 
@@ -117,6 +127,18 @@ describe('the models runs launch with', () => {
     expect(await host.call('foundry:ask-model-set', { model: 'opus' })).toEqual({
       ok: true,
       selected: 'opus',
+    })
+    expect(await host.call('foundry:ask-model')).toEqual({ selected: 'opus' })
+  })
+
+  it('answers asks with Sonnet until the operator chooses otherwise', async () => {
+    expect(await host.call('foundry:ask-model')).toEqual({ selected: 'sonnet' })
+  })
+
+  it('refuses an ask model that is not Sonnet or Opus, and keeps the one chosen', async () => {
+    await host.call('foundry:ask-model-set', { model: 'opus' })
+    expect(await host.call('foundry:ask-model-set', { model: 'haiku' })).toEqual({
+      error: 'model must be one of sonnet, opus',
     })
     expect(await host.call('foundry:ask-model')).toEqual({ selected: 'opus' })
   })

@@ -33,4 +33,9 @@ describe('the log file', () => {
     await flushLogs()
     expect(readFileSync(join(logs, 'terminator.log'), 'utf8')).toContain('written after')
   })
+
+  it('settles flushLogs at once when nothing was written', async () => {
+    const { flushLogs } = await import('../../../src/main/logger')
+    await expect(flushLogs()).resolves.toBeUndefined()
+  })
 })

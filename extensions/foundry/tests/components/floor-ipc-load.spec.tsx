@@ -61,7 +61,6 @@ function perChannel(invoke: ReturnType<typeof vi.fn>): Record<string, number> {
 
 afterEach(() => {
   vi.useRealTimers()
-  Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
 })
 
 describe('an open Floor with nothing happening', () => {
@@ -76,7 +75,6 @@ describe('an open Floor with nothing happening', () => {
     await vi.advanceTimersByTimeAsync(60_000)
 
     const counts = perChannel(invoke)
-    console.info(`Floor, one minute: ${invoke.mock.calls.length} calls`, counts)
     expect(Object.keys(counts)).toEqual(['foundry:run-transcript'])
   })
 
@@ -86,7 +84,7 @@ describe('an open Floor with nothing happening', () => {
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-transcript', expect.anything())
     )
-    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
     document.dispatchEvent(new Event('visibilitychange'))
     invoke.mockClear()
 

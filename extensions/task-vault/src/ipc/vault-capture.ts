@@ -73,10 +73,10 @@ async function insertNewTask({ db }: IpcContext, args: z.infer<typeof AddTaskReq
 
 async function editTask({ db }: IpcContext, args: z.infer<typeof EditTaskRequestSchema>) {
   const { taskId, text } = args
+  if (!(await taskExists(db, taskId))) return { error: 'STALE_ID' }
   const extracted = extractTags(text)
   const now = nowIso()
   const { projectId, areaId } = await resolveProjectAndAreaIds(db, extracted, now)
-  if (!(await taskExists(db, taskId))) return { error: 'STALE_ID' }
   await db.run(
     `UPDATE tasks SET text=?,project_id=?,context=?,area_id=?,due_date=?,updated_at=? WHERE id=?`,
     [

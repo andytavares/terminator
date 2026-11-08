@@ -59,7 +59,7 @@ export interface ForgeLoopDeps {
 
 /** The Forge's turns, reviews and hand-offs, entered from a channel or a decision. */
 export interface ForgeLoop {
-  readonly convergeWithFollowUps: (ask: ArchitectAsk) => Promise<ConvergeStarted>
+  readonly convergeWithFollowUps: (ask: Omit<ArchitectAsk, 'root'>) => Promise<ConvergeStarted>
   readonly convergeMaybeScouted: (
     order: WorkOrder,
     message: string,
@@ -79,6 +79,8 @@ interface ArchitectAsk {
   readonly order: WorkOrder
   readonly message: string
   readonly autoTurns: number
+  /** The data root the turn started against; everything its end leads to writes there. */
+  readonly root: string
   // Set only for a turn the review loop started to fix its own findings: its round,
   // which keeps the turn on the draft model (`architectModel`). Undefined starts a
   // fresh chain, so the next review the redraft earns is round 1.
@@ -118,7 +120,8 @@ export function createForgeLoop(
 ): ForgeLoop {
   const forge: Forge = { api, dataRoot, deciding, channels }
   return {
-    convergeWithFollowUps: (ask) => convergeWithFollowUps(forge, ask),
+    convergeWithFollowUps: (ask) =>
+      convergeWithFollowUps(forge, { ...ask, root: forge.dataRoot() }),
     convergeMaybeScouted: (order, message, recordStart) =>
       convergeForForge(forge, { order, message, recordStart }),
     onReleased: (order) => inBackground(resumeAfterRelease(forge, order)),
@@ -129,8 +132,8 @@ async function recordLoopEntry(root: string, entry: LoopEntry): Promise<void> {
   await orderStoreAt(root).record({ at: new Date().toISOString(), ...entry, evidence: [] })
 }
 
-const nextReviewRound = async (forge: Forge, orderId: string): Promise<number> =>
-  nextRound(loopFacts(await orderStoreAt(forge.dataRoot()).entries(orderId)))
+const nextReviewRound = async (root: string, orderId: string): Promise<number> =>
+  nextRound(loopFacts(await orderStoreAt(root).entries(orderId)))
 
 // One architect turn and the ones the Forge starts after it: a plan still failing a
 // check the architect can close goes back up to MAX_AUTO_TURNS times (spec 062).
@@ -146,7 +149,7 @@ async function convergeWithFollowUps(forge: Forge, ask: ArchitectAsk): Promise<C
   })
   try {
     const started = await convergeOnce(forge.api, {
-      root: forge.dataRoot(),
+      root: ask.root,
       order,
       message: ask.message,
       loop: ask.loopRound !== undefined,
@@ -157,7 +160,7 @@ async function convergeWithFollowUps(forge: Forge, ask: ArchitectAsk): Promise<C
     })
     if (!started.ok && started.notStarted) sayNotStarted(forge.api, order, started.reason)
     else await ask.recordStart?.(started)
-    await setIntake(forge.dataRoot(), order.id, startedIntake(ask, started))
+    await setIntake(ask.root, order.id, startedIntake(ask, started))
     return started
   } finally {
     startWritten()
@@ -179,14 +182,14 @@ async function continueAutomatically(
   ask: ArchitectAsk,
   next: { from: WorkOrder; message: string; why: string }
 ): Promise<void> {
-  const { order } = ask
-  const root = forge.dataRoot()
+  const { order, root } = ask
   await endPreviousTurn(order.id)
   await convergeWithFollowUps(forge, {
     order: next.from,
     message: next.message,
     autoTurns: ask.autoTurns + 1,
     loopRound: ask.loopRound,
+    root,
     recordStart: (started) =>
       recordLoopEntry(root, {
         orderId: order.id,
@@ -211,7 +214,7 @@ async function afterArchitectTurn(
   ask: ArchitectAsk,
   outcome: ConvergeOutcome
 ): Promise<void> {
-  const root = forge.dataRoot()
+  const { root } = ask
   if (!outcome.ok) {
     await afterRefusedProposal(forge, ask, { root, reason: outcome.reason })
     return
@@ -323,20 +326,19 @@ async function reviewOrHandOff(
       anotherPass: anotherPassWanted(await store.entries(ask.order.id)),
     }) === 'hand-off'
   ) {
-    await handOffWhenReady(forge, drafted)
+    await handOffWhenReady(forge, root, drafted)
     return
   }
-  const round = ask.loopRound ?? (await nextReviewRound(forge, ask.order.id))
-  await startReviewRound(forge, { order: drafted, round, changed })
+  const round = ask.loopRound ?? (await nextReviewRound(root, ask.order.id))
+  await startReviewRound(forge, { order: drafted, round, changed, root })
 }
 
 // One red-team round and what follows: `fix` sends the open blocking findings back as
 // one architect turn on the loop's tier, `operator` gives up after MAX_REVIEW_ROUNDS
 // (the one point that reaches the operator), `clean` hands the order off.
-async function startReviewRound(forge: Forge, review: Review): Promise<void> {
+async function startReviewRound(forge: Forge, review: ReviewAt): Promise<void> {
   const { api } = forge
-  const { order, round } = review
-  const root = forge.dataRoot()
+  const { order, round, root } = review
   const skipReason = round === 1 ? reviewSkipReason(order) : null
   if (skipReason !== null) {
     await skipReview(forge, { root, order, reason: skipReason })
@@ -355,10 +357,10 @@ async function startReviewRound(forge: Forge, review: Review): Promise<void> {
     nodeId: `review-${round}`,
     round,
     model: lighterRedTeam(api) ? lighterRedTeamModel(defaultModel(api)) : undefined,
-    prompt: (role) => reviewPromptFor(api, { ...review, root }, { role, attacked }),
+    prompt: (role) => reviewPromptFor(api, review, { role, attacked }),
     startedAction: 'review.started',
     startedReason: `round ${round}`,
-    ...reviewEnds(forge, { ...review, root }),
+    ...reviewEnds(forge, review),
   })
 }
 
@@ -411,7 +413,7 @@ async function skipReview(
     subject: order.id,
     reason,
   })
-  await handOffWhenReady(forge, order)
+  await handOffWhenReady(forge, root, order)
 }
 
 function reviewPromptFor(
@@ -446,7 +448,7 @@ async function afterReviewRound(
 
   const next = reviewNext({ order: updated, round })
   if (next.kind === 'clean') {
-    await handOffWhenReady(forge, updated)
+    await handOffWhenReady(forge, root, updated)
     return
   }
   if (next.kind === 'operator') {
@@ -508,6 +510,7 @@ async function startFixTurn(forge: Forge, review: ReviewAt, message: string): Pr
     message,
     autoTurns: 0,
     loopRound: round + 1,
+    root,
     recordStart: (started) =>
       recordLoopEntry(root, {
         orderId: updated.id,
@@ -521,13 +524,12 @@ async function startFixTurn(forge: Forge, review: ReviewAt, message: string): Pr
 
 // A draft that passes every check. One never released waits for Hand off; one a
 // defect sent back after release is agreed again and restarted (release-again.ts).
-async function handOffWhenReady(forge: Forge, order: WorkOrder): Promise<void> {
-  await readyToHandOff(order, releaseDepsFor(forge))
+async function handOffWhenReady(forge: Forge, root: string, order: WorkOrder): Promise<void> {
+  await readyToHandOff(order, releaseDepsFor(forge, root))
 }
 
-function releaseDepsFor(forge: Forge): ReleaseDeps {
+function releaseDepsFor(forge: Forge, root: string): ReleaseDeps {
   const { api } = forge
-  const root = forge.dataRoot()
   const store = orderStoreAt(root)
   return {
     entries: (orderId) => store.entries(orderId),
@@ -608,9 +610,9 @@ async function resumeAfterRelease(forge: Forge, order: WorkOrder): Promise<void>
     reviewedCurrentPlan: reviewedCurrentPlan(entries),
   })
   if (next.kind === 'review') {
-    await startReviewRound(forge, { order, round: next.round, changed: '' })
+    await startReviewRound(forge, { order, round: next.round, changed: '', root })
   } else if (next.kind === 'hand-off') {
-    await handOffWhenReady(forge, order)
+    await handOffWhenReady(forge, root, order)
   } else if (next.kind === 'fix' || next.kind === 'follow-up') {
     await convergeAfterRelease(forge, { root, order }, next)
   }
@@ -630,6 +632,7 @@ async function convergeAfterRelease(
     message: next.message,
     autoTurns: fix !== null ? 0 : 1,
     loopRound: fix !== null ? fix.round + 1 : undefined,
+    root,
     recordStart: (started) =>
       recordLoopEntry(root, {
         orderId: order.id,
@@ -657,6 +660,7 @@ function convergeForForge(
           order: architectOrder,
           message: architectMessage,
           autoTurns: 0,
+          root,
           recordStart,
         }),
     },

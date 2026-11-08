@@ -24,9 +24,12 @@ let view: EditorView | null = null
 function deferSelectionChange(event: Event): void {
   if ('deferred' in event) return
   event.stopImmediatePropagation()
-  setTimeout(() =>
+  const task = new MessageChannel()
+  task.port1.onmessage = () => {
+    task.port1.close()
     document.dispatchEvent(Object.assign(new Event('selectionchange'), { deferred: true }))
-  )
+  }
+  task.port2.postMessage(null)
 }
 
 beforeEach(() => window.addEventListener('selectionchange', deferSelectionChange, true))
@@ -58,11 +61,7 @@ function mountPreview(doc: string, extensions: Extension[] = []): EditorView {
 
 function installShell() {
   const openExternal = vi.fn(async () => ({ ok: true }))
-  Object.defineProperty(window, 'electronAPI', {
-    value: { shell: { openExternal } },
-    writable: true,
-    configurable: true,
-  })
+  vi.stubGlobal('electronAPI', { shell: { openExternal } })
   return openExternal
 }
 
@@ -113,6 +112,8 @@ function listAndTaskTests() {
 
   it('keeps the caret where it was when the checkbox is pressed', () => {
     const box = mountPreview('- [ ] buy milk\n\nend').dom.querySelector('.notepad-task-checkbox')!
+    // The test DOM lays nothing out, so the caret never moves here; the refused default is the
+    // signal that a browser would leave it alone.
     expect(pressOn(box, 'mousedown').defaultPrevented).toBe(true)
   })
 }
@@ -216,19 +217,25 @@ function redrawTests() {
 }
 
 function widgetPressTests() {
-  it('is left to the widget: the editor neither moves the caret nor takes focus', () => {
-    const v = mountPreview(EVERY_WIDGET)
-    const head = v.state.selection.main.head
-    for (const selector of ['.notepad-list-bullet', '.notepad-hr', '.notepad-image-widget']) {
+  it.each(['.notepad-list-bullet', '.notepad-hr', '.notepad-image-widget'])(
+    'on %s is left to the widget: the editor neither moves the caret nor takes focus',
+    (selector) => {
+      const v = mountPreview(EVERY_WIDGET)
+      const head = v.state.selection.main.head
       pressOn(v.dom.querySelector(selector)!, 'mousedown')
       expect(v.hasFocus).toBe(false)
       expect(v.state.selection.main.head).toBe(head)
     }
-    for (const selector of ['.notepad-mermaid', '.notepad-table', '.notepad-alert__header']) {
+  )
+
+  it.each(['.notepad-mermaid', '.notepad-table', '.notepad-alert__header'])(
+    'on %s is left to the widget: the editor does not take focus',
+    (selector) => {
+      const v = mountPreview(EVERY_WIDGET)
       pressOn(v.dom.querySelector(selector)!, 'mousedown')
       expect(v.hasFocus).toBe(false)
     }
-  })
+  )
 
   it('on a link reaches the editor too, which takes focus', () => {
     const v = mountPreview('[link](https://example.com)\n\nend')

@@ -25,7 +25,12 @@ export function BranchSelect(props: Props): React.JSX.Element {
   return (
     <div ref={containerRef} className="branch-select">
       <div className="branch-select__row">
-        <button type="button" className="branch-select__trigger" onClick={() => setOpen((o) => !o)}>
+        <button
+          type="button"
+          className="branch-select__trigger"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+        >
           <span className="branch-select__value">{displayValue}</span>
           <span className="branch-select__caret">{open ? '▴' : '▾'}</span>
         </button>
@@ -111,7 +116,7 @@ function BranchList({
     close()
   }
   return (
-    <div className="branch-select__list">
+    <div className="branch-select__list" role="group" aria-label="Branches">
       <NewBranchItem {...choice} choosing={choosing} />
       {filtered.map((b) => (
         <BranchItem
@@ -150,6 +155,7 @@ function NewBranchItem({
     <button
       type="button"
       className={`branch-select__item branch-select__item--new${isNewSelected ? ' branch-select__item--active' : ''}`}
+      aria-current={isNewSelected ? 'true' : undefined}
       onClick={choosing(onNewBranch)}
     >
       {newBranchLabel}
@@ -169,6 +175,7 @@ function BranchItem({ branch, active, onClick }: BranchItemProps): React.JSX.Ele
     <button
       type="button"
       className={`branch-select__item${active ? ' branch-select__item--active' : ''}`}
+      aria-current={active ? 'true' : undefined}
       onClick={() => {
         recordUse('core.sidebar.branch-switch')
         onClick()

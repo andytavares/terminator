@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import React from 'react'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { EditorView } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import {
@@ -24,8 +24,7 @@ function renderEditor(props: Partial<EditorProps> & { initialDoc: string }) {
     <NoteEditor onChange={onChange} {...props} {...extra} />
   )
   const result = render(element({}))
-  const dom = result.container.querySelector<HTMLElement>('.cm-editor')!
-  const view = EditorView.findFromDOM(dom)!
+  const view = EditorView.findFromDOM(screen.getByRole('textbox'))!
   const rerender = (extra: Partial<EditorProps>) => result.rerender(element(extra))
   return { view, onChange, rerender }
 }
@@ -121,7 +120,7 @@ function highlightTests() {
   it('highlights a commented range, marks the hovered one, and clears them all', () => {
     const { view } = renderEditor({ initialDoc: 'one two three' })
     applyAnchors(view, [{ id: 'c1', from: 4, to: 7 }])
-    expect(view.dom.querySelector('[data-comment-id="c1"]')?.textContent).toBe('two')
+    expect(screen.getByText('two').dataset.commentId).toBe('c1')
 
     setEditorHoverAnchor(view, 'c1')
     expect(highlights(view)).toEqual(['notepad-comment-highlight notepad-comment-highlight--hover'])
@@ -136,8 +135,9 @@ function highlightTests() {
       { id: 'long', from: 4, to: 13 },
       { id: 'short', from: 4, to: 7 },
     ])
-    expect(view.dom.querySelector('[data-comment-id="short"]')).not.toBeNull()
-    expect(view.dom.querySelector('[data-comment-id="long"]')).not.toBeNull()
+    expect(screen.getByText('two').dataset.commentId).toBe('short')
+    const longMark = screen.getByText((_, element) => element?.textContent === 'two three')
+    expect(longMark.dataset.commentId).toBe('long')
   })
 
   it('draws nothing for a comment whose text was deleted', () => {
@@ -146,7 +146,7 @@ function highlightTests() {
       { id: 'gone', from: 4, to: 4 },
       { id: 'kept', from: 8, to: 13 },
     ])
-    expect(view.dom.querySelector('[data-comment-id="gone"]')).toBeNull()
-    expect(view.dom.querySelector('[data-comment-id="kept"]')?.textContent).toBe('three')
+    expect(view.dom.innerHTML).not.toContain('data-comment-id="gone"')
+    expect(screen.getByText('three').dataset.commentId).toBe('kept')
   })
 }

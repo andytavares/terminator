@@ -5,7 +5,6 @@ import {
   SCHEMA_VERSION,
   SchemaVersionTooNewError,
   RED_TEAM_CATEGORIES,
-  BLOCKING_CATEGORIES,
   isBlocking,
 } from '../../src/order/schema.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -252,11 +251,6 @@ function nonOrdersAndVersionsTests() {
     expect(() => parseWorkOrder(o)).toThrow()
     expect(() => parseWorkOrder(o)).not.toThrow(SchemaVersionTooNewError)
   })
-
-  it('accepts the version it knows', () => {
-    const o = { ...(valid() as Record<string, unknown>), schemaVersion: SCHEMA_VERSION }
-    expect(parseWorkOrder(o).schemaVersion).toBe(SCHEMA_VERSION)
-  })
 }
 
 function optionalCollectionsTests() {
@@ -339,18 +333,15 @@ function budgetsTests() {
 }
 
 function proofTests() {
-  it('accepts every kind of proof a criterion can carry', () => {
-    const kinds = [
-      { kind: 'command', command: 'make check', assert: 'exit_code == 0' },
-      { kind: 'judge', rubric: 'measure ink', evidence: ['screenshot'] },
-      { kind: 'artifact', path: 'dist/app.js', assert: 'exists' },
-      { kind: 'screenshot', target: 'terminal pane' },
-    ]
-    for (const verify of kinds) {
-      const o = valid() as Record<string, unknown>
-      ;(o.acceptance as Record<string, unknown>[])[0].verify = verify
-      expect(() => parseWorkOrder(o)).not.toThrow()
-    }
+  it.each([
+    { kind: 'command', command: 'make check', assert: 'exit_code == 0' },
+    { kind: 'judge', rubric: 'measure ink', evidence: ['screenshot'] },
+    { kind: 'artifact', path: 'dist/app.js', assert: 'exists' },
+    { kind: 'screenshot', target: 'terminal pane' },
+  ])('accepts a $kind proof on a criterion', (verify) => {
+    const o = valid() as Record<string, unknown>
+    ;(o.acceptance as Record<string, unknown>[])[0].verify = verify
+    expect(parseWorkOrder(o).acceptance[0].verify).toEqual(verify)
   })
 
   it('rejects a judge with no evidence to judge from', () => {
@@ -365,12 +356,21 @@ function proofTests() {
 }
 
 function schemaRedTeamFindingsTests() {
-  it('rejects a red-team finding accepted without a reason, and keeps one with', () => {
+  it('rejects a red-team finding accepted without a reason', () => {
     const o = valid() as Record<string, unknown>
     o.redTeam = [{ id: 'RT-1', text: 'ambiguous', status: 'accepted', reason: '' }]
-    expect(() => parseWorkOrder(o)).toThrow()
+    expect(() => parseWorkOrder(o)).toThrow(
+      'An accepted red-team finding must carry the reason it was accepted.'
+    )
+  })
+
+  it('keeps a red-team finding accepted with a reason', () => {
+    const o = valid() as Record<string, unknown>
     o.redTeam = [{ id: 'RT-1', text: 'ambiguous', status: 'accepted', reason: 'out of scope' }]
-    expect(() => parseWorkOrder(o)).not.toThrow()
+    expect(parseWorkOrder(o).redTeam[0]).toMatchObject({
+      status: 'accepted',
+      reason: 'out of scope',
+    })
   })
 
   it('leaves an open red-team finding alone, since it needs no reason yet', () => {
@@ -397,12 +397,10 @@ function roundsAndCategoriesTests() {
     expect(order.redTeam[0].round).toBe(0)
   })
 
-  it('accepts every declared category', () => {
-    for (const category of RED_TEAM_CATEGORIES) {
-      const o = valid() as Record<string, unknown>
-      o.redTeam = [{ id: 'RT-1', text: 'x', category }]
-      expect(() => parseWorkOrder(o)).not.toThrow()
-    }
+  it.each(RED_TEAM_CATEGORIES)('accepts the declared category "%s"', (category) => {
+    const o = valid() as Record<string, unknown>
+    o.redTeam = [{ id: 'RT-1', text: 'x', category }]
+    expect(parseWorkOrder(o).redTeam[0].category).toBe(category)
   })
 
   it('rejects a category outside the declared set', () => {
@@ -504,13 +502,16 @@ function nothingAssumedTests() {
 }
 
 describe('isBlocking', () => {
-  it('blocks only wrong-outcome, regression and unprovable', () => {
-    expect(BLOCKING_CATEGORIES).toEqual(['wrong-outcome', 'regression', 'unprovable'])
-    for (const category of RED_TEAM_CATEGORIES) {
-      expect(isBlocking({ category })).toBe(
-        category === 'wrong-outcome' || category === 'regression' || category === 'unprovable'
-      )
-    }
+  it.each([
+    ['wrong-outcome', true],
+    ['regression', true],
+    ['unprovable', true],
+    ['scope', false],
+    ['process', false],
+    ['pre-existing', false],
+    ['infra', false],
+  ] as const)('a %s finding blocks: %s', (category, blocks) => {
+    expect(isBlocking({ category })).toBe(blocks)
   })
 })
 

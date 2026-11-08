@@ -1,50 +1,26 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { restoreLocalClock, setLocalClock } from '../support/clock'
+import { eventually } from './helpers/bridge'
+
+import { useVaultDataStore } from '../../src/stores/vault-data.store'
+import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
 const mockInvoke = vi.fn()
-const mockLoadDate = vi.fn()
-const mockLoadToday = vi.fn()
-const mockNavigateToTask = vi.fn()
-
-vi.mock('../../src/stores/vault.store', () => ({
-  useVaultStore: (
-    sel?: (s: {
-      loadDate: typeof mockLoadDate
-      loadToday: typeof mockLoadToday
-      calendarRefreshKey: number
-    }) => unknown
-  ) => {
-    const store = {
-      loadDate: mockLoadDate,
-      loadToday: mockLoadToday,
-      calendarRefreshKey: 0,
-    }
-    if (sel) return sel(store)
-    return store
-  },
-}))
-
-vi.mock('../../src/stores/vault-nav.store', () => ({
-  useVaultNavStore: {
-    getState: () => ({ navigateToTask: mockNavigateToTask }),
-  },
-}))
 
 // Track registered extensionBridge.on handlers so tests can trigger them
 const bridgeHandlers = new Map<string, (data: unknown) => void>()
-const mockOn = vi.fn((channel: string, handler: (data: unknown) => void) => {
-  bridgeHandlers.set(channel, handler)
-  return () => bridgeHandlers.delete(channel)
-})
+const mockOn = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: {
-    extensionBridge: { invoke: mockInvoke, on: mockOn },
-  },
-  writable: true,
-  configurable: true,
+beforeEach(() => {
+  bridgeHandlers.clear()
+  mockOn.mockImplementation((channel: string, handler: (data: unknown) => void) => {
+    bridgeHandlers.set(channel, handler)
+    return () => bridgeHandlers.delete(channel)
+  })
+  vi.stubGlobal('electronAPI', { extensionBridge: { invoke: mockInvoke, on: mockOn } })
 })
 
 vi.mock('../../src/components/task-vault.css', () => ({}))
@@ -53,23 +29,22 @@ afterEach(() => {
   cleanup()
   bridgeHandlers.clear()
   vi.clearAllMocks()
+  restoreLocalClock()
 })
 
-function todayString(): string {
-  const today = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
-}
+// Every test runs at noon on this day: setLocalClock in calendarDrawerTests.
+const TODAY = '2026-01-15'
 
 function dayTask(id: string, text: string) {
   return { id, text, status: 'open', metadata: {}, terminatorLinks: [] }
 }
 
-/** Answers the month query with `days` and every daily query with `daily`. */
+/** Answers the month query with `days` and every daily or today query with `daily`. */
 function answerDays(days: unknown[], daily: unknown): void {
   mockInvoke.mockImplementation((channel: string) => {
     if (channel === 'task-vault:vault:get-calendar-month') return Promise.resolve({ days })
     if (channel === 'task-vault:vault:get-daily') return Promise.resolve(daily)
+    if (channel === 'task-vault:vault:get-today') return Promise.resolve(daily)
     return Promise.resolve({})
   })
 }
@@ -83,67 +58,44 @@ describe('CalendarDrawer', calendarDrawerTests)
 
 function calendarDrawerTests() {
   beforeEach(() => {
+    setLocalClock('UTC', `${TODAY}T12:00:00.000Z`)
     mockInvoke.mockResolvedValue({ days: [] })
+    useVaultDataStore.setState({ todayLog: null })
+    useVaultNavStore.setState({ viewingDate: null })
   })
 
-  describe('mounting', calendarDrawerMountingTests)
   describe('today', calendarDrawerTodayTests)
   describe('opening a task', calendarDrawerOpeningTaskTests)
-  describe('months', calendarDrawerMonthsTests)
+  describe('opening a task on another day', calendarDrawerOtherDayTests)
   describe('refreshing', calendarDrawerRefreshingTests)
 }
 
-function calendarDrawerMountingTests() {
-  it('renders the calendar panel immediately (always open)', async () => {
-    await renderDrawer()
-    await waitFor(() => {
-      expect(screen.getByTitle('Previous month')).toBeTruthy()
-      expect(screen.getByTitle('Next month')).toBeTruthy()
-    })
-  })
-
-  it('calls get-calendar-month on mount', async () => {
-    await renderDrawer()
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith(
-        'task-vault:vault:get-calendar-month',
-        expect.objectContaining({ year: expect.any(Number), month: expect.any(Number) })
-      )
-    })
-  })
-}
-
 function calendarDrawerTodayTests() {
-  it('navigates to today and shows task list when today cell is clicked', async () => {
+  it('loads today into the vault and lists its tasks when the today cell is clicked', async () => {
     const user = userEvent.setup()
-    const todayStr = todayString()
-
-    answerDays([{ date: todayStr, status: 'open', count: 1 }], {
-      date: todayStr,
+    const log = {
+      date: TODAY,
       tasks: [dayTask('t1', 'Test task')],
       events: [],
       notes: [],
       exists: true,
-    })
+    }
+    answerDays([{ date: TODAY, status: 'open', count: 1 }], log)
 
     await renderDrawer()
-    // The cell's label now says what the day is carrying, not just its date —
-    // a grid already shows the date.
-    const todayCell = () => screen.getByRole('button', { name: new RegExp(`^${todayStr}`) })
-    await waitFor(todayCell)
-    await user.click(todayCell())
+    // The cell's label says what the day is carrying; a grid already shows the date.
+    await user.click(await screen.findByRole('button', { name: new RegExp(`^${TODAY}`) }))
 
-    expect(mockLoadToday).toHaveBeenCalled()
-    await waitFor(() => {
-      expect(screen.getByText('Test task')).toBeTruthy()
-    })
+    await eventually(() => expect(useVaultNavStore.getState().viewingDate).toBe(TODAY))
+    expect(useVaultDataStore.getState().todayLog).toEqual(log)
+    expect(screen.getByText('Test task')).toBeTruthy()
   })
 }
 
 function calendarDrawerOpeningTaskTests() {
   it('invokes task-vault:open-panel with taskId when a task in the day panel is clicked', async () => {
     const user = userEvent.setup()
-    const todayStr = todayString()
+    const todayStr = TODAY
 
     answerDays([{ date: todayStr, status: 'done', count: 1 }], {
       date: todayStr,
@@ -164,31 +116,32 @@ function calendarDrawerOpeningTaskTests() {
   })
 }
 
-function calendarDrawerMonthsTests() {
-  it('navigates to previous month on prev button click', async () => {
+function calendarDrawerOtherDayTests() {
+  it('opens a task picked on another day with that day, not today', async () => {
     const user = userEvent.setup()
+    const otherDay = '2026-01-20'
+    answerDays([{ date: otherDay, status: 'open', count: 1 }], {
+      date: otherDay,
+      tasks: [dayTask('task-moodboard', 'Present the moodboard')],
+      events: [],
+      notes: [],
+      exists: true,
+    })
+
     await renderDrawer()
-    await screen.findByTitle('Previous month')
-    await user.click(screen.getByTitle('Previous month'))
+    await user.click(await screen.findByRole('button', { name: new RegExp(`^${otherDay}`) }))
+    await user.click(await screen.findByText('Present the moodboard'))
 
-    // 1: get-calendar-month on mount, 2: get-daily for today on mount, 3: get-calendar-month after prev
-    expect(mockInvoke).toHaveBeenCalledTimes(3)
-  })
-
-  it('navigates to next month on next button click', async () => {
-    const user = userEvent.setup()
-    await renderDrawer()
-    await screen.findByTitle('Next month')
-    await user.click(screen.getByTitle('Next month'))
-
-    // 1: get-calendar-month on mount, 2: get-daily for today on mount, 3: get-calendar-month after next
-    expect(mockInvoke).toHaveBeenCalledTimes(3)
+    expect(mockInvoke).toHaveBeenCalledWith('task-vault:open-panel', {
+      date: otherDay,
+      taskId: 'task-moodboard',
+    })
   })
 }
 
 function calendarDrawerRefreshingTests() {
   it('refreshes task list when task-vault:push:index-updated fires', async () => {
-    const todayStr = todayString()
+    const todayStr = TODAY
 
     answerDays([], { tasks: [dayTask('t1', 'Updated task')] })
 

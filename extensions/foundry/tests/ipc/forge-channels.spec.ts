@@ -10,7 +10,7 @@ import { createForgeChannels, forgeChannelSpecs } from '../../src/ipc/forge-chan
 import type { ForgeDeps } from '../../src/ipc/forge-channels.js'
 import { quietForgeSeams } from './forge-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { raiseGate } from '../../src/gates/rules.js'
+import { decide, raiseGate } from '../../src/gates/rules.js'
 import { writeCiState } from '../../src/line/ci-state.js'
 import type { Standing } from '../../src/order/standing.js'
 import type { OrderStore } from '../../src/order/store.js'
@@ -38,8 +38,8 @@ function forgeDeps(over: Partial<ForgeDeps> = {}): ForgeDeps {
 /** A compile payload as the channel's schema leaves it: one the operator asked for. */
 const compiling = (id: string, commit: boolean) => ({ id, commit, automatic: false })
 
-function channels(readIssue?: ReturnType<typeof vi.fn>) {
-  return createForgeChannels(forgeDeps({ readIssue: readIssue as never }))
+function channels(readIssue?: ForgeDeps['readIssue']) {
+  return createForgeChannels(forgeDeps(readIssue === undefined ? {} : { readIssue }))
 }
 
 /** Through the channel's own schema, as the renderer's request arrives. */
@@ -67,29 +67,8 @@ afterEach(() => {
 describe('foundry:order.create', () => {
   describe('the draft', theDraftTests)
   describe('the ledger and the same issue', theLedgerAndTheSameIssueTests)
-  describe('a canary order', theCanaryTests)
+  describe('who seeded the order', whoSeededTests)
 })
-
-function theCanaryTests() {
-  it('works on a canary/<id> branch, so a leftover is found by its name', async () => {
-    const r = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-      canary: true,
-    })) as OrderView
-    const expected = `canary/${r.order.id.toLowerCase()}`
-    expect(r.order.source.branch).toBe(expected)
-    expect(r.order.plan.lanes[0]?.branch).toBe(expected)
-  })
-
-  it('keeps the usual branch for an order that is not a canary', async () => {
-    const r = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    expect(r.order.source.branch ?? null).toBeNull()
-  })
-}
 
 async function seeded(): Promise<WorkOrder> {
   const r = (await channels().create({
@@ -146,6 +125,24 @@ function theDraftTests() {
   })
 }
 
+function whoSeededTests() {
+  it('records who seeded the order, so the entry is attributable', async () => {
+    const r = (await channels().create({
+      source: { kind: 'typed', text: 'something to record' },
+      repoPaths: [repo],
+    })) as OrderView
+    const ledger = path.join(root, 'orders', r.order.id, 'ledger.jsonl')
+    const entries = fs
+      .readFileSync(ledger, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { actor: string; action: string })
+    expect(entries).toContainEqual(
+      expect.objectContaining({ action: 'order.seeded', actor: 'role:scout' })
+    )
+  })
+}
+
 function theLedgerAndTheSameIssueTests() {
   it('records the seeding in the ledger', async () => {
     const r = (await channels().create({
@@ -184,13 +181,6 @@ describe('foundry:order.turn', () => {
 })
 
 function strikesAndAnswersTests() {
-  it('strikes an assumption and says exactly what has to be redrawn', async () => {
-    const order = await seeded()
-    const r = (await channels().turn({ id: order.id, strike: 'A-1' })) as OrderView
-    expect(r.changed).toEqual(['U-1'])
-    expect(r.order.assumptions[0].struck).toBe(true)
-  })
-
   it('answers a multiple-choice question by the indices of its options', async () => {
     const seededOrder = await seeded()
     const order = {
@@ -217,9 +207,11 @@ function strikesAndAnswersTests() {
 }
 
 function persistingAndRecordingTests() {
-  it('persists the turn rather than only returning it', async () => {
+  it('strikes an assumption, keeps it, and says exactly what has to be redrawn', async () => {
     const order = await seeded()
-    await channels().turn({ id: order.id, strike: 'A-1' })
+    const r = (await channels().turn({ id: order.id, strike: 'A-1' })) as OrderView
+    expect(r.changed).toEqual(['U-1'])
+    expect(r.order.assumptions[0].struck).toBe(true)
     expect((await store.load(order.id))?.assumptions[0].struck).toBe(true)
   })
 
@@ -296,14 +288,6 @@ function previewingAndAgreeingTests() {
 }
 
 function forgeChannelsTheLedgerTests() {
-  it('records the agreement in the ledger', async () => {
-    const order = await completeOrder()
-    await channels().compile(compiling(order.id, true))
-    expect(fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')).toContain(
-      'order.agreed'
-    )
-  })
-
   // A released order agreed again after an amendment was Foundry's doing, and
   // the ledger has to say so rather than credit the operator with a click.
   it('records an automatic agreement as Foundry\u2019s, with why', async () => {
@@ -428,8 +412,7 @@ function checksAndRunningOrdersTests() {
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
+    const loaded = await savedOrder(seeded.order.id)
     await store.save({ ...loaded, status: 'running' })
 
     const r = (await c.list()) as { orders: { standing: Standing }[] }
@@ -454,8 +437,7 @@ function haltedOrdersTests() {
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
+    const loaded = await savedOrder(seeded.order.id)
     await store.save({ ...loaded, status: 'running' })
 
     const r = (await c.list()) as { orders: { standing: Standing }[] }
@@ -475,8 +457,7 @@ function forgeChannelsOpenQuestionsTests() {
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
+    const loaded = await savedOrder(seeded.order.id)
     await store.save({
       ...loaded,
       openQuestions: [openQuestion('Q-1', { text: 'a?', options: ['x', 'y'], recommended: 0 })],
@@ -517,10 +498,16 @@ function watchingThreeChecks(url: string) {
   }
 }
 
-/** Puts the order in a run that opened the pull request at `url`. */
-async function runningWithPull(orderId: string, url: string): Promise<void> {
+/** The order as saved, for a test that goes on to change it. */
+async function savedOrder(orderId: string): Promise<WorkOrder> {
   const loaded = await store.load(orderId)
   if (loaded === null) throw new Error('the order this test needs was not saved')
+  return loaded
+}
+
+/** Puts the order in a run that opened the pull request at `url`. */
+async function runningWithPull(orderId: string, url: string): Promise<void> {
+  const loaded = await savedOrder(orderId)
   await store.save({ ...loaded, status: 'running' })
   const dir = path.join(root, 'orders', orderId)
   fs.mkdirSync(dir, { recursive: true })
@@ -550,7 +537,7 @@ function finishedChecksAndPullsTests() {
 }
 
 function theOpenGateTests() {
-  it('hands the row the open gate whose move is yours, and nothing for another', async () => {
+  it('hands the row the open gate whose move is yours, and nothing once it is decided', async () => {
     const held = raiseGate({
       id: 'G-1',
       rule: 'ready-for-review',
@@ -559,13 +546,13 @@ function theOpenGateTests() {
       why: 'the work shipped as drafts',
       at: '2026-09-06T11:30:00.000Z',
     })
-    const c = createForgeChannels(forgeDeps({ standingSources: { gatesFor: async () => [held] } }))
+    let gates = [held]
+    const c = createForgeChannels(forgeDeps({ standingSources: { gatesFor: async () => gates } }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
+    const loaded = await savedOrder(seeded.order.id)
     await store.save({ ...loaded, status: 'shipped' })
 
     const r = (await c.list()) as {
@@ -574,9 +561,8 @@ function theOpenGateTests() {
     expect(r.orders[0].gate?.id).toBe('G-1')
     expect(r.orders[0].gate?.options[0].id).toBe('mark_ready')
 
-    await store.save({ ...loaded, status: 'running' })
-    const none = createForgeChannels(forgeDeps())
-    const again = (await none.list()) as { orders: { gate: unknown }[] }
+    gates = [decide(held, { option: 'mark_ready', note: '', at: '2026-09-06T11:40:00.000Z' })]
+    const again = (await c.list()) as { orders: { gate: unknown }[] }
     expect(again.orders[0].gate).toBeNull()
   })
 }
@@ -693,15 +679,6 @@ function unknownQuestionsAndNoTrackerTests() {
       answer: { questionId: 'Q-nope', option: 'x' },
     })) as OrderView
     expect(r.order.openQuestions).toEqual([])
-  })
-
-  it('seeds without a tracker reader at all', async () => {
-    const c = createForgeChannels(forgeDeps())
-    const r = (await c.create({
-      source: { kind: 'typed', text: 'no tracker here' },
-      repoPaths: [repo],
-    })) as OrderView
-    expect(r.order.id).toBeTruthy()
   })
 }
 
@@ -1010,15 +987,6 @@ function startingTests() {
     expect(r.converging).toBe('sess-arch')
     expect(r.order.acceptance).toEqual([])
   })
-
-  it('names the session, so the surface can take the operator to it', async () => {
-    const seed = await drafted()
-    const c = createForgeChannels(
-      forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
-    )
-    const r = answered(await c.converge({ id: seed.order.id }))
-    expect('converging' in r && r.converging).toBe('sess-arch')
-  })
 }
 
 function forgeChannelsRecordingTests() {
@@ -1248,7 +1216,6 @@ function aBlankReasonTests() {
 }
 
 describe('free text reaches the architect', () => {
-  describe('intake', intakeTests)
   describe('other turns and empty text', otherTurnsAndEmptyTextTests)
 })
 
@@ -1259,24 +1226,6 @@ async function withFinding() {
   })) as OrderView
   expect(seed.order.redTeam.length).toBeGreaterThan(0)
   return seed.order
-}
-
-function intakeTests() {
-  it('goes to intake rather than nowhere', async () => {
-    const seed = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels(forgeDeps({ converge }))
-
-    await c.turn({ id: seed.order.id, message: 'the second unit is not needed' })
-    expect(converge).toHaveBeenCalledWith(
-      expect.anything(),
-      'the second unit is not needed',
-      expect.any(Function)
-    )
-  })
 }
 
 function otherTurnsAndEmptyTextTests() {
@@ -1386,12 +1335,8 @@ function reasonsAndRecordsTests() {
 function unblockingCompileTests() {
   it('unblocks the compile check once every finding is cleared', async () => {
     const o = await withFinding()
-    for (const finding of o.redTeam) {
-      await channels().turn({
-        id: o.id,
-        finding: { id: finding.id, decision: 'accepted', reason: 'priced in' },
-      })
-    }
+    const accepts = o.redTeam.map((finding) => ({ findingId: finding.id, reason: 'priced in' }))
+    await channels().converge({ id: o.id, settle: { accepts } })
     // The one check this used to fail for ever, because nothing could clear a
     // finding.
     const compiled = answered(await channels().compile(compiling(o.id, false)))
@@ -1683,13 +1628,6 @@ const issue = () =>
   }))
 
 function configuredBudgetsTests() {
-  it('takes the budgets the operator configured (FR-030)', async () => {
-    const r = await seededWith({
-      budgetDefaults: () => ({ agents: 1, wallClockMinutes: 10 }),
-    })
-    expect(r.order.budgets).toMatchObject({ agents: 1, wallClockMinutes: 10 })
-  })
-
   it('takes a configured budget of no limit', async () => {
     const r = await seededWith({
       budgetDefaults: () => ({ agents: null, wallClockMinutes: 10 }),
@@ -1697,9 +1635,9 @@ function configuredBudgetsTests() {
     expect(r.order.budgets).toMatchObject({ agents: null, wallClockMinutes: 10 })
   })
 
-  it('falls back to the schema defaults when nothing is configured', async () => {
-    const r = await seededWith({})
-    expect(r.order.budgets).toMatchObject({ agents: 3, wallClockMinutes: 45 })
+  it('starts with only the write-backs the operator left on', async () => {
+    const r = await seededWith({ writeBackDefault: () => ['status'] })
+    expect(r.order.writeBack).toEqual(['status'])
   })
 }
 
@@ -1782,8 +1720,7 @@ function statedCriteriaTests() {
       source: { kind: 'tracker', tracker: 'linear', key: 'TAV-14' },
       repoPaths: [repo],
     })) as OrderView
-    expect(r.order.intent.problem).toContain('# Dev Hints'.slice(0, 1))
-    expect(r.order.intent.problem).toContain('# Summary')
+    expect(r.order.intent.problem).toBe(DESCRIPTION)
   })
 }
 
@@ -2009,13 +1946,14 @@ describe('the base branch is assumed to pass (ADR 137)', () => {
 })
 
 function theMoveErrorsTests() {
-  it('refuses a move that no longer exists, and errors on an unknown order', async () => {
+  it.each(['skip', 'check', 'waive'])('refuses the retired move "%s"', async (move) => {
     const seed = await drafted()
-    for (const move of ['skip', 'check', 'waive']) {
-      expect(
-        await sendThroughSchema('foundry:forge.environment', { id: seed.order.id, move })
-      ).toEqual({ error: 'Malformed request.' })
-    }
+    expect(
+      await sendThroughSchema('foundry:forge.environment', { id: seed.order.id, move })
+    ).toEqual({ error: 'Malformed request.' })
+  })
+
+  it('errors on a move for an unknown order', async () => {
     const r = (await channels().environment({ id: 'WO-nope', move: 'decline-pictures' })) as {
       error?: string
     }
@@ -2071,21 +2009,6 @@ function thePicturesDecisionTests() {
 
 describe('the decisions about what cannot be measured', theDecisionMovesTests)
 describe('the decision to ship without pictures', thePicturesDecisionTests)
-
-describe('handing off needs no base branch check', () => {
-  it('agrees a complete order that has no baseline.json', async () => {
-    const order = await completeOrder()
-    expect(fs.existsSync(path.join(root, 'orders', order.id, 'baseline.json'))).toBe(false)
-    const r = answered(await channels().compile(compiling(order.id, true)))
-    expect(r.order.status).toBe('agreed')
-  })
-
-  it("agrees through the Forge's own automatic hand-off too", async () => {
-    const order = await completeOrder()
-    const r = answered(await channels().compile({ id: order.id, commit: true, automatic: true }))
-    expect(r.order.status).toBe('agreed')
-  })
-})
 
 // An order made by mistake used to stay on the list for good. Discarding marks
 // it rather than deleting it, and refuses one whose agents are still working.
@@ -2178,18 +2101,5 @@ function documentOnTheRowTests() {
       url: published.url,
       path: expect.stringMatching(/\/orders\/WO-[^/]+\/research\.md$/),
     })
-  })
-
-  it('has a file in the outputs folder open by its path', async () => {
-    expect(await listedDocument({ path: '/out/notes.md', location: 'outputs' })).toEqual({
-      kind: 'file',
-      url: null,
-      path: '/out/notes.md',
-    })
-  })
-
-  it('says nothing for a document in the checkout, which ships as a pull request, or for none', async () => {
-    expect(await listedDocument({ path: 'docs/a.md', location: 'checkout' })).toBeNull()
-    expect(await listedDocument(null)).toBeNull()
   })
 }

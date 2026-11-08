@@ -278,23 +278,21 @@ describe('integrations:set-mine', () => {
 })
 
 describe('integrations:status-changed', () => {
-  it('announces after a connect, so every open surface learns about it', async () => {
-    await invoke('integrations:connect', { tracker: 'linear', apiKey: 'k' })
-    expect(sent.map((s) => s.channel)).toContain('integrations:status-changed')
-  })
-
-  it('announces after a disconnect', async () => {
-    await invoke('integrations:disconnect', { tracker: 'linear' })
-    expect(sent.map((s) => s.channel)).toContain('integrations:status-changed')
-  })
-
-  it('announces after the mine selector changes', async () => {
-    await invoke('integrations:set-mine', {
-      tracker: 'linear',
-      mine: { kind: 'assignee', email: 'me@x.co' },
-    })
-    expect(sent.map((s) => s.channel)).toContain('integrations:status-changed')
-  })
+  it.each([
+    ['a connect', 'integrations:connect', { tracker: 'linear', apiKey: 'k' }],
+    ['a disconnect', 'integrations:disconnect', { tracker: 'linear' }],
+    [
+      'the mine selector changes',
+      'integrations:set-mine',
+      { tracker: 'linear', mine: { kind: 'assignee', email: 'me@x.co' } },
+    ],
+  ])(
+    'announces after %s, so every open surface learns about it',
+    async (_change, channel, payload) => {
+      await invoke(channel, payload)
+      expect(sent.map((s) => s.channel)).toContain('integrations:status-changed')
+    }
+  )
 
   it('carries connections and never a secret', async () => {
     await invoke('integrations:connect', { tracker: 'linear', apiKey: 'super-secret' })

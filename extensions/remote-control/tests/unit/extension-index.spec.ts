@@ -16,7 +16,7 @@ vi.mock('../../src/server/remote-server', () => ({
   createRemoteServer: mockCreateRemoteServer,
 }))
 
-const mockNgrokStart = vi.hoisted(() => vi.fn().mockResolvedValue('https://example.ngrok.app'))
+const mockNgrokStart = vi.hoisted(() => vi.fn())
 const mockNgrokStop = vi.hoisted(() => vi.fn())
 const mockNgrokSetOnCrash = vi.hoisted(() => vi.fn())
 
@@ -114,11 +114,14 @@ describe('remote-control extension index', extensionIndexTests)
 
 // A settings store that remembers what the extension writes, so credential
 // handling can be judged by what ends up stored and returned.
-async function activateWithSettings(initial: Record<string, unknown>) {
+async function activateWithSettings(
+  initial: Record<string, unknown>,
+  serverHandle: ReturnType<typeof makeServerHandle> = makeServerHandle()
+) {
   const values = new Map<string, unknown>(Object.entries(initial))
   mockSettingsGet.mockImplementation((key: string) => values.get(key))
   mockSettingsSet.mockImplementation((key: string, value: unknown) => void values.set(key, value))
-  mockCreateRemoteServer.mockResolvedValue(makeServerHandle())
+  mockCreateRemoteServer.mockResolvedValue(serverHandle)
   const { activate } = await import('../../src/index.ts')
   activate(makeApi() as never)
   const channelHandler = (channel: string) =>
@@ -133,25 +136,35 @@ describe('remote-control credentials', credentialHandlingTests)
 
 // ADR 096: whether a channel rejects bad input is its schema's job, so this
 // checks once, for every channel the extension registers, that one is declared.
+const CHANNELS = [
+  'remote:toggle',
+  'remote:port-change',
+  'remote:update-password',
+  'remote:update-max-subscribers',
+  'remote:update-ngrok-token',
+  'remote:get-settings',
+  'remote:disconnect-device',
+  'remote:tunnel-reconnect',
+]
+
 describe('every remote-control channel', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules()
     vi.clearAllMocks()
-  })
-
-  it('declares a schema that keeps a malformed payload from reaching run', async () => {
     mockCreateRemoteServer.mockResolvedValue(makeServerHandle())
     const { activate } = await import('../../src/index.ts')
     activate(makeApi() as never)
+  })
 
-    const specs = registeredSpecs()
-    expect(specs.map((spec) => spec.channel)).toContain('remote:toggle')
-    for (const spec of specs) {
-      expect(spec.schema, `${spec.channel} has no schema`).toBeDefined()
-      const run = vi.fn()
-      await dispatchChannel({ ...spec, run }, 42)
-      expect(run, `${spec.channel} ran a malformed payload`).not.toHaveBeenCalled()
-    }
+  it('registers exactly the channels checked below', () => {
+    expect(registeredSpecs().map((spec) => spec.channel)).toEqual(CHANNELS)
+  })
+
+  it.each(CHANNELS)('%s keeps a malformed payload from reaching run', async (channel) => {
+    const spec = registeredSpecs().find((registered) => registered.channel === channel)!
+    const run = vi.fn()
+    await dispatchChannel({ ...spec, run }, 42)
+    expect(run).not.toHaveBeenCalled()
   })
 })
 
@@ -264,14 +277,17 @@ function startServerFailureTests() {
 }
 
 function startServerUnexpectedErrorTests() {
-  it('on non-PortInUseError, sets enabled=false in settings and broadcasts START_FAILED', async () => {
+  it('on non-PortInUseError, stores enabled=false and broadcasts START_FAILED', async () => {
     const serverHandle = makeServerHandle(() => Promise.reject(new Error('unexpected error')))
-    const toggleHandler = await setupAndGetToggleHandler(serverHandle)
+    const { values, channelHandler } = await activateWithSettings(
+      { [`${EXT}.passwordHash`]: currentHash, [`${EXT}.port`]: 7681 },
+      serverHandle
+    )
 
-    await toggleHandler({ enabled: true })
+    await channelHandler('remote:toggle')({ enabled: true })
     await queueDrained()
 
-    expect(mockSettingsSet).toHaveBeenCalledWith('terminator.remote-control.enabled', false)
+    expect(values.get(`${EXT}.enabled`)).toBe(false)
     expect(mockBroadcast).toHaveBeenCalledWith('remote:status', {
       enabled: false,
       error: 'START_FAILED',
@@ -280,19 +296,18 @@ function startServerUnexpectedErrorTests() {
 }
 
 function startServerPortInUseTests() {
-  it('on PortInUseError, does NOT set enabled=false (user intent preserved)', async () => {
+  it('on PortInUseError, keeps enabled=true stored (user intent preserved)', async () => {
     const { PortInUseError } = await import('../../src/server/port-in-use-error')
     const serverHandle = makeServerHandle(() => Promise.reject(new PortInUseError(7681)))
-    const toggleHandler = await setupAndGetToggleHandler(serverHandle)
+    const { values, channelHandler } = await activateWithSettings(
+      { [`${EXT}.passwordHash`]: currentHash, [`${EXT}.port`]: 7681 },
+      serverHandle
+    )
 
-    await toggleHandler({ enabled: true })
+    await channelHandler('remote:toggle')({ enabled: true })
     await queueDrained()
 
-    const enabledFalseCalls = mockSettingsSet.mock.calls.filter(
-      ([key, val]: [string, unknown]) =>
-        key === 'terminator.remote-control.enabled' && val === false
-    )
-    expect(enabledFalseCalls).toHaveLength(0)
+    expect(values.get(`${EXT}.enabled`)).toBe(true)
   })
 }
 
@@ -311,26 +326,41 @@ function startServerSuccessTests() {
   })
 }
 
+/** Starts the server with a tunnel open, then forgets the broadcasts that start made. */
+async function startWithTunnel(): Promise<void> {
+  mockNgrokIsInstalled.mockReturnValue(true)
+  mockNgrokStart.mockResolvedValue('https://example.ngrok.app')
+  const toggleHandler = await setupAndGetToggleHandler(makeServerHandle())
+  await toggleHandler({ enabled: true })
+  // The start opens the tunnel last, so its crash handler marks the start as done.
+  await eventually(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
+  mockNgrokSetOnCrash.mockClear()
+  mockBroadcast.mockClear()
+}
+
 function tunnelReconnectTests() {
-  it('re-registers crash handler and updates currentPublicUrl after reconnect', async () => {
-    mockNgrokIsInstalled.mockReturnValue(true)
-    const toggleHandler = await setupAndGetToggleHandler(makeServerHandle())
-
-    // Start the server so remoteServer is set
-    await toggleHandler({ enabled: true })
-    // The start opens the tunnel last, so its crash handler marks the start as done.
-    await eventually(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
-
-    mockNgrokSetOnCrash.mockClear()
-    mockBroadcast.mockClear()
+  it('broadcasts the public address again after a reconnect', async () => {
+    await startWithTunnel()
 
     await registeredHandler('remote:tunnel-reconnect')()
 
-    await eventually(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
-    expect(mockBroadcast).toHaveBeenCalledWith(
-      'remote:status',
-      expect.objectContaining({ publicUrl: 'https://example.ngrok.app' })
+    await eventually(() =>
+      expect(mockBroadcast).toHaveBeenCalledWith(
+        'remote:status',
+        expect.objectContaining({ publicUrl: 'https://example.ngrok.app' })
+      )
     )
+  })
+
+  it('reports a crash of the reconnected tunnel as a disconnect', async () => {
+    await startWithTunnel()
+    await registeredHandler('remote:tunnel-reconnect')()
+    await eventually(() => expect(mockBroadcast).toHaveBeenCalled())
+
+    const crashOfReconnectedTunnel = mockNgrokSetOnCrash.mock.calls.at(-1)![0] as () => void
+    crashOfReconnectedTunnel()
+
+    expect(mockBroadcast).toHaveBeenCalledWith('remote:tunnel-disconnected', {})
   })
 }
 
@@ -379,6 +409,12 @@ function passwordGateTests() {
     expect(settings).not.toHaveProperty('password')
   })
 
+  it('answers get-settings with the viewer limit written in Settings', async () => {
+    const { channelHandler } = await activateWithSettings({ [`${EXT}.maxSubscribers`]: 13 })
+    const settings = await channelHandler('remote:get-settings')()
+    expect(settings.maxSubscribers).toBe(13)
+  })
+
   it('refuses to turn on while no password is set', async () => {
     const { values, channelHandler } = await activateWithSettings({})
     const result = await channelHandler('remote:toggle')({ enabled: true })
@@ -422,15 +458,17 @@ function bcryptHashTests() {
 
 function passwordRotationTests() {
   it('reports the new password saved when closing the remote terminals fails', async () => {
-    currentHash = await hashPassword('the-old-one')
     const serverHandle = makeServerHandle()
     serverHandle.disconnectAllClients.mockRejectedValue(new Error('could not list the sessions'))
-    const toggleHandler = await setupAndGetToggleHandler(serverHandle)
-    await toggleHandler({ enabled: true })
+    const { channelHandler } = await activateWithSettings(
+      { [`${EXT}.passwordHash`]: await hashPassword('the-old-one'), [`${EXT}.port`]: 7681 },
+      serverHandle
+    )
+    await channelHandler('remote:toggle')({ enabled: true })
     await eventually(() => expect(serverHandle.start).toHaveBeenCalled())
     await serverHandle.start.mock.results[0].value
 
-    const result = await registeredHandler('remote:update-password')({ password: 'the-new-one' })
+    const result = await channelHandler('remote:update-password')({ password: 'the-new-one' })
 
     expect(result).toEqual({ ok: true })
     expect(mockBroadcast).toHaveBeenLastCalledWith(

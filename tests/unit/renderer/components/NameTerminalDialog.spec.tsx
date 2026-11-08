@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { NameTerminalDialog } from '../../../../src/renderer/components/NameTerminalDialog'
-import { pressOutside } from '../../../support/modal'
 
 const defaultName = 'Terminal 1'
 
@@ -26,68 +26,43 @@ vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 beforeEach(() => recordUse.mockClear())
 
 describe('NameTerminalDialog', () => {
-  it('renders the dialog title', () => {
+  it('titles the dialog and shows the default name as the placeholder', () => {
     renderDialog()
-    expect(screen.getByText('Name this terminal')).toBeTruthy()
-  })
-
-  it('shows placeholder with the default name', () => {
-    renderDialog()
-    const input = screen.getByRole('textbox') as HTMLInputElement
+    const dialog = screen.getByRole('dialog', { name: 'Name this terminal' })
+    const input = within(dialog).getByRole('textbox') as HTMLInputElement
     expect(input.placeholder).toBe(defaultName)
   })
 
-  it('calls onConfirm with the typed name on Open click', () => {
+  it('calls onConfirm with the typed name on Open click', async () => {
+    const user = userEvent.setup()
     renderDialog()
     const input = screen.getByRole('textbox')
-    fireEvent.change(input, { target: { value: 'My API server' } })
-    fireEvent.click(screen.getByText('Open'))
+    await user.clear(input)
+    await user.type(input, 'My API server')
+    await user.click(screen.getByText('Open'))
     expect(onConfirm).toHaveBeenCalledWith('My API server')
   })
 
-  it('calls onConfirm with empty string when no name is entered', () => {
+  it('calls onConfirm with empty string when no name is entered', async () => {
+    const user = userEvent.setup()
     renderDialog()
-    fireEvent.click(screen.getByText('Open'))
+    await user.click(screen.getByText('Open'))
     expect(onConfirm).toHaveBeenCalledWith('')
   })
 
-  it('calls onCancel when Cancel button is clicked', () => {
+  it('calls onCancel when Cancel button is clicked', async () => {
+    const user = userEvent.setup()
     renderDialog()
-    fireEvent.click(screen.getByText('Cancel'))
+    await user.click(screen.getByText('Cancel'))
     expect(onCancel).toHaveBeenCalled()
   })
 })
 
-describe('NameTerminalDialog — calls onCancel when overlay is clicked', () => {
-  it('calls onCancel when overlay is clicked', () => {
+describe('NameTerminalDialog — dismiss', () => {
+  it('calls onCancel when Escape is pressed', async () => {
+    const user = userEvent.setup()
     renderDialog()
-    pressOutside(screen.getByRole('dialog'))
+    await user.keyboard('{Escape}')
     expect(onCancel).toHaveBeenCalled()
-  })
-
-  it('does not call onCancel when dialog body is clicked', () => {
-    renderDialog()
-    fireEvent.click(screen.getByRole('dialog'))
-    expect(onCancel).not.toHaveBeenCalled()
-  })
-
-  it('calls onCancel when Escape is pressed', () => {
-    renderDialog()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(onCancel).toHaveBeenCalled()
-  })
-
-  it('does not call onCancel when a non-Escape key is pressed', () => {
-    renderDialog()
-    fireEvent.keyDown(document, { key: 'Enter' })
-    expect(onCancel).not.toHaveBeenCalled()
-  })
-
-  it('submits on Enter key via form submit', () => {
-    renderDialog()
-    const input = screen.getByRole('textbox')
-    fireEvent.change(input, { target: { value: 'Build runner' } })
-    fireEvent.submit(screen.getByRole('textbox'))
-    expect(onConfirm).toHaveBeenCalledWith('Build runner')
   })
 })

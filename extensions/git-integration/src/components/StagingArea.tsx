@@ -3,6 +3,7 @@ import { Button } from '@terminator/extension-ui'
 import { useGitStore } from '../stores/git.store'
 import type { GitFileStatus, GitStatus } from '../schemas/git.schema'
 import { gitAPI } from '../api/git'
+import { currentAttr } from './pr-review/file-rows'
 import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 /**
@@ -51,10 +52,11 @@ const CONFLICT_HINT = 'Resolve conflicts before staging'
 function FileItem(props: FileItemProps): React.JSX.Element {
   const { file, onToggle } = props
   const isConflicted = file.status === 'conflicted'
-  const selected = (props.isSelected && ' staging-area__file-row--selected') || ''
   return (
     <div
-      className={`staging-area__file-row${selected}`}
+      className={`staging-area__file-row${(props.isSelected && ' staging-area__file-row--selected') || ''}`}
+      aria-current={currentAttr(props.isSelected)}
+      data-testid="staging-file-row"
       onClick={() => props.onSelect(file.path, file.staged)}
     >
       <input
@@ -150,8 +152,9 @@ interface FileSectionProps {
 
 function StagingFileSection(props: FileSectionProps) {
   const { files, item, text } = props
+  const label = `${text.title} (${files.length})`
   return (
-    <div className="staging-area__section">
+    <div className="staging-area__section" role="group" aria-label={label}>
       <div className="staging-area__section-header">
         <span>
           {text.title} ({files.length})

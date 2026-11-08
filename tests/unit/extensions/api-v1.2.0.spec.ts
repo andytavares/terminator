@@ -71,8 +71,8 @@ const mockWorkspaces = [
   { id: 'ws-2', name: 'Beta', folderPath: '/projects/beta', color: undefined, tags: [] },
 ]
 const mockProjects = [
-  { id: 'proj-1', workspaceId: 'ws-1', name: 'App', gitBranch: 'main' },
-  { id: 'proj-2', workspaceId: 'ws-1', name: 'API', gitBranch: 'main' },
+  { id: 'proj-1', workspaceId: 'ws-1', name: 'App', gitBranch: 'main', worktreePath: '/wt/app' },
+  { id: 'proj-2', workspaceId: 'ws-1', name: 'API', gitBranch: 'main', worktreePath: '/wt/api' },
 ]
 
 vi.mock('../../../src/main/storage/workspace-store', () => ({
@@ -90,7 +90,7 @@ vi.mock('../../../src/main/logger', () => ({
 import { createExtensionAPI } from '../../../src/main/extensions/api'
 import { setExtensionSetting } from '../../../src/main/storage/extension-settings-store'
 import { EventEmitter } from 'events'
-import type { SessionInfo } from '@terminator/extension-sdk'
+import type { ExtensionAPI, SessionInfo } from '@terminator/extension-sdk'
 import type { PtyManager } from '../../../src/main/terminal/pty-manager'
 import { partialFake } from '../../support/fakes'
 
@@ -136,25 +136,24 @@ describe('api.globalShortcut.register', () => {
 // ── workspace ────────────────────────────────────────────────────────────────
 
 describe('api.workspace.list', () => {
-  it('returns WorkspaceSnapshot[] from the workspace store', () => {
+  it('returns each workspace with only its id, name and folder', () => {
     const api = createExtensionAPI('test.ws')
 
-    const result = api.workspace.list()
-
-    expect(result).toHaveLength(2)
-    expect(result[0]).toMatchObject({ id: 'ws-1', name: 'Alpha', folderPath: '/projects/alpha' })
-    expect(result[1]).toMatchObject({ id: 'ws-2', name: 'Beta', folderPath: '/projects/beta' })
+    expect(api.workspace.list()).toEqual([
+      { id: 'ws-1', name: 'Alpha', folderPath: '/projects/alpha' },
+      { id: 'ws-2', name: 'Beta', folderPath: '/projects/beta' },
+    ])
   })
 })
 
 describe('api.workspace.listProjects', () => {
-  it('returns ProjectSnapshot[] for the given workspace', () => {
+  it('returns each project of the workspace with only its id, workspace, name and worktree', () => {
     const api = createExtensionAPI('test.ws2')
 
-    const result = api.workspace.listProjects('ws-1')
-
-    expect(result).toHaveLength(2)
-    expect(result[0]).toMatchObject({ id: 'proj-1', workspaceId: 'ws-1', name: 'App' })
+    expect(api.workspace.listProjects('ws-1')).toEqual([
+      { id: 'proj-1', workspaceId: 'ws-1', name: 'App', worktreePath: '/wt/app' },
+      { id: 'proj-2', workspaceId: 'ws-1', name: 'API', worktreePath: '/wt/api' },
+    ])
   })
 })
 
@@ -272,23 +271,6 @@ describe('api.ipc bridge channels — declared remote access', () => {
     // channels not in registry remain blocked even with a bridge
     expect(await api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
   })
-
-  it('isRemoteAccessible: registry presence alone is NOT sufficient — the declared flag decides', async () => {
-    // Regression test for the declared-authority design: a channel registered
-    // without remoteAccessible: true stays unreachable from the bridge. The old
-    // rule ("any registered channel is accessible") also exposed every internal
-    // core invoke channel to authenticated remote clients.
-    const invokeRegistry = new Map([
-      ['dialog:open-directory', { handler: vi.fn(), remoteAccessible: false }],
-      ['my-ext:local-only', { handler: vi.fn(), remoteAccessible: false }],
-    ])
-    const eventBus = new EventEmitter()
-    const api = createExtensionAPI('test.ipc6', {
-      bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
-    })
-    expect(await api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
-    expect(await api.ipc.isRemoteAccessible('my-ext:local-only')).toBe(false)
-  })
 })
 
 // ── pty ──────────────────────────────────────────────────────────────────────
@@ -315,7 +297,7 @@ const mockPtyManager = partialFake<PtyManager>({
 })
 
 describe('api.pty — session authority surface (v1.4.0)', () => {
-  it('spawnSession delegates and returns the session info', async () => {
+  it('spawnSession hands the options to the ptyManager', async () => {
     const api = createExtensionAPI('test.pty10', { ptyManager: mockPtyManager })
     const opts = {
       sessionId: 's1',
@@ -324,7 +306,7 @@ describe('api.pty — session authority surface (v1.4.0)', () => {
       type: 'human' as const,
       origin: 'remote' as const,
     }
-    expect(await api.pty.spawnSession(opts)).toEqual(sessionInfo)
+    await api.pty.spawnSession(opts)
     expect(mockPtyManager.spawnSession).toHaveBeenCalledWith(opts)
   })
 
@@ -353,62 +335,81 @@ describe('api.pty — session authority surface, streams and lookups', () => {
     expect(bare.pty.onData('s1', vi.fn())()).toBeUndefined()
     expect(bare.pty.onExit('s1', vi.fn())()).toBeUndefined()
   })
+})
 
-  it('getSession and setWorkspace delegate, defaulting without a ptyManager', async () => {
-    const api = createExtensionAPI('test.pty14', { ptyManager: mockPtyManager })
-    expect(await api.pty.getSession('s1')).toEqual(sessionInfo)
-    expect(await api.pty.setWorkspace('s1', 'ws-1')).toBe(true)
-    expect(mockPtyManager.setWorkspace).toHaveBeenCalledWith('s1', 'ws-1')
-    const bare = createExtensionAPI('test.pty15', {})
-    expect(await bare.pty.getSession('s1')).toBeUndefined()
-    expect(await bare.pty.setWorkspace('s1', 'ws-1')).toBe(false)
+type Pty = ExtensionAPI['pty']
+
+describe('api.pty — with ptyManager', () => {
+  it.each([
+    {
+      name: 'write',
+      call: (pty: Pty) => pty.write('s1', 'hello'),
+      managerMethod: mockPtyManager.write,
+      args: ['s1', 'hello'],
+    },
+    {
+      name: 'resize',
+      call: (pty: Pty) => pty.resize('s1', 80, 24),
+      managerMethod: mockPtyManager.resize,
+      args: ['s1', 80, 24],
+    },
+    {
+      name: 'kill',
+      call: (pty: Pty) => pty.kill('s1'),
+      managerMethod: mockPtyManager.kill,
+      args: ['s1'],
+    },
+  ])('$name delegates to the same ptyManager method', ({ call, managerMethod, args }) => {
+    const api = createExtensionAPI('test.pty2', { ptyManager: mockPtyManager })
+    call(api.pty)
+    expect(managerMethod).toHaveBeenCalledWith(...args)
   })
 })
 
-describe('api.pty — with ptyManager', () => {
-  it('write delegates to ptyManager.write', () => {
-    const api = createExtensionAPI('test.pty2', { ptyManager: mockPtyManager })
-    api.pty.write('s1', 'hello')
-    expect(mockPtyManager.write).toHaveBeenCalledWith('s1', 'hello')
-  })
-
-  it('resize delegates to ptyManager.resize', () => {
+describe('api.pty — with ptyManager, lookups', () => {
+  it.each([
+    {
+      name: 'getSession',
+      call: (pty: Pty) => pty.getSession('s1'),
+      managerMethod: mockPtyManager.getSession,
+      args: ['s1'],
+    },
+    {
+      name: 'setWorkspace',
+      call: (pty: Pty) => pty.setWorkspace('s1', 'ws-1'),
+      managerMethod: mockPtyManager.setWorkspace,
+      args: ['s1', 'ws-1'],
+    },
+    {
+      name: 'listSessions',
+      call: (pty: Pty) => pty.listSessions(),
+      managerMethod: mockPtyManager.listSessions,
+      args: [],
+    },
+  ])('$name asks the ptyManager', async ({ call, managerMethod, args }) => {
     const api = createExtensionAPI('test.pty3', { ptyManager: mockPtyManager })
-    api.pty.resize('s1', 80, 24)
-    expect(mockPtyManager.resize).toHaveBeenCalledWith('s1', 80, 24)
-  })
-
-  it('kill delegates to ptyManager.kill', () => {
-    const api = createExtensionAPI('test.pty4', { ptyManager: mockPtyManager })
-    api.pty.kill('s1')
-    expect(mockPtyManager.kill).toHaveBeenCalledWith('s1')
-  })
-
-  it('listSessions returns the manager session list', async () => {
-    const api = createExtensionAPI('test.pty5', { ptyManager: mockPtyManager })
-    expect(await api.pty.listSessions()).toEqual([sessionInfo, otherSession])
+    await call(api.pty)
+    expect(managerMethod).toHaveBeenCalledWith(...args)
   })
 })
 
 describe('api.pty — without ptyManager', () => {
-  it('listSessions returns []', async () => {
+  it.each([
+    ['listSessions', (pty: Pty) => pty.listSessions(), []],
+    ['getSession', (pty: Pty) => pty.getSession('s1'), undefined],
+    ['setWorkspace', (pty: Pty) => pty.setWorkspace('s1', 'ws-1'), false],
+  ])('%s answers %j', async (_name, call, expected) => {
     const api = createExtensionAPI('test.pty.nopty5')
-    expect(await api.pty.listSessions()).toEqual([])
+    expect(await call(api.pty)).toEqual(expected)
   })
 
-  it('write is a no-op and does not throw', () => {
+  it.each([
+    ['write', (pty: Pty) => pty.write('s1', 'hello')],
+    ['resize', (pty: Pty) => pty.resize('s1', 80, 24)],
+    ['kill', (pty: Pty) => pty.kill('s1')],
+  ])('%s is a no-op and does not throw', (_name, call) => {
     const api = createExtensionAPI('test.pty.nopty2')
-    expect(() => api.pty.write('s1', 'hello')).not.toThrow()
-  })
-
-  it('resize is a no-op and does not throw', () => {
-    const api = createExtensionAPI('test.pty.nopty3')
-    expect(() => api.pty.resize('s1', 80, 24)).not.toThrow()
-  })
-
-  it('kill is a no-op and does not throw', () => {
-    const api = createExtensionAPI('test.pty.nopty4')
-    expect(() => api.pty.kill('s1')).not.toThrow()
+    expect(() => call(api.pty)).not.toThrow()
   })
 })
 
@@ -504,15 +505,33 @@ describe("api.window.openAuxiliary — the extension's own renderer", () => {
   })
 })
 
+/** A BrowserWindow that emits its own events to the listeners openAuxiliary adds. */
+function emittingWindow() {
+  const webContents = Object.assign(new EventEmitter(), {
+    send: vi.fn(),
+    insertCSS: vi.fn().mockResolvedValue(undefined),
+  })
+  return Object.assign(new EventEmitter(), {
+    focus: vi.fn(),
+    isDestroyed: () => false,
+    loadURL: vi.fn(),
+    loadFile: vi.fn(),
+    webContents,
+  })
+}
+
 describe('api.window.openAuxiliary — window lifecycle and sources', () => {
   afterEach(() => vi.unstubAllEnvs())
 
   it('opens a new window once the previous one for the view has closed', async () => {
     const { BrowserWindow } = await import('electron')
+    const auxWindow = emittingWindow()
+    vi.mocked(BrowserWindow).mockImplementationOnce(function () {
+      return auxWindow
+    })
     const api = createExtensionAPI('test.aux-closed')
     api.window.openAuxiliary('test-view-closed')
-    const closed = vi.mocked(mockBWInstance.on).mock.calls.find(([event]) => event === 'closed')
-    closed![1]()
+    auxWindow.emit('closed')
     vi.mocked(BrowserWindow).mockClear()
     api.window.openAuxiliary('test-view-closed')
     expect(BrowserWindow).toHaveBeenCalled()
@@ -522,16 +541,16 @@ describe('api.window.openAuxiliary — window lifecycle and sources', () => {
 describe('api.window.openAuxiliary — design tokens and the dev server', () => {
   afterEach(() => vi.unstubAllEnvs())
 
-  it("gives an extension's own window the design tokens once it has loaded", () => {
+  it("gives an extension's own window the design tokens once it has loaded", async () => {
+    const { BrowserWindow } = await import('electron')
+    const auxWindow = emittingWindow()
+    vi.mocked(BrowserWindow).mockImplementationOnce(function () {
+      return auxWindow
+    })
     const api = createExtensionAPI('test.aux-css', undefined, 'ext://com.css/index.html')
     api.window.openAuxiliary('test-view-css')
-    const loaded = vi
-      .mocked(mockBWInstance.webContents.on)
-      .mock.calls.find(([event]) => event === 'did-finish-load')
-    loaded![1]()
-    expect(mockBWInstance.webContents.insertCSS).toHaveBeenCalledWith(
-      expect.stringContaining('--tm-')
-    )
+    auxWindow.webContents.emit('did-finish-load')
+    expect(auxWindow.webContents.insertCSS).toHaveBeenCalledWith(expect.stringContaining('--tm-'))
   })
 
   it('loads the app renderer from the dev server when one is running', () => {

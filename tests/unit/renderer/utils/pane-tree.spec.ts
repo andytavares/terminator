@@ -129,7 +129,9 @@ describe('updateSplitRatio', () => {
       split('s1', [leaf('a'), leaf('b')], { direction: 'vertical', ratio: 0.3 })
     )
   })
+})
 
+describe('updateSplitRatio — a nested split', () => {
   it('updates a nested split node', () => {
     const tree = split(
       's1',
@@ -138,11 +140,13 @@ describe('updateSplitRatio', () => {
         direction: 'vertical',
       }
     )
-    const result = updateSplitRatio(tree, 's2', 0.8)
-    if (result.type !== 'split') throw new Error('expected split')
-    if (result.second.type !== 'split') throw new Error('expected nested split')
-    expect(result.second.ratio).toBe(0.8)
-    expect(result.ratio).toBe(0.5)
+    expect(updateSplitRatio(tree, 's2', 0.8)).toEqual(
+      split(
+        's1',
+        [leaf('a'), split('s2', [leaf('b'), leaf('c')], { direction: 'horizontal', ratio: 0.8 })],
+        { direction: 'vertical' }
+      )
+    )
   })
 
   it('returns tree unchanged when splitId does not match', () => {

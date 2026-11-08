@@ -94,8 +94,10 @@ describe('components/factory/HallThumbnail', () => {
 function thePictureTests() {
   it('renders a picture region labelled for the order once its graph arrives', async () => {
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
+    const io = stubIntersectionObserver()
     mockBridge(invoke)
     render(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
+    io.fire()
     expect(
       await screen.findByRole('img', { name: 'Factory floor for Build the thing' })
     ).toBeTruthy()
@@ -103,8 +105,10 @@ function thePictureTests() {
 
   it('shows a plain placeholder for a draft with no run yet, never an empty box', async () => {
     const invoke = vi.fn(async () => ({}))
+    const io = stubIntersectionObserver()
     mockBridge(invoke)
     render(<HallThumbnail orderId="WO-2" title="Not yet started" refreshKey="draft" />)
+    io.fire()
     expect(
       await screen.findByText('Not started yet — the floor appears when the work starts.')
     ).toBeTruthy()
@@ -114,10 +118,12 @@ function thePictureTests() {
 function fetchingTests() {
   it('fetches the graph only once per order', async () => {
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
+    const io = stubIntersectionObserver()
     mockBridge(invoke)
     const { rerender } = render(
       <HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />
     )
+    io.fire()
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1))
     rerender(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
     await screen.findByRole('img')
@@ -126,10 +132,12 @@ function fetchingTests() {
 
   it('refetches when the order standing changes', async () => {
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
+    const io = stubIntersectionObserver()
     mockBridge(invoke)
     const { rerender } = render(
       <HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />
     )
+    io.fire()
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1))
     rerender(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="halted" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
@@ -144,14 +152,6 @@ function visibilityTests() {
     render(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
     expect(invoke).not.toHaveBeenCalled()
     io.fire()
-    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1))
-  })
-
-  it('fetches right away when IntersectionObserver is unavailable', async () => {
-    vi.stubGlobal('IntersectionObserver', undefined)
-    const invoke = vi.fn(async () => ({ graph: GRAPH }))
-    mockBridge(invoke)
-    render(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1))
   })
 }

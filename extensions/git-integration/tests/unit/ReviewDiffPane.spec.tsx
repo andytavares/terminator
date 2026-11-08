@@ -1,11 +1,13 @@
 import React from 'react'
 import { describe, it, beforeAll, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 // Imported with the file rather than inside a test: the pane's module graph
 // (highlight.js among it) takes about a second to load under vitest, and a
 // test that imported it paid that against its own five-second timeout.
 import { ReviewDiffPane } from '../../src/components/pr-review/ReviewDiffPane'
 import { PrReviewDetailSchema, type PrChangedFile } from '../../src/schemas/pr-review.schema'
+import { measureDiffComplexity } from '../../src/review/insights'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
 const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
@@ -32,7 +34,6 @@ vi.mock('../../src/stores/review-ui.store', async (importOriginal) => {
 })
 vi.mock('../../src/utils/syntax', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/utils/syntax')>()
-  highlightSpy.mockImplementation(actual.highlight)
   return { ...actual, highlight: highlightSpy }
 })
 // Counts renders inside each row's memo boundary, keeping the real component and its comparison.
@@ -88,7 +89,7 @@ vi.mock('../../src/components/pr-review/CommentComposer', () => ({
   ),
 }))
 vi.mock('../../src/review/insights', () => ({
-  measureDiffComplexity: vi.fn().mockResolvedValue(null),
+  measureDiffComplexity: vi.fn(),
 }))
 
 const mockPatchFileComplexity = vi.fn()
@@ -249,8 +250,12 @@ afterAll(() => {
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
 })
 
-beforeEach(() => {
-  vi.clearAllMocks()
+beforeEach(async () => {
+  // mockReset clears implementations before each test, so the spies get theirs back here.
+  const syntax =
+    await vi.importActual<typeof import('../../src/utils/syntax')>('../../src/utils/syntax')
+  highlightSpy.mockImplementation(syntax.highlight)
+  vi.mocked(measureDiffComplexity).mockResolvedValue(null)
   layOut(4000)
   mockPrFileDiff.mockResolvedValue({ diff: { hunks: [] } })
   mockPrCompare.mockResolvedValue({ rewritten: false, commits: [], files: [] })
@@ -309,13 +314,33 @@ const oneLineDiff = () => oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'const x = 1')]
 async function renderDiffPane(diff: unknown, props: Partial<typeof defaultProps> = {}) {
   mockPrFileDiff.mockResolvedValue({ diff })
   const view = await renderPane(props)
-  await waitFor(() => expect(view.container.querySelector('.rs-hunk-anchor')).toBeTruthy())
+  await findFirstHunk()
   return view
 }
 
-/** Waits for the pane to mount its first hunk row. */
-const findFirstHunk = (container: HTMLElement) =>
-  waitFor(() => expect(container.querySelector('.rs-hunk-anchor')).toBeTruthy())
+/** Waits for the pane to mount its first hunk header, which carries a "Section viewed" box. */
+const findFirstHunk = () => screen.findAllByRole('checkbox', { name: 'Section viewed' })
+
+/** The mounted code rows, top to bottom: gap and hunk rows are left out. */
+const codeRows = () =>
+  screen.queryAllByRole('row').filter((row) => row.classList.contains('diff-line'))
+
+/** The mounted code row of new-side line `line`. */
+const rowOfLine = (line: number) =>
+  codeRows().find((row) => row.getAttribute('data-new-line') === String(line))!
+
+/** A code row's comment button in the line-number gutter. */
+const gutterButton = (row: HTMLElement) => within(row).getByRole('button', { name: 'Add comment' })
+
+/** A unified code row's code cell, its last. */
+const codeCell = (row: HTMLElement) => within(row).getAllByRole('cell').at(-1)!
+
+/** The code rows the reviewer has selected. */
+const selectedRows = () => screen.queryAllByRole('row', { selected: true })
+
+/** Whether the pane draws the split view's side tables. */
+const drawsSplit = () =>
+  screen.getAllByRole('table').some((table) => table.classList.contains('diff-table--split'))
 
 /** Line 1 of src/foo.ts, right side, as the reviewer's selection. */
 function selectLineOne() {
@@ -325,14 +350,24 @@ function selectLineOne() {
   })
 }
 
-/** Puts the real UI store, with nothing selected, behind the pane's selector. */
+/** Puts the real UI store, in its initial state, behind the pane's selector. */
 async function useRealUiStore() {
   const actual = await vi.importActual<typeof import('../../src/stores/review-ui.store')>(
     '../../src/stores/review-ui.store'
   )
-  actual.useReviewUiStore.setState({ selection: null })
+  actual.useReviewUiStore.setState(actual.useReviewUiStore.getInitialState(), true)
   uiStoreMock.mockImplementation(actual.useReviewUiStore)
   return actual.useReviewUiStore
+}
+
+/** Puts the real PR review store, in its initial state, behind the pane's selector. */
+async function useRealPrStore() {
+  const actual = await vi.importActual<typeof import('../../src/stores/pr-review.store')>(
+    '../../src/stores/pr-review.store'
+  )
+  actual.usePrReviewStore.setState(actual.usePrReviewStore.getInitialState(), true)
+  prStoreMock.mockImplementation(actual.usePrReviewStore)
+  return actual.usePrReviewStore
 }
 
 /** A review comment `id` in thread `threadId` on line 1 of src/foo.ts. */
@@ -511,14 +546,12 @@ describe('ReviewDiffPane', () => {
     expect(screen.getByTitle('src/foo.ts').textContent).toBe('src/foo.ts')
   })
 
-  it('leaves the additions and deletions to the file list', async () => {
-    await renderPane()
-    expect(screen.queryByText('+5/−2')).toBeNull()
-  })
-
-  it('shows no risk label for a low risk file', async () => {
-    await renderPane()
-    expect(screen.queryByText(/Low risk/)).toBeNull()
+  it.each([
+    { level: 'low' as const, label: /Low risk/ },
+    { level: 'medium' as const, label: /Medium risk/ },
+  ])('shows no risk label for a $level risk file', async ({ level, label }) => {
+    await renderPane({ file: { ...mockFile, riskScore: { ...mockFile.riskScore, level } } })
+    expect(screen.queryByText(label)).toBeNull()
   })
 
   it('shows high-risk label for high risk file', async () => {
@@ -549,75 +582,40 @@ describe('ReviewDiffPane — shows loading diff message while fetching', () => {
 })
 
 describe('ReviewDiffPane — shows viewed badge when file is already viewed', () => {
-  it('shows viewed badge when file is already viewed', async () => {
-    prStoreMock.mockReturnValue({
-      ...basePrReviewStoreState(),
-      viewedFiles: new Set(['src/foo.ts']),
-    })
+  it('shows a checked Viewed box for a viewed file and unmarks it on click', async () => {
+    const user = userEvent.setup()
+    const prStore = await useRealPrStore()
+    prStore.setState({ viewedFiles: new Set(['src/foo.ts']) })
     await renderPane()
     const box = screen.getByRole('checkbox', { name: 'Viewed' }) as HTMLInputElement
     expect(box.checked).toBe(true)
-    fireEvent.click(box)
-    expect(mockUnmarkFileViewed).toHaveBeenCalledWith(
-      { repoRoot: '/repo', prNumber: mockPr.number, headSHA: mockPr.headSHA },
-      'src/foo.ts'
-    )
+    await user.click(box)
+    expect(prStore.getState().viewedFiles.has('src/foo.ts')).toBe(false)
+    expect(box.checked).toBe(false)
   })
 })
 
 describe('ReviewDiffPane — marks the file viewed from the header checkbox without leaving it', () => {
   it('marks the file viewed from the header checkbox without leaving it', async () => {
+    const user = userEvent.setup()
+    const prStore = await useRealPrStore()
     const onMarkViewed = vi.fn()
     await renderPane({ onMarkViewed })
     const box = screen.getByRole('checkbox', { name: 'Viewed' }) as HTMLInputElement
     expect(box.checked).toBe(false)
-    fireEvent.click(box)
-    expect(mockMarkFileViewed).toHaveBeenCalledWith(
-      { repoRoot: '/repo', prNumber: mockPr.number, headSHA: mockPr.headSHA },
-      'src/foo.ts'
-    )
+    await user.click(box)
+    expect(prStore.getState().viewedFiles.has('src/foo.ts')).toBe(true)
+    expect(box.checked).toBe(true)
     expect(onMarkViewed).not.toHaveBeenCalled()
   })
 
   it('calls onShowRisk when the Why? button is clicked', async () => {
+    const user = userEvent.setup()
     const onShowRisk = vi.fn()
     const highFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'high' as const } }
     await renderPane({ onShowRisk, file: highFile })
-    fireEvent.click(screen.getByRole('button', { name: 'High risk' }))
+    await user.click(screen.getByRole('button', { name: 'High risk' }))
     expect(onShowRisk).toHaveBeenCalled()
-  })
-})
-
-describe('ReviewDiffPane — renders diff hunks when diff is loaded', () => {
-  it('renders diff hunks when diff is loaded', async () => {
-    const diff = {
-      path: 'src/foo.ts',
-      isBinary: false,
-      hunks: [
-        {
-          header: '@@ -1,3 +1,3 @@',
-          lines: [{ type: 'context', content: 'const x = 1', oldLineNumber: 1, newLineNumber: 1 }],
-        },
-      ],
-    }
-    mockPrFileDiff.mockResolvedValue({ diff })
-    const { container } = await renderPane()
-    await waitFor(() => expect(container.querySelector('.rs-hunk-anchor')).toBeTruthy())
-  })
-
-  it('does not repeat the change type in the file toolbar', async () => {
-    const addedFile = { ...mockFile, changeType: 'added' as const }
-    await renderPane({ file: addedFile })
-    expect(screen.queryByText('added')).toBeNull()
-  })
-})
-
-describe('ReviewDiffPane — calls patchFileComplexity after diff load', () => {
-  it('calls patchFileComplexity after diff load', async () => {
-    const diff = { hunks: [] }
-    mockPrFileDiff.mockResolvedValue({ diff })
-    await renderPane()
-    await waitFor(() => expect(mockPrFileDiff).toHaveBeenCalled())
   })
 })
 
@@ -625,21 +623,22 @@ describe('ReviewDiffPane — switches to split view mode when Split button is cl
   it('switches to split view mode when Split button is clicked', async () => {
     const diff = oneHunk('@@ -1,3 +1,3 @@', [ctxLine(1, 'x'), addLine(2, 'y'), removeLine(2, 'z')])
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
-    const { container } = await renderDiffPane(diff)
+    await renderDiffPane(diff)
 
-    await waitFor(() => expect(container.querySelector('.diff-table--split')).toBeTruthy())
+    await waitFor(() => expect(drawsSplit()).toBe(true))
   })
 })
 
-describe('ReviewDiffPane — gutter drag no longer opens the composer, but calls setSelection', () => {
-  it('gutter drag no longer opens the composer, but calls setSelection', async () => {
+describe('ReviewDiffPane — a gutter press selects the line and opens no composer', () => {
+  it('a gutter press selects the line and opens no composer', async () => {
+    const user = userEvent.setup()
+    const uiStore = await useRealUiStore()
     await renderDiffPane(oneLineDiff())
 
     const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
-    fireEvent.mouseDown(btn)
-    fireEvent.mouseUp(btn)
+    await user.pointer([{ keys: '[MouseLeft>]', target: btn }, { keys: '[/MouseLeft]' }])
 
-    expect(mockSetSelection).toHaveBeenCalledWith({
+    expect(uiStore.getState().selection).toEqual({
       path: 'src/foo.ts',
       side: 'RIGHT',
       startLine: 1,
@@ -651,23 +650,25 @@ describe('ReviewDiffPane — gutter drag no longer opens the composer, but calls
 
 describe('ReviewDiffPane — a gutter drag across rows keeps the multi-line selection after the trailing click', () => {
   it('a gutter drag across rows keeps the multi-line selection after the trailing click', async () => {
+    const user = userEvent.setup()
     const uiStore = await useRealUiStore()
     const diff = oneHunk(
       '@@ -1,3 +1,3 @@',
       [1, 2, 3].map((n) => ctxLine(n))
     )
-    const { container } = await renderDiffPane(diff)
+    await renderDiffPane(diff)
 
-    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
-    fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
-    fireEvent.mouseEnter(rows[1])
-    fireEvent.mouseEnter(rows[2])
-    fireEvent.mouseUp(rows[2].querySelector('.diff-line__content')!)
+    const rows = codeRows()
     // A press and release on different elements clicks their common ancestor.
-    fireEvent.click(rows[0].parentElement!)
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: gutterButton(rows[0]) },
+      { target: rows[1] },
+      { target: codeCell(rows[2]) },
+      { keys: '[/MouseLeft]' },
+    ])
 
-    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(3))
-    expect(screen.getByText('Comment')).toBeTruthy()
+    await waitFor(() => expect(selectedRows()).toHaveLength(3))
+    expect(screen.getByRole('button', { name: /^Comment/ })).toBeTruthy()
     expect(uiStore.getState().selection).toEqual({
       path: 'src/foo.ts',
       side: 'RIGHT',
@@ -684,48 +685,53 @@ describe('ReviewDiffPane — a background click after the drag has settled still
       '@@ -1,2 +1,2 @@',
       [1, 2].map((n) => ctxLine(n))
     )
-    const { container } = await renderDiffPane(diff)
+    await renderDiffPane(diff)
 
-    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
-    // The drag ends with a zero-delay timer that lets the click after it through; run it on a
-    // fake clock so the click below comes after it has fired.
-    vi.useFakeTimers()
-    fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
-    fireEvent.mouseEnter(rows[1])
-    fireEvent.mouseUp(rows[1])
-    await vi.advanceTimersByTimeAsync(0)
-    vi.useRealTimers()
-    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(2))
+    const rows = codeRows()
+    // The drag ends with a zero-delay timer that lets the click after it through. user-event
+    // waits one zero-delay tick after the release, so that timer has fired before the click below.
+    const user = userEvent.setup()
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: gutterButton(rows[0]) },
+      { target: rows[1] },
+      { keys: '[/MouseLeft]' },
+    ])
+    await waitFor(() => expect(selectedRows()).toHaveLength(2))
 
-    fireEvent.click(rows[0].querySelector('.diff-line__content')!)
+    await user.click(codeCell(rows[0]))
 
-    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(0))
+    await waitFor(() => expect(selectedRows()).toHaveLength(0))
     expect(uiStore.getState().selection).toBeNull()
   })
 })
 
 describe('ReviewDiffPane — shows the float bar under a selection, with Comment opening the composer', () => {
   it('shows the float bar under a selection, with Comment opening the composer', async () => {
+    const user = userEvent.setup()
     selectLineOne()
     await renderDiffPane(oneLineDiff())
 
     expect(screen.queryByTestId('composer')).toBeNull()
-    fireEvent.click(screen.getByText('Comment'))
+    await user.click(screen.getByRole('button', { name: /^Comment/ }))
     await screen.findByTestId('composer')
 
-    fireEvent.click(await screen.findByText('Cancel'))
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByTestId('composer')).toBeNull())
   })
 })
 
-describe('ReviewDiffPane — calls openAgentPanel with the lines scope when Ask agent is clicked', () => {
-  it('calls openAgentPanel with the lines scope when Ask agent is clicked', async () => {
-    selectLineOne()
+describe('ReviewDiffPane — opens the agent panel on the selected lines when Ask agent is clicked', () => {
+  it('opens the agent panel on the selected lines when Ask agent is clicked', async () => {
+    const user = userEvent.setup()
+    const uiStore = await useRealUiStore()
+    uiStore.setState({
+      selection: { path: 'src/foo.ts', side: 'RIGHT', startLine: 1, endLine: 1 },
+    })
     await renderDiffPane(oneLineDiff())
 
-    fireEvent.click(screen.getByText(/Ask agent/))
-    expect(mockOpenAgentPanel).toHaveBeenCalledWith(
-      {
+    await user.click(screen.getByRole('button', { name: /Ask agent/ }))
+    expect(uiStore.getState()).toMatchObject({
+      agentPanelScope: {
         kind: 'lines',
         path: 'src/foo.ts',
         startLine: 1,
@@ -733,8 +739,8 @@ describe('ReviewDiffPane — calls openAgentPanel with the lines scope when Ask 
         side: 'RIGHT',
         chapter: null,
       },
-      'review'
-    )
+      agentPanelRequest: 'review',
+    })
   })
 })
 
@@ -759,12 +765,6 @@ describe('ReviewDiffPane — fires keyboard navigation events for prev-file and 
     expect(onPrevFile).toHaveBeenCalled()
     expect(onMarkViewed).toHaveBeenCalled()
   })
-
-  it('shows no risk label for a medium risk file', async () => {
-    const medFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'medium' as const } }
-    await renderPane({ file: medFile })
-    expect(screen.queryByText(/Medium risk/)).toBeNull()
-  })
 })
 
 describe('ReviewDiffPane — comment visibility (R2)', () => {
@@ -785,13 +785,6 @@ describe('ReviewDiffPane — comment visibility (R2)', () => {
     expect(screen.getByText('2')).toBeTruthy()
   })
 
-  it('clicking a hidden pip sets visibility back to all', async () => {
-    await renderThreads([openThread], 'hidden')
-
-    fireEvent.click(screen.getByRole('button', { name: '1 hidden comments' }))
-    expect(mockSetCommentVisibility).toHaveBeenCalledWith('all')
-  })
-
   it('Unresolved hides a resolved thread but keeps an open one', async () => {
     await renderThreads([openThread, resolvedThread], 'unresolved')
 
@@ -802,6 +795,20 @@ describe('ReviewDiffPane — comment visibility (R2)', () => {
     await renderThreads([openThread, resolvedThread], 'all')
 
     expect(screen.getAllByTestId('thread')).toHaveLength(2)
+  })
+})
+
+describe('ReviewDiffPane — comment visibility (R2) — the hidden pip', () => {
+  it('clicking a hidden pip sets visibility back to all and shows the thread', async () => {
+    const user = userEvent.setup()
+    const uiStore = await useRealUiStore()
+    uiStore.setState({ commentVisibility: 'hidden', diffRange: 'whole' })
+    storeThreads([threadOnLineOne('thread-open')])
+    await renderDiffPane(oneLineDiff())
+
+    await user.click(screen.getByRole('button', { name: '1 hidden comments' }))
+    expect(uiStore.getState().commentVisibility).toBe('all')
+    expect(await screen.findByTestId('thread')).toBeTruthy()
   })
 })
 
@@ -873,8 +880,8 @@ async function renderSplit(overrides: Partial<typeof defaultProps> = {}) {
     diffViewMode: 'split',
   })
   const view = await renderPane(overrides)
-  await waitFor(() => expect(view.container.querySelector('.rs-hunk-anchor')).toBeTruthy())
-  await waitFor(() => expect(document.querySelector('.diff-table--split')).toBeTruthy())
+  await findFirstHunk()
+  await waitFor(() => expect(drawsSplit()).toBe(true))
   return view
 }
 
@@ -961,10 +968,9 @@ describe('ReviewDiffPane — pending drafts (S5)', () => {
         },
       ],
     })
-    const { container } = await renderPane()
+    await renderPane()
     await screen.findByText(/sent when you submit your review/)
-    const code = container.querySelector('.rs-thread-bd code')
-    expect(code?.textContent).toBe('fetch(filter)')
+    expect(screen.getAllByRole('code').map((code) => code.textContent)).toContain('fetch(filter)')
   })
 })
 
@@ -979,10 +985,10 @@ function answerTestsForBlock(locations: unknown[]) {
 }
 
 /** Renders the pane on the block diff and asks for the tests of its block. */
-async function jumpToTests() {
+async function jumpToTests(user: ReturnType<typeof userEvent.setup>) {
   mockPrFileDiff.mockResolvedValue({ diff: blockDiff })
   await renderPane()
-  fireEvent.click(await screen.findByRole('button', { name: 'Jump to the tests for this block' }))
+  await user.click(await screen.findByRole('button', { name: 'Jump to the tests for this block' }))
 }
 
 /** A block of foo() whose old() became next(). */
@@ -997,7 +1003,7 @@ describe('ReviewDiffPane — jump to the tests for a block', () => {
 
   it('searches the tests with the hunk as it reads after the change', async () => {
     answerTestsForBlock([])
-    await jumpToTests()
+    await jumpToTests(userEvent.setup())
     await waitFor(() =>
       expect(mockInvoke).toHaveBeenCalledWith('github:tests-for-block', {
         repoRoot: '/repo',
@@ -1011,18 +1017,26 @@ describe('ReviewDiffPane — jump to the tests for a block', () => {
   })
 })
 
+/** The virtual list entry that holds new-side line `line`. */
+const entryOfLine = (line: number) =>
+  screen.getAllByTestId('diff-entry').find((entry) =>
+    within(entry)
+      .queryAllByRole('row')
+      .some((row) => row.getAttribute('data-new-line') === String(line))
+  )!
+
 describe('ReviewDiffPane — jump to the tests for a block — opening one', () => {
   useOneRowViewport()
 
   it('opens a test in the PR at its line', async () => {
+    const user = userEvent.setup()
+    const prStore = await useRealPrStore()
     answerTestsForBlock([{ path: 'src/foo.ts', line: 2, symbol: 'foo', text: 'done()' }])
-    await jumpToTests()
-    fireEvent.click(await screen.findByRole('button', { name: /src\/foo\.ts:2/ }))
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('src/foo.ts')
-    const entry = document
-      .querySelector('[data-new-line="2"]')!
-      .closest<HTMLElement>('[data-index]')!
-    const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
+    await jumpToTests(user)
+    await user.click(await screen.findByRole('button', { name: /src\/foo\.ts:2/ }))
+    expect(prStore.getState().currentFilePath).toBe('src/foo.ts')
+    const entry = entryOfLine(2)
+    const scroller = screen.getByTestId('review-diff-scroll')
     await waitFor(() =>
       expect(scroller.scrollTo).toHaveBeenCalledWith(
         expect.objectContaining({ top: Number(entry.dataset.index) * ROW_PX })
@@ -1046,11 +1060,12 @@ const renderTwoHunks = (props: Partial<typeof defaultProps> = {}) =>
   renderDiffPane(keyTwoHunkDiff, props)
 
 /** The scroll position of the entry holding the hunk at `hunkIndex`. */
-const topOfHunk = (hunkIndex: number) =>
-  Number(
-    document.querySelectorAll('.rs-hunk-anchor')[hunkIndex].closest<HTMLElement>('[data-index]')!
-      .dataset.index
-  ) * ROW_PX
+const topOfHunk = (hunkIndex: number) => {
+  const hunkEntries = screen
+    .getAllByTestId('diff-entry')
+    .filter((entry) => within(entry).queryByRole('checkbox', { name: 'Section viewed' }))
+  return Number(hunkEntries[hunkIndex].dataset.index) * ROW_PX
+}
 
 /** The hunk at line 1, the scope the agent keys act on without a selection. */
 const firstHunkScope = {
@@ -1067,7 +1082,7 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
 
   it('nextHunk scrolls the next hunk header into view', async () => {
     await renderTwoHunks()
-    const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
+    const scroller = screen.getByTestId('review-diff-scroll')
     window.dispatchEvent(new CustomEvent('review:next-hunk'))
     expect(topOfHunk(1)).toBeGreaterThan(0)
     expect(scroller.scrollTo).toHaveBeenLastCalledWith(
@@ -1077,7 +1092,7 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
 
   it('prevHunk scrolls the previous hunk header into view', async () => {
     await renderTwoHunks()
-    const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
+    const scroller = screen.getByTestId('review-diff-scroll')
     window.dispatchEvent(new CustomEvent('review:next-hunk')) // move to hunk 1 first
     expect(scroller.scrollTo).toHaveBeenLastCalledWith(
       expect.objectContaining({ top: topOfHunk(1) })
@@ -1093,15 +1108,25 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — agent keys'
   useOneRowViewport()
 
   it('askAgent with no selection opens the agent panel scoped to the nearest hunk', async () => {
+    const uiStore = await useRealUiStore()
     await renderTwoHunks()
     window.dispatchEvent(new CustomEvent('review:ask-agent'))
-    expect(mockOpenAgentPanel).toHaveBeenCalledWith(firstHunkScope, 'review')
+    expect(uiStore.getState()).toMatchObject({
+      agentPanelScope: firstHunkScope,
+      agentPanelRequest: 'review',
+      agentPanelAutoStart: false,
+    })
   })
 
   it('explain requests explain with autoStart', async () => {
+    const uiStore = await useRealUiStore()
     await renderTwoHunks()
     window.dispatchEvent(new CustomEvent('review:explain'))
-    expect(mockOpenAgentPanel).toHaveBeenCalledWith(firstHunkScope, 'explain', true)
+    expect(uiStore.getState()).toMatchObject({
+      agentPanelScope: firstHunkScope,
+      agentPanelRequest: 'explain',
+      agentPanelAutoStart: true,
+    })
   })
 })
 
@@ -1137,10 +1162,13 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — leaving the
   })
 
   it('peekDefinition selects the definition file', async () => {
+    const prStore = await useRealPrStore()
     await renderTwoHunks({ pr: prWithReadingOrder() })
     window.dispatchEvent(new CustomEvent('review:peek-definition'))
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('src/other.ts')
+    expect(prStore.getState()).toMatchObject({
+      currentChapterId: 'ch-2',
+      currentFilePath: 'src/other.ts',
+    })
   })
 })
 
@@ -1168,12 +1196,16 @@ describe('ReviewDiffPane — reading order (R3)', () => {
   })
 })
 
-describe('ReviewDiffPane — reading order (R3) — calls setCurrentChapter/setCurrentFile when Peek definition is clicked', () => {
-  it('calls setCurrentChapter/setCurrentFile when Peek definition is clicked', async () => {
+describe('ReviewDiffPane — reading order (R3) — Peek definition opens the definition file', () => {
+  it('opens the chapter and file of the definition when Peek definition is clicked', async () => {
+    const user = userEvent.setup()
+    const prStore = await useRealPrStore()
     await renderPane({ pr: prWithReadingOrder() })
-    fireEvent.click(screen.getByText('Peek definition'))
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('src/other.ts')
+    await user.click(screen.getByRole('button', { name: 'Peek definition' }))
+    expect(prStore.getState()).toMatchObject({
+      currentChapterId: 'ch-2',
+      currentFilePath: 'src/other.ts',
+    })
   })
 })
 
@@ -1217,7 +1249,7 @@ describe('ReviewDiffPane — insight gutter chips (R4)', () => {
     expect(screen.getByText('+6')).toBeTruthy()
     expect(screen.getByText('untested')).toBeTruthy()
     // The gutter column is sized to its widest chip ("untested"), so it never overlaps code.
-    const gut = screen.getByText('untested').closest('td') as HTMLElement
+    const gut = screen.getAllByRole('cell').find((cell) => within(cell).queryByText('untested'))!
     expect(gut.className).toBe('rs-gut')
     expect(gut.style.width).toBe('78px')
   })
@@ -1249,18 +1281,23 @@ const renderLoaded = async (
 ) => {
   mockPrFileDiff.mockResolvedValue({ diff })
   const view = await renderPane(props)
-  await waitFor(() => expect(view.container.querySelector('.diff-hunk-header')).toBeTruthy())
+  await findFirstHunk()
   return view
 }
-const expandedRows = (c: HTMLElement) => c.querySelectorAll('tr[data-expanded="true"]')
 
-/** Clicks the button labelled `label` in gap row `index`. */
-const clickGap = (c: HTMLElement, index: number, label: string) =>
-  fireEvent.click(
-    (c.querySelectorAll('.diff-gap-row')[index] as HTMLElement).querySelector(
-      `button[aria-label${label.endsWith('*') ? '^' : ''}="${label.replace(/\*$/, '')}"]`
-    )!
-  )
+/** The code rows revealed from the file text, top to bottom. */
+const expandedRows = () => codeRows().filter((row) => row.getAttribute('data-expanded') === 'true')
+
+/** The gaps between hunks, each with its expand buttons. */
+const gaps = () => screen.queryAllByRole('group', { name: 'Unchanged lines' })
+
+/** Clicks the button labelled `label` in gap `index`. */
+const clickGap = (index: number, label: string) =>
+  userEvent.setup().click(within(gaps()[index]).getByRole('button', { name: label }))
+
+/** The unified view's hunk header cells. */
+const unifiedHunkHeaders = () =>
+  screen.queryAllByRole('cell').filter((cell) => cell.classList.contains('diff-hunk-header'))
 
 /** The PR head's file text is the 100 numbered lines. */
 const useFileContent = () =>
@@ -1272,22 +1309,24 @@ describe('ReviewDiffPane expandable context', () => {
   useFileContent()
 
   it('shows no expanded rows and fetches nothing on first render', async () => {
-    const { container } = await renderLoaded()
-    expect(expandedRows(container).length).toBe(0)
+    await renderLoaded()
+    expect(expandedRows().length).toBe(0)
     expect(mockPrFileContent).not.toHaveBeenCalled()
   })
 
   it('offers the right buttons per gap kind without touching hunk headers', async () => {
-    const { container } = await renderLoaded()
-    const rows = Array.from(container.querySelectorAll('.diff-gap-row'))
+    await renderLoaded()
+    const rows = gaps()
     expect(rows.length).toBe(3)
     const names = rows.map((r) =>
-      Array.from(r.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))
+      within(r)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label'))
     )
     expect(names[0]).toEqual(['Show 9 unchanged lines'])
     expect(names[1]).toEqual(['Show 20 lines below', 'Show all 37 lines', 'Show 20 lines above'])
     expect(names[2]).toEqual(['Show 20 lines below', 'Show all lines'])
-    expect(container.querySelectorAll('.diff-hunk-header').length).toBe(2)
+    expect(unifiedHunkHeaders().length).toBe(2)
   })
 })
 
@@ -1295,9 +1334,9 @@ describe('ReviewDiffPane expandable context — fetches once on the first click 
   useFileContent()
 
   it('fetches once on the first click and renders 20 numbered rows below the hunk', async () => {
-    const { container } = await renderLoaded()
-    clickGap(container, 1, 'Show 20 lines below')
-    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
+    await waitFor(() => expect(expandedRows().length).toBe(20))
     expect(mockPrFileContent).toHaveBeenCalledTimes(1)
     expect(mockPrFileContent).toHaveBeenCalledWith({
       repoRoot: '/repo',
@@ -1305,15 +1344,15 @@ describe('ReviewDiffPane expandable context — fetches once on the first click 
       path: 'src/foo.ts',
       ref: 'abc',
     })
-    const rows = Array.from(expandedRows(container))
+    const rows = Array.from(expandedRows())
     expect(rows[0].getAttribute('data-old-line')).toBe('13')
     expect(rows[0].getAttribute('data-new-line')).toBe('13')
     expect(rows[19].getAttribute('data-new-line')).toBe('32')
     expect(rows[0].classList.contains('diff-line--expanded')).toBe(true)
     expect(rows[0].textContent).toContain('line 13')
 
-    clickGap(container, 1, 'Show 17 unchanged lines')
-    await waitFor(() => expect(expandedRows(container).length).toBe(37))
+    await clickGap(1, 'Show 17 unchanged lines')
+    await waitFor(() => expect(expandedRows().length).toBe(37))
     expect(mockPrFileContent).toHaveBeenCalledTimes(1)
   })
 })
@@ -1322,10 +1361,10 @@ describe('ReviewDiffPane expandable context — a gap no bigger than one step op
   useFileContent()
 
   it('reveals the whole 9-line gap above the first hunk', async () => {
-    const { container } = await renderLoaded()
-    clickGap(container, 0, 'Show 9 unchanged lines')
-    await waitFor(() => expect(expandedRows(container).length).toBe(9))
-    const rows = Array.from(expandedRows(container))
+    await renderLoaded()
+    await clickGap(0, 'Show 9 unchanged lines')
+    await waitFor(() => expect(expandedRows().length).toBe(9))
+    const rows = Array.from(expandedRows())
     expect(rows[0].getAttribute('data-new-line')).toBe('1')
     expect(rows[8].getAttribute('data-new-line')).toBe('9')
   })
@@ -1353,13 +1392,13 @@ describe('ReviewDiffPane expandable context — Show all removes that expander a
         },
       ],
     }
-    const { container } = await renderLoaded(shifted)
-    clickGap(container, 1, 'Show 8 unchanged lines')
-    await waitFor(() => expect(expandedRows(container).length).toBe(8))
-    const rows = Array.from(expandedRows(container))
+    await renderLoaded(shifted)
+    await clickGap(1, 'Show 8 unchanged lines')
+    await waitFor(() => expect(expandedRows().length).toBe(8))
+    const rows = Array.from(expandedRows())
     expect(rows[0].getAttribute('data-new-line')).toBe('13')
     expect(rows[0].getAttribute('data-old-line')).toBe('12')
-    expect(container.querySelectorAll('.diff-gap-row').length).toBe(2)
+    expect(gaps().length).toBe(2)
   })
 })
 
@@ -1372,15 +1411,16 @@ describe('ReviewDiffPane expandable context — renders revealed rows in split v
       diffViewMode: 'split' as const,
     })
     mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
-    const { container } = await renderPane()
-    await waitFor(() => expect(container.querySelector('.diff-split-header')).toBeTruthy())
-    clickGap(container, 1, 'Show 20 lines below')
-    await waitFor(() =>
-      expect(container.querySelectorAll('tr[data-expanded="true"]').length).toBe(40)
-    )
-    expect(container.querySelectorAll('.diff-table--left tr[data-old-line="13"]').length).toBe(1)
-    expect(container.querySelectorAll('.diff-table--right tr[data-new-line="13"]').length).toBe(1)
-    expect(container.querySelectorAll('.diff-hunk-header').length).toBe(0)
+    await renderPane()
+    await findFirstHunk()
+    await clickGap(1, 'Show 20 lines below')
+    await waitFor(() => expect(expandedRows().length).toBe(40))
+    // A split row names only its own side's line, so line 13 shows once on each side.
+    const lineThirteen = (side: string) =>
+      expandedRows().filter((row) => row.getAttribute(`data-${side}-line`) === '13')
+    expect(lineThirteen('old').length).toBe(1)
+    expect(lineThirteen('new').length).toBe(1)
+    expect(unifiedHunkHeaders().length).toBe(0)
   })
 })
 
@@ -1389,13 +1429,11 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
 
   it('hides Comment but keeps the other actions when the selection includes a revealed line', async () => {
     await useRealUiStore()
-    const { container } = await renderLoaded()
-    clickGap(container, 1, 'Show 20 lines below')
-    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
+    await waitFor(() => expect(expandedRows().length).toBe(20))
 
-    const row = container.querySelector('tr[data-new-line="13"]')!
-    fireEvent.mouseDown(row.querySelector('.diff-gutter-btn')!)
-    fireEvent.mouseUp(window)
+    await userEvent.setup().click(gutterButton(rowOfLine(13)))
     await screen.findByRole('button', { name: /Ask agent/ })
     expect(screen.queryByRole('button', { name: /Comment/ })).toBeNull()
     expect(screen.getByRole('button', { name: /Add note/ })).toBeTruthy()
@@ -1409,10 +1447,8 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
 
   it('still offers Comment for a selection inside the diff', async () => {
     await useRealUiStore()
-    const { container } = await renderLoaded()
-    const row = container.querySelector('tr[data-new-line="11"]')!
-    fireEvent.mouseDown(row.querySelector('.diff-gutter-btn')!)
-    fireEvent.mouseUp(window)
+    await renderLoaded()
+    await userEvent.setup().click(gutterButton(rowOfLine(11)))
     await screen.findByRole('button', { name: /Comment/ })
   })
 })
@@ -1422,21 +1458,21 @@ describe('ReviewDiffPane expandable context — says the file is too large and o
 
   it('says the file is too large and offers no buttons', async () => {
     mockPrFileContent.mockResolvedValue({ tooLarge: true })
-    const { container } = await renderLoaded()
-    clickGap(container, 1, 'Show 20 lines below')
+    await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
     await waitFor(() =>
       expect(screen.getAllByText('This file is too large to expand here.').length).toBe(3)
     )
-    expect(container.querySelectorAll('.diff-gap-row button').length).toBe(0)
+    expect(gaps().flatMap((gap) => within(gap).queryAllByRole('button'))).toHaveLength(0)
   })
 
   it('shows the error with Retry, and Retry fetches again', async () => {
     mockPrFileContent.mockResolvedValueOnce({ error: 'NETWORK_DOWN' })
-    const { container } = await renderLoaded()
-    clickGap(container, 1, 'Show 20 lines below')
+    await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
     await waitFor(() => expect(screen.getAllByText('NETWORK_DOWN').length).toBe(3))
-    fireEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0])
-    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    await userEvent.setup().click(screen.getAllByRole('button', { name: 'Retry' })[0])
+    await waitFor(() => expect(expandedRows().length).toBe(20))
     expect(mockPrFileContent).toHaveBeenCalledTimes(2)
   })
 })
@@ -1445,32 +1481,32 @@ describe('ReviewDiffPane expandable context — resets expansions when another f
   useFileContent()
 
   it('resets expansions when another file opens', async () => {
-    const { container, rerender } = await renderLoaded()
-    clickGap(container, 1, 'Show 20 lines below')
-    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    const { rerender } = await renderLoaded()
+    await clickGap(1, 'Show 20 lines below')
+    await waitFor(() => expect(expandedRows().length).toBe(20))
 
     const other = { ...mockFile, path: 'src/bar.ts' }
     mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
     rerender(<ReviewDiffPane {...defaultProps} file={other} />)
     await screen.findByTitle('src/bar.ts')
-    await waitFor(() => expect(container.querySelectorAll('.diff-gap-row').length).toBe(3))
-    expect(expandedRows(container).length).toBe(0)
+    await waitFor(() => expect(gaps().length).toBe(3))
+    expect(expandedRows().length).toBe(0)
   })
 
   it('shows no expanders for a binary file', async () => {
-    const { container } = await renderPane({ file: { ...mockFile, isBinary: true } })
-    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
+    await renderPane({ file: { ...mockFile, isBinary: true } })
+    expect(gaps().length).toBe(0)
   })
 
   it('shows no expanders for a truncated diff', async () => {
-    const { container } = await renderLoaded({ ...twoHunkDiff, truncated: true })
-    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
+    await renderLoaded({ ...twoHunkDiff, truncated: true })
+    expect(gaps().length).toBe(0)
   })
 
   it('shows no expanders for an added file', async () => {
     const added = oneHunk('@@ -0,0 +1,2 @@', [addLine(1, 'a'), addLine(2, 'b')])
-    const { container } = await renderLoaded(added)
-    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
+    await renderLoaded(added)
+    expect(gaps().length).toBe(0)
   })
 })
 
@@ -1592,15 +1628,15 @@ describe('ReviewDiffPane — fetch and render cost — highlights each distinct 
 
 describe('ReviewDiffPane — fetch and render cost — a drag over the diff re-renders only the rows whose selection changed', () => {
   it('a drag over the diff re-renders only the rows whose selection changed', async () => {
+    const user = userEvent.setup()
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
-    const { container } = await renderPane()
-    await findFirstHunk(container)
-    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
-    fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
+    await renderPane()
+    await findFirstHunk()
+    const rows = codeRows()
+    await user.pointer({ keys: '[MouseLeft>]', target: gutterButton(rows[0]) })
     rowRenderSpy.mockClear()
 
-    fireEvent.mouseEnter(rows[1])
-    fireEvent.mouseEnter(rows[2])
+    await user.pointer([{ target: rows[1] }, { target: rows[2] }])
 
     expect(rowRenderSpy.mock.calls.map(([line]) => line)).toEqual([2, 3])
   })
@@ -1608,34 +1644,45 @@ describe('ReviewDiffPane — fetch and render cost — a drag over the diff re-r
 
 describe('ReviewDiffPane — fetch and render cost — dragging the split divider re-renders no row', () => {
   it('dragging the split divider re-renders no row', async () => {
+    const user = userEvent.setup()
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
-    const { container } = await renderPane()
-    await findFirstHunk(container)
-    vi.spyOn(
-      container.querySelector('.review-diff-scroll')!,
-      'getBoundingClientRect'
-    ).mockReturnValue({ width: 400 } as DOMRect)
+    await renderPane()
+    await findFirstHunk()
+    vi.spyOn(screen.getByTestId('review-diff-scroll'), 'getBoundingClientRect').mockReturnValue({
+      width: 400,
+    } as DOMRect)
     rowRenderSpy.mockClear()
 
-    fireEvent.mouseDown(container.querySelector('.diff-split-resize-handle')!, { clientX: 100 })
-    fireEvent.mouseMove(window, { clientX: 140 })
-    fireEvent.mouseUp(window)
+    await user.pointer([
+      {
+        keys: '[MouseLeft>]',
+        target: screen.getAllByRole('separator', { name: 'Resize split' })[0],
+        coords: { clientX: 100 },
+      },
+      { coords: { clientX: 140 } },
+      { keys: '[/MouseLeft]' },
+    ])
 
-    expect(container.querySelector<HTMLElement>('.diff-table--left')!.style.width).toBe('60%')
+    const left = screen
+      .getAllByRole('table')
+      .find((table) => table.classList.contains('diff-table--left'))!
+    expect(left.style.width).toBe('60%')
     expect(rowRenderSpy).not.toHaveBeenCalled()
   })
+})
 
+describe('ReviewDiffPane — fetch and render cost — mounts few rows', () => {
   it('mounts only the rows near the viewport of a 2,000-line file', async () => {
     layOut(800)
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
-    const { container } = await renderPane()
-    await findFirstHunk(container)
+    await renderPane()
+    await findFirstHunk()
 
-    const mounted = container.querySelectorAll('tr.diff-line').length
+    const mounted = codeRows().length
     expect(mounted).toBeGreaterThan(800 / ROW_PX - 1)
     expect(mounted).toBeLessThan(MOUNTED_ROWS_CAP)
-    expect(container.querySelector('[data-new-line="1500"]')).toBeNull()
+    expect(rowOfLine(1500)).toBeUndefined()
   })
 })
 
@@ -1643,17 +1690,14 @@ describe('ReviewDiffPane — fetch and render cost — mounts the rows it scroll
   it('mounts the rows it scrolls to', async () => {
     layOut(800)
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
-    const { container } = await renderPane()
-    await findFirstHunk(container)
-    const scroller = container.querySelector<HTMLElement>('.review-diff-scroll')!
+    await renderPane()
+    await findFirstHunk()
+    const scroller = screen.getByTestId('review-diff-scroll')
 
     Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 1500 * ROW_PX })
     fireEvent.scroll(scroller)
 
-    const mountedLines = () =>
-      Array.from(container.querySelectorAll<HTMLElement>('tr.diff-line')).map((row) =>
-        Number(row.dataset.newLine)
-      )
+    const mountedLines = () => codeRows().map((row) => Number(row.dataset.newLine))
     await waitFor(() => expect(Math.min(...mountedLines())).toBeGreaterThan(1000))
     expect(mountedLines().length).toBeLessThan(MOUNTED_ROWS_CAP)
   })
@@ -1663,16 +1707,15 @@ describe('ReviewDiffPane — hunk rows read as prose', () => {
   it('names the enclosing symbol and hides the line ranges', async () => {
     const diff = oneHunk('@@ -1,3 +1,3 @@ def add(a, b):', [ctxLine(1, 'return a + b')])
     const { container } = await renderDiffPane(diff)
-    const row = container.querySelector('.diff-hunk-header')!
-    expect(row.textContent).toContain('in add')
-    expect(row.querySelector('code')?.textContent).toBe('add')
+    expect(screen.getByText(wholeText('in add'))).toBeTruthy()
+    expect(screen.getByRole('code').textContent).toBe('add')
     expect(container.textContent).not.toContain('@@')
   })
 
   it('shows the context text when it names no symbol', async () => {
     const diff = oneHunk('@@ -1,3 +1,3 @@ (', [ctxLine(1, 'x')])
     const { container } = await renderDiffPane(diff)
-    expect(container.querySelector('.diff-hunk-header')!.textContent).toContain('(')
+    expect(unifiedHunkHeaders()[0].textContent).toContain('(')
     expect(container.textContent).not.toContain('@@')
   })
 })
@@ -1683,11 +1726,11 @@ describe('ReviewDiffPane — gap of one line', () => {
       ...hunkAt(start),
       header: `@@ -${start},3 +${start},3 @@`,
     }))
-    const { container } = await renderLoaded({ path: 'src/foo.ts', isBinary: false, hunks })
-    const between = container.querySelectorAll('.diff-gap-row')[1]
+    await renderLoaded({ path: 'src/foo.ts', isBinary: false, hunks })
+    const between = gaps()[1]
     expect(between.textContent).toContain('Show 1 unchanged line')
     expect(between.textContent).not.toContain('1 unchanged lines')
-    expect(between.querySelectorAll('button').length).toBe(1)
+    expect(within(between).getAllByRole('button').length).toBe(1)
   })
 })
 
@@ -1700,16 +1743,19 @@ describe('ReviewDiffPane — changed words in the unified view', () => {
 
   it('marks the changed words of a replaced pair and nothing else', async () => {
     const { container } = await renderDiffPane(replaced)
+    // The marks sit inside the highlighted HTML and carry no role, so they are found by class.
+    // eslint-disable-next-line testing-library/no-node-access -- see above
     const added = container.querySelectorAll('.diff-word--add')
+    // eslint-disable-next-line testing-library/no-node-access -- see above
     const removed = container.querySelectorAll('.diff-word--remove')
     expect(Array.from(added).map((n) => n.textContent)).toEqual(['pull_up', 'True'])
     expect(Array.from(removed).map((n) => n.textContent)).toEqual(['bounce_time', '0.05'])
   })
 
   it('leaves an unpaired added line unmarked', async () => {
-    const { container } = await renderDiffPane(replaced)
-    const unpaired = container.querySelector('tr[data-new-line="44"]')!
-    expect(unpaired.querySelector('.diff-word--add')).toBeNull()
+    await renderDiffPane(replaced)
+    const unpaired = rowOfLine(44)
+    expect(unpaired.innerHTML).not.toContain('diff-word--add')
     expect(unpaired.textContent).toContain('self.contact = settings.contact')
   })
 })

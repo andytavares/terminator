@@ -446,9 +446,11 @@ function theHallTests() {
   })
 
   it('skips the lane stencil when a lane label carries no digit', () => {
+    const LANE_STENCIL = '#5a4e32'
     const noDigitLane = bakedMap({ lanes: [{ lane: 1, row: 5, label: 'Lane' }] })
     const paint = createRecordingPaint()
-    expect(() => bakeHall(noDigitLane, paint)).not.toThrow()
+    bakeHall(noDigitLane, paint)
+    expect(paint.calls).not.toContainEqual(expect.objectContaining({ style: LANE_STENCIL }))
   })
 }
 

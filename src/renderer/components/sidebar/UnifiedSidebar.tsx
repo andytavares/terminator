@@ -7,8 +7,8 @@ import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
+import { useSettingsStore } from '../../stores/settings.store'
 import type { BranchRow as BranchRowData } from '../../sidebar/branch-rows'
-import { DEFAULT_VIEW_ID } from '../../sidebar/views'
 import { mergeReorder } from '../../sidebar/manual-order'
 import type { WorkItem } from '../../sidebar/work-item'
 import { useDismissSurfaceOnClick } from '../../hooks/useDismissSurfaceOnClick'
@@ -40,20 +40,21 @@ interface UnifiedSidebarProps {
   visible: boolean
   /** Injected by tests so relative times and staleness are deterministic. */
   now?: number
-  /** Initial saved view. Phase 5's view bar drives this through state. */
-  initialViewId?: string
 }
 
 export function UnifiedSidebar(props: UnifiedSidebarProps): React.JSX.Element {
   const { width, sidebarRef, onResizeMouseDown, onResizeDoubleClick } = useSidebarWidth()
   const { data, views, rows, dialogs, links, ctx } = useUnifiedSidebar(props)
   const dismissSurfaceHandlers = useDismissSurfaceOnClick()
+  const className = useSidebarClassName(props.visible)
 
   return (
     <>
       <div
         ref={sidebarRef}
-        className={`unified-sidebar${props.visible ? '' : ' unified-sidebar--hidden'}`}
+        role="complementary"
+        aria-label="Sidebar"
+        className={className}
         style={{ width }}
         {...dismissSurfaceHandlers}
       >
@@ -68,6 +69,19 @@ export function UnifiedSidebar(props: UnifiedSidebarProps): React.JSX.Element {
       />
     </>
   )
+}
+
+/** Hidden or shown; the width slides only once settings have loaded, so their first answer
+ * (Home hides the sidebar) does not move it under a pointer at startup. */
+function useSidebarClassName(visible: boolean): string {
+  const settingsLoaded = useSettingsStore((s) => s.globalSettings !== null)
+  return [
+    'unified-sidebar',
+    !visible && 'unified-sidebar--hidden',
+    settingsLoaded && 'unified-sidebar--animated',
+  ]
+    .filter(Boolean)
+    .join(' ')
 }
 
 interface ContentProps {
@@ -144,6 +158,9 @@ interface ResizeHandleProps {
 function ResizeHandle({ onMouseDown, onDoubleClick }: ResizeHandleProps): React.JSX.Element {
   return (
     <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize sidebar"
       className="unified-sidebar__resize-handle"
       onMouseDown={onMouseDown}
       onDoubleClick={onDoubleClick}
@@ -155,7 +172,7 @@ function ResizeHandle({ onMouseDown, onDoubleClick }: ResizeHandleProps): React.
 
 /** The list's state: its views, the rows they show, the open dialog, and the row context. */
 function useUnifiedSidebar(props: UnifiedSidebarProps) {
-  const views = useSidebarViews(props.initialViewId ?? DEFAULT_VIEW_ID)
+  const views = useSidebarViews()
   const data = useSidebarData()
   useSidebarSources(data)
   const links = useSessionLinks()

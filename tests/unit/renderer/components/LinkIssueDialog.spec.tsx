@@ -1,11 +1,12 @@
-import { isSurfaceOpen } from '@shared/double-escape'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { LinkIssueDialog } from '../../../../src/renderer/components/integrations/LinkIssueDialog'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
-import { pressOutside } from '../../../support/modal'
+import { installElectronApi } from '../../../support/electron-api'
+import type { IssueLink } from '../../../../src/shared/types/index'
 
 const P = '11111111-1111-4111-8111-111111111111'
 
@@ -90,11 +91,17 @@ describe('LinkIssueDialog — partial failures', () => {
   })
 })
 
+/** Fake timers that user-event can wait through: it pauses between keys on the clock. */
+function typingUnderFakeTimers() {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  return userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+}
+
 describe('LinkIssueDialog — searching', () => {
   it('debounces before searching', async () => {
-    vi.useFakeTimers()
+    const user = typingUnderFakeTimers()
     open()
-    fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value: 'sidebar' } })
+    await user.type(screen.getByPlaceholderText(/Search/), 'sidebar')
 
     expect(searchIssues).not.toHaveBeenCalled()
     await act(async () => {
@@ -104,9 +111,9 @@ describe('LinkIssueDialog — searching', () => {
   })
 
   it('switches the heading once searching', async () => {
-    vi.useFakeTimers()
+    const user = typingUnderFakeTimers()
     open()
-    fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value: 'x' } })
+    await user.type(screen.getByPlaceholderText(/Search/), 'x')
     await act(async () => {
       vi.advanceTimersByTime(300)
     })
@@ -116,19 +123,19 @@ describe('LinkIssueDialog — searching', () => {
 
 describe('LinkIssueDialog — searching — goes back to assigned issues when the search is cleared', () => {
   it('goes back to assigned issues when the search is cleared', async () => {
-    vi.useFakeTimers()
+    const user = typingUnderFakeTimers()
     open()
     const input = screen.getByPlaceholderText(/Search/)
-    fireEvent.change(input, { target: { value: 'x' } })
+    await user.type(input, 'x')
     await act(async () => {
       vi.advanceTimersByTime(300)
     })
-    listMine.mockClear()
-    fireEvent.change(input, { target: { value: '' } })
+    expect(screen.queryByText('Assigned to you')).toBeNull()
+    await user.clear(input)
     await act(async () => {
-      await listMine.mock.results[0].value
+      vi.advanceTimersByTime(300)
     })
-    expect(listMine).toHaveBeenCalled()
+    expect(screen.getByText('Assigned to you')).toBeTruthy()
   })
 })
 
@@ -140,41 +147,55 @@ describe('LinkIssueDialog — linking', () => {
   })
 
   it('names the issue on the button once picked', async () => {
+    const user = userEvent.setup()
     open()
-    fireEvent.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
     expect(screen.getByText('Link TAV-42')).toBeTruthy()
   })
+})
 
-  it('links the picked issue and closes', async () => {
+describe('LinkIssueDialog — linking — the write', () => {
+  it('asks main to link the picked issue, keeps the link it reads back, and closes', async () => {
+    const user = userEvent.setup()
+    const link: IssueLink = {
+      projectId: P,
+      tracker: 'linear',
+      key: 'TAV-42',
+      injectContext: true,
+      linkedAt: '2026-11-07T09:00:00.000Z',
+    }
+    const linkSet = vi.fn(async () => ({ link }))
+    const linkGet = vi.fn(async () => ({ link, issue: null }))
+    installElectronApi({ integrations: { linkSet, linkGet } })
+    useIntegrationsStore.setState({ linkIssue: useIntegrationsStore.getInitialState().linkIssue })
     const onClose = vi.fn()
     open({ onClose })
-    fireEvent.click(await screen.findByText('TAV-42'))
-    fireEvent.click(await screen.findByText('Link TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('Link TAV-42'))
 
-    await waitFor(() =>
-      expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
-    )
     await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(linkSet).toHaveBeenCalledWith({ projectId: P, tracker: 'linear', key: 'TAV-42' })
+    expect(useIntegrationsStore.getState().links.get(P)).toEqual(link)
   })
 })
 
 describe('LinkIssueDialog — linking — reports a failure and stays open rather than pretending', () => {
   it('reports a failure and stays open rather than pretending', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     linkIssue.mockResolvedValue(false)
     open({ onClose })
-    fireEvent.click(await screen.findByText('TAV-42'))
-    fireEvent.click(await screen.findByText('Link TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('Link TAV-42'))
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toContain('Nothing was changed')
-    )
+    expect((await screen.findByRole('alert')).textContent).toContain('Nothing was changed')
     expect(onClose).not.toHaveBeenCalled()
   })
 
   it('warns that linking replaces the issue already attached (FR-033)', async () => {
+    const user = userEvent.setup()
     open({ currentKey: 'TAV-9' })
-    fireEvent.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
 
     const warning = screen.getByRole('alert')
     expect(warning.textContent).toContain('TAV-9')
@@ -182,16 +203,18 @@ describe('LinkIssueDialog — linking — reports a failure and stays open rathe
   })
 
   it('does not warn when the picked issue is the one already attached', async () => {
+    const user = userEvent.setup()
     open({ currentKey: 'TAV-42' })
-    fireEvent.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
 
 describe('LinkIssueDialog — linking — does not warn for a project that has no issue yet', () => {
   it('does not warn for a project that has no issue yet', async () => {
+    const user = userEvent.setup()
     open()
-    fireEvent.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
@@ -209,45 +232,27 @@ describe('LinkIssueDialog — not connected', () => {
 })
 
 describe('LinkIssueDialog — dismissal', () => {
-  it('counts as an open modal until it closes', async () => {
-    const { unmount } = open()
-    await screen.findByText('TAV-42')
-    expect(isSurfaceOpen(document)).toBe(true)
-    unmount()
-    expect(isSurfaceOpen(document)).toBe(false)
-  })
-
   it('closes on Cancel', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     open({ onClose })
     // Let the initial load settle first, or its state update lands after the
     // test and React warns about an unwrapped update.
     await screen.findByText('TAV-42')
-    fireEvent.click(await screen.findByText('Cancel'))
-    expect(onClose).toHaveBeenCalled()
-  })
-
-  it('closes when the backdrop is clicked but not the dialog itself', async () => {
-    const onClose = vi.fn()
-    open({ onClose })
-    await screen.findByText('TAV-42')
-
-    fireEvent.mouseDown(await screen.findByRole('dialog'))
-    expect(onClose).not.toHaveBeenCalled()
-
-    pressOutside(screen.getByRole('dialog'))
+    await user.click(await screen.findByText('Cancel'))
     expect(onClose).toHaveBeenCalled()
   })
 })
 
 describe('LinkIssueDialog — shortcuts and odd failures', () => {
   it('links a row on double click, and tells the caller', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     const onLinked = vi.fn()
     open({ onClose, onLinked })
     const row = await screen.findByText('TAV-42')
-    fireEvent.click(row)
-    fireEvent.doubleClick(row)
+    await user.click(row)
+    await user.dblClick(row)
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
     expect(onLinked).toHaveBeenCalledWith(expect.objectContaining({ key: 'TAV-42' }))

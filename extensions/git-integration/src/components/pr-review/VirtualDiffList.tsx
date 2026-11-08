@@ -53,6 +53,7 @@ export function VirtualDiffList(props: Props) {
           <div
             key={virtualItem.key}
             data-index={virtualItem.index}
+            data-testid="diff-entry"
             ref={virtualizer.measureElement}
           >
             {renderItem(items[virtualItem.index])}

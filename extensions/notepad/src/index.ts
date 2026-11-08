@@ -46,7 +46,6 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
 
 const disposables: Disposable[] = []
 let _pendingQuickCreate = false
-let _pendingQuickCreateTimer: ReturnType<typeof setTimeout> | null = null
 
 // Each registers one group of IPC handlers and returns its cleanup.
 const IPC_GROUPS = [
@@ -184,7 +183,6 @@ function pendingQuickCreateChannel() {
     run: () => {
       const pending = _pendingQuickCreate
       _pendingQuickCreate = false
-      clearPendingQuickCreateTimer()
       return { data: { pending } }
     },
   })
@@ -214,30 +212,18 @@ function quickCreateEntryPoints(api: ExtensionAPI): Disposable[] {
   return [menuItem, command]
 }
 
-function clearPendingQuickCreateTimer(): void {
-  if (_pendingQuickCreateTimer === null) return
-  clearTimeout(_pendingQuickCreateTimer)
-  _pendingQuickCreateTimer = null
-}
-
 function newNote(api: ExtensionAPI): void {
+  // Pending until a view takes it: the one that loads, however long a cold load takes, or the
+  // open one that got the broadcast (it tells us, so a later load does not open it again).
+  _pendingQuickCreate = true
   // Broadcast to any already-running extension view immediately.
   api.window.broadcast('terminator.notepad:ui.openQuickCreate', {})
   // Activate the notepad tab — this creates the WebContentsView if it doesn't exist yet.
   api.window.broadcast('extension:activate-global-tab', 'terminator.notepad')
-  // Set pending flag so the renderer shows the overlay on first load.
-  // Auto-expire after 5 s so a late manual panel open doesn't surprise the user.
-  _pendingQuickCreate = true
-  if (_pendingQuickCreateTimer !== null) clearTimeout(_pendingQuickCreateTimer)
-  _pendingQuickCreateTimer = setTimeout(() => {
-    _pendingQuickCreate = false
-    _pendingQuickCreateTimer = null
-  }, 5000)
 }
 
 export function deactivate(): void {
   for (const d of disposables) d.dispose()
   disposables.length = 0
   _pendingQuickCreate = false
-  clearPendingQuickCreateTimer()
 }

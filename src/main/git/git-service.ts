@@ -1,4 +1,5 @@
-import { join } from 'path'
+import { access, readFile, realpath, stat } from 'fs/promises'
+import { dirname, join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
 import type { ChangeStats } from '../../shared/schemas/git.schema.js'
 import { runTextCommand } from '../shell/command-runner.js'
@@ -59,10 +60,57 @@ export async function getChangeStats(cwd: string): Promise<ChangeStats> {
   return { added, removed, files }
 }
 
-/** True or false only when git answered; rejects when it did not (timed out, never started, ended
- * by a signal). Git documents a nonzero exit outside a repository but no code or message, so any
+/** Whether `dirPath` or a folder above it holds what git's discovery looks for: a `.git`, or the
+ * `HEAD` of a bare repository (https://git-scm.com/docs/git#Documentation/git.txt-GITCEILINGDIRECTORIES).
+ * Real paths, as git walks them. */
+async function hasRepositoryMarker(dirPath: string): Promise<boolean> {
+  const exists = (path: string) =>
+    access(path).then(
+      () => true,
+      () => false
+    )
+  for (let dir = await realpath(dirPath); ; dir = dirname(dir)) {
+    if ((await exists(join(dir, '.git'))) || (await exists(join(dir, 'HEAD')))) return true
+    if (dirname(dir) === dir) return false
+  }
+}
+
+type Level = 'work-tree' | 'bare' | 'none'
+
+/** What git's discovery finds in one folder: a `.git` folder with a HEAD or a `.git` file that
+ * points at its repository (a linked worktree), a bare repository, or neither
+ * (https://git-scm.com/docs/gitrepository-layout). */
+async function repositoryLevel(dir: string): Promise<Level> {
+  const dotGit = join(dir, '.git')
+  const found = await stat(dotGit).catch(() => null)
+  if (found?.isDirectory() && (await stat(join(dotGit, 'HEAD')).catch(() => null))) {
+    return 'work-tree'
+  }
+  if (found?.isFile() && (await readFile(dotGit, 'utf8')).startsWith('gitdir: ')) return 'work-tree'
+  const bare = await Promise.all(['HEAD', 'objects', 'refs'].map((name) => stat(join(dir, name))))
+    .then(() => true)
+    .catch(() => false)
+  return bare ? 'bare' : 'none'
+}
+
+/** The checkout that holds `dirPath`, read from the folder tree without running git, so a first
+ * /usr/bin/git slower than GIT_TIMEOUT cannot fail it (issue #326). Null when git must decide:
+ * no checkout above, or a bare repository first. A real path, as `--show-toplevel` gives. */
+export async function workTreeRoot(dirPath: string): Promise<string | null> {
+  for (let dir = await realpath(dirPath); ; dir = dirname(dir)) {
+    const level = await repositoryLevel(dir)
+    if (level === 'work-tree') return dir
+    if (level === 'bare' || dirname(dir) === dir) return null
+  }
+}
+
+/** False without running git when no folder up the tree has a repository marker: on macOS the
+ * first /usr/bin/git, an xcrun shim, can take longer than GIT_TIMEOUT (issue #326). Otherwise true
+ * or false only when git answered; rejects when it did not (timed out, never started, ended by a
+ * signal). Git documents a nonzero exit outside a repository but no code or message, so any
  * nonzero answer means no (https://git-scm.com/docs/git-rev-parse). */
 export async function isGitRepo(dirPath: string): Promise<boolean> {
+  if (!(await hasRepositoryMarker(dirPath))) return false
   const result = await runTextCommand(
     { command: 'git', args: ['rev-parse', '--git-dir'], cwd: dirPath, timeoutMs: GIT_TIMEOUT },
     GIT_ENV

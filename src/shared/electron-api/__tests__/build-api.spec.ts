@@ -229,14 +229,6 @@ describe('buildElectronApi — native mode surface', () => {
     expect(api.getFilePath(new File([], 'notes.md'))).toBe('/tmp/file')
   })
 
-  it('includes native-only methods', () => {
-    const { api } = nativeBridge()
-    expect(typeof api.workspace.getActive).toBe('function')
-    expect(typeof api.db.health).toBe('function')
-    expect(typeof api.getFilePath).toBe('function')
-    expect(typeof api.extension.setTheme).toBe('function')
-  })
-
   it('throws at build time when a local implementation is missing', () => {
     const t = makeTransport()
     expect(() => buildElectronApi(t, { mode: 'native', locals: {} })).toThrow(

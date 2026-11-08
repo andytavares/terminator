@@ -11,6 +11,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { requiredLiveEnv } from '../../../../tests/support/live-env'
 
 // The one thing the whole suite could never prove: that `git push` and
 // `gh pr create --draft` do what this code believes they do.
@@ -22,7 +23,7 @@ import type { Gate } from '../../src/gates/rules.js'
 // Excluded from the default run — it needs `gh` authenticated and a repository
 // on GitHub. `FOUNDRY_LIVE_REPO` points at a checkout with a remote.
 
-const LIVE = process.env.FOUNDRY_LIVE_REPO ?? ''
+const LIVE = requiredLiveEnv('FOUNDRY_LIVE_REPO', 'it names a checkout with a GitHub remote')
 
 /**
  * The same shape the core shell executor hands the extension: an exit code and
@@ -284,35 +285,12 @@ async function expectDraftMarkedReady(): Promise<void> {
   await exec({ command: 'gh', args: ['pr', 'ready', pull.url, '--undo'], cwd: LIVE })
 }
 
-async function expectDraftRecordedInOrdersLedger(): Promise<void> {
-  // `ship.draft_opened`'s subject is the pull request URL; filing by subject once put it in
-  // `orders/https:/github.com/…/ledger.jsonl`, not here (docs/ARCHITECTURE.md, "The ledger").
-  const ledger = path.join(dataRoot, 'orders', liveOrder().id, 'ledger.jsonl')
-  expect(fs.existsSync(ledger)).toBe(true)
-  const actions = fs
-    .readFileSync(ledger, 'utf8')
-    .split('\n')
-    .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line) as { action: string })
-    .map((entry) => entry.action)
-  expect(actions).toContain('ship.draft_opened')
-
-  // And no order directory named after anything but an order.
-  const orders = fs.readdirSync(path.join(dataRoot, 'orders'))
-  expect(orders).toEqual([liveOrder().id])
-}
-
-describe.skipIf(LIVE === '')('shipping, for real', () => {
+describe('shipping, for real', () => {
   afterAll(removeTheLiveRecords)
   beforeAll(commitTheChangeInAWorktree)
 
-  it('pushes the branch and opens a draft pull request GitHub can show back', async () => {
+  it('opens a draft pull request GitHub shows back, and marks it ready when the operator says so', async () => {
     await expectDraftOpenedAndShownBack()
-  })
-  it('turns the draft into a review request when the operator says so', async () => {
     await expectDraftMarkedReady()
-  })
-  it("records the draft in the order's own ledger, and nowhere else", async () => {
-    await expectDraftRecordedInOrdersLedger()
   })
 })

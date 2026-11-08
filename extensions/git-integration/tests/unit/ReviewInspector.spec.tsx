@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReviewInspector } from '../../src/components/pr-review/ReviewInspector'
 import { makeRiskScore } from './risk-score-fixtures'
 
@@ -51,10 +52,18 @@ describe('ReviewInspector — shows only the File tab when agent is unavailable'
 })
 
 describe('ReviewInspector — marks the active tab aria-selected and renders its panel', () => {
-  it('marks the active tab aria-selected and renders its panel', () => {
+  it.each([
+    {
+      tab: 'agent' as const,
+      selected: ['true', 'false'],
+      shown: 'agent-body',
+      hidden: 'why-panel',
+    },
+    { tab: 'file' as const, selected: ['false', 'true'], shown: 'why-panel', hidden: 'agent-body' },
+  ])('selects the $tab tab and renders only its panel', ({ tab, selected, shown, hidden }) => {
     render(
       <ReviewInspector
-        tab="agent"
+        tab={tab}
         onTabChange={vi.fn()}
         onClose={vi.fn()}
         agentAvailable
@@ -63,21 +72,22 @@ describe('ReviewInspector — marks the active tab aria-selected and renders its
         file={baseFile}
       />
     )
-    const agentTab = screen.getByRole('tab', { name: /Agent/ })
-    const fileTab = screen.getByRole('tab', { name: /Why this file/ })
-    expect(agentTab.getAttribute('aria-selected')).toBe('true')
-    expect(fileTab.getAttribute('aria-selected')).toBe('false')
-    expect(screen.getByTestId('agent-body')).toBeTruthy()
-    expect(screen.queryByTestId('why-panel')).toBeNull()
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((element) => element.getAttribute('aria-selected'))).toEqual(selected)
+    expect(screen.getByRole('tabpanel').contains(screen.getByTestId(shown))).toBe(true)
+    expect(screen.queryByTestId(hidden)).toBeNull()
   })
 })
 
 describe('ReviewInspector — calls onTabChange when a tab is clicked', () => {
-  it('calls onTabChange when a tab is clicked', () => {
+  it.each([
+    { tab: 'agent' as const, click: /Why this file/, expected: 'file' },
+    { tab: 'file' as const, click: /Agent/, expected: 'agent' },
+  ])('calls onTabChange with $expected from the $tab tab', async ({ tab, click, expected }) => {
     const onTabChange = vi.fn()
     render(
       <ReviewInspector
-        tab="agent"
+        tab={tab}
         onTabChange={onTabChange}
         onClose={vi.fn()}
         agentAvailable
@@ -86,61 +96,8 @@ describe('ReviewInspector — calls onTabChange when a tab is clicked', () => {
         file={baseFile}
       />
     )
-    fireEvent.click(screen.getByRole('tab', { name: /Why this file/ }))
-    expect(onTabChange).toHaveBeenCalledWith('file')
-  })
-})
-
-describe('ReviewInspector — calls onTabChange with agent when the Agent tab is clicked', () => {
-  it('calls onTabChange with "agent" when the Agent tab is clicked', () => {
-    const onTabChange = vi.fn()
-    render(
-      <ReviewInspector
-        tab="file"
-        onTabChange={onTabChange}
-        onClose={vi.fn()}
-        agentAvailable
-        agentFindingCount={0}
-        agent={<div data-testid="agent-body" />}
-        file={baseFile}
-      />
-    )
-    fireEvent.click(screen.getByRole('tab', { name: /Agent/ }))
-    expect(onTabChange).toHaveBeenCalledWith('agent')
-  })
-})
-
-describe('ReviewInspector — shows a count badge on the Agent tab when agentFindingCount > 0', () => {
-  it('shows a count badge on the Agent tab when agentFindingCount > 0', () => {
-    render(
-      <ReviewInspector
-        tab="agent"
-        onTabChange={vi.fn()}
-        onClose={vi.fn()}
-        agentAvailable
-        agentFindingCount={3}
-        agent={<div data-testid="agent-body" />}
-        file={baseFile}
-      />
-    )
-    expect(screen.getByText('3')).toBeTruthy()
-  })
-})
-
-describe('ReviewInspector — does not show a count badge when agentFindingCount is 0', () => {
-  it('does not show a count badge when agentFindingCount is 0', () => {
-    render(
-      <ReviewInspector
-        tab="agent"
-        onTabChange={vi.fn()}
-        onClose={vi.fn()}
-        agentAvailable
-        agentFindingCount={0}
-        agent={<div data-testid="agent-body" />}
-        file={baseFile}
-      />
-    )
-    expect(screen.queryByText('0')).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: click }))
+    expect(onTabChange).toHaveBeenCalledWith(expected)
   })
 })
 
@@ -164,7 +121,8 @@ describe('ReviewInspector — falls back to the available tab when the requested
 })
 
 describe('ReviewInspector — calls onClose when the close button is clicked', () => {
-  it('calls onClose when the close button is clicked', () => {
+  it('calls onClose when the close button is clicked', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(
       <ReviewInspector
@@ -177,48 +135,14 @@ describe('ReviewInspector — calls onClose when the close button is clicked', (
         file={baseFile}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }))
+    await user.click(screen.getByRole('button', { name: 'Close inspector' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
 
-describe('ReviewInspector — renders the Why this file tab with its panel', () => {
-  it('renders the Why this file tab with its panel', () => {
-    render(
-      <ReviewInspector
-        tab="file"
-        onTabChange={vi.fn()}
-        onClose={vi.fn()}
-        agentAvailable
-        agentFindingCount={0}
-        agent={<div data-testid="agent-body" />}
-        file={baseFile}
-      />
-    )
-    expect(screen.getByTestId('why-panel')).toBeTruthy()
-    expect(screen.getByRole('tabpanel')).toBeTruthy()
-  })
-})
-
-describe('ReviewInspector — has an accessible tablist labelled Inspector', () => {
-  it('has an accessible tablist labelled Inspector', () => {
-    render(
-      <ReviewInspector
-        tab="agent"
-        onTabChange={vi.fn()}
-        onClose={vi.fn()}
-        agentAvailable
-        agentFindingCount={0}
-        agent={<div data-testid="agent-body" />}
-        file={baseFile}
-      />
-    )
-    expect(screen.getByRole('tablist', { name: 'Inspector' })).toBeTruthy()
-  })
-})
-
 describe('ReviewInspector — moves to the File tab with the arrow keys', () => {
-  it('moves to the File tab with the arrow keys', () => {
+  it('moves to the File tab with the arrow keys', async () => {
+    const user = userEvent.setup()
     const onTabChange = vi.fn()
     render(
       <ReviewInspector
@@ -231,14 +155,19 @@ describe('ReviewInspector — moves to the File tab with the arrow keys', () => 
         file={baseFile}
       />
     )
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Agent' }), { key: 'ArrowRight' })
+    const agentTab = screen.getByRole('tab', { name: 'Agent' })
+    act(() => agentTab.focus())
+    expect(agentTab.matches(':focus')).toBe(true)
+
+    await user.keyboard('{ArrowRight}')
+
     expect(onTabChange).toHaveBeenCalledWith('file')
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Why this file' }))
+    expect(screen.getByRole('tab', { name: 'Why this file' }).matches(':focus')).toBe(true)
   })
 })
 
 describe('ReviewInspector — names the Agent tab with its finding count and ties the panel to it', () => {
-  it('names the Agent tab with its finding count and ties the panel to it', () => {
+  it('shows the finding count badge, names the Agent tab with it and ties the panel to it', () => {
     render(
       <ReviewInspector
         tab="agent"
@@ -251,6 +180,7 @@ describe('ReviewInspector — names the Agent tab with its finding count and tie
       />
     )
     const agentTab = screen.getByRole('tab', { name: 'Agent, 3' })
+    expect(agentTab.textContent).toBe('Agent3')
     expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe(agentTab.id)
     expect(agentTab.getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel').id)
   })
@@ -291,10 +221,11 @@ function DrawerHarness() {
 }
 
 describe('ReviewInspector — closes on Escape', () => {
-  it('leaves the DOM when Escape is pressed', () => {
+  it('leaves the DOM when Escape is pressed', async () => {
+    const user = userEvent.setup()
     render(<DrawerHarness />)
-    expect(screen.getByRole('tablist', { name: 'Inspector' })).toBeTruthy()
-    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('tablist', { name: 'Inspector' }).matches(':focus-within')).toBe(false)
+    await user.keyboard('{Escape}')
     expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
   })
 })

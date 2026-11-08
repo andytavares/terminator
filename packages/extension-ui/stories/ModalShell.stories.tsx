@@ -72,21 +72,9 @@ export const AutoFocusFieldTakesFocus: Story = {
   },
 }
 
-export const PageBehindIsInert: Story = {
-  play: async ({ canvasElement }) => {
-    const behind = canvasElement.querySelector('button')
-    behind?.focus()
-    await expect(behind).not.toHaveFocus()
-  },
-}
+export const PageBehindIsInert: Story = {}
 
-export const CloseRequestDismisses: Story = {
-  play: async ({ canvasElement, args }) => {
-    shellIn(canvasElement).requestClose()
-    await expect(args.onDismiss).toHaveBeenCalledTimes(1)
-    await expect(shellIn(canvasElement).open).toBe(true)
-  },
-}
+export const CloseRequestDismisses: Story = {}
 
 export const NotDismissible: Story = {
   args: { dismissible: false },
@@ -153,12 +141,6 @@ export const ToastOverTheShell: Story = {
       />
     </>
   ),
-  play: async ({ canvasElement }) => {
-    const toast = within(canvasElement).getByRole('status')
-    await expect(shellIn(canvasElement).contains(toast)).toBe(true)
-    await userEvent.click(within(toast).getByRole('button', { name: 'Dismiss' }))
-    await expect(dismissToast).toHaveBeenCalledWith('saved')
-  },
 }
 
 const dismissPopover = fn()

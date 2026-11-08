@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 const answerChoice = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/session-controller', () => ({ answerChoice }))
@@ -13,7 +14,8 @@ describe('answersFor', () => {
     expect(answersFor(fact({ state: 'awaiting-input', choicePrompt: null }))).toBeNull()
   })
 
-  it("answers the session's own prompt", () => {
+  it("answers the session's own prompt", async () => {
+    const user = userEvent.setup()
     const facts = fact({
       sessionId: 's9',
       choicePrompt: {
@@ -25,7 +27,7 @@ describe('answersFor', () => {
       },
     })
     render(<>{answersFor(facts)}</>)
-    fireEvent.click(screen.getByRole('button', { name: '2. No' }))
+    await user.click(screen.getByRole('button', { name: '2. No' }))
     expect(answerChoice).toHaveBeenCalledWith('s9', 2)
   })
 })

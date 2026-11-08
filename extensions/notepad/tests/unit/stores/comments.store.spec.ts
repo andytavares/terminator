@@ -31,10 +31,6 @@ function commentsStoreTests() {
 }
 
 function commentsStoreSettingCommentsTests() {
-  it('starts with empty comments', () => {
-    expect(useCommentsStore.getState().comments).toEqual([])
-  })
-
   it('setComments replaces comments', () => {
     useCommentsStore.getState().setComments([mockComment])
     expect(useCommentsStore.getState().comments).toHaveLength(1)

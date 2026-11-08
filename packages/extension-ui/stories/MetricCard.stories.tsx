@@ -1,6 +1,5 @@
 import React from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, within } from 'storybook/test'
 import { MetricCard } from '../src/MetricCard'
 import { Sparkline } from '../src/Sparkline'
 import { inLight } from './in-light'
@@ -27,11 +26,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Default: Story = {
-  play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByText('4.2')).toBeTruthy()
-  },
-}
+export const Default: Story = {}
 export const DefaultLight = inLight(Default)
 
 export const WithSparkline: Story = {

@@ -1,6 +1,6 @@
 # ADR 133: Paved-path cleanup
 
-**Status**: Accepted
+**Status**: Accepted; its `ci:local` parts are superseded by ADR 151
 
 **Date**: 2026-10-27
 

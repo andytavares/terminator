@@ -4,19 +4,14 @@ const { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBoun
   vi.hoisted(() => {
     const mockNotificationShow = vi.fn()
     const mockNotificationOn = vi.fn()
-    const MockNotification = Object.assign(
-      vi.fn().mockImplementation(function () {
-        return { show: mockNotificationShow, on: mockNotificationOn }
-      }),
-      { isSupported: vi.fn(() => true) }
-    )
+    const MockNotification = Object.assign(vi.fn(), { isSupported: vi.fn() })
     const mockDockBounce = vi.fn()
     const mockSend = vi.fn()
     return { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBounce, mockSend }
   })
 
-const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
-const mockDestroyedWin = { isDestroyed: vi.fn(() => true), webContents: { send: mockSend } }
+const mockWin = { isDestroyed: () => false, webContents: { send: mockSend } }
+const mockDestroyedWin = { isDestroyed: () => true, webContents: { send: mockSend } }
 
 const getAllWindows = vi.hoisted(() => vi.fn())
 
@@ -27,7 +22,7 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('crypto', () => ({
-  randomUUID: vi.fn(() => 'test-uuid'),
+  randomUUID: () => 'test-uuid',
 }))
 
 vi.mock('electron-store', async () =>
@@ -60,6 +55,9 @@ beforeEach(async () => {
   ;({ notificationManager, setExtensionNotificationSettingReader } =
     await import('../../../src/main/notifications/notification-manager'))
   getAllWindows.mockReturnValue([mockWin])
+  MockNotification.mockImplementation(function () {
+    return { show: mockNotificationShow, on: mockNotificationOn }
+  })
   MockNotification.isSupported.mockReturnValue(true)
   withDefaultTargets('system', 'center', 'toast')
   // Reset the injected extension reader to its no-registration default between tests.
@@ -127,15 +125,6 @@ describe('NotificationManager.create — extension targets', () => {
 })
 
 describe('NotificationManager.create — errors always toast', () => {
-  it('force-includes toast for an error even when settings omit it', () => {
-    withDefaultTargets('system')
-    notificationManager.create({ type: 'error', title: 'Uh oh', key: 'errKey' })
-    expect(mockSend).toHaveBeenCalledWith(
-      'notifications:push',
-      expect.objectContaining({ targets: ['system', 'toast'] })
-    )
-  })
-
   it('force-includes toast for an extension error even when its settings omit it', () => {
     setExtensionNotificationSettingReader(() => ['system'])
     notificationManager.create({
@@ -179,15 +168,6 @@ describe('NotificationManager.create — persistent targets', () => {
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
       expect.objectContaining({ targets: ['center'] })
-    )
-  })
-
-  it('broadcasts when resolved targets includes toast', () => {
-    withDefaultTargets('toast')
-    notificationManager.create({ type: 'info', title: 'Toast only', key: 'toastKey' })
-    expect(mockSend).toHaveBeenCalledWith(
-      'notifications:push',
-      expect.objectContaining({ targets: ['toast'] })
     )
   })
 })

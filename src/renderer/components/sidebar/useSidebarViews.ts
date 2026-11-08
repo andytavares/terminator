@@ -1,21 +1,19 @@
 import { useMemo, useState } from 'react'
 import type { SessionView } from '../../sidebar/view-model'
-import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
+import { DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
 
 /** The active view, with the search typed into the header folded into its filters. */
 function activeView(views: SessionView[], activeViewId: string, searchQuery: string): SessionView {
-  const base =
-    views.find((v) => v.id === activeViewId) ??
-    BUILT_IN_VIEWS.find((v) => v.id === DEFAULT_VIEW_ID)!
+  const base = views.find((v) => v.id === activeViewId)!
   return searchQuery ? { ...base, filters: { ...base.filters, query: searchQuery } } : base
 }
 
 /** The saved views, which one is active, and the search. The active view is deliberately
  * component state, never restored from storage: a filtered view must never be what greets you
  * at launch (FR-015). */
-export function useSidebarViews(initialViewId: string) {
+export function useSidebarViews() {
   const [views, setViews] = useState(loadViews)
-  const [activeViewId, setActiveViewId] = useState(initialViewId)
+  const [activeViewId, setActiveViewId] = useState(DEFAULT_VIEW_ID)
   const [searchQuery, setSearchQuery] = useState('')
   const view = useMemo(
     () => activeView(views, activeViewId, searchQuery),

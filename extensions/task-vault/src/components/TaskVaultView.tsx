@@ -236,6 +236,7 @@ function TransferButtons({ transfer }: { transfer: Transfer }): React.JSX.Elemen
       <input
         ref={fileInputRef}
         type="file"
+        aria-label="Vault JSON file"
         accept=".json"
         style={{ display: 'none' }}
         onChange={(e) => void transfer.importChosen(e.target)}
@@ -657,7 +658,11 @@ function DetailPane({ selection }: DailyProps): React.JSX.Element | null {
   if (!id) return null
   return (
     <>
-      <div className="tv-detail-panel__backdrop" onClick={() => selection.select(null)} />
+      <div
+        className="tv-detail-panel__backdrop"
+        data-testid="detail-backdrop"
+        onClick={() => selection.select(null)}
+      />
       <TaskDetailPanel taskId={id} taskText={text} onClose={() => selection.select(null)} />
     </>
   )

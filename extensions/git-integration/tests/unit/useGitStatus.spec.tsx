@@ -76,7 +76,7 @@ let desktop: FakeDesktop
 const settle = () => act(() => vi.advanceTimersByTimeAsync(0))
 
 const setVisibility = (state: 'hidden' | 'visible') => {
-  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state)
   document.dispatchEvent(new Event('visibilitychange'))
 }
 

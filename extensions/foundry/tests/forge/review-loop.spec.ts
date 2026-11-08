@@ -115,7 +115,7 @@ describe('fixMessage', () => {
     expect(fixMessage(order())).toBeNull()
   })
 
-  it('lists every open blocking finding, with its id, category, severity and text', () => {
+  it('lists every open blocking finding, and says how to fix or dismiss each', () => {
     const message = fixMessage(
       order({
         redTeam: [
@@ -129,10 +129,6 @@ describe('fixMessage', () => {
     expect(message).toContain('RT-1 (wrong-outcome, high) — wrong')
     expect(message).toContain('RT-2 (regression, medium) — breaks it')
     expect(message).not.toContain('RT-3')
-  })
-
-  it('tells the architect to fix or dismiss, and how', () => {
-    const message = fixMessage(order({ redTeam: [finding()] }))
     expect(message).toContain('resolveFindings')
     expect(message).toContain('dismissFindings')
     expect(message).toContain('90%')
@@ -147,11 +143,6 @@ describe('reviewNext', () => {
     ).toEqual({ kind: 'clean' })
   })
 
-  it('is a fix while blocking findings remain and the round is under the cap', () => {
-    const next = reviewNext({ order: order({ redTeam: [finding()] }), round: 1 })
-    expect(next.kind).toBe('fix')
-  })
-
   it('hands off to the operator once the cap is reached', () => {
     const next = reviewNext({
       order: order({ redTeam: [finding()] }),
@@ -160,7 +151,7 @@ describe('reviewNext', () => {
     expect(next).toEqual({ kind: 'operator' })
   })
 
-  it('is still a fix one round short of the cap', () => {
+  it('is a fix while blocking findings remain, up to one round short of the cap', () => {
     const next = reviewNext({
       order: order({ redTeam: [finding()] }),
       round: MAX_REVIEW_ROUNDS - 1,

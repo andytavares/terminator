@@ -187,6 +187,8 @@ function ColorField({ form }: { form: WorkspaceForm }): React.JSX.Element {
             type="button"
             className={`dialog__color-swatch${form.draft.color === c ? ' dialog__color-swatch--selected' : ''}`}
             style={{ backgroundColor: c }}
+            aria-label={`Color ${c}`}
+            aria-pressed={form.draft.color === c}
             onClick={() => form.update({ color: c })}
           />
         ))}

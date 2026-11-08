@@ -36,13 +36,9 @@ function useVaultNavStoreViewsDatesTests() {
     expect(useVaultNavStore.getState().showCaptureModal).toBe(false)
   })
 
-  it('setViewingDate sets viewingDate', () => {
+  it('setViewingDate sets viewingDate and clears it with null', () => {
     useVaultNavStore.getState().setViewingDate('2026-06-01')
     expect(useVaultNavStore.getState().viewingDate).toBe('2026-06-01')
-  })
-
-  it('setViewingDate accepts null to clear viewingDate', () => {
-    useVaultNavStore.setState({ viewingDate: '2026-06-01' })
     useVaultNavStore.getState().setViewingDate(null)
     expect(useVaultNavStore.getState().viewingDate).toBeNull()
   })
@@ -93,17 +89,9 @@ function useVaultNavStoreNavigationTasksTests() {
 }
 
 function useVaultNavStoreVisibilityResetTests() {
-  it('skipNextVisibilityReset defaults to false', () => {
-    expect(useVaultNavStore.getState().skipNextVisibilityReset).toBe(false)
-  })
-
-  it('setSkipNextVisibilityReset sets the flag to true', () => {
+  it('setSkipNextVisibilityReset sets the flag and sets it back to false', () => {
     useVaultNavStore.getState().setSkipNextVisibilityReset(true)
     expect(useVaultNavStore.getState().skipNextVisibilityReset).toBe(true)
-  })
-
-  it('setSkipNextVisibilityReset sets the flag back to false', () => {
-    useVaultNavStore.setState({ skipNextVisibilityReset: true })
     useVaultNavStore.getState().setSkipNextVisibilityReset(false)
     expect(useVaultNavStore.getState().skipNextVisibilityReset).toBe(false)
   })

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
+import { render, screen, cleanup, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installVaultBridge, eventually } from './helpers/bridge'
 import { DatabaseAdmin } from '../../src/components/DatabaseAdmin'
 import { pressOutside } from '../../../../tests/support/modal'
@@ -51,10 +52,11 @@ function confirmRun(): HTMLElement {
   })
 }
 
-function typeSql(sql: string) {
-  fireEvent.change(screen.getByPlaceholderText('SELECT * FROM tasks LIMIT 50'), {
-    target: { value: sql },
-  })
+const sqlBox = () => screen.getByPlaceholderText('SELECT * FROM tasks LIMIT 50')
+
+async function typeSql(user: UserEvent, sql: string) {
+  await user.clear(sqlBox())
+  await user.type(sqlBox(), sql)
 }
 
 describe('DatabaseAdmin usage', () => {
@@ -66,29 +68,50 @@ describe('DatabaseAdmin usage', () => {
 })
 
 describe('DatabaseAdmin tables', tablesTests)
+describe('DatabaseAdmin tables, continued', tablesTestsPart2)
 describe('DatabaseAdmin queries', queryTests)
 describe('DatabaseAdmin confirmations', confirmTests)
+describe('DatabaseAdmin row deletes', rowDeleteTests)
 describe('DatabaseAdmin reloading the vault', reloadTests)
 
 function tablesTests() {
-  it('shows table counts, browses a table, and refreshes', async () => {
+  it('shows Loading… until the table counts arrive', async () => {
     renderAdmin()
     expect(screen.getByText('Loading…')).toBeTruthy()
-    fireEvent.click(await screen.findByTitle('Browse tasks'))
+    await screen.findByTitle('Browse tasks')
+    expect(screen.queryByText('Loading…')).toBeNull()
+  })
+
+  it('browses a table, with a delete button on each row', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await user.click(await screen.findByTitle('Browse tasks'))
     await shows(/^2 rows/)
     expect(queriesRun()).toEqual(['SELECT * FROM tasks LIMIT 100'])
     expect(screen.getAllByRole('button', { name: 'Delete this row' })).toHaveLength(2)
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh tables' }))
+  })
+}
+
+function tablesTestsPart2() {
+  it('reads the table counts again on Refresh tables', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await screen.findByTitle('Browse tasks')
+    const readsBefore = bridge.calls('task-vault:admin:table-stats').length
+    await user.click(screen.getByRole('button', { name: 'Refresh tables' }))
     await eventually(() =>
-      expect(bridge.calls('task-vault:admin:table-stats').length).toBeGreaterThanOrEqual(3)
+      expect(bridge.calls('task-vault:admin:table-stats')).toHaveLength(readsBefore + 1)
     )
   })
 
   it('confirms before clearing a table', async () => {
+    const user = userEvent.setup()
     renderAdmin()
-    fireEvent.click(await screen.findByRole('button', { name: 'Clear all rows from areas' }))
-    expect(screen.getByText('Clear all rows from "areas"?')).toBeTruthy()
-    fireEvent.click(confirmRun())
+    await user.click(await screen.findByRole('button', { name: 'Clear all rows from areas' }))
+    expect(screen.getByText('Clear all rows from "areas"?').textContent).toBe(
+      'Clear all rows from "areas"?'
+    )
+    await user.click(confirmRun())
     await eventually(() => expect(queriesRun()).toEqual(['DELETE FROM areas']))
   })
 }
@@ -100,32 +123,33 @@ function queryTests() {
 
 function queryWritingAndErrorsTests() {
   it('runs typed SQL with Cmd+Enter and reports writes', async () => {
+    const user = userEvent.setup()
     const onWrite = renderAdmin()
-    typeSql('UPDATE tasks SET text = 1')
-    fireEvent.keyDown(screen.getByPlaceholderText('SELECT * FROM tasks LIMIT 50'), {
-      key: 'Enter',
-      metaKey: true,
-    })
+    await typeSql(user, 'UPDATE tasks SET text = 1')
+    expect(sqlBox().matches(':focus')).toBe(true)
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
     await shows(/^1 row affected/)
     expect(onWrite).toHaveBeenCalled()
   })
 
-  it('shows an error the query answered with, or one it threw', async () => {
+  it.each([
+    ['answered with', 'bad', 'syntax error'],
+    ['threw', 'throw', 'Error: down'],
+  ])('shows an error the query %s', async (_how, sql, error) => {
+    const user = userEvent.setup()
     renderAdmin()
-    typeSql('bad')
-    fireEvent.click(screen.getByTitle('Run (⌘↵)'))
-    expect(await screen.findByText('syntax error')).toBeTruthy()
-    typeSql('throw')
-    fireEvent.click(screen.getByTitle('Run (⌘↵)'))
-    expect(await screen.findByText('Error: down')).toBeTruthy()
+    await typeSql(user, sql)
+    await user.click(screen.getByTitle('Run (⌘↵)'))
+    expect((await screen.findByText(error)).textContent).toBe(error)
   })
 }
 
 function queryQuickActionsTests() {
   it('runs a safe quick action at once, without row deletes when there is no table', async () => {
+    const user = userEvent.setup()
     bridge.responses['task-vault:admin:run-query'] = { rows: [{ status: 'open', count: 2 }] }
     renderAdmin()
-    fireEvent.click(screen.getByRole('button', { name: 'Count tasks by status' }))
+    await user.click(screen.getByRole('button', { name: 'Count tasks by status' }))
     await shows(/^1 row /)
     expect(screen.queryByRole('button', { name: 'Delete this row' })).toBeNull()
     expect(screen.getByText('open')).toBeTruthy()
@@ -133,28 +157,51 @@ function queryQuickActionsTests() {
 }
 
 function confirmTests() {
-  it('asks before a destructive quick action, and can be cancelled', async () => {
+  it('asks before a destructive quick action', async () => {
+    const user = userEvent.setup()
     renderAdmin()
-    fireEvent.click(screen.getByRole('button', { name: 'Delete all cancelled tasks' }))
-    expect(screen.getByText('Run destructive query?')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(screen.queryByText('Run destructive query?')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Delete all cancelled tasks' }))
-    pressOutside(screen.getByRole('dialog', { name: 'Run destructive query?' }))
+    await user.click(screen.getByRole('button', { name: 'Delete all cancelled tasks' }))
+    expect(screen.getByRole('dialog', { name: 'Run destructive query?' })).toBeTruthy()
     expect(queriesRun()).toEqual([])
   })
 
-  it('deletes a row by its id, quoting string ids', async () => {
+  it('closes the destructive query dialog on Cancel, running nothing', async () => {
+    const user = userEvent.setup()
     renderAdmin()
-    fireEvent.click(await screen.findByTitle('Browse tasks'))
+    await user.click(screen.getByRole('button', { name: 'Delete all cancelled tasks' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText('Run destructive query?')).toBeNull()
+    expect(queriesRun()).toEqual([])
+  })
+
+  it('closes the destructive query dialog on a press outside, running nothing', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await user.click(screen.getByRole('button', { name: 'Delete all cancelled tasks' }))
+    pressOutside(screen.getByRole('dialog', { name: 'Run destructive query?' }))
+    expect(screen.queryByText('Run destructive query?')).toBeNull()
+    expect(queriesRun()).toEqual([])
+  })
+}
+
+function rowDeleteTests() {
+  it('deletes a row with a string id by its quoted id', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await user.click(await screen.findByTitle('Browse tasks'))
     await shows(/^2 rows/)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete this row' })[0])
-    fireEvent.click(document.querySelector('.db-admin__confirm')!)
-    fireEvent.click(confirmRun())
+    await user.click(screen.getAllByRole('button', { name: 'Delete this row' })[0])
+    await user.click(screen.getByRole('dialog'))
+    await user.click(confirmRun())
     await eventually(() => expect(queriesRun()).toContain("DELETE FROM tasks WHERE id = 't1'"))
-    fireEvent.click(await screen.findByTitle('Browse tasks'))
+  })
+
+  it('asks to delete a row with a number id by its unquoted id', async () => {
+    const user = userEvent.setup()
+    renderAdmin()
+    await user.click(await screen.findByTitle('Browse tasks'))
     await shows(/^2 rows/)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete this row' })[1])
+    await user.click(screen.getAllByRole('button', { name: 'Delete this row' })[1])
     expect(screen.getByText('DELETE FROM tasks WHERE id = 2')).toBeTruthy()
   })
 }
@@ -166,20 +213,22 @@ function answerQueries(result: { rows: unknown[]; changes: number }): void {
 
 function reloadTests() {
   it('tells the vault to reload after a query that changed rows', async () => {
+    const user = userEvent.setup()
     answerQueries({ rows: [], changes: 1 })
     const onWrite = renderAdmin()
-    typeSql("UPDATE tasks SET text = 'x'")
-    fireEvent.click(screen.getByTitle('Run (⌘↵)'))
+    await typeSql(user, "UPDATE tasks SET text = 'x'")
+    await user.click(screen.getByTitle('Run (⌘↵)'))
     await shows(/^1 row affected/)
     expect(onWrite).toHaveBeenCalledTimes(1)
   })
 
   it('does not reload after a read', async () => {
+    const user = userEvent.setup()
     answerQueries({ rows: [{ text: 'Water the plants' }], changes: 0 })
     const onWrite = renderAdmin()
-    typeSql('SELECT text FROM tasks')
-    fireEvent.click(screen.getByTitle('Run (⌘↵)'))
-    expect(await screen.findByText('Water the plants')).toBeTruthy()
+    await typeSql(user, 'SELECT text FROM tasks')
+    await user.click(screen.getByTitle('Run (⌘↵)'))
+    expect((await screen.findByText('Water the plants')).tagName).toBe('TD')
     expect(onWrite).not.toHaveBeenCalled()
   })
 }

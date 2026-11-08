@@ -276,6 +276,20 @@ function DayTitle({ day }: DayProps): React.JSX.Element {
   )
 }
 
+function BackToToday({ onGoToToday }: { onGoToToday: () => void }): React.JSX.Element {
+  return (
+    <Button
+      size="sm"
+      icon={CornerUpLeft}
+      onClick={onGoToToday}
+      title="Back to today"
+      aria-label="Back to today"
+    >
+      Today
+    </Button>
+  )
+}
+
 function DayHeader({ day }: DayProps): React.JSX.Element {
   return (
     <div className="daily-log__date">
@@ -288,11 +302,7 @@ function DayHeader({ day }: DayProps): React.JSX.Element {
         disabled={!day.onPrevDay}
       />
       <DayTitle day={day} />
-      {!day.isToday && day.onGoToToday && (
-        <Button size="sm" icon={CornerUpLeft} onClick={day.onGoToToday} title="Back to today">
-          Today
-        </Button>
-      )}
+      {!day.isToday && day.onGoToToday && <BackToToday onGoToToday={day.onGoToToday} />}
       <IconButton
         icon={ChevronRight}
         label="Next day"
@@ -319,7 +329,12 @@ function TasksHeading({ parts }: { parts: DayParts }): React.JSX.Element {
         )}
       </div>
       {total > 0 && (
-        <div className="daily-log__progress-bar">
+        <div
+          className="daily-log__progress-bar"
+          role="progressbar"
+          aria-label="Tasks done"
+          aria-valuenow={(done / total) * 100}
+        >
           <div className={fill} style={{ width: `${(done / total) * 100}%` }} />
         </div>
       )}
@@ -361,7 +376,7 @@ function TodayTasks({ parts, list }: PartsProps): React.JSX.Element {
         <TaskWithSubtasks key={task.id} task={task} list={list} draggable />
       ))}
       {parts.terminal.length > 0 && parts.active.length > 0 && (
-        <div className="daily-log__done-divider" />
+        <div className="daily-log__done-divider" role="separator" />
       )}
       {parts.terminal.map((task) => (
         <TaskWithSubtasks key={task.id} task={task} list={list} />

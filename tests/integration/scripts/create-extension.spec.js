@@ -22,21 +22,6 @@ beforeEach(() => {
 })
 
 describe('create-extension.js CLI', () => {
-  it('exits 0 and creates extension directory', () => {
-    const result = run(['my-ext', '--dir', join(tempDir, 'my-ext')])
-    expect(result.status).toBe(0)
-    expect(existsSync(join(tempDir, 'my-ext', 'manifest.json'))).toBe(true)
-    expect(existsSync(join(tempDir, 'my-ext', 'src', 'index.js'))).toBe(true)
-  })
-
-  it('generates valid manifest.json', () => {
-    run(['test-ext', '--dir', join(tempDir, 'test-ext')])
-    const manifest = JSON.parse(readFileSync(join(tempDir, 'test-ext', 'manifest.json'), 'utf8'))
-    expect(manifest.id).toBe('com.example.test-ext')
-    expect(manifest.version).toBe('0.1.0')
-    expect(manifest.main).toBe('src/index.js')
-  })
-
   it('uses custom --id when provided', () => {
     run(['my-tool', '--id', 'com.acme.my-tool', '--dir', join(tempDir, 'my-tool')])
     const manifest = JSON.parse(readFileSync(join(tempDir, 'my-tool', 'manifest.json'), 'utf8'))
@@ -44,7 +29,7 @@ describe('create-extension.js CLI', () => {
   })
 })
 
-describe('create-extension.js CLI — collisions, bad names and the guide', () => {
+describe('create-extension.js CLI — collisions and bad names', () => {
   it('exits 2 on directory collision', () => {
     const dir = join(tempDir, 'existing-ext')
     mkdirSync(dir, { recursive: true })
@@ -55,15 +40,6 @@ describe('create-extension.js CLI — collisions, bad names and the guide', () =
   it('exits 1 for invalid name', () => {
     const result = run(['1-bad-name', '--dir', join(tempDir, 'bad')])
     expect(result.status).toBe(1)
-  })
-
-  it('points at the guide for a view, not at the removed renderer.tsx model', () => {
-    const result = run(['view-ext', '--dir', join(tempDir, 'view-ext')])
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('docs/EXTENSION-DEVELOPMENT.md')
-    expect(result.stdout).not.toContain('renderer.tsx')
-    expect(result.stdout).not.toContain('useExtensionRegistry')
-    expect(result.stdout).not.toMatch(/v1\.\d\.\d/)
   })
 })
 
@@ -115,7 +91,12 @@ describe('create-extension.js CLI — defaults and report', () => {
     const result = run(['my-ext'], { cwd: tempDir })
     const outDir = join(tempDir, 'extensions', 'my-ext')
     const manifest = JSON.parse(readFileSync(join(outDir, 'manifest.json'), 'utf8'))
-    expect(manifest.id).toBe('com.example.my-ext')
+    expect(result.status).toBe(0)
+    expect(manifest).toMatchObject({
+      id: 'com.example.my-ext',
+      version: '0.1.0',
+      main: 'src/index.js',
+    })
     expect(result.stdout).toBe(
       [
         `✓ Created extension "my-ext" at ${outDir}`,

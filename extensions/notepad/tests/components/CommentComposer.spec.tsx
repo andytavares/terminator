@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 
-const mockInvoke = vi.fn().mockResolvedValue({ data: { id: 'c-new' } })
+const mockInvoke = vi.fn()
 const mockRecord = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke }, usage: { record: mockRecord } },
-  writable: true,
-  configurable: true,
+beforeEach(() => {
+  mockInvoke.mockResolvedValue({ data: { id: 'c-new' } })
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke: mockInvoke },
+    usage: { record: mockRecord },
+  })
 })
 
 // CommentComposer does not exist yet — these tests will fail at import
@@ -26,22 +29,12 @@ const baseAnchor = {
 describe('CommentComposer', commentComposerTests)
 
 function commentComposerTests() {
-  beforeEach(() => {
-    mockInvoke.mockClear()
-    mockRecord.mockClear()
-  })
-
   describe('editing', commentComposerEditingTests)
   describe('submitting', commentComposerSubmittingTests)
   describe('cancelling', commentComposerCancellingTests)
 }
 
 function commentComposerEditingTests() {
-  it('renders a textarea for the comment body', () => {
-    render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={vi.fn()} />)
-    expect(screen.getByRole('textbox')).toBeTruthy()
-  })
-
   it('submit button is disabled when body is empty', () => {
     render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={vi.fn()} />)
     const btn = screen.getByRole('button', { name: /add comment/i })
@@ -53,8 +46,9 @@ function commentComposerSubmittingTests() {
   it('submit calls comments.create IPC with anchor data', async () => {
     const onCreated = vi.fn()
     render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={onCreated} />)
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'My comment' } })
-    fireEvent.click(screen.getByRole('button', { name: /add comment/i }))
+    const user = userEvent.setup()
+    await user.type(screen.getByRole('textbox'), 'My comment')
+    await user.click(screen.getByRole('button', { name: /add comment/i }))
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith(
         'terminator.notepad:comments.create',
@@ -72,25 +66,30 @@ function commentComposerSubmittingTests() {
 
   it('counts a created comment as one use of the comment feature', async () => {
     render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={vi.fn()} />)
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'My comment' } })
-    fireEvent.click(screen.getByRole('button', { name: /add comment/i }))
+    const user = userEvent.setup()
+    await user.type(screen.getByRole('textbox'), 'My comment')
+    await user.click(screen.getByRole('button', { name: /add comment/i }))
     await waitFor(() => expect(mockRecord).toHaveBeenCalledWith('comment'))
   })
 }
 
 function commentComposerCancellingTests() {
-  it('cancel button calls onClose without saving', () => {
+  it('cancel button calls onClose without saving', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<CommentComposer anchor={baseAnchor} onClose={onClose} onCreated={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
     expect(onClose).toHaveBeenCalled()
     expect(mockInvoke).not.toHaveBeenCalled()
   })
 
-  it('closes on Escape key press', () => {
+  it('closes on Escape key press', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<CommentComposer anchor={baseAnchor} onClose={onClose} onCreated={vi.fn()} />)
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
+    await user.click(screen.getByRole('textbox'))
+    expect(screen.getByRole('textbox').matches(':focus')).toBe(true)
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
 }

@@ -6,9 +6,8 @@ const homeFeed = {
   action: vi.fn(),
   onChanged: vi.fn(),
 }
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: { homeFeed } },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: { homeFeed } })
 })
 
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
@@ -56,7 +55,7 @@ describe('useHomeFeedStore pushes and actions', () => {
     expect(useHomeFeedStore.getState().measures[0].id).toBe('shipped')
   })
 
-  it('sends an action to main with its source and reports whether it ran, and why not', async () => {
+  it('sends an action to main with its source and reports that it ran', async () => {
     homeFeed.action.mockResolvedValue({ data: true })
     expect(
       await useHomeFeedStore.getState().runAction('git-integration', 'ask-1', 'approve')
@@ -66,6 +65,9 @@ describe('useHomeFeedStore pushes and actions', () => {
       itemId: 'ask-1',
       actionId: 'approve',
     })
+  })
+
+  it("reports main's reason when an action did not run", async () => {
     homeFeed.action.mockResolvedValue({ error: 'failed', message: 'no handler' })
     expect(await useHomeFeedStore.getState().runAction('x', 'i', 'a')).toEqual({
       ok: false,

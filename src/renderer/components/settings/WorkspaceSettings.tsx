@@ -5,6 +5,7 @@ import { QuickActionsSettings } from './QuickActionsSettings'
 import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 import { ThemeChoices } from './ThemeChoices'
+import { ScrollbackInput } from './ScrollbackInput'
 import { parsePatterns, PATTERNS_PLACEHOLDER } from './patterns'
 import { useFieldChangeCounter } from '../../usage/use-field-change-counter'
 import { UseGlobalButton } from './UseGlobalButton'
@@ -113,7 +114,7 @@ interface FieldProps {
 function ThemeField({ workspaceId, effective, overridden }: FieldProps): React.JSX.Element {
   const updateWorkspaceTheme = useSettingsStore((s) => s.updateWorkspaceTheme)
   return (
-    <div className="settings-section__field">
+    <div className="settings-section__field" role="group" aria-label="Theme">
       <label className="settings-section__label">Theme</label>
       <div className="settings-section__radio-group">
         <ThemeChoices
@@ -138,18 +139,11 @@ function ThemeField({ workspaceId, effective, overridden }: FieldProps): React.J
 function ScrollbackField({ workspaceId, effective }: FieldProps): React.JSX.Element {
   const updateWorkspaceScrollback = useSettingsStore((s) => s.updateWorkspaceScrollback)
   return (
-    <div className="settings-section__field">
+    <div className="settings-section__field" role="group" aria-label="Scrollback Limit">
       <label className="settings-section__label">Scrollback Limit</label>
-      <input
-        type="number"
-        className="settings-section__input"
+      <ScrollbackInput
         value={effective.scrollback}
-        min={1000}
-        max={100000}
-        onChange={(e) => {
-          const val = parseInt(e.target.value, 10)
-          if (val >= 1000 && val <= 100000) updateWorkspaceScrollback(workspaceId, val)
-        }}
+        onSave={(lines) => updateWorkspaceScrollback(workspaceId, lines)}
       />
       <button
         className="settings-section__btn-link"
@@ -169,7 +163,7 @@ function ScrollbackField({ workspaceId, effective }: FieldProps): React.JSX.Elem
 function DefaultShellField({ workspaceId, effective, overridden }: FieldProps): React.JSX.Element {
   const update = useSettingsStore((s) => s.updateWorkspaceDefaultShell)
   return (
-    <div className="settings-section__field">
+    <div className="settings-section__field" role="group" aria-label="Default Shell">
       <label className="settings-section__label">Default Shell</label>
       <input
         type="text"
@@ -190,7 +184,7 @@ function DefaultShellField({ workspaceId, effective, overridden }: FieldProps): 
 function WorktreeDirField({ workspaceId, effective, overridden }: FieldProps): React.JSX.Element {
   const update = useSettingsStore((s) => s.updateWorkspaceWorktreeBaseDir)
   return (
-    <div className="settings-section__field">
+    <div className="settings-section__field" role="group" aria-label="Worktree Base Directory">
       <label className="settings-section__label">Worktree Base Directory</label>
       <input
         type="text"
@@ -212,7 +206,7 @@ function BranchExcludeField({ workspaceId, effective, overridden }: FieldProps):
   const update = useSettingsStore((s) => s.updateWorkspaceBranchExcludePatterns)
   const text = effective.branchExcludePatterns.join('\n')
   return (
-    <div className="settings-section__field">
+    <div className="settings-section__field" role="group" aria-label="Branch Exclude Patterns">
       <label className="settings-section__label">Branch Exclude Patterns</label>
       <textarea
         className="settings-section__input settings-section__textarea"

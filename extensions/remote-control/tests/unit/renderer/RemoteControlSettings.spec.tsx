@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { RemoteControlSettings } from '../../../src/components/RemoteControlSettings'
 
 // The password is stored only as a hash, so this form can no longer show the
@@ -24,12 +25,10 @@ function answerInvokes(hasPassword: boolean, updatePassword: unknown = { ok: tru
 beforeEach(() => {
   invoke.mockReset()
   record.mockClear()
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { on: () => () => {}, invoke }, usage: { record } },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { on: () => () => {}, invoke },
+    usage: { record },
   })
-  Object.assign(navigator, { clipboard: { writeText: vi.fn() } })
 })
 
 describe('RemoteControlSettings password', settingsPasswordTests)
@@ -57,11 +56,12 @@ function settingsPasswordStateTests() {
 
 function settingsPasswordSetTests() {
   it('sets the typed password on request and clears the field', async () => {
+    const user = userEvent.setup()
     answerInvokes(false)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     const field = await screen.findByPlaceholderText('New password')
-    fireEvent.change(field, { target: { value: ' chosen-secret ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Set password' }))
+    await user.type(field, ' chosen-secret ')
+    await user.click(screen.getByRole('button', { name: 'Set password' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('remote:update-password', { password: 'chosen-secret' })
     )
@@ -73,11 +73,14 @@ function settingsPasswordSetTests() {
 
 function settingsPasswordWithholdTests() {
   it('does not send a password merely because the field lost focus', async () => {
+    const user = userEvent.setup()
     answerInvokes(true)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     const field = await screen.findByPlaceholderText('New password')
-    fireEvent.focus(field)
-    fireEvent.blur(field)
+    await user.click(field)
+    expect(field.matches(':focus')).toBe(true)
+    await user.tab()
+    expect(field.matches(':focus')).toBe(false)
     expect(invoke).not.toHaveBeenCalledWith('remote:update-password', expect.anything())
   })
 
@@ -92,13 +95,14 @@ function settingsPasswordWithholdTests() {
 
 function settingsPasswordGenerateTests() {
   it('shows a generated password once, with a warning that it cannot be shown again', async () => {
+    const user = userEvent.setup()
     answerInvokes(true, { password: 'generated-abc123' })
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await screen.findByPlaceholderText('New password')
-    fireEvent.click(await screen.findByRole('button', { name: 'Generate new' }))
-    expect(await screen.findByText('generated-abc123')).toBeTruthy()
+    await user.click(await screen.findByRole('button', { name: 'Generate new' }))
+    expect((await screen.findByText('generated-abc123')).textContent).toBe('generated-abc123')
     expect(screen.getByText(/will not be shown again/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.queryByText('generated-abc123')).toBeNull()
   })
 }

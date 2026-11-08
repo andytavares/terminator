@@ -30,7 +30,11 @@ export async function activateFoundry(host: FoundryHost): Promise<void> {
  * test started have ended: each writes records until it does, so the next test waits for it. */
 export async function settleFoundryWork(): Promise<void> {
   // A turn a test left running ends as the runner's dispose would end it; work that waits on it
-  // then ends too.
-  endOpenTurns()
-  await settleBackground()
+  // then ends too. That work can start another turn (a retry, a follow-up), which reads the data
+  // root when it ends: left open, it would write into the next test's records.
+  let ended: number
+  do {
+    ended = endOpenTurns()
+    await settleBackground()
+  } while (ended > 0)
 }

@@ -410,54 +410,48 @@ const withUnit = (): WorkOrder => {
 
 function rolesAndSelectionTests() {
   it('falls back to the unit own role when a fan-out names none', () => {
-    const r = parseRecipe(
+    const parsed = recipe(
       `schemaVersion: 1\nid: f\nsteps:\n  - id: build\n    kind: fanout\n    over: plan.units\n    step: { kind: agent }\n`,
       'f.yaml'
     )
-    if (!r.ok) throw new Error(r.reason)
-    const graph = buildRunGraph(order(), r.value)
+    const graph = buildRunGraph(order(), parsed)
     expect(nodeById(graph, 'build:U-3')?.role).toBe('scribe')
   })
 
   it('selects nothing for a fan-out with no `over` at all', () => {
-    const r = parseRecipe(
+    const parsed = recipe(
       `schemaVersion: 1\nid: f\nsteps:\n  - id: build\n    kind: fanout\n    over: nonsense\n    step: { kind: agent, role: builder }\n`,
       'f.yaml'
     )
-    if (!r.ok) throw new Error(r.reason)
-    expect(buildRunGraph(order(), r.value).nodes).toEqual([])
+    expect(buildRunGraph(order(), parsed).nodes).toEqual([])
   })
 
   it('leaves a step with no role as having none, rather than inventing one', () => {
-    const r = parseRecipe(MINIMAL, 'minimal.yaml')
-    if (!r.ok) throw new Error(r.reason)
-    expect(nodeById(buildRunGraph(order(), r.value), 'only')?.role).toBeNull()
+    const parsed = recipe(MINIMAL, 'minimal.yaml')
+    expect(nodeById(buildRunGraph(order(), parsed), 'only')?.role).toBeNull()
   })
 }
 
 function dependenciesAndConditionsTests() {
   it('gives a step with nothing to wait for an empty dependency list', () => {
-    const r = parseRecipe(MINIMAL, 'minimal.yaml')
-    if (!r.ok) throw new Error(r.reason)
-    expect(nodeById(buildRunGraph(order(), r.value), 'only')?.dependsOn).toEqual([])
+    const parsed = recipe(MINIMAL, 'minimal.yaml')
+    expect(nodeById(buildRunGraph(order(), parsed), 'only')?.dependsOn).toEqual([])
   })
 
   it('skips a fan-out entirely when its condition is false', () => {
-    const r = parseRecipe(
+    const parsed = recipe(
       `schemaVersion: 1\nid: f\nsteps:\n  - id: build\n    kind: fanout\n    over: plan.units\n    when: risk.triggers is not empty\n    step: { kind: agent, role: builder }\n`,
       'f.yaml'
     )
-    if (!r.ok) throw new Error(r.reason)
-    const graph = buildRunGraph(order(), r.value)
+    const graph = buildRunGraph(order(), parsed)
     expect(graph.nodes.every((n) => n.state === 'skipped')).toBe(true)
   })
 }
 
 function initialStateTests() {
   it('starts every node with no session, no worktree and no attempts', () => {
-    const r = parseRecipe(MINIMAL, 'minimal.yaml')
-    if (!r.ok) throw new Error(r.reason)
-    const node = nodeById(buildRunGraph(order(), r.value), 'only')
+    const parsed = recipe(MINIMAL, 'minimal.yaml')
+    const node = nodeById(buildRunGraph(order(), parsed), 'only')
     expect(node?.sessionId).toBeNull()
     expect(node?.worktreePath).toBeNull()
     expect(node?.attempts).toBe(0)
@@ -465,9 +459,8 @@ function initialStateTests() {
   })
 
   it('starts every node with no reworks and no feedback', () => {
-    const r = parseRecipe(MINIMAL, 'minimal.yaml')
-    if (!r.ok) throw new Error(r.reason)
-    const node = nodeById(buildRunGraph(order(), r.value), 'only')
+    const parsed = recipe(MINIMAL, 'minimal.yaml')
+    const node = nodeById(buildRunGraph(order(), parsed), 'only')
     expect(node?.reworks).toBe(0)
     expect(node?.feedback).toEqual([])
   })
@@ -475,11 +468,10 @@ function initialStateTests() {
 
 function foreignNodesTests() {
   it('has no step for a node that is not from this recipe', () => {
-    const r = parseRecipe(MINIMAL, 'minimal.yaml')
-    if (!r.ok) throw new Error(r.reason)
-    const graph = buildRunGraph(order(), r.value)
+    const parsed = recipe(MINIMAL, 'minimal.yaml')
+    const graph = buildRunGraph(order(), parsed)
     const alien = { ...graph.nodes[0], stepId: 'elsewhere' }
-    expect(stepFor(r.value, alien)).toBeUndefined()
+    expect(stepFor(parsed, alien)).toBeUndefined()
   })
 }
 

@@ -19,14 +19,18 @@ const agentsOffering = (answer: AgentConfigOption | null) =>
  * agent that cannot say is a shorter list rather than a broken settings page.
  */
 describe('the model catalog', () => {
-  it('leads with an empty id, which means "pass no model at all"', () => {
-    expect(MODEL_ALIASES[0].id).toBe('')
-  })
-
-  it('asks the Claude agent which models it offers', async () => {
-    const agents = agentsOffering(null)
-    await modelCatalog(agents)
-    expect(agents.models).toHaveBeenCalledWith('claude')
+  it('lists the models the Claude agent offers, and no other agent’s', async () => {
+    const claudeOnly = partialFake<Pick<AgentsAPI, 'models'>>({
+      models: async (agentId: string) =>
+        agentId === 'claude'
+          ? modelOption([{ value: 'claude-opus-5', name: 'Claude Opus 5' }])
+          : null,
+    })
+    const models = await modelCatalog(claudeOnly)
+    expect(models.map((model) => model.id)).toEqual([
+      ...MODEL_ALIASES.map((alias) => alias.id),
+      'claude-opus-5',
+    ])
   })
 
   it('appends what the agent offers, under its display name', async () => {

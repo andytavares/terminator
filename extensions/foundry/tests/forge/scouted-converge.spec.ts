@@ -176,6 +176,6 @@ function givingUpTests() {
     const startScout = vi.fn(() => Promise.reject(new Error('crashed')))
     const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'a' })
     await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-x' }), 'draft')
-    await expect(waitForScout('WO-x')).resolves.toMatch(/^(finished|none)$/)
+    await expect(waitForScout('WO-x')).resolves.toBe('finished')
   })
 }

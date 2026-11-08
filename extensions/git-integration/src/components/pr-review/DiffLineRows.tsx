@@ -186,6 +186,7 @@ export const UnifiedLineRow = memo(function UnifiedLineRow(
   return (
     <tr
       className={rowClassName(props)}
+      aria-selected={props.selected}
       data-expanded={expandedAttr(props.expanded)}
       data-new-line={line.newLineNumber ?? undefined}
       data-old-line={line.oldLineNumber ?? undefined}
@@ -231,6 +232,7 @@ export const SplitLineRow = memo(function SplitLineRow(
   return (
     <tr
       className={rowClassName(props)}
+      aria-selected={props.selected}
       data-expanded={expandedAttr(props.expanded)}
       {...view.attrs}
       onMouseEnter={() => props.onRowMouseEnter(lineNum, side)}

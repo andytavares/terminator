@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReviewQueue } from '../../src/components/pr-review/ReviewQueue'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
@@ -115,7 +116,8 @@ describe('ReviewQueue — summarises the queue in one line instead of four tiles
 })
 
 describe('ReviewQueue — calls onOpenPr when PR row is clicked', () => {
-  it('calls onOpenPr when PR row is clicked', () => {
+  it('calls onOpenPr when PR row is clicked', async () => {
+    const user = userEvent.setup()
     const pr = makePr({ number: 7, title: 'My PR' })
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
@@ -123,29 +125,20 @@ describe('ReviewQueue — calls onOpenPr when PR row is clicked', () => {
     })
     const onOpenPr = vi.fn()
     render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
-    fireEvent.click(screen.getByText('My PR'))
+    await user.click(screen.getByText('My PR'))
     expect(onOpenPr).toHaveBeenCalledWith(pr)
   })
 
-  it('shows refresh button', () => {
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByRole('button', { name: 'Refresh pull requests' })).toBeTruthy()
-  })
-
   it('calls onRefresh when refresh button is clicked', async () => {
+    const user = userEvent.setup()
     const onRefresh = vi.fn().mockResolvedValue(undefined)
     render(<ReviewQueue {...defaultProps} onRefresh={onRefresh} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh pull requests' }))
+    await user.click(screen.getByRole('button', { name: 'Refresh pull requests' }))
     expect(onRefresh).toHaveBeenCalled()
   })
 })
 
-describe('ReviewQueue — shows search input', () => {
-  it('shows search input', () => {
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByRole('searchbox')).toBeTruthy()
-  })
-
+describe('ReviewQueue — load failures', () => {
   it('shows error state when queueError is set', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
@@ -177,15 +170,6 @@ describe('ReviewQueue — says a page is on its way rather than asking for a cli
     expect(screen.getByText('Loading the rest…')).toBeTruthy()
     expect(screen.queryByText('Load more pull requests')).toBeNull()
   })
-
-  it('renders the risk in words for high-risk PRs', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [makePr({ riskLevel: 'high', number: 10, title: 'Risky PR' })],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('High risk')).toBeTruthy()
-  })
 })
 
 describe('ReviewQueue — says nothing about medium or low risk', () => {
@@ -199,15 +183,6 @@ describe('ReviewQueue — says nothing about medium or low risk', () => {
     })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.queryByText(/risk/i)).toBeNull()
-  })
-
-  it('shows Draft label for draft PRs', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [makePr({ isDraft: true, number: 11, title: 'Draft PR' })],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('Draft')).toBeTruthy()
   })
 })
 
@@ -230,35 +205,6 @@ describe('ReviewQueue — shows Resume action for paused PRs', () => {
   })
 })
 
-describe('ReviewQueue — shows approval chip when PR has approvals', () => {
-  it('shows approval chip when PR has approvals', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [
-        makePr({
-          number: 99,
-          title: 'Approved PR',
-          approvalCount: 2,
-          approvedBy: ['bob', 'carol'],
-        }),
-      ],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText(/2 approved/)).toBeTruthy()
-  })
-
-  it('does not show approval chip when PR has no approvals', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [
-        makePr({ number: 100, title: 'No approvals PR', approvalCount: 0, approvedBy: [] }),
-      ],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.queryByText(/approved/)).toBeNull()
-  })
-})
-
 function renderMany(prs: ReviewQueuePR[], extra: Record<string, unknown> = {}) {
   vi.mocked(usePrReviewStore).mockReturnValue({
     ...defaultStoreState,
@@ -268,10 +214,17 @@ function renderMany(prs: ReviewQueuePR[], extra: Record<string, unknown> = {}) {
   return render(<ReviewQueue {...defaultProps} />)
 }
 
+/** Matches the one element whose whole text, across its child elements, is `text`. */
+const wholeText = (text: string) => (_: string, node: Element | null) => node?.textContent === text
+
 const days = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
 
-const titles = (container: HTMLElement) =>
-  [...container.querySelectorAll('.rd-ti')].map((t) => t.textContent ?? '')
+/** The rows' names, "#7 Title", top to bottom. */
+const titles = () =>
+  screen.getAllByRole('group', { name: /^#\d+ / }).map((row) => row.getAttribute('aria-label'))
+
+/** The second line of the only row. */
+const metaLine = () => screen.getByTestId('pr-meta').textContent
 
 describe('ReviewQueue (continued) — one list, two lines per row', () => {
   it('has no open/closed toggle', () => {
@@ -285,14 +238,12 @@ describe('ReviewQueue (continued) — one list, two lines per row', () => {
     expect(screen.getByPlaceholderText('Search open PRs · is:merged for merged')).toBeTruthy()
   })
 
-  it('shows Merged first on the second line of a merged row', () => {
-    const { container } = renderMany([makePr({ state: 'merged', title: 'Shipped' })])
-    expect(container.querySelector('.rd-ti small')!.textContent!.startsWith('Merged')).toBe(true)
-  })
-
-  it('shows Closed first on the second line of a closed row', () => {
-    const { container } = renderMany([makePr({ state: 'closed', title: 'Dropped' })])
-    expect(container.querySelector('.rd-ti small')!.textContent!.startsWith('Closed')).toBe(true)
+  it.each([
+    ['merged', 'Merged'],
+    ['closed', 'Closed'],
+  ] as const)('shows the state first on the second line of a %s row', (state, label) => {
+    renderMany([makePr({ state, title: 'Finished' })])
+    expect(metaLine()!.startsWith(label)).toBe(true)
   })
 })
 
@@ -305,26 +256,25 @@ describe('ReviewQueue (continued) — one list, two lines per row — has one he
     expect(headings).toHaveLength(1)
     expect(headings[0].textContent).toContain('Open pull requests')
     expect(headings[0].textContent).toContain('47')
-    for (const old of [
+    const oldGroups = [
       'In progress',
       'Needs your review',
       'Read these first',
       'Quick wins',
       'Larger reviews',
-    ]) {
-      expect(screen.queryByText(old)).toBeNull()
-    }
+    ]
+    expect(oldGroups.filter((old) => screen.queryByText(old))).toEqual([])
     expect(screen.queryByText(/Open more than/)).toBeNull()
   })
 })
 
 describe('ReviewQueue (continued) — one list, two lines per row — sorts newest first by default', () => {
   it('sorts newest first by default', () => {
-    const { container } = renderMany([
+    renderMany([
       makePr({ number: 1, title: 'Older', openedAt: days(9) }),
       makePr({ number: 2, title: 'Newer', openedAt: days(1) }),
     ])
-    expect(titles(container)[0]).toContain('Newer')
+    expect(titles()[0]).toContain('Newer')
     expect((screen.getByRole('combobox', { name: 'Sort' }) as HTMLSelectElement).value).toBe(
       'newest'
     )
@@ -333,17 +283,18 @@ describe('ReviewQueue (continued) — one list, two lines per row — sorts newe
   it('offers the three sorts by name', () => {
     renderMany([])
     const select = screen.getByRole('combobox', { name: 'Sort' })
-    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual([
-      'Newest first',
-      'Closest to merging',
-      'Started by you',
-    ])
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent)
+    ).toEqual(['Newest first', 'Closest to merging', 'Started by you'])
   })
 })
 
 describe('ReviewQueue (continued) — one list, two lines per row — puts approved, passing pull requests first under Closest to merging', () => {
-  it('puts approved, passing pull requests first under Closest to merging', () => {
-    const { container } = renderMany([
+  it('puts approved, passing pull requests first under Closest to merging', async () => {
+    const user = userEvent.setup()
+    renderMany([
       makePr({ number: 1, title: 'Waiting', openedAt: days(9) }),
       makePr({
         number: 2,
@@ -353,30 +304,27 @@ describe('ReviewQueue (continued) — one list, two lines per row — puts appro
         approvedBy: ['bo'],
       }),
     ])
-    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
-      target: { value: 'closest' },
-    })
-    expect(titles(container)[0]).toContain('Ready')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'closest')
+    expect(titles()[0]).toContain('Ready')
     expect(useReviewUiStore.getState().queueSort).toBe('closest')
   })
 })
 
 describe('ReviewQueue (continued) — one list, two lines per row — puts a paused pull request first under Started by you', () => {
-  it('puts a paused pull request first under Started by you', () => {
-    const { container } = renderMany([
+  it('puts a paused pull request first under Started by you', async () => {
+    const user = userEvent.setup()
+    renderMany([
       makePr({ number: 1, title: 'Untouched', openedAt: days(9) }),
       makePr({ number: 2, title: 'Paused one', openedAt: days(1), sessionStatus: 'paused' }),
     ])
-    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
-      target: { value: 'started' },
-    })
-    expect(titles(container)[0]).toContain('Paused one')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'started')
+    expect(titles()[0]).toContain('Paused one')
   })
 })
 
 describe('ReviewQueue (continued) — one list, two lines per row — lays the second line out as attention states only', () => {
   it('lays the second line out as attention states only', () => {
-    const { container } = renderMany(
+    renderMany(
       [
         makePr({
           number: 212,
@@ -396,7 +344,7 @@ describe('ReviewQueue (continued) — one list, two lines per row — lays the s
       ],
       { currentUserLogin: 'me' }
     )
-    expect(container.querySelector('.rd-ti small')!.textContent).toBe(
+    expect(metaLine()).toBe(
       'Draft · Conflicts · alice · 139d · 2 approved · High risk · CI failing · Your review requested · 1 of 3 viewed'
     )
   })
@@ -404,29 +352,30 @@ describe('ReviewQueue (continued) — one list, two lines per row — lays the s
 
 describe('ReviewQueue (continued) — one list, two lines per row — leaves a quiet row with only the author and age', () => {
   it('leaves a quiet row with only the author and age', () => {
-    const { container } = renderMany([makePr({ openedAt: days(2) })])
-    expect(container.querySelector('.rd-ti small')!.textContent).toBe('alice · 2d')
+    renderMany([makePr({ openedAt: days(2) })])
+    expect(metaLine()).toBe('alice · 2d')
   })
 
   it('shows the size and the reading time in the right column, with no risk chip', () => {
-    const { container } = renderMany([
-      makePr({ additions: 1234, deletions: 3, fileCount: 1, estimatedMinutes: 7 }),
-    ])
-    const row = container.querySelector('.rd-row')!
-    expect(row.querySelector('.rd-size')!.textContent).toBe('+1,234 −3 · 1 file')
-    expect(row.querySelector('.rd-num:not(.rd-size)')!.textContent).toBe('~7 min')
-    expect(row.querySelector('.rd-chip')).toBeNull()
+    renderMany([makePr({ additions: 1234, deletions: 3, fileCount: 1, estimatedMinutes: 7 })])
+    const row = screen.getByRole('group', { name: /^#\d+ / })
+    expect(within(row).getByText(wholeText('+1,234 −3 · 1 file'))).toBeTruthy()
+    expect(within(row).getByText('~7 min')).toBeTruthy()
   })
 
-  it('opens a row on Enter', () => {
+  it('opens a row on Enter', async () => {
+    const user = userEvent.setup()
     const pr = makePr({ title: 'Keyboard' })
     const onOpenPr = vi.fn()
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [pr],
     })
-    const { container } = render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
-    fireEvent.keyDown(container.querySelector('.rd-row')!, { key: 'Enter' })
+    render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
+    const row = screen.getByRole('group', { name: '#1 Keyboard' })
+    row.focus()
+    expect(row.matches(':focus')).toBe(true)
+    await user.keyboard('{Enter}')
     expect(onOpenPr).toHaveBeenCalledWith(pr)
   })
 })
@@ -439,8 +388,8 @@ describe('ReviewQueue (continued) — one list, two lines per row — colours ad
   })
 
   it('names conflicts in the second line as text, with no icon', () => {
-    const { container } = renderMany([makePr({ mergeStateStatus: 'dirty' })])
-    expect(screen.getByText('Conflicts').closest('small')).toBeTruthy()
-    expect(container.querySelector('.rd-row svg')).toBeNull()
+    renderMany([makePr({ mergeStateStatus: 'dirty' })])
+    expect(within(screen.getByTestId('pr-meta')).getByText('Conflicts')).toBeTruthy()
+    expect(screen.getByRole('group', { name: /^#\d+ / }).innerHTML).not.toContain('<svg')
   })
 })

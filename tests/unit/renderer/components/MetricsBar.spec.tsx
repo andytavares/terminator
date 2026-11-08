@@ -4,9 +4,11 @@ import React from 'react'
 import { MetricsBar } from '../../../../src/renderer/components/overview/MetricsBar'
 
 describe('MetricsBar', () => {
-  it('renders skeleton elements when system is null', () => {
-    const { container } = render(<MetricsBar system={null} />)
-    expect(container.querySelectorAll('.skeleton--metrics').length).toBeGreaterThan(0)
+  it('marks the metrics busy until the first sample arrives', () => {
+    render(<MetricsBar system={null} />)
+    expect(screen.getByRole('group', { name: 'System metrics' }).getAttribute('aria-busy')).toBe(
+      'true'
+    )
   })
 
   it('renders CPU percentage when metrics are provided', () => {
@@ -22,6 +24,7 @@ describe('MetricsBar', () => {
       />
     )
     expect(screen.getByText(/42%/)).toBeTruthy()
+    expect(screen.getByRole('meter', { name: 'CPU' }).getAttribute('aria-valuenow')).toBe('42')
   })
 })
 
@@ -42,63 +45,38 @@ describe('MetricsBar — renders memory in GB format', () => {
   })
 })
 
-describe('MetricsBar — renders network rates', () => {
-  it('renders network rates', () => {
+describe('MetricsBar — network rates', () => {
+  it.each([
+    [200, '200 B/s'],
+    [1024, '1 KB/s'],
+    [2 * 1024 * 1024, '2.0 MB/s'],
+  ])('renders %i bytes per second in as %s', (netInBytesPerSec, rate) => {
     render(
       <MetricsBar
         system={{
           cpuPercent: 0,
           memUsedBytes: 0,
           memTotalBytes: 1,
-          netInBytesPerSec: 1024,
-          netOutBytesPerSec: 512,
-        }}
-      />
-    )
-    expect(screen.getByText(/1 KB\/s/)).toBeTruthy()
-  })
-})
-
-describe('MetricsBar — renders network rates in MB/s for large values', () => {
-  it('renders network rates in MB/s for large values', () => {
-    render(
-      <MetricsBar
-        system={{
-          cpuPercent: 0,
-          memUsedBytes: 0,
-          memTotalBytes: 1,
-          netInBytesPerSec: 2 * 1024 * 1024,
+          netInBytesPerSec,
           netOutBytesPerSec: 0,
         }}
       />
     )
-    expect(screen.getByText(/MB\/s/)).toBeTruthy()
+    expect(screen.getByText(`↓ ${rate} ↑ 0 B/s`)).toBeTruthy()
   })
 })
 
-describe('MetricsBar — renders network rates in B/s for tiny values', () => {
-  it('renders network rates in B/s for tiny values', () => {
+describe('MetricsBar — CPU bar colour', () => {
+  it.each([
+    [95, /e03131|224.*49.*49/],
+    [90, /e03131|224.*49.*49/],
+    [75, /f08c00|240.*140.*0/],
+    [50, /var\(--tm-accent\)/],
+  ])('colours the CPU bar at %i%% as %s', (cpuPercent, colour) => {
     render(
       <MetricsBar
         system={{
-          cpuPercent: 0,
-          memUsedBytes: 0,
-          memTotalBytes: 1,
-          netInBytesPerSec: 200,
-          netOutBytesPerSec: 0,
-        }}
-      />
-    )
-    expect(screen.getByText(/200 B\/s/)).toBeTruthy()
-  })
-})
-
-describe('MetricsBar — applies red color at 90%+ CPU', () => {
-  it('applies red color at 90%+ CPU', () => {
-    const { container } = render(
-      <MetricsBar
-        system={{
-          cpuPercent: 95,
+          cpuPercent,
           memUsedBytes: 1,
           memTotalBytes: 8 * 1024 ** 3,
           netInBytesPerSec: 0,
@@ -106,27 +84,8 @@ describe('MetricsBar — applies red color at 90%+ CPU', () => {
         }}
       />
     )
-    const fill = container.querySelector('.metrics-bar__bar-fill') as HTMLElement
-    // Browser normalises #e03131 to rgb(224, 49, 49)
-    expect(fill.style.background).toMatch(/e03131|224.*49.*49/)
-  })
-})
-
-describe('MetricsBar — applies orange color at 70–89% CPU', () => {
-  it('applies orange color at 70–89% CPU', () => {
-    const { container } = render(
-      <MetricsBar
-        system={{
-          cpuPercent: 75,
-          memUsedBytes: 1,
-          memTotalBytes: 8 * 1024 ** 3,
-          netInBytesPerSec: 0,
-          netOutBytesPerSec: 0,
-        }}
-      />
-    )
-    const fill = container.querySelector('.metrics-bar__bar-fill') as HTMLElement
-    // Browser normalises #f08c00 to rgb(240, 140, 0)
-    expect(fill.style.background).toMatch(/f08c00|240.*140.*0/)
+    const fill = screen.getByRole('meter', { name: 'CPU' })
+    // The browser normalises a hex colour to rgb().
+    expect(fill.style.background).toMatch(colour)
   })
 })

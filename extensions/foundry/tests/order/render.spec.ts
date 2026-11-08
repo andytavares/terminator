@@ -110,14 +110,22 @@ function criteriaTests() {
     expect(renderOrder(o)).toContain('accepted as unverifiable — no runner exists here')
   })
 
-  it('renders each kind of proof in its own terms', () => {
+  it.each<[string, WorkOrder['acceptance'][number]['verify'], string]>([
+    [
+      'judge',
+      { kind: 'judge', rubric: 'measure ink', evidence: ['screenshot'] },
+      'judge · "measure ink" · evidence: screenshot',
+    ],
+    [
+      'artifact',
+      { kind: 'artifact', path: 'dist/a.js', assert: 'exists' },
+      'artifact · dist/a.js · exists',
+    ],
+    ['screenshot', { kind: 'screenshot', target: 'terminal pane' }, 'screenshot · terminal pane'],
+  ])('renders a %s proof in its own terms', (_kind, verify, line) => {
     const o = order()
-    o.acceptance[0].verify = { kind: 'judge', rubric: 'measure ink', evidence: ['screenshot'] }
-    expect(renderOrder(o)).toContain('judge · "measure ink" · evidence: screenshot')
-    o.acceptance[0].verify = { kind: 'artifact', path: 'dist/a.js', assert: 'exists' }
-    expect(renderOrder(o)).toContain('artifact · dist/a.js · exists')
-    o.acceptance[0].verify = { kind: 'screenshot', target: 'terminal pane' }
-    expect(renderOrder(o)).toContain('screenshot · terminal pane')
+    o.acceptance[0].verify = verify
+    expect(renderOrder(o)).toContain(line)
   })
 }
 

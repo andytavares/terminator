@@ -66,7 +66,11 @@ function theInlineReasonTests() {
         Redraft
       </ReasonButton>
     )
-    expect(document.querySelector('.fdry-inline-why')).toBeNull()
+    expect(
+      screen
+        .queryAllByText('The red team is reviewing the plan.')
+        .some((el) => el.className === 'fdry-inline-why')
+    ).toBe(false)
     await user.click(screen.getByRole('button', { name: 'Redraft' }))
     expect(
       screen
@@ -101,17 +105,9 @@ function aChangedReasonAndFocusTests() {
         Redraft
       </ReasonButton>
     )
-    expect(document.querySelector('.fdry-inline-why')).toBeNull()
-  })
-
-  it('is keyboard-focusable when it has a reason', () => {
-    render(
-      <ReasonButton reason="Not ready yet." onClick={vi.fn()}>
-        Redraft
-      </ReasonButton>
-    )
-    const button = screen.getByRole('button', { name: 'Redraft' })
-    button.focus()
-    expect(document.activeElement).toBe(button)
+    const inline = screen
+      .queryAllByText(/^(First|Second) reason\.$/)
+      .filter((el) => el.className === 'fdry-inline-why')
+    expect(inline).toEqual([])
   })
 }

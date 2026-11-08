@@ -311,7 +311,7 @@ function WallGrid({ shown, prefs, processes, onLink }: WallGridProps): React.JSX
   const factsById = new Map(shown.map((f) => [f.sessionId, f]))
   const now = useNow()
   return (
-    <div className="wall__grid" data-size={prefs.size}>
+    <div className="wall__grid" role="group" aria-label="Terminals" data-size={prefs.size}>
       <BandHeadings
         needsCount={wall.needsCount}
         hasRest={wall.placements.length > wall.needsCount}

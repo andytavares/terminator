@@ -192,7 +192,7 @@ function HubTopBar({ session, hub }: { session: ConflictSession; hub: Props }) {
 function Stat(props: { value: React.ReactNode; label: string; tone?: string }) {
   const tone = choose(props.tone, ` conflict-hub__stat-value--${props.tone}`, '')
   return (
-    <div className="conflict-hub__stat">
+    <div className="conflict-hub__stat" role="group" aria-label={props.label}>
       <span className={`conflict-hub__stat-value${tone}`}>{props.value}</span>
       <span className="conflict-hub__stat-label">{props.label}</span>
     </div>

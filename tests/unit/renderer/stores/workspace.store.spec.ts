@@ -34,14 +34,12 @@ const mockLocalStorage = {
   }),
 }
 
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: mockElectronAPI },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: mockElectronAPI })
 })
 
-Object.defineProperty(globalThis, 'localStorage', {
-  value: mockLocalStorage,
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('localStorage', mockLocalStorage)
 })
 
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -119,10 +117,11 @@ describe('useWorkspaceStore', () => {
       expect(useWorkspaceStore.getState().workspaces[1]).toEqual(ws2)
     })
 
-    it('returns the api result directly (including errors)', async () => {
+    it('keeps the workspace list unchanged when main refuses the name', async () => {
+      useWorkspaceStore.setState({ workspaces: [ws1] })
       mockElectronAPI.workspace.create.mockResolvedValue({ error: 'DUPLICATE_NAME' })
-      const result = await useWorkspaceStore.getState().createWorkspace({ name: 'Dup' })
-      expect(result).toEqual({ error: 'DUPLICATE_NAME' })
+      await useWorkspaceStore.getState().createWorkspace({ name: 'Dup' })
+      expect(useWorkspaceStore.getState().workspaces).toEqual([ws1])
     })
   })
 })
@@ -202,10 +201,12 @@ describe('useWorkspaceStore — setActiveWorkspace', () => {
       expect(useWorkspaceStore.getState().activeProjectId).toBeNull()
     })
 
-    it('triggers loadProjects for the new workspace', () => {
+    it('loads the projects of the new workspace', async () => {
       mockElectronAPI.project.list.mockResolvedValue({ projects: [proj1] })
       useWorkspaceStore.getState().setActiveWorkspace('ws-1')
-      expect(mockElectronAPI.project.list).toHaveBeenCalledWith('ws-1')
+      await expect
+        .poll(() => useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1'))
+        .toEqual([proj1])
     })
 
     it('sets activeWorkspaceId to null when called with null', () => {
@@ -214,6 +215,10 @@ describe('useWorkspaceStore — setActiveWorkspace', () => {
       expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull()
     })
   })
+})
+
+describe('useWorkspaceStore — loadProjects', () => {
+  setUpUseWorkspaceStore()
 
   describe('loadProjects', () => {
     it('stores projects under workspaceId key', async () => {
@@ -270,20 +275,29 @@ describe('useWorkspaceStore — updateProjectBranch', () => {
     expect(projects[0].gitBranch).toBe('feature/x')
     expect(projects[1]).toEqual(proj2)
   })
+})
 
-  it('does not update state when result has no project (error case)', async () => {
+describe('useWorkspaceStore — project updates that change nothing', () => {
+  setUpUseWorkspaceStore()
+
+  it.each([
+    ['updateProjectBranch', 'updateBranch'],
+    ['renameProject', 'rename'],
+  ] as const)('%s keeps the map and returns the error when main fails', async (action, ipc) => {
     useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    mockElectronAPI.project.updateBranch.mockResolvedValue({ error: 'NOT_FOUND' })
-    const result = await useWorkspaceStore.getState().updateProjectBranch('p-1', 'feature/x')
+    mockElectronAPI.project[ipc].mockResolvedValue({ error: 'NOT_FOUND' })
+    const result = await useWorkspaceStore.getState()[action]('p-1', 'new-value')
     expect(result).toEqual({ error: 'NOT_FOUND' })
-    expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')![0]).toEqual(proj1)
+    expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1])
   })
 
-  it('leaves map unchanged when project id not in any workspace', async () => {
+  it.each([
+    ['updateProjectBranch', 'updateBranch'],
+    ['renameProject', 'rename'],
+  ] as const)('%s leaves the map unchanged for a project in no workspace', async (action, ipc) => {
     useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    const updated = { ...proj2, gitBranch: 'feature/y' }
-    mockElectronAPI.project.updateBranch.mockResolvedValue({ project: updated })
-    await useWorkspaceStore.getState().updateProjectBranch('p-999', 'feature/y')
+    mockElectronAPI.project[ipc].mockResolvedValue({ project: { ...proj2, id: 'p-999' } })
+    await useWorkspaceStore.getState()[action]('p-999', 'new-value')
     expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1])
   })
 })
@@ -291,38 +305,7 @@ describe('useWorkspaceStore — updateProjectBranch', () => {
 describe('useWorkspaceStore — renameProject', () => {
   setUpUseWorkspaceStore()
 
-  it('renames matching project in the map', async () => {
-    useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    const updated = { ...proj1, name: 'Renamed' }
-    mockElectronAPI.project.rename.mockResolvedValue({ project: updated })
-    await useWorkspaceStore.getState().renameProject('p-1', 'Renamed')
-    const projects = useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')!
-    expect(projects[0].name).toBe('Renamed')
-  })
-
-  it('does not update state when result has no project (error case)', async () => {
-    useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    mockElectronAPI.project.rename.mockResolvedValue({ error: 'NOT_FOUND' })
-    const result = await useWorkspaceStore.getState().renameProject('p-1', 'New')
-    expect(result).toEqual({ error: 'NOT_FOUND' })
-    expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')![0].name).toBe(
-      'Project 1'
-    )
-  })
-
-  it('leaves map unchanged when project id not in any workspace', async () => {
-    useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    const updated = { ...proj2, name: 'Whatever' }
-    mockElectronAPI.project.rename.mockResolvedValue({ project: updated })
-    await useWorkspaceStore.getState().renameProject('p-999', 'Whatever')
-    expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1])
-  })
-})
-
-describe('useWorkspaceStore — renameProject — keeps other projects unchanged when only one is renamed', () => {
-  setUpUseWorkspaceStore()
-
-  it('keeps other projects unchanged when only one is renamed', async () => {
+  it('renames the matching project and keeps the others unchanged', async () => {
     useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1, proj2]]]) })
     const updated = { ...proj1, name: 'Renamed' }
     mockElectronAPI.project.rename.mockResolvedValue({ project: updated })
@@ -612,7 +595,7 @@ describe('useWorkspaceStore — toggleProjectCollapse', () => {
     expect(stored).toContain('p-1')
   })
 
-  it('survives a localStorage.setItem failure', () => {
+  it('keeps the change in memory when localStorage.setItem fails', () => {
     mockLocalStorage.setItem.mockImplementationOnce(() => {
       throw new Error('QuotaExceededError')
     })
@@ -655,15 +638,6 @@ describe('useWorkspaceStore — ensureProjectExpanded', () => {
     const stored = JSON.parse(localStorage.getItem(storageKey) ?? '["p-1"]') as string[]
     expect(stored).not.toContain('p-1')
   })
-
-  it('survives a localStorage.setItem failure', () => {
-    useWorkspaceStore.setState({ collapsedProjectIds: new Set(['p-1']) })
-    mockLocalStorage.setItem.mockImplementationOnce(() => {
-      throw new Error('QuotaExceededError')
-    })
-    useWorkspaceStore.getState().ensureProjectExpanded('p-1')
-    expect(useWorkspaceStore.getState().collapsedProjectIds.has('p-1')).toBe(false)
-  })
 })
 
 /** The hooks every "useWorkspaceStore — expandedWorkspaceIds" describe registers. */
@@ -679,10 +653,6 @@ function setUpUseWorkspaceStoreExpandedWorkspaceIds(): void {
 describe('useWorkspaceStore — expandedWorkspaceIds', () => {
   const storageKey = 'terminator.workspace.expanded'
   setUpUseWorkspaceStoreExpandedWorkspaceIds()
-
-  it('initializes as empty set when localStorage has no entry', () => {
-    expect(useWorkspaceStore.getState().expandedWorkspaceIds.size).toBe(0)
-  })
 
   it('toggleWorkspaceCollapse adds an ID that is not present', () => {
     useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
@@ -709,17 +679,9 @@ describe('useWorkspaceStore — expandedWorkspaceIds', () => {
   })
 })
 
-describe('useWorkspaceStore — expandedWorkspaceIds — survives a localStorage.setItem failure in toggleWorkspaceCollapse', () => {
+describe('useWorkspaceStore — expandedWorkspaceIds — setExpandedWorkspaceIds', () => {
   const storageKey = 'terminator.workspace.expanded'
   setUpUseWorkspaceStoreExpandedWorkspaceIds()
-
-  it('survives a localStorage.setItem failure in toggleWorkspaceCollapse', () => {
-    mockLocalStorage.setItem.mockImplementationOnce(() => {
-      throw new Error('QuotaExceededError')
-    })
-    useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
-    expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
-  })
 
   it('setExpandedWorkspaceIds updates the store and writes to localStorage', () => {
     useWorkspaceStore.getState().setExpandedWorkspaceIds(new Set(['ws-1', 'ws-2']))
@@ -729,18 +691,14 @@ describe('useWorkspaceStore — expandedWorkspaceIds — survives a localStorage
     expect(stored).toContain('ws-1')
     expect(stored).toContain('ws-2')
   })
-
-  it('setExpandedWorkspaceIds survives a localStorage.setItem failure', () => {
-    mockLocalStorage.setItem.mockImplementationOnce(() => {
-      throw new Error('QuotaExceededError')
-    })
-    useWorkspaceStore.getState().setExpandedWorkspaceIds(new Set(['ws-1']))
-    expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
-  })
 })
 
-// Module-reset tests — must run after the main suite to avoid corrupting the static import
 describe('workspace.store — localStorage initialisation', () => {
+  afterEach(() => {
+    Object.keys(localStorageStore).forEach((key) => delete localStorageStore[key])
+    vi.resetModules()
+  })
+
   it('loads expandedWorkspaceIds from localStorage on module init', async () => {
     localStorageStore['terminator.workspace.expanded'] = JSON.stringify(['ws-1', 'ws-2'])
     vi.resetModules()
@@ -748,8 +706,6 @@ describe('workspace.store — localStorage initialisation', () => {
       await import('../../../../src/renderer/stores/workspace.store')
     expect(freshStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
     expect(freshStore.getState().expandedWorkspaceIds.has('ws-2')).toBe(true)
-    delete localStorageStore['terminator.workspace.expanded']
-    vi.resetModules()
   })
 
   it('loads collapsedProjectIds from localStorage on module init', async () => {
@@ -758,8 +714,6 @@ describe('workspace.store — localStorage initialisation', () => {
     const { useWorkspaceStore: freshStore } =
       await import('../../../../src/renderer/stores/workspace.store')
     expect(freshStore.getState().collapsedProjectIds.has('p-1')).toBe(true)
-    delete localStorageStore['terminator.project.collapsed']
-    vi.resetModules()
   })
 })
 

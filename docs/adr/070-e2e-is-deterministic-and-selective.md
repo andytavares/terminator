@@ -1,6 +1,6 @@
 # ADR 070: E2E is deterministic and selective
 
-**Status**: Accepted; superseded in part by ADR 123
+**Status**: Accepted; superseded in part by ADR 123; its selection is superseded by ADR 151
 
 **Date**: 2026-09-27
 

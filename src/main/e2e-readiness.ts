@@ -48,12 +48,28 @@ export function whenAnnounced(kind: Announcement, subject: string): Promise<void
   return pendingFor(kind, subject).promise
 }
 
+const FOCUS_EMULATION_ANSWER_MS = 30_000
+
 /** Gives the window Chromium focus whatever the OS says, so no test depends on the active application.
  * https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setFocusEmulationEnabled */
 async function emulateFocus(window: BrowserWindow): Promise<void> {
   const session = window.webContents.debugger
   if (!session.isAttached()) session.attach('1.3')
-  await session.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true })
+  let timer: NodeJS.Timeout | undefined
+  const unanswered = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const seconds = FOCUS_EMULATION_ANSWER_MS / 1000
+      reject(new Error(`Emulation.setFocusEmulationEnabled did not answer in ${seconds} s`))
+    }, FOCUS_EMULATION_ANSWER_MS)
+  })
+  try {
+    await Promise.race([
+      session.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true }),
+      unanswered,
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Announces `drawn` at the window's first frame and `focused` once focus emulation is on. */
@@ -61,11 +77,14 @@ export function announceWindowReadiness(window: BrowserWindow): void {
   if (!enabled()) return
   const subject = String(window.id)
   window.once('ready-to-show', () => announce('drawn', subject))
-  // A failure fails the wait for focus with its reason, rather than leaving it to hang.
-  emulateFocus(window).then(
-    () => announce('focused', subject),
-    (error: unknown) => pendingFor('focused', subject).reject(error)
-  )
+  // A command sent before the page's navigation can go unanswered (Electron's debugger.sendCommand
+  // docs), so emulation starts once the page has loaded. A failure fails the wait with its reason.
+  window.webContents.once('did-finish-load', () => {
+    emulateFocus(window).then(
+      () => announce('focused', subject),
+      (error: unknown) => pendingFor('focused', subject).reject(error)
+    )
+  })
 }
 
 /** Lets a test's `app.evaluate` wait on an announcement from the main process. */

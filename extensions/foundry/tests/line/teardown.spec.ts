@@ -278,10 +278,16 @@ function unremovableRecordsAndTwiceTests() {
     }
   })
 
-  it('is safe to run twice, because a stopped run is stopped again all the time', async () => {
+  // A stopped run is stopped again all the time; the second pass must find the records gone.
+  it('reports only the git checkout removal and no failure when it runs twice', async () => {
+    seedRunArtefacts()
     const { exec } = recorder()
     await tearDownRun(order(), { exec, root })
-    await expect(tearDownRun(order(), { exec, root })).resolves.toBeDefined()
+    const second = await tearDownRun(order(), { exec, root })
+    expect(second).toEqual({
+      removed: [expect.stringMatching(/^the checkout at /)],
+      failed: [],
+    })
   })
 }
 

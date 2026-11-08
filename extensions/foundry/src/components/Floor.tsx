@@ -933,15 +933,10 @@ function AskActions({ ask, answer, handBack }: HeldCallProps) {
   )
 }
 
-/** An agent's question is prose; any other tool's input is literal, and rendering it would eat a command's `*`s. */
+/** A tool's input is literal: rendering it would eat a command's `*`s. */
 function AskDetail({ ask }: { readonly ask: PendingAsk }) {
   if (ask.detail === null) return null
-  if (ask.toolName !== 'AskUserQuestion') return <pre className="fdry-ask-detail">{ask.detail}</pre>
-  return (
-    <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
-      {ask.detail}
-    </Markdown>
-  )
+  return <pre className="fdry-ask-detail">{ask.detail}</pre>
 }
 
 /** Only for more than one repository: "1 of 1, merges first" is ceremony (FR-068). */
@@ -1047,7 +1042,7 @@ function Lanes({ floor, view }: PageProps) {
   return (
     <>
       {lanes.map((lane) => (
-        <div key={lane} className="fdry-lane">
+        <div key={lane} className="fdry-lane" role="group" aria-label={laneName(view, lane)}>
           <div className="fdry-lane-name">
             <b>{laneName(view, lane)}</b>
           </div>
@@ -1106,6 +1101,8 @@ function UnitChip({ node, floor, view }: UnitProps) {
   return (
     <span
       className={`fdry-unit is-${node.state}${gone ? ' is-orphaned' : ''}`}
+      role="group"
+      aria-label={stepName(view, node)}
       // The id stays reachable because it is what the ledger and the graph call
       // this node, but it is not what a person watching the run needs to read.
       // A skipped step is better explained by why it did not run.
@@ -1186,7 +1183,7 @@ function WatchPanel({ floor, view, node }: WatchPanelProps) {
       <h3 className="fdry-panel-h" id="fdry-watching-h">
         {node === undefined ? watching : stepName(view, node)}
       </h3>
-      <pre className="fdry-transcript">
+      <pre className="fdry-transcript" role="log" aria-label="Transcript">
         {transcript.length === 0 ? 'Nothing yet.' : transcript.map((l) => l.text).join('\n')}
       </pre>
       <RedirectForm watch={floor.watch} watching={watching} control={floor.control} />
@@ -1334,8 +1331,8 @@ function StallsPanel({ floor, view }: PageProps) {
   const { stalls, shadowMode } = floor
   if (stalls.length === 0) return null
   return (
-    <section className="fdry-panel" style={{ marginTop: 12 }}>
-      <h3 className="fdry-panel-h">
+    <section className="fdry-panel" style={{ marginTop: 12 }} aria-labelledby="fdry-stalls-h">
+      <h3 className="fdry-panel-h" id="fdry-stalls-h">
         Stopped making progress — {stalls.length}
         {shadowMode ? ' (recorded, not acted on)' : ''}
       </h3>

@@ -18,9 +18,8 @@ const api = {
 
 // A .spec.ts under tests/unit runs in the node project, which has no DOM — the
 // store only ever touches window.electronAPI, so that is all it needs.
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: { integrations: api } },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: { integrations: api } })
 })
 
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
@@ -336,32 +335,19 @@ describe('integrations store — links — ignores a malformed link push', () =>
 
 /** The remote /app/ shim deliberately omits connect and disconnect. */
 function withoutCredentialWrites(): void {
-  Object.defineProperty(globalThis, 'window', {
-    value: {
-      electronAPI: {
-        integrations: {
-          status: api.status,
-          linkGet: api.linkGet,
-          onStatusChanged: api.onStatusChanged,
-        },
+  vi.stubGlobal('window', {
+    electronAPI: {
+      integrations: {
+        status: api.status,
+        linkGet: api.linkGet,
+        onStatusChanged: api.onStatusChanged,
       },
     },
-    writable: true,
   })
 }
 
 function withNoIntegrationsAtAll(): void {
-  Object.defineProperty(globalThis, 'window', {
-    value: { electronAPI: {} },
-    writable: true,
-  })
-}
-
-function restore(): void {
-  Object.defineProperty(globalThis, 'window', {
-    value: { electronAPI: { integrations: api } },
-    writable: true,
-  })
+  vi.stubGlobal('window', { electronAPI: {} })
 }
 
 describe('integrations store — partial transports', () => {
@@ -370,20 +356,17 @@ describe('integrations store — partial transports', () => {
     const ok = await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'k' })
     expect(ok).toBe(false)
     expect(useIntegrationsStore.getState().connectError.linear).toBe('Could not connect')
-    restore()
   })
 
   it('does nothing when disconnect is not carried', async () => {
     withoutCredentialWrites()
     await expect(useIntegrationsStore.getState().disconnect('linear')).resolves.toBeUndefined()
-    restore()
   })
 
   it('subscribes to what the transport has and ignores what it does not', () => {
     withoutCredentialWrites()
     expect(() => useIntegrationsStore.getState().subscribe()()).not.toThrow()
     expect(api.onStatusChanged).toHaveBeenCalled()
-    restore()
   })
 })
 
@@ -399,7 +382,6 @@ describe('integrations store — partial transports — survives an electronAPI 
       failures: [],
     })
     expect(() => useIntegrationsStore.getState().subscribe()()).not.toThrow()
-    restore()
   })
 })
 

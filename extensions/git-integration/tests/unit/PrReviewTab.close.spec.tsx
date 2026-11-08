@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore, sessionKey } from '../../src/stores/pr-review.store'
 import { ReviewSessionSchema } from '../../src/schemas/pr-review.schema'
@@ -66,7 +67,7 @@ beforeEach(() => {
 })
 
 describe('closing a PR under review', () => {
-  it('keeps the notes, drafts and viewed marks the reviewer has not submitted', async () => {
+  it('keeps the notes, drafts and viewed marks the reviewer has not submitted, and shows the queue', async () => {
     usePrReviewStore.setState({
       activePr,
       viewedFiles: new Set(['src/a.ts']),
@@ -85,7 +86,7 @@ describe('closing a PR under review', () => {
       ],
     })
     render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(await screen.findByText('Close PR'))
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Close PR' }))
 
     await waitFor(() => expect(storedSessions.get(key)).toBeDefined())
     const saved = ReviewSessionSchema.parse(storedSessions.get(key))
@@ -93,5 +94,6 @@ describe('closing a PR under review', () => {
     expect(saved.drafts.map((d) => d.body)).toEqual(['rename this'])
     expect(saved.notes.map((n) => n.body)).toEqual(['why?'])
     expect(saved.viewedAt).toEqual({ 'src/a.ts': 'abc123' })
+    expect(screen.getByTestId('review-queue')).toBeTruthy()
   })
 })

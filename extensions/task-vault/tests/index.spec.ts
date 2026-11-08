@@ -21,10 +21,10 @@ vi.mock('../src/vault/db.js', () => ({
 vi.mock('../src/vault/ensure-next-occurrence.js', () => ({
   backfillRecurringTasks: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('../src/notifications/task-scheduler.js', () => ({
+vi.mock('../src/notifications/task-scheduler.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/notifications/task-scheduler.js')>()),
   startTaskScheduler: vi.fn(() => ({ dispose: vi.fn(), tick: vi.fn() })),
   setSchedulerTick: vi.fn(),
-  bindBroadcast: vi.fn(),
 }))
 vi.mock('../src/navigation.js', () => ({
   openInVault: vi.fn(),
@@ -76,28 +76,6 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('task-vault manifest quick action', () => {
-  it('declares a Task Vault group and a mnemonic on the capture command', () => {
-    const manifest = JSON.parse(readFileSync(join(__dirname, '../manifest.json'), 'utf-8')) as {
-      contributes: {
-        quickActions?: { group?: { mnemonic?: string; label?: string } }
-        commands?: { id: string; mnemonic?: string; label?: string }[]
-      }
-    }
-
-    expect(manifest.contributes.quickActions?.group).toEqual({
-      mnemonic: 'v',
-      label: 'Task Vault',
-    })
-
-    const command = manifest.contributes.commands?.find(
-      (c) => c.id === 'task-vault:capture-to-inbox'
-    )
-    expect(command?.mnemonic).toBe('c')
-    expect(command?.label).toBe('Capture to inbox')
-  })
-})
-
 describe(
   'task-vault activate() quick-actions command registration',
   taskVaultActivateQuickActionsTests
@@ -120,21 +98,23 @@ function taskVaultActivateQuickActionsTests() {
 }
 
 function taskVaultActivateQuickActionsRegisteringTests() {
-  it('registers the manifest command id with its label and mnemonic', async () => {
+  it('registers the capture command exactly as the manifest declares it, in the Task Vault group', async () => {
+    const manifest = JSON.parse(readFileSync(join(__dirname, '../manifest.json'), 'utf-8')) as {
+      contributes: {
+        quickActions: { group: { mnemonic: string; label: string } }
+        commands: { id: string }[]
+      }
+    }
+    const declared = manifest.contributes.commands.find(
+      (c) => c.id === 'task-vault:capture-to-inbox'
+    )
     const { api } = makeApi()
     const { activate } = await import('../src/index.ts')
 
     await activate(api)
 
-    const commandsRegister = vi.mocked(api.commands.register)
-    expect(commandsRegister).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'task-vault:capture-to-inbox',
-        label: 'Capture to inbox',
-        mnemonic: 'c',
-      }),
-      expect.any(Function)
-    )
+    expect(manifest.contributes.quickActions.group).toEqual({ mnemonic: 'v', label: 'Task Vault' })
+    expect(api.commands.register).toHaveBeenCalledWith(declared, expect.any(Function))
   })
 }
 
@@ -197,23 +177,51 @@ function taskVaultActivateQuickActionsDisposingTests() {
 }
 
 describe('task-vault activate() Home feed', () => {
-  it('publishes 500 ms after the vault says its index changed, and registers the open command', async () => {
-    const { api, commandsRegister } = makeApi()
+  it('publishes 500 ms after the vault says its index changed', async () => {
+    const { api } = makeApi()
     const { activate } = await import('../src/index.ts')
-    const { bindBroadcast } = await import('../src/notifications/task-scheduler.js')
+    const { broadcast } = await import('../src/notifications/task-scheduler.js')
     await activate(api)
     const publish = vi.mocked(api.home.publish)
     await vi.advanceTimersByTimeAsync(500)
     publish.mockClear()
 
-    const send = vi.mocked(bindBroadcast).mock.calls.at(-1)![0]
-    send('task-vault:push:index-updated', {})
-    await vi.advanceTimersByTimeAsync(500)
+    broadcast('task-vault:push:index-updated', {})
+    await vi.advanceTimersByTimeAsync(499)
+    expect(publish).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
 
     expect(publish).toHaveBeenCalledTimes(1)
+  })
+
+  it('registers the open command', async () => {
+    const { api, commandsRegister } = makeApi()
+    const { activate } = await import('../src/index.ts')
+    await activate(api)
+
     expect(commandsRegister).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'task-vault:open' }),
       expect.any(Function)
+    )
+  })
+})
+
+describe('task-vault activate() — the View menu', () => {
+  it('adds "Toggle Vault Calendar", ticked by its panel, which asks the window to toggle that panel', async () => {
+    const { api } = makeApi()
+    const { activate } = await import('../src/index.ts')
+    await activate(api)
+
+    const [item] = vi
+      .mocked(api.nativeMenu.addViewMenuItem)
+      .mock.calls.map(([options]) => options)
+      .filter((options) => options.label === 'Toggle Vault Calendar')
+    expect(item).toMatchObject({ type: 'checkbox', panelId: 'terminator.task-vault' })
+    item.onClick()
+
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'extension:toggle-panel',
+      'terminator.task-vault'
     )
   })
 })

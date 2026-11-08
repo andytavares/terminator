@@ -3,8 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { partialFake } from '../../../../tests/support/fakes'
 
-const mockSetShowCaptureModal = vi.fn()
-const mockSetView = vi.fn()
 const mockOn = vi.fn<Window['electronAPI']['extensionBridge']['on']>(() => vi.fn())
 const mockInvoke = vi.fn()
 
@@ -17,20 +15,8 @@ vi.mock('../../src/components/CalendarDrawer', () => ({
   CalendarDrawer: () => <div data-testid="calendar-drawer" />,
 }))
 
-vi.mock('../../src/stores/vault-nav.store', () => ({
-  useVaultNavStore: () => ({
-    setShowCaptureModal: mockSetShowCaptureModal,
-    setView: mockSetView,
-  }),
-}))
-
 function setSearch(params: Record<string, string>): void {
-  const search = '?' + new URLSearchParams(params).toString()
-  Object.defineProperty(window, 'location', {
-    value: { search },
-    configurable: true,
-    writable: true,
-  })
+  window.history.replaceState(null, '', '?' + new URLSearchParams(params).toString())
 }
 
 beforeEach(() => {
@@ -43,7 +29,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.resetModules()
   mockOn.mockReset()
-  mockSetShowCaptureModal.mockReset()
 })
 
 describe('task-vault renderer App', taskVaultRendererAppTests)
@@ -78,13 +63,14 @@ function taskVaultRendererAppCaptureCommandTests() {
     expect(mockOn).toHaveBeenCalledWith('task-vault:push:open-capture', expect.any(Function))
   })
 
-  it('calls setShowCaptureModal(true) when capture command fires', async () => {
+  it('opens the capture modal when the capture command fires', async () => {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
+    const { useVaultNavStore } = await import('../../src/stores/vault-nav.store')
     render(<App />)
     const [, handler] = mockOn.mock.calls[0]
-    handler(undefined)
-    expect(mockSetShowCaptureModal).toHaveBeenCalledWith(true)
+    act(() => handler(undefined))
+    expect(useVaultNavStore.getState().showCaptureModal).toBe(true)
   })
 
   it('unsubscribes on unmount', async () => {
@@ -103,16 +89,17 @@ function taskVaultRendererAppPendingCaptureTests() {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
     render(<App />)
-    await act(async () => {})
-    expect(mockInvoke).toHaveBeenCalledWith('task-vault:ui.consumePendingCapture')
+    await expect
+      .poll(() => mockInvoke.mock.calls)
+      .toContainEqual(['task-vault:ui.consumePendingCapture'])
   })
 
-  it('calls setShowCaptureModal(true) when pending flag is set', async () => {
+  it('opens the capture modal when a capture is pending', async () => {
     mockInvoke.mockResolvedValue({ data: { pending: true } })
     setSearch({})
     const { App } = await import('../../src/renderer/App')
+    const { useVaultNavStore } = await import('../../src/stores/vault-nav.store')
     render(<App />)
-    await act(async () => {})
-    expect(mockSetShowCaptureModal).toHaveBeenCalledWith(true)
+    await expect.poll(() => useVaultNavStore.getState().showCaptureModal).toBe(true)
   })
 }

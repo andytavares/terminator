@@ -72,12 +72,14 @@ describe('findTestLocations — when the head is not available', () => {
     expect(runGit).toHaveBeenCalledTimes(2)
   })
 
-  it('returns nothing for no usable symbols, an uncloned repo, or no match', async () => {
+  it.each([
+    ['no usable symbols', '/repo', ['not an identifier']],
+    ['an uncloned repo', 'gh:acme/widgets', ['foo']],
+    ['no match', '/repo', ['foo']],
+  ])('returns nothing for %s', async (_case, repoRoot, symbols) => {
+    // git grep exits 1 when nothing matches.
     const runGit = vi.fn().mockRejectedValue(Object.assign(new Error('exit 1'), { code: 1 }))
-    const at = (repoRoot: string) => ({ repoRoot, headSHA: 'abc' })
-    expect(await findTestLocations(at('/repo'), ['not an identifier'], runGit)).toEqual([])
-    expect(await findTestLocations(at('gh:acme/widgets'), ['foo'], runGit)).toEqual([])
-    expect(await findTestLocations(at('/repo'), ['foo'], runGit)).toEqual([])
+    expect(await findTestLocations({ repoRoot, headSHA: 'abc' }, symbols, runGit)).toEqual([])
   })
 })
 

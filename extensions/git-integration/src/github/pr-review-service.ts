@@ -146,7 +146,7 @@ function compositeScore(norm: NormalisedMetrics, testFilePresent: boolean | null
   const totalWeight = known.reduce((s, k) => s + RISK_WEIGHTS[k], 0)
   const weighted = known.reduce((s, k) => s + norm[k]! * RISK_WEIGHTS[k], 0)
   const penalty = testFilePresent ? 0 : MISSING_TEST_PENALTY
-  return Math.min(100, Math.round((weighted / totalWeight) * 80 + penalty))
+  return Math.round((weighted / totalWeight) * 80 + penalty)
 }
 
 function churnLabel(commits: number): string {

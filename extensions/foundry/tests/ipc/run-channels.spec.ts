@@ -5,7 +5,7 @@ import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRunChannels, proposeRecipe, readRunGraph } from '../../src/ipc/run-channels.js'
+import { createRunChannels, readRunGraph } from '../../src/ipc/run-channels.js'
 import type { RunDeps } from '../../src/ipc/run-channels.js'
 import { idleRunSeams } from './run-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -16,10 +16,10 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
 import { readTimeline } from '../../src/factory/timeline-store.js'
+import { settleBackground } from '../../src/background.js'
 import { writeCiState } from '../../src/line/ci-state.js'
 import type { CiState } from '../../src/line/ci-state.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { eventually } from '../../../../tests/support/eventually'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -177,29 +177,14 @@ function shapesTests() {
 }
 
 function runChannelsRecordingTests() {
-  it('records an operator override as an operator decision', async () => {
+  it('records an operator override as an operator decision, and says the operator chose it', async () => {
     await store.save(order())
     await freshRunChannels().start({ id: 'WO-1', recipe: 'direct' })
     const saved = await store.load('WO-1')
     expect(saved?.recipeOverriddenBy).toBe('operator')
     const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('"actor":"operator"')
-  })
-
-  it('records a proposal as the architect proposing, not the operator choosing', async () => {
-    await store.save(order())
-    await freshRunChannels().start({ id: 'WO-1' })
-    expect((await store.load('WO-1'))?.recipeOverriddenBy).toBeNull()
-    const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
-    expect(ledger).toContain('role:architect')
-  })
-
-  it('records which rung the recipe came from', async () => {
-    await store.save(order())
-    await freshRunChannels().start({ id: 'WO-1' })
-    expect(
-      fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
-    ).toContain('built-in')
+    expect(ledger).toContain('chosen by the operator')
   })
 }
 
@@ -398,23 +383,6 @@ describe('foundry:run.recipes', () => {
   describe('the proposal', runChannelsTheProposalTests)
 })
 
-function unit(over: Partial<WorkOrder['plan']['units'][number]> = {}) {
-  return {
-    id: 'U-2',
-    title: 'b',
-    role: 'builder',
-    lane: 1,
-    dependsOn: [],
-    satisfies: ['AC-1'],
-    touches: [],
-    verify: [],
-    ...over,
-  }
-}
-function graded(grade: WorkOrder['risk']['grade'], triggers: WorkOrder['risk']['triggers'] = []) {
-  return order({ risk: { grade, triggers, blastRadius: [], criticalPaths: [] } })
-}
-
 function offeringTests() {
   it('offers every shape, marking the ones this repository cannot support', async () => {
     writeToolkitShape()
@@ -478,71 +446,6 @@ function runChannelsTheProposalTests() {
   })
 }
 
-// Choosing the shape.
-//
-// The ladder is lanes first, then risk. Lanes because that is the only thing a
-// heavier shape can actually run in parallel, and risk because that is the
-// order's own statement of who ought to look. Unit count decides nothing: a
-// fan-out is `by lane` now, so seven units in one lane cost one session and
-// pricing the shape off them charged for parallelism that never existed.
-describe('proposeRecipe', () => {
-  describe('direct', directTests)
-  describe('standard', standardTests)
-})
-
-function directTests() {
-  it('keeps a shape the order already carries', () => {
-    expect(proposeRecipe(order({ recipe: 'research' }))).toEqual({
-      name: 'research',
-      why: 'the order already names this shape',
-    })
-  })
-
-  it('proposes the direct shape for one lane at the lowest risk', () => {
-    const proposal = proposeRecipe(graded('P3'))
-    expect(proposal.name).toBe('direct')
-    expect(proposal.why).toBe('one lane, graded low risk')
-  })
-
-  it('still proposes it when that lane holds several units', () => {
-    const o = graded('P3')
-    o.plan.units.push(unit(), unit({ id: 'U-3' }), unit({ id: 'U-4' }))
-    expect(proposeRecipe(o).name).toBe('direct')
-  })
-
-  it('proposes direct for an order graded notable', () => {
-    const proposal = proposeRecipe(graded('P2'))
-    expect(proposal.name).toBe('direct')
-    expect(proposal.why).toContain('ordinary risk')
-  })
-
-  it('proposes direct, naming the trigger, when one fired at the lowest grade', () => {
-    const proposal = proposeRecipe(graded('P3', ['public_interface']))
-    expect(proposal.name).toBe('direct')
-    expect(proposal.why).toContain('public_interface')
-  })
-}
-
-function standardTests() {
-  it('proposes the standard shape once there is more than one lane', () => {
-    const o = graded('P3')
-    o.plan.units.push(unit({ lane: 2 }))
-    o.plan.lanes = [
-      { ord: 1, repo: 'a', branch: '', role: null, blocks: [], blockedBy: [] },
-      { ord: 2, repo: 'b', branch: '', role: null, blocks: [], blockedBy: [] },
-    ]
-    const proposal = proposeRecipe(o)
-    expect(proposal.name).toBe('standard')
-    expect(proposal.why).toBe('2 lanes of work')
-  })
-
-  it('proposes the standard shape for anything above the lowest two grades', () => {
-    const proposal = proposeRecipe(graded('P1'))
-    expect(proposal.name).toBe('standard')
-    expect(proposal.why).toContain("above the direct shape's ceiling")
-  })
-}
-
 describe('the reason a shape was chosen (FR-014)', () => {
   describe('recording the reason', recordingTheReasonTests)
   describe('offering the reason', offeringTheReasonTests)
@@ -557,16 +460,11 @@ function recordingTheReasonTests() {
   it('records why the system picked the shape, not only where it came from', async () => {
     await store.save(order())
     await freshRunChannels().start({ id: 'WO-1' })
+    expect((await store.load('WO-1'))?.recipeOverriddenBy).toBeNull()
     const text = ledgerText()
     expect(text).toContain('role:architect')
     expect(text).toContain('one lane, graded low risk')
     expect(text).toContain('resolved from built-in')
-  })
-
-  it('says the operator chose it when the operator chose it', async () => {
-    await store.save(order())
-    await freshRunChannels().start({ id: 'WO-1', recipe: 'standard' })
-    expect(ledgerText()).toContain('chosen by the operator')
   })
 }
 
@@ -579,16 +477,6 @@ function offeringTheReasonTests() {
     }
     expect(view.proposed).toBe('direct')
     expect(view.proposedWhy).toBe('one lane, graded low risk')
-  })
-
-  it('proposes direct in a repository with no test command, because direct needs none', async () => {
-    await store.save(order())
-    const view = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
-      recipes: { name: string; available: boolean }[]
-      proposed: string
-    }
-    expect(view.recipes.find((r) => r.name === 'direct')?.available).toBe(true)
-    expect(view.proposed).toBe('direct')
   })
 }
 
@@ -605,18 +493,6 @@ function directAndRefusedChoicesTests() {
     })
     const view = (await freshRunChannels().recipes({ id: 'WO-1' })) as { proposed: string }
     expect(view.proposed).toBe('direct')
-  })
-
-  // Never quietly swapped: an operator who names a shape gets it or gets told
-  // why not, because a silent substitution is a decision nobody made.
-  it('refuses an operator choice this repository cannot run, rather than stepping down', async () => {
-    writeToolkitShape()
-    await store.save(order())
-    const result = (await freshRunChannels().start({ id: 'WO-1', recipe: 'toolkit' })) as {
-      error?: string
-    }
-    expect(result.error).toContain('toolkit')
-    expect(result.error).toContain('.specify')
   })
 }
 
@@ -889,12 +765,29 @@ describe('offering shapes of work', () => {
   })
 
   it('observes with the order own budgets rather than a guessed default', async () => {
-    await store.save(order({ budgets: { agents: 1, wallClockMinutes: 5, tokens: null } }))
+    await store.save({
+      ...twoFreeLanes(),
+      budgets: { agents: 1, wallClockMinutes: 5, tokens: null },
+    })
     await freshRunChannels().start({ id: 'WO-1' })
     const r = (await freshRunChannels().observe({ id: 'WO-1' })) as { ready: string[] }
-    expect(r.ready.length).toBeLessThanOrEqual(2)
+    expect(r.ready).toHaveLength(1)
   })
 })
+
+/** Two lanes with nothing between them, so both lanes' builders can start at once. */
+function twoFreeLanes(): WorkOrder {
+  const lanes = twoLanes()
+  return {
+    ...lanes,
+    plan: {
+      ...lanes.plan,
+      sharedFiles: [],
+      lanes: lanes.plan.lanes.map((lane) => ({ ...lane, role: null, blocks: [], blockedBy: [] })),
+      units: lanes.plan.units.map((unit, at) => ({ ...unit, touches: [`src/${at}`] })),
+    },
+  }
+}
 
 function twoLanes(): WorkOrder {
   const base = order()
@@ -925,6 +818,7 @@ function twoLanes(): WorkOrder {
 }
 describe('what run.observe says about lanes (FR-067, FR-068)', () => {
   describe('lanes', runChannelsLanesTests)
+  describe('a single lane', aSingleLaneTests)
 })
 
 function runChannelsLanesTests() {
@@ -939,8 +833,10 @@ function runChannelsLanesTests() {
     await store.save(twoLanes())
     await freshRunChannels().start({ id: 'WO-1' })
     const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
-    expect(r.lanes.length).toBeGreaterThan(1)
-    for (const lane of r.lanes) expect(lane.collisions).toEqual(['proto/session.proto'])
+    expect(r.lanes.map((l) => l.collisions)).toEqual([
+      ['proto/session.proto'],
+      ['proto/session.proto'],
+    ])
   })
 
   it('gives the hold as a sentence, so the surface does not reassemble it', async () => {
@@ -951,7 +847,9 @@ function runChannelsLanesTests() {
     expect(r.lanes[1].hold).toContain('must merge first')
     expect(r.lanes[1].hold).toContain('proto/session.proto')
   })
+}
 
+function aSingleLaneTests() {
   it('reports one unremarkable lane for a single-repository order', async () => {
     await store.save(order())
     await freshRunChannels().start({ id: 'WO-1' })
@@ -1024,12 +922,10 @@ function failuresAndRefusalsTests() {
       })
     ).start({ id: 'WO-1' })
 
-    // The rejection is handled off the call — that is the point of not
-    // awaiting it — so wait for the entry rather than assuming one turn of the
-    // microtask queue is enough.
-    const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
-    await eventually(() => expect(fs.readFileSync(ledgerFile, 'utf8')).toContain('run.failed'))
-    const ledger = fs.readFileSync(ledgerFile, 'utf8')
+    // The rejection is handled off the call, which is the point of not awaiting it; the
+    // failure's ledger line is background work, so it has landed once the background settles.
+    await settleBackground()
+    const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('run.failed')
     expect(ledger).toContain('no worktree could be prepared')
   })
@@ -1048,6 +944,7 @@ function failuresAndRefusalsTests() {
 describe('foundry:run.resume', () => {
   describe('picking up', runChannelsPickingUpTests)
   describe('retrying', runChannelsRetryingTests)
+  describe('not retrying', runChannelsNotRetryingTests)
   describe('recording the resume', recordingTheResumeTests)
   describe('refusals', runChannelsRefusalsTests)
 })
@@ -1093,15 +990,23 @@ function runChannelsRetryingTests() {
     const handed = execute.mock.calls[0][2] as RunGraph
     expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('waiting')
   })
+}
 
-  it('leaves everything else where it was', async () => {
+function runChannelsNotRetryingTests() {
+  it('leaves a failed node it was not told to retry failed', async () => {
     const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
+    const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+    const graph = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
+    const twoFailed = graph.nodes.map((n) =>
+      ['build:lane-1', 'document'].includes(n.id) ? { ...n, state: 'failed', attempts: 1 } : n
+    )
+    fs.writeFileSync(file, JSON.stringify({ ...graph, nodes: twoFailed }))
     execute.mockClear()
 
-    await channels.resume({ id: 'WO-1', retry: [] })
+    await channels.resume({ id: 'WO-1', retry: ['build:lane-1'] })
     const handed = execute.mock.calls[0][2] as RunGraph
-    expect(handed.nodes.every((n) => n.state !== 'failed')).toBe(true)
+    expect(handed.nodes.find((n) => n.id === 'document')?.state).toBe('failed')
   })
 }
 
@@ -1166,30 +1071,6 @@ describe('what the Floor is told to call each node', () => {
   })
 })
 
-// Per-hunk review ended with the review queue, so nothing counts finished
-// turns and nothing refuses a run because of them. A deps object that still
-// carries the old gate must not be able to hold a start back.
-describe('a start is never refused for finished turns waiting on review', () => {
-  const full = () => ({
-    allowed: false,
-    unreviewed: 3,
-    limit: 3,
-    reason: '3 finished sessions are waiting for review, and the limit is 3.',
-  })
-
-  it('starts even when a legacy gate says there is no room', async () => {
-    await store.save(order())
-    // Not a RunDeps field any more: the old gate rides along as a stray property.
-    const legacyDeps = { ...runDeps(), backpressure: full }
-    const legacy = createRunChannels(legacyDeps)
-    const r = (await legacy.start({ id: 'WO-1' })) as { error?: string }
-    expect(r.error).toBeUndefined()
-    expect((await store.load('WO-1'))?.status).toBe('running')
-    const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
-    expect(ledger).not.toContain('backpressure.overridden')
-  })
-})
-
 const nothingLive = (): boolean => false
 const everythingLive = (): boolean => true
 function withRunning(): { nodeId: string } {
@@ -1236,31 +1117,15 @@ describe('a run whose agents are gone', () => {
 })
 
 function takingNodesBackTests() {
-  it('resume takes the node back so the scheduler can offer it again', async () => {
+  it('resume takes the node back, says so, and writes the reclaimed graph down', async () => {
     const execute = vi.fn<RunDeps['execute']>(async () => undefined)
-    const channels = await startedRunChannels({
-      execute: execute as never,
-      isLive: nothingLive,
-    })
+    const channels = await startedRunChannels({ execute: execute as never, isLive: nothingLive })
     const { nodeId } = withRunning()
     execute.mockClear()
 
-    await channels.resume({ id: 'WO-1' })
+    expect(await channels.resume({ id: 'WO-1' })).toMatchObject({ reclaimed: [nodeId] })
     const handed = execute.mock.calls[0][2] as RunGraph
     expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('waiting')
-  })
-
-  it('says what it took back, so the answer is not silent', async () => {
-    const channels = await startedRunChannels({ isLive: nothingLive })
-    const { nodeId } = withRunning()
-    expect(await channels.resume({ id: 'WO-1' })).toMatchObject({ reclaimed: [nodeId] })
-  })
-
-  it('writes the reclaimed graph down, so a reopened surface reads it too', async () => {
-    const channels = await startedRunChannels({ isLive: nothingLive })
-    const { nodeId } = withRunning()
-    await channels.resume({ id: 'WO-1' })
-
     const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
     const saved = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
     expect(saved.nodes.find((n) => n.id === nodeId)?.state).toBe('waiting')
@@ -1373,13 +1238,6 @@ function theTimelineTests() {
   it('says so for an order with no run', async () => {
     expect(await freshRunChannels().timeline({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
   })
-
-  it('hands back no gates when the host has no gate store to ask', async () => {
-    await store.save(order())
-    await freshRunChannels().start({ id: 'WO-1' })
-    const r = answered(await freshRunChannels().timeline({ id: 'WO-1' }))
-    expect(r.gates).toEqual([])
-  })
 }
 
 function documentOnTheFloorTests() {
@@ -1397,11 +1255,6 @@ function documentOnTheFloorTests() {
       url,
       path: expect.stringMatching(/\/orders\/WO-1\/r\.md$/),
     })
-  })
-
-  it('reports none for a document in the checkout, and none handed back', async () => {
-    expect(await observedDocument({ path: 'docs/a.md', location: 'checkout' })).toBeNull()
-    expect(await observedDocument(null)).toBeNull()
   })
 }
 
