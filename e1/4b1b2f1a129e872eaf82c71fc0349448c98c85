@@ -1,0 +1,19 @@
+docs/adr/150-tests-run-in-enforced-tiers.md
+  s_7a27f124c1e8e3::t_5e55df74b73b82 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e14b1b2f1a129e872eaf82c71fc0349448c98c85",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
