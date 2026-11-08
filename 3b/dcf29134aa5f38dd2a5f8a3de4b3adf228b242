@@ -1,0 +1,21 @@
+packages/extension-ui/src/icon-tooltips.ts
+  s_7a27f124c1e8e3::t_f82fecdc18e90e 44-49,59
+tests/unit/packages/extension-ui/icon-tooltips.spec.tsx
+  s_7a27f124c1e8e3::t_8898f40fadd54f 61-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3bdcf29134aa5f38dd2a5f8a3de4b3adf228b242",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
