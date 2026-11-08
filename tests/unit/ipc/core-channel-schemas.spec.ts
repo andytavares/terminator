@@ -127,10 +127,6 @@ describe('core invoke channels', () => {
   })
 
   describe.each([...ipcInvokeRegistry.keys()])('%s', (channel) => {
-    it('was registered through the schema table', () => {
-      expect(tableRows.get(channel)?.schema).toBeDefined()
-    })
-
     it('answers a payload of the wrong type with its invalid response, without running', async () => {
       const spec = tableRows.get(channel)!
       const run = vi.spyOn(spec, 'run')

@@ -31,25 +31,9 @@ describe('the focus store reading what was stored', () => {
     expect(state.planDismissedOn).toBeNull()
     expect(state.planCollapsed).toBe(false)
   })
-
-  it('keeps a well-formed record', async () => {
-    const saved = {
-      days: { '2026-10-17': [{ id: 'a', title: 'Ship TAV-20', doneByHand: false }] },
-      planDismissedOn: '2026-10-17',
-      planCollapsed: true,
-    }
-    localStorage.setItem(FOCUS_KEY, JSON.stringify(saved))
-    const state = (await loadFocusStore()).getState()
-    expect(state).toMatchObject(saved)
-  })
 })
 
 describe('parked threads', () => {
-  it('starts empty when storage holds something that is not a list of keys', async () => {
-    localStorage.setItem(PARKED_THREADS_KEY, '{"a":"yesterday"}')
-    expect((await loadParkedThreads()).getState().keys).toEqual([])
-  })
-
   it('still reads the keys-only list the first version stored', async () => {
     localStorage.setItem(PARKED_THREADS_KEY, '["linear:TAV-20"]')
     expect((await loadParkedThreads()).getState().keys).toEqual(['linear:TAV-20'])

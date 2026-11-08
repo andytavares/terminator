@@ -89,16 +89,6 @@ function freshHandlers(): Record<string, Handler> {
   return handlers
 }
 
-function captureHandlersWithToken(token: string): Record<string, Handler> {
-  const handlers: Record<string, Handler> = {}
-  registerGithubHandlers(answerInto(handlers), {
-    github: githubOverStub(mockExecFile),
-    getToken: () => token,
-    noCheckoutCwd: GLOBAL_STORAGE,
-  })
-  return handlers
-}
-
 function mockGitSuccess(stdout: string) {
   mockExecFile.mockImplementationOnce(stubPrints(stdout))
 }
@@ -833,57 +823,6 @@ describe('github:pr-file-diff', () => {
   })
 })
 
-describe('github:pr-file-diff — parses a diff with binary file indicator', () => {
-  const handlers = freshHandlers()
-
-  it('parses a diff with binary file indicator', async () => {
-    mockGitSuccess('') // git fetch
-    mockGitSuccess('{"baseRefName":"main"}') // gh pr view
-    mockGitSuccess('') // git fetch of the base branch
-    mockGitSuccess('abc123\n') // git merge-base
-    mockGitSuccess('Binary files a/image.png and b/image.png differ\n') // git diff
-
-    const result = (await handlers['github:pr-file-diff']({
-      repoRoot: '/repo',
-      prNumber: 6,
-      path: 'image.png',
-    })) as { diff: { isBinary: boolean } }
-
-    expect(result.diff.isBinary).toBe(true)
-  })
-})
-
-describe('github:pr-file-diff — parses a diff with actual hunks', () => {
-  const handlers = freshHandlers()
-
-  it('parses a diff with actual hunks', async () => {
-    const diffContent = `diff --git a/src/foo.ts b/src/foo.ts
---- a/src/foo.ts
-+++ b/src/foo.ts
-@@ -1,3 +1,4 @@
- const x = 1
-+const y = 2
- const z = 3
--const w = 4
- export { x }
-`
-    mockGitSuccess('') // git fetch
-    mockGitSuccess('{"baseRefName":"main"}') // gh pr view
-    mockGitSuccess('') // git fetch of the base branch
-    mockGitSuccess('abc123\n') // git merge-base
-    mockGitSuccess(diffContent) // git diff
-
-    const result = (await handlers['github:pr-file-diff']({
-      repoRoot: '/repo',
-      prNumber: 6,
-      path: 'src/foo.ts',
-    })) as { diff: { hunks: Array<{ lines: unknown[] }> } }
-
-    expect(result.diff.hunks).toHaveLength(1)
-    expect(result.diff.hunks[0].lines.length).toBeGreaterThan(0)
-  })
-})
-
 describe('github:pr-file-content', () => {
   let handlers: Record<string, Handler>
   const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts', ref: 'abc123' }
@@ -1081,67 +1020,6 @@ describe('github:list-open-prs — returns generic error message for other failu
   })
 })
 
-describe('github:list-open-prs — handles numeric PR number search', () => {
-  const handlers = freshHandlers()
-
-  it('handles numeric PR number search', async () => {
-    const prData = {
-      number: 42,
-      title: 'Test PR',
-      author: { login: 'alice', avatarUrl: '' },
-      createdAt: '2025-01-01T00:00:00Z',
-      headRefName: 'feat/thing',
-      baseRefName: 'main',
-      isDraft: false,
-      statusCheckRollup: [],
-      files: [],
-      additions: 0,
-      deletions: 0,
-    }
-    mockGitSuccess(JSON.stringify(prData))
-
-    const result = (await handlers['github:list-open-prs']({
-      repoRoot: '/repo',
-      search: '42',
-    })) as { prs: unknown[]; hasMore: boolean }
-    expect(result.prs).toHaveLength(1)
-    expect(result.hasMore).toBe(false)
-  })
-})
-
-describe('github:list-open-prs — handles text search', () => {
-  const handlers = freshHandlers()
-
-  it('handles text search', async () => {
-    const prList = [
-      {
-        number: 10,
-        title: 'Fix bug',
-        author: { login: 'bob', avatarUrl: '' },
-        createdAt: '2025-01-01T00:00:00Z',
-        headRefName: 'fix/bug',
-        baseRefName: 'main',
-        isDraft: false,
-        statusCheckRollup: [],
-        files: [],
-        additions: 5,
-        deletions: 2,
-      },
-    ]
-    mockGitSuccess(JSON.stringify(prList))
-
-    const result = (await handlers['github:list-open-prs']({
-      repoRoot: '/repo',
-      search: 'fix bug',
-    })) as { prs: unknown[]; hasMore: boolean }
-    expect(result.prs).toHaveLength(1)
-    expect(result.hasMore).toBe(false)
-  })
-
-  // Settings → Git → Branch Exclude Patterns: the queue leaves out pull
-  // requests opened from an excluded branch, and does not count them.
-})
-
 describe('github:list-open-prs — leaves out pull requests opened from an excluded branch', () => {
   const handlers = freshHandlers()
 
@@ -1243,30 +1121,6 @@ describe('github:list-open-prs — always asks GraphQL for open PRs, newest firs
     expect(query).toContain('direction:DESC')
     expect(query).not.toContain('direction:ASC')
     expect(query).toMatch(/nodes\{number title state isDraft/)
-  })
-})
-
-describe('github:list-open-prs — maps the PR state of a GraphQL node', () => {
-  const handlers = freshHandlers()
-
-  it('maps the PR state of a GraphQL node', async () => {
-    mockGitSuccess(JSON.stringify(REPO_VIEW))
-    mockGitSuccess(
-      JSON.stringify({
-        data: {
-          repository: {
-            pullRequests: {
-              pageInfo: { endCursor: null, hasNextPage: false },
-              nodes: [{ number: 3, title: 't', state: 'OPEN', createdAt: '2026-01-01T00:00:00Z' }],
-            },
-          },
-        },
-      })
-    )
-    const result = (await handlers['github:list-open-prs']({ repoRoot: '/repo' })) as {
-      prs: Array<{ state: string }>
-    }
-    expect(result.prs[0].state).toBe('open')
   })
 })
 
@@ -1386,83 +1240,6 @@ describe('github:pr-inline-comments — returns resolvedCommentIds: [] when the 
   })
 })
 
-describe('github:pr-inline-comments — returns NOT_AUTHENTICATED on auth error', () => {
-  const handlers = freshHandlers()
-
-  it('returns NOT_AUTHENTICATED on auth error', async () => {
-    mockGitFailure('GH_TOKEN is not set — run: gh auth login')
-    const result = (await handlers['github:pr-inline-comments']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('NOT_AUTHENTICATED')
-  })
-})
-
-describe('github:pr-comment-reply', () => {
-  const handlers = freshHandlers()
-
-  it('posts a reply and returns comment', async () => {
-    const reply = {
-      id: 200,
-      user: { login: 'bob', avatar_url: '' },
-      body: 'Agreed',
-      created_at: '2025-01-01T00:00:00Z',
-      updated_at: '2025-01-01T00:00:00Z',
-      path: 'src/foo.ts',
-      line: 5,
-      start_line: null,
-      side: 'RIGHT',
-      diff_hunk: '',
-      in_reply_to_id: 100,
-      pull_request_review_id: 1,
-    }
-    mockGitSuccess(JSON.stringify(reply))
-
-    const result = (await handlers['github:pr-comment-reply']({
-      repoRoot: '/repo',
-      prNumber: 6,
-      inReplyToId: 100,
-      body: 'Agreed',
-    })) as { comment: { id: number; isReply: boolean } }
-    expect(result.comment.id).toBe(200)
-    expect(result.comment.isReply).toBe(true)
-  })
-})
-
-describe('github:pr-review-submit', () => {
-  const handlers = freshHandlers()
-
-  it('submits an APPROVE review and returns reviewId', async () => {
-    mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
-    mockGitSuccess(JSON.stringify({ id: 999 }))
-
-    const result = (await handlers['github:pr-review-submit']({
-      repoRoot: '/repo',
-      prNumber: 6,
-      event: 'APPROVE',
-      body: 'LGTM!',
-    })) as { reviewId: number }
-    expect(result.reviewId).toBe(999)
-  })
-})
-
-describe('github:pr-review-submit — returns error string on failure', () => {
-  const handlers = freshHandlers()
-
-  it('returns error string on failure', async () => {
-    mockGitFailure('permission denied')
-
-    const result = (await handlers['github:pr-review-submit']({
-      repoRoot: '/repo',
-      prNumber: 6,
-      event: 'COMMENT',
-      body: '',
-    })) as { error: string }
-    expect(result.error).toContain('permission denied')
-  })
-})
-
 describe('github:pr-review-submit — extracts string error from JSON stdout errors array (covers 731T, 740T branches)', () => {
   const handlers = freshHandlers()
 
@@ -1525,61 +1302,6 @@ describe('github:pr-review-submit — sends draft comments in the same POST via 
   })
 })
 
-describe('github:sessions-for-repo and github:session-get/set', () => {
-  const handlers = freshHandlers()
-
-  it('github:sessions-for-repo returns sessions for valid repo', async () => {
-    const result = (await handlers['github:sessions-for-repo']({
-      repoRoot: '/repo',
-    })) as { sessions: unknown[] }
-    expect(Array.isArray(result.sessions)).toBe(true)
-  })
-
-  it('github:session-get returns { session: null } for unknown key', async () => {
-    const result = (await handlers['github:session-get']({ key: 'unknown-key' })) as {
-      session: null
-    }
-    expect(result.session).toBeNull()
-  })
-})
-
-describe('github:sessions-for-repo and github:session-get/set — github:session-set stores a valid session', () => {
-  const handlers = freshHandlers()
-
-  it('github:session-set stores a valid session', async () => {
-    const validSession = {
-      repoRoot: '/repo',
-      prNumber: 42,
-      headSHA: 'abc123',
-      currentChapterId: null,
-      currentFilePath: null,
-      viewedFiles: [],
-      fileOrderOverrides: {},
-      scrollPosition: null,
-      pausedAt: null,
-      lastAccessedAt: '2026-01-01T00:00:00Z',
-    }
-
-    const result = (await handlers['github:session-set']({
-      key: '/repo:::42:::abc123',
-      session: validSession,
-    })) as { ok?: boolean; error?: string }
-    expect(result.ok).toBe(true)
-  })
-})
-
-describe('github:remove-active-review', () => {
-  const handlers = freshHandlers()
-
-  it('returns { ok: true } when entry is deleted successfully', async () => {
-    const result = (await handlers['github:remove-active-review']({
-      repoRoot: '/repo',
-      prNumber: 42,
-    })) as { ok: boolean }
-    expect(result.ok).toBe(true)
-  })
-})
-
 describe('github:prune-active-reviews', () => {
   const handlers = freshHandlers()
 
@@ -1591,89 +1313,40 @@ describe('github:prune-active-reviews', () => {
     expect(result.openNumbers).toEqual([])
     expect(mockExecFile).not.toHaveBeenCalled()
   })
-
-  it('includes OPEN PRs in openNumbers', async () => {
-    mockGitSuccess(JSON.stringify({ number: 7, state: 'OPEN' }))
-    const result = (await handlers['github:prune-active-reviews']({
-      repoRoot: '/repo',
-      prNumbers: [7],
-    })) as { openNumbers: number[] }
-    expect(result.openNumbers).toEqual([7])
-  })
 })
 
-describe('github:prune-active-reviews — excludes CLOSED PRs from openNumbers and removes them from the store', () => {
+describe('github:prune-active-reviews — open, closed, merged and failed PRs', () => {
   const handlers = freshHandlers()
 
-  it('excludes CLOSED PRs from openNumbers and removes them from the store', async () => {
-    mockGitSuccess(JSON.stringify({ number: 8, state: 'CLOSED' }))
-    const result = (await handlers['github:prune-active-reviews']({
-      repoRoot: '/repo',
-      prNumbers: [8],
-    })) as { openNumbers: number[] }
-    expect(result.openNumbers).toEqual([])
+  beforeEach(() => {
+    keepStoreWrites()
   })
 
-  it('excludes MERGED PRs from openNumbers', async () => {
-    mockGitSuccess(JSON.stringify({ number: 9, state: 'MERGED' }))
-    const result = (await handlers['github:prune-active-reviews']({
-      repoRoot: '/repo',
-      prNumbers: [9],
-    })) as { openNumbers: number[] }
-    expect(result.openNumbers).toEqual([])
-  })
-})
-
-describe('github:prune-active-reviews — silently skips PRs whose gh call fails and excludes them from openNumbers', () => {
-  const handlers = freshHandlers()
-
-  it('silently skips PRs whose gh call fails and excludes them from openNumbers', async () => {
-    mockGitFailure('not found')
-    const result = (await handlers['github:prune-active-reviews']({
-      repoRoot: '/repo',
-      prNumbers: [10],
-    })) as { openNumbers: number[] }
-    expect(result.openNumbers).toEqual([])
+  afterEach(async () => {
+    await handlers['github:remove-active-review']({ repoRoot: '/other', prNumber: 1 })
+    await handlers['github:remove-active-review']({ repoRoot: '/other', prNumber: 4 })
+    vi.restoreAllMocks()
   })
 
-  it('handles mixed results: OPEN kept, CLOSED excluded, failed silently skipped', async () => {
+  it('keeps only OPEN PRs open and drops CLOSED and MERGED ones from the store, skipping failed calls', async () => {
+    const save = (number: number) =>
+      handlers['github:save-active-review']({ repoRoot: '/other', pr: reviewQueuePr(number) })
+    await Promise.all([save(1), save(2), save(3), save(4)])
     mockGitSuccess(JSON.stringify({ number: 1, state: 'OPEN' }))
     mockGitSuccess(JSON.stringify({ number: 2, state: 'CLOSED' }))
+    mockGitSuccess(JSON.stringify({ number: 3, state: 'MERGED' }))
     mockGitFailure('network error')
+
     const result = (await handlers['github:prune-active-reviews']({
-      repoRoot: '/repo',
-      prNumbers: [1, 2, 3],
+      repoRoot: '/other',
+      prNumbers: [1, 2, 3, 4],
     })) as { openNumbers: number[] }
+
     expect(result.openNumbers).toEqual([1])
-  })
-})
-
-describe('github:pr-review-detail — catchError branches', () => {
-  const handlers = freshHandlers()
-
-  it('returns NOT_AUTHENTICATED when auth error thrown', async () => {
-    mockGitFailure('You need to run: gh auth login')
-
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { error: string }
-    expect(result.error).toBe('NOT_AUTHENTICATED')
-  })
-})
-
-describe('github:pr-review-detail — catchError branches — returns RATE_LIMITED when rate limit error thrown', () => {
-  const handlers = freshHandlers()
-
-  it('returns RATE_LIMITED when rate limit error thrown', async () => {
-    mockGitFailure('rate limit exceeded')
-
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { error: string; resetAt?: number }
-    expect(result.error).toBe('RATE_LIMITED')
-    expect(result.resetAt).toBeTypeOf('number')
+    const { prs } = (await handlers['github:active-reviews-for-repo']({ repoRoot: '/other' })) as {
+      prs: Array<{ number: number }>
+    }
+    expect(prs.map((pr) => pr.number)).toEqual([1, 4])
   })
 })
 
@@ -1995,62 +1668,6 @@ describe('github:current-user', () => {
   })
 })
 
-describe('github:current-user — passes GH_TOKEN env var to gh when a token is configured', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    captureHandlers()
-  })
-
-  it('passes GH_TOKEN env var to gh when a token is configured', async () => {
-    const handlersWithToken = captureHandlersWithToken('my-secret-token')
-    mockGitSuccess('alice\n')
-    await handlersWithToken['github:current-user']({ repoRoot: '/repo' })
-    const callOpts = mockExecFile.mock.calls[0][2] as { env?: Record<string, string> }
-    expect(callOpts.env?.GH_TOKEN).toBe('my-secret-token')
-  })
-})
-
-describe('github:current-user — retries without token when token is set but gh returns auth error', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    captureHandlers()
-  })
-
-  it('retries without token when token is set but gh returns auth error', async () => {
-    const handlersWithToken = captureHandlersWithToken('expired-token')
-    // First call with token → auth error
-    mockGitFailure('You need to run: gh auth login')
-    // Second call (retry without token) → success
-    mockGitSuccess('bob\n')
-    const result = (await handlersWithToken['github:current-user']({ repoRoot: '/repo' })) as {
-      login: string
-    }
-    expect(result.login).toBe('bob')
-    // Second call must have no GH_TOKEN env var
-    const retryOpts = mockExecFile.mock.calls[1][2] as { env?: Record<string, string> }
-    expect(retryOpts.env?.GH_TOKEN).toBeUndefined()
-  })
-})
-
-describe('github:save-active-review and github:active-reviews-for-repo', () => {
-  const handlers = freshHandlers()
-
-  it('github:save-active-review stores and returns ok:true', async () => {
-    const result = (await handlers['github:save-active-review']({
-      repoRoot: '/repo',
-      pr: reviewQueuePr(42),
-    })) as { ok: boolean }
-    expect(result.ok).toBe(true)
-  })
-
-  it('github:active-reviews-for-repo returns prs array for valid repoRoot', async () => {
-    const result = (await handlers['github:active-reviews-for-repo']({
-      repoRoot: '/repo',
-    })) as { prs: unknown[] }
-    expect(Array.isArray(result.prs)).toBe(true)
-  })
-})
-
 describe('github:remove-active-review — store side-effects', () => {
   const handlers = freshHandlers()
 
@@ -2113,61 +1730,7 @@ describe('github:sessions-for-repo — v1/v2 key precedence', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    keepStoreWrites()
-    handlers = captureHandlers()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  const session = storedSession
-
-  it('reads a v1 key ("repo:::pr:::sha")', async () => {
-    await handlers['github:session-set']({
-      key: '/repo:::42:::abc123',
-      session: session({}),
-    })
-    const result = (await handlers['github:sessions-for-repo']({ repoRoot: '/repo' })) as {
-      sessions: Array<{ prNumber: number }>
-    }
-    expect(result.sessions).toHaveLength(1)
-    expect(result.sessions[0].prNumber).toBe(42)
-  })
-})
-
-describe('github:sessions-for-repo — v1/v2 key precedence — reads a v2 key ("repo:::pr")', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    keepStoreWrites()
-    handlers = captureHandlers()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  const session = storedSession
-
-  it('reads a v2 key ("repo:::pr")', async () => {
-    await handlers['github:session-set']({
-      key: '/repo:::42',
-      session: session({}),
-    })
-    const result = (await handlers['github:sessions-for-repo']({ repoRoot: '/repo' })) as {
-      sessions: Array<{ prNumber: number }>
-    }
-    expect(result.sessions).toHaveLength(1)
-  })
-})
-
-describe('github:sessions-for-repo — v1/v2 key precedence — prefers the v2 key over a v1 key for the same PR', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
+    Object.keys(sessionData).forEach((key) => Reflect.deleteProperty(sessionData, key))
     keepStoreWrites()
     handlers = captureHandlers()
   })

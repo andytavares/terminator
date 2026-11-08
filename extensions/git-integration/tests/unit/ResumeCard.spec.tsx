@@ -136,13 +136,6 @@ describe('ResumeCard — shows the last-position row with chapter and file', () 
   })
 })
 
-describe('ResumeCard — omits the last-position row when there is no current file', () => {
-  it('omits the last-position row when there is no current file', () => {
-    renderCard()
-    expect(screen.queryByText('last position')).toBeNull()
-  })
-})
-
 describe('ResumeCard — shows notes with the question quoted and an Ask agent button', () => {
   it('shows notes with the question quoted and an Ask agent button', () => {
     renderCard({ notes: [makeNote(), makeNote({ id: 'n2', body: 'a plain note' })] })
@@ -211,6 +204,7 @@ describe('ResumeCard — shows the push-since row only when files changed since 
 describe('ResumeCard — omits empty rows entirely', () => {
   it('omits empty rows entirely', () => {
     renderCard()
+    expect(screen.queryByText('last position')).toBeNull()
     expect(screen.queryByText('Review drafts')).toBeNull()
     expect(screen.queryByText('Ask agent')).toBeNull()
     expect(screen.queryByText(/push since/)).toBeNull()

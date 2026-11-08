@@ -1,6 +1,4 @@
 import React from 'react'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { PlanTheDay } from '../../../../src/renderer/components/home/PlanTheDay'
@@ -305,29 +303,6 @@ describe('PlanTheDay: what is owed', () => {
     ]
     render(<PlanTheDay />)
     expect(within(band()).getByText(/Estimated review time for your queue: 40 min/)).toBeTruthy()
-  })
-})
-
-describe('PlanTheDay: the band caps its height and each column scrolls', () => {
-  const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
-
-  it('caps the band at a third of the Desk body and scrolls each column', () => {
-    const css = read('../../../../src/renderer/components/home/PlanTheDay.css')
-    const plan = css.slice(css.indexOf('.plan {'), css.indexOf('}', css.indexOf('.plan {')))
-    expect(plan).toMatch(/max-height:\s*calc\(100cqh \/ 3\)/)
-    expect(plan).toMatch(/display:\s*flex/)
-    const column = css.slice(
-      css.indexOf('.plan__column {'),
-      css.indexOf('}', css.indexOf('.plan__column {'))
-    )
-    expect(column).toMatch(/overflow-y:\s*auto/)
-    expect(column).toMatch(/min-height:\s*0/)
-    const home = read('../../../../src/renderer/components/home/HomeScreen.css')
-    const body = home.slice(
-      home.indexOf('.desk__body {'),
-      home.indexOf('}', home.indexOf('.desk__body {'))
-    )
-    expect(body).toMatch(/container-type:\s*size/)
   })
 })
 

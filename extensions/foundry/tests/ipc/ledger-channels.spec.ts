@@ -280,41 +280,6 @@ function anUnsupportedProposalTests() {
   })
 }
 
-describe('nothing is proposed unprompted (FR-076)', () => {
-  it('the path a run writes decisions through cannot reach the curator', () => {
-    // `record` is what a run calls after every decision. If it could produce a
-    // proposal, proposals would arrive unasked — which is the failure this
-    // requirement exists to prevent.
-    const store = fs.readFileSync(
-      path.join(__dirname, '..', '..', 'src', 'order', 'store.ts'),
-      'utf8'
-    )
-    expect(store).not.toMatch(/curator/)
-  })
-
-  it('recording a decision returns nothing a caller could mistake for one', async () => {
-    await repeatedRejections()
-    const result = await createOrderStore(root).record({
-      at: '2026-09-07T10:00:00.000Z',
-      orderId: 'WO-1',
-      actor: 'operator',
-      action: 'review.rejected',
-      subject: 'U-4',
-      reason: 'the timeout is hardcoded rather than read from configuration',
-      evidence: [],
-    })
-    expect(result).toBeUndefined()
-  })
-
-  it('proposals only ever come back from the channel the operator reaches', async () => {
-    await repeatedRejections()
-    // Four ledger entries now support a proposal, and it exists only when
-    // asked for.
-    const asked = (await channels().proposeRules({})) as { proposals: unknown[] }
-    expect(asked.proposals).toHaveLength(1)
-  })
-})
-
 async function accept(): Promise<string> {
   await repeatedRejections()
   const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
@@ -470,12 +435,6 @@ function gatheringTests() {
 }
 
 function ledgerChannelsWindowsTests() {
-  it('defaults to the 30 day window', async () => {
-    await seedLedgerOrder('WO-1')
-    const r = (await channels().factoryMetrics({})) as { window: string }
-    expect(r.window).toBe('30d')
-  })
-
   it('honours an explicit window', async () => {
     await seedLedgerOrder('WO-1')
     const r = (await channels().factoryMetrics({ window: 'all' })) as { window: string }

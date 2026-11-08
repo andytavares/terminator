@@ -37,11 +37,6 @@ function commentComposerTests() {
 }
 
 function commentComposerEditingTests() {
-  it('renders a textarea for the comment body', () => {
-    render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={vi.fn()} />)
-    expect(screen.getByRole('textbox')).toBeTruthy()
-  })
-
   it('submit button is disabled when body is empty', () => {
     render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={vi.fn()} />)
     const btn = screen.getByRole('button', { name: /add comment/i })

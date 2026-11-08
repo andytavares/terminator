@@ -95,21 +95,6 @@ async function auditReportsOnlyMisalignedControls(): Promise<void> {
   expect(found[0]).toContain('"Add task" (28px) beside button. "Add" (34px)')
 }
 
-test('form controls under the shared sheet are themed, one height, and audited for alignment', async () => {
-  for (const theme of ['dark', 'light'] as const) {
-    await test.step(`a classless field is the themed field, in the ${theme} theme`, () =>
-      classlessFieldIsThemed(theme))
-  }
-  await test.step(
-    'a field, a button and an icon button of one size are one height',
-    controlsOfOneSizeAreOneHeight
-  )
-  await test.step(
-    'the alignment audit reports controls that do not line up, and only those',
-    auditReportsOnlyMisalignedControls
-  )
-})
-
 /** Markdown under the core sheets in the bundle's order: the design system first, then core's. */
 async function markdownListIndent(): Promise<number> {
   const sheet = (path: string) => readFileSync(join(ROOT, path), 'utf8')
@@ -125,6 +110,25 @@ async function markdownListIndent(): Promise<number> {
   })
 }
 
-test("core's reset leaves Markdown its list indent, so bullets sit inside the pane", async () => {
+async function markdownKeepsItsListIndent(): Promise<void> {
   await expect.poll(() => markdownListIndent()).toBe(20)
+}
+
+test('the shared sheets theme form controls at one height, audit their alignment and keep Markdown indented', async () => {
+  for (const theme of ['dark', 'light'] as const) {
+    await test.step(`a classless field is the themed field, in the ${theme} theme`, () =>
+      classlessFieldIsThemed(theme))
+  }
+  await test.step(
+    'a field, a button and an icon button of one size are one height',
+    controlsOfOneSizeAreOneHeight
+  )
+  await test.step(
+    'the alignment audit reports controls that do not line up, and only those',
+    auditReportsOnlyMisalignedControls
+  )
+  await test.step(
+    "core's reset leaves Markdown its list indent, so bullets sit inside the pane",
+    markdownKeepsItsListIndent
+  )
 })

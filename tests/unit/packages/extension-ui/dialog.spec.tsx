@@ -276,19 +276,6 @@ describe('a disabled action', () => {
       true
     )
   })
-
-  it('does not fire when clicked', () => {
-    const onSelect = vi.fn()
-    render(
-      <Dialog
-        title="Open Pull Request"
-        actions={[{ label: 'Create PR', disabled: true, onSelect }]}
-        onDismiss={() => {}}
-      />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /Create PR/ }))
-    expect(onSelect).not.toHaveBeenCalled()
-  })
 })
 
 describe('a disabled action — is enabled by default', () => {

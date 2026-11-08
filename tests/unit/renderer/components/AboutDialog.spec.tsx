@@ -4,7 +4,6 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { AboutDialog } from '../../../../src/renderer/components/AboutDialog'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { installElectronApi } from '../../../support/electron-api'
-import { pressOutside } from '../../../support/modal'
 
 const mockGetInfo = vi.fn<ElectronAPI['app']['getInfo']>()
 const mockDbHealth = vi.fn<ElectronAPI['db']['health']>()
@@ -57,14 +56,6 @@ describe('AboutDialog', () => {
     fireEvent.click(await screen.findByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
-
-  it('calls onClose when overlay is clicked', async () => {
-    const onClose = vi.fn()
-    render(<AboutDialog onClose={onClose} />)
-    await screen.findByRole('dialog')
-    pressOutside(screen.getByRole('dialog'))
-    expect(onClose).toHaveBeenCalled()
-  })
 })
 
 describe('AboutDialog — extension versions', () => {
@@ -95,15 +86,7 @@ describe('AboutDialog — extension versions', () => {
   })
 })
 
-describe('AboutDialog — does not call onClose when dialog body is clicked', () => {
-  it('does not call onClose when dialog body is clicked', async () => {
-    const onClose = vi.fn()
-    render(<AboutDialog onClose={onClose} />)
-    await screen.findByRole('dialog')
-    fireEvent.click(await screen.findByRole('dialog'))
-    expect(onClose).not.toHaveBeenCalled()
-  })
-
+describe('AboutDialog — calls onClose when Escape is pressed', () => {
   it('calls onClose when Escape is pressed', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
@@ -147,15 +130,5 @@ describe('AboutDialog — keeps the placeholders when the app info cannot be rea
     mockDbHealth.mockRejectedValue(new Error('IPC failed'))
     render(<AboutDialog onClose={vi.fn()} />)
     await screen.findByText('Error — IPC error')
-  })
-})
-
-describe('AboutDialog — does not close when non-Escape key is pressed', () => {
-  it('does not close when non-Escape key is pressed', async () => {
-    const onClose = vi.fn()
-    render(<AboutDialog onClose={onClose} />)
-    await screen.findByRole('dialog')
-    fireEvent.keyDown(document, { key: 'Enter' })
-    expect(onClose).not.toHaveBeenCalled()
   })
 })

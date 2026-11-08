@@ -1,6 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import React from 'react'
-import { isValidElement } from 'react'
 import { iconFromName } from '../../../src/renderer/extensions/icon-from-name'
 
 /** The names an extension manifest may give its icon (docs/EXTENSION-DEVELOPMENT.md). */
@@ -31,34 +29,16 @@ const CURATED_ICON_NAMES = [
 ]
 
 describe('iconFromName', () => {
-  it('returns a React element for known icon names', () => {
-    const el = iconFromName('wrench')
-    expect(isValidElement(el)).toBe(true)
-  })
-
-  it('returns Puzzle for unknown icon names', () => {
-    const unknown = iconFromName('not-a-real-icon')
-    const puzzle = iconFromName('puzzle')
-    expect(isValidElement(unknown)).toBe(true)
-    const unknownType = (unknown as React.ReactElement).type
-    const puzzleType = (puzzle as React.ReactElement).type
-    expect(unknownType).toBe(puzzleType)
-  })
-
-  it('returns Puzzle for empty string', () => {
-    const el = iconFromName('')
-    const puzzle = iconFromName('puzzle')
-    expect((el as React.ReactElement).type).toBe((puzzle as React.ReactElement).type)
+  it.each([
+    ['an unknown name', 'not-a-real-icon'],
+    ['an empty name', ''],
+    ['an uppercase name, since names are case-sensitive', 'Wrench'],
+  ])('falls back to Puzzle for %s', (_case, name) => {
+    expect(iconFromName(name).type).toBe(iconFromName('puzzle').type)
   })
 
   it('maps all curated icon names to distinct elements', () => {
     const types = CURATED_ICON_NAMES.map((name) => iconFromName(name).type)
     expect(new Set(types).size).toBe(CURATED_ICON_NAMES.length)
-  })
-
-  it('is case-sensitive — uppercase is treated as unknown', () => {
-    const el = iconFromName('Wrench')
-    const puzzle = iconFromName('puzzle')
-    expect((el as React.ReactElement).type).toBe((puzzle as React.ReactElement).type)
   })
 })

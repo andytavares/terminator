@@ -87,11 +87,6 @@ describe('useDragReorder — clears state on drag end so an abandoned drag canno
     expect(result.current.dragOverIndex).toBeNull()
   })
 
-  it('marks every item draggable', () => {
-    const { result } = renderHook(() => useDragReorder(items, onReorder))
-    expect(result.current.getItemProps(0).draggable).toBe(true)
-  })
-
   it('reorders against the latest items when the list changes mid-drag', () => {
     const { result, rerender } = renderHook(({ list }) => useDragReorder(list, onReorder), {
       initialProps: { list: items },

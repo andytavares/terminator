@@ -31,9 +31,6 @@ const PROVIDER_OPERATIONS = [
  * operator asked for (ADR-061); neither can set a field of an existing one. */
 const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition', 'create'] as const
 
-/** What a provider may expose but need not: callers ask the issue service first. */
-const PROVIDER_OPTIONAL_OPERATIONS = ['states', 'transition', 'teams', 'create'] as const
-
 const providers = [['linear', createLinearProvider(() => ({}) as never)]] as const
 
 // Anything matching these would be a write we have not sanctioned.
@@ -56,10 +53,6 @@ function methodsOf(provider: unknown): string[] {
   )
 }
 
-const REQUIRED_OPERATIONS = PROVIDER_OPERATIONS.filter(
-  (operation) => !(PROVIDER_OPTIONAL_OPERATIONS as readonly string[]).includes(operation)
-)
-
 describe('TrackerProvider surface', () => {
   it.each(providers)('%s exposes nothing beyond the sanctioned operations', (_name, provider) => {
     for (const method of methodsOf(provider)) {
@@ -67,19 +60,6 @@ describe('TrackerProvider surface', () => {
         (PROVIDER_OPERATIONS as readonly string[]).includes(method),
         `provider method "${method}" is not in PROVIDER_OPERATIONS`
       ).toBe(true)
-    }
-  })
-
-  it.each(providers)('%s implements every required operation', (_name, provider) => {
-    for (const operation of REQUIRED_OPERATIONS) {
-      expect(methodsOf(provider)).toContain(operation)
-    }
-  })
-
-  it('linear implements every optional operation', () => {
-    const [, linear] = providers[0]
-    for (const operation of PROVIDER_OPTIONAL_OPERATIONS) {
-      expect(methodsOf(linear)).toContain(operation)
     }
   })
 })
@@ -94,12 +74,6 @@ describe('TrackerProvider writes', () => {
           `provider method "${method}" looks like a mutation; FR-034 permits only comment`
         ).toBe(false)
       }
-    }
-  })
-
-  it('sanctions no way to delete or archive an issue', () => {
-    for (const operation of PROVIDER_OPERATIONS) {
-      expect(/^(delete|archive)/i.test(operation)).toBe(false)
     }
   })
 

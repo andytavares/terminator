@@ -44,11 +44,6 @@ describe('a view that did not exist to hear it', () => {
     openInVault(api(), { taskId: 't-2' })
     expect(popPendingNavigation()).toMatchObject({ taskId: 't-2' })
   })
-
-  it('holds nothing for a bare "open the vault"', () => {
-    openInVault(api())
-    expect(popPendingNavigation()).toBeNull()
-  })
 })
 
 function takingSomeoneTaskTests() {

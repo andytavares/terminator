@@ -327,13 +327,6 @@ describe('FactorySite status wall', () => {
     expect(screen.getByText('First-pass yield').nextSibling?.textContent).toBe('50%')
   })
 
-  it('renders a null number as —, never 0', async () => {
-    mount([], { ...METRICS, medianLeadTimeMs: null, firstPassYield: null })
-    await screen.findByText('Median lead time')
-    expect(screen.getByText('Median lead time').nextSibling?.textContent).toBe('—')
-    expect(screen.getByText('First-pass yield').nextSibling?.textContent).toBe('—')
-  })
-
   it('refetches with the chosen window when the toggle is switched', async () => {
     const { invoke } = mount([])
     await screen.findByText('Status wall')

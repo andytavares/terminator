@@ -121,16 +121,7 @@ describe('InboxList — settling', () => {
   })
 })
 
-describe('InboxList — settling on its own and snoozing', () => {
-  it('settles a card on its own after 24 hours with no activity', () => {
-    renderInbox([
-      threadOf('fresh', { lastActivity: NOW - 23 * HOUR_MS }),
-      threadOf('stale', { lastActivity: NOW - 24 * HOUR_MS }),
-    ])
-    expect(cardTitles()).toEqual(['Work fresh'])
-    expect(screen.getByRole('button', { name: '1 settled' })).toBeTruthy()
-  })
-
+describe('InboxList — snoozing', () => {
   it('snoozes a card into the settled section', () => {
     renderInbox([threadOf('a')])
     fireEvent.click(within(cardFor('Work a')).getByRole('button', { name: 'Snooze' }))

@@ -492,22 +492,16 @@ describe('App — shows Welcome to Terminator EmptyState when no welcome seen', 
     expect(screen.getByRole('heading', { name: 'Select a workspace to get started' })).toBeTruthy()
   })
 
-  it('opens SettingsPanel via menu:open-settings IPC event', async () => {
+  it('opens SettingsPanel via menu:open-settings IPC event, and closes it', async () => {
     render(<App />)
     expect(screen.queryByTestId('settings-panel')).toBeNull()
-    act(() => main.events.openSettings.deliver())
-    await screen.findByTestId('settings-panel')
-  })
-})
-
-describe('App — closes SettingsPanel when onClose is called', () => {
-  it('closes SettingsPanel when onClose is called', async () => {
-    render(<App />)
     act(() => main.events.openSettings.deliver())
     fireEvent.click(await screen.findByText('Close Settings'))
     await waitFor(() => expect(screen.queryByTestId('settings-panel')).toBeNull())
   })
+})
 
+describe("App — marks the session exited when main reports its process's exit", () => {
   it("marks the session exited when main reports its process's exit", () => {
     setupApp({ sessions: [terminalSessionOf({ id: 'sess-1', projectId: 'p1', tabTitle: 'zsh' })] })
     render(<App />)
@@ -547,31 +541,19 @@ describe('App — records the welcome as seen once a project is opened', () => {
     await screen.findByTestId('settings-panel')
   })
 
-  it('opens LogWindow via onToggleLog keyboard shortcut callback', async () => {
+  it('opens LogWindow via onToggleLog keyboard shortcut callback, and closes it', async () => {
     render(<App />)
     expect(screen.queryByTestId('log-window')).toBeNull()
-    act(() => shortcuts.callbacks.onToggleLog?.())
-    await screen.findByTestId('log-window')
-  })
-})
-
-describe('App — closes LogWindow when its onClose is called', () => {
-  it('closes LogWindow when its onClose is called', async () => {
-    render(<App />)
     act(() => shortcuts.callbacks.onToggleLog?.())
     fireEvent.click(await screen.findByText('Close Log'))
     await waitFor(() => expect(screen.queryByTestId('log-window')).toBeNull())
   })
+})
 
-  it('opens CommandPalette via onOpenCommandPalette keyboard shortcut callback', async () => {
+describe('App — opens CommandPalette via onOpenCommandPalette keyboard shortcut callback, and closes it', () => {
+  it('opens CommandPalette via onOpenCommandPalette keyboard shortcut callback, and closes it', async () => {
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
-    openPalette()
-    await screen.findByTestId('quick-actions')
-  })
-
-  it('closes CommandPalette when its onClose is called', async () => {
-    render(<App />)
     openPalette()
     fireEvent.click(await screen.findByText('Close Palette'))
     await waitFor(() => expect(screen.queryByTestId('quick-actions')).toBeNull())
@@ -705,26 +687,18 @@ describe('App — command core.toggle-log action opens LogWindow', () => {
     await runAction('core.switch-workspace-ws-1')
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-1')
   })
-
-  it('command core.split-vertical action splits the active project', async () => {
-    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
-    render(<App />)
-    openPalette()
-    await runAction('core.split-vertical')
-    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', {
-      cwd: '/a',
-      scrollbackLimit: 10000,
-    })
-  })
 })
 
-describe('App — command core.toggle-log action opens LogWindow — command core.split-horizontal action splits the active project', () => {
-  it('command core.split-horizontal action splits the active project', async () => {
+describe('App — command core.split-* action splits the active project', () => {
+  it.each([
+    ['core.split-vertical', 'vertical'],
+    ['core.split-horizontal', 'horizontal'],
+  ])('command %s action splits the active project %s', async (actionId, direction) => {
     setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
     openPalette()
-    await runAction('core.split-horizontal')
-    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', {
+    await runAction(actionId)
+    expect(splitSession).toHaveBeenCalledWith('proj-1', direction, {
       cwd: '/a',
       scrollbackLimit: 10000,
     })

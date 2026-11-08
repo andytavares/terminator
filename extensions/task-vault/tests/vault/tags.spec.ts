@@ -134,16 +134,4 @@ function extractTagsNoTagsTests() {
     expect(result.terminatorLinks).toEqual([])
     expect(result.metadata).toEqual({})
   })
-
-  it('returns empty terminatorLinks when no terminator links present (loop not entered)', () => {
-    // This exercises the case where the while loop at lines 29-31 is never entered
-    const result = extractTags('No links here at all')
-    expect(result.terminatorLinks).toHaveLength(0)
-  })
-
-  it('returns empty metadata when no key:value pairs present', () => {
-    // Lines 51-59: while loop not entered when no meta patterns
-    const result = extractTags('Simple task @project')
-    expect(result.metadata).toEqual({})
-  })
 }

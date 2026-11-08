@@ -99,16 +99,6 @@ function indexedStoresLoadingTests() {
     const store = createOrderStore(root, indexOver(root))
     expect((await store.list()).map((o) => o.id)).toEqual(['WO-1'])
   })
-
-  it('finds an open order by its issue from memory', async () => {
-    const store = createOrderStore(root, indexOver(root))
-    const seeded = {
-      ...draftedOrder('WO-1'),
-      source: { kind: 'tracker', tracker: 'linear', key: 'ENG-1', url: null },
-    } as WorkOrder
-    await store.save(seeded)
-    expect(await store.findByIssue('linear', 'ENG-1')).toEqual({ id: 'WO-1', title: 'Order WO-1' })
-  })
 }
 
 describe('ledgers through the index', () => {

@@ -69,20 +69,12 @@ describe('InlineCommentThread', () => {
     expect(screen.getByText('Nice code')).toBeTruthy()
   })
 
-  it('shows outdated label when thread is outdated', () => {
-    render(<InlineCommentThread thread={makeThread({ outdated: true })} />)
-    expect(screen.getByText('Outdated')).toBeTruthy()
-  })
-
-  it('does not show outdated label when not outdated', () => {
-    render(<InlineCommentThread thread={makeThread({ outdated: false })} />)
-    expect(screen.queryByText('Outdated')).toBeNull()
-  })
-
-  it('shows reply button when onReply is provided', () => {
-    const onReply = vi.fn()
-    render(<InlineCommentThread thread={makeThread()} onReply={onReply} />)
-    expect(screen.getByRole('button', { name: 'Reply' })).toBeTruthy()
+  it.each([
+    { outdated: true, labelCount: 1 },
+    { outdated: false, labelCount: 0 },
+  ])('shows $labelCount Outdated label when outdated is $outdated', ({ outdated, labelCount }) => {
+    render(<InlineCommentThread thread={makeThread({ outdated })} />)
+    expect(screen.queryAllByText('Outdated')).toHaveLength(labelCount)
   })
 })
 
@@ -148,26 +140,6 @@ describe('InlineCommentThread — expands collapsed thread when show more is cli
   })
 })
 
-describe('InlineCommentThread — shows singular reply label for single hidden comment', () => {
-  it('shows singular "reply" label for single hidden comment', () => {
-    const thread = makeThread({
-      collapsed: true,
-      comments: [
-        comment(),
-        comment({
-          id: 2,
-          author: 'bob',
-          body: 'Second',
-          createdAt: '2024-01-01T01:00:00Z',
-          isReply: true,
-        }),
-      ],
-    })
-    render(<InlineCommentThread thread={thread} />)
-    expect(screen.getByText('Show 1 more reply')).toBeTruthy()
-  })
-})
-
 describe('InlineCommentThread — renders avatar image', () => {
   it('renders avatar image', () => {
     render(<InlineCommentThread thread={makeThread()} />)
@@ -175,14 +147,11 @@ describe('InlineCommentThread — renders avatar image', () => {
     expect(img.getAttribute('alt')).toBe('alice')
   })
 
-  it('shows "Resolved" and dims the thread when resolved', () => {
-    const { container } = render(<InlineCommentThread thread={makeThread({ resolved: true })} />)
-    expect(screen.getByText('Resolved')).toBeTruthy()
-    expect(container.querySelector('.rs-thread--resolved')).toBeTruthy()
-  })
-
-  it('does not show "Resolved" when not resolved', () => {
-    render(<InlineCommentThread thread={makeThread({ resolved: false })} />)
-    expect(screen.queryByText('Resolved')).toBeNull()
+  it.each([
+    { resolved: true, labelCount: 1 },
+    { resolved: false, labelCount: 0 },
+  ])('shows $labelCount Resolved label when resolved is $resolved', ({ resolved, labelCount }) => {
+    render(<InlineCommentThread thread={makeThread({ resolved })} />)
+    expect(screen.queryAllByText('Resolved')).toHaveLength(labelCount)
   })
 })

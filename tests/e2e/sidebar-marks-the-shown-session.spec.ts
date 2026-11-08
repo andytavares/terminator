@@ -37,34 +37,35 @@ async function openNewestMain(page: Page, repo: string): Promise<void> {
 
 let handle: AppHandle
 
-test.beforeEach(async () => {
+test.beforeAll(async () => {
   handle = await launchApp()
 })
 
-test.afterEach(async () => {
+test.afterAll(async () => {
   await closeApp(handle)
 })
 
-test('marks only the session on screen, and nothing under Home', async () => {
-  const { page } = handle
+// Its terminal row listed, as in the report: the row stayed marked once another repo showed.
+async function marksTheTerminalOnScreen(page: Page): Promise<void> {
   await createWorkspace(page, 'quicknote', gitFolder())
   await openNewestMain(page, 'quicknote')
-  // Its terminal row listed, as in the report: the row stayed marked once another repo showed.
   await page.getByRole('button', { name: 'Show terminals in main' }).click()
   await expect(marked(page)).toHaveCount(1)
   await expect(marked(page)).toHaveClass(/terminal-row/)
+}
+
+async function marksOnlyTheNewRepo(page: Page): Promise<void> {
   await createWorkspace(page, 'terminator', gitFolder())
   await openNewestMain(page, 'terminator')
   await expect(marked(page)).toHaveCount(1)
+}
+
+async function marksNothingUnderHome(page: Page): Promise<void> {
   await openHome(page)
   await expect(marked(page)).toHaveCount(0)
-})
+}
 
-test("draws a row's menu whole, on top of everything", async () => {
-  const { page } = handle
-  await createWorkspace(page, 'quicknote', gitFolder())
-  await openNewestMain(page, 'quicknote')
-  await openHome(page)
+async function rowMenuIsDrawnWhole(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Work actions' }).first().click()
   const items = page.locator('.ctx-menu__item')
   await expect(items.first()).toBeVisible()
@@ -81,4 +82,13 @@ test("draws a row's menu whole, on top of everything", async () => {
     )
     expect(hit).toBe(await item.textContent())
   }
+}
+
+test("the sidebar marks only the session on screen, nothing under Home, and draws a row's menu whole", async () => {
+  const { page } = handle
+  await test.step('marks the terminal row of the branch on screen', () =>
+    marksTheTerminalOnScreen(page))
+  await test.step('marks only the newer repo once it is on screen', () => marksOnlyTheNewRepo(page))
+  await test.step('marks nothing under Home', () => marksNothingUnderHome(page))
+  await test.step("draws a row's menu whole, on top of everything", () => rowMenuIsDrawnWhole(page))
 })

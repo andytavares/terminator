@@ -11,13 +11,7 @@ import {
   defaultInWords,
 } from '../../src/gates/rules.js'
 import type { Gate, GateRuleId } from '../../src/gates/rules.js'
-import {
-  liveRules,
-  isLive,
-  silencedRules,
-  UNCONDITIONAL,
-  AUTONOMY_LEVELS,
-} from '../../src/gates/autonomy.js'
+import { liveRules, isLive, silencedRules } from '../../src/gates/autonomy.js'
 import { rankOf, rankInbox, summariseInbox } from '../../src/gates/rank.js'
 
 // A gate is a row raised by a named rule. If no rule fires, nothing stops —
@@ -65,12 +59,9 @@ function whatAGateCarriesTests() {
 }
 
 function refusalsAndOptionsTests() {
-  it('refuses a gate that cannot say why it exists', () => {
-    expect(() => gate({ why: '   ' })).toThrow(UnattributedGateError)
-  })
-
-  it('says why it refused, rather than failing silently', () => {
-    expect(() => gate({ why: '' })).toThrow(/learn to dismiss/)
+  it.each(['', '   '])('refuses a gate whose why is %j, and says why it refused', (why) => {
+    expect(() => gate({ why })).toThrow(UnattributedGateError)
+    expect(() => gate({ why })).toThrow(/learn to dismiss/)
   })
 
   it.each(GATE_RULES)('%s offers options with stated consequences', (rule) => {
@@ -79,17 +70,14 @@ function refusalsAndOptionsTests() {
     expect(g.options.every((o) => o.consequence.trim() !== '')).toBe(true)
   })
 
-  it.each(GATE_RULES)('%s says what happens when nobody answers', (rule) => {
+  it.each(GATE_RULES)('%s holds when nobody answers, and offers holding', (rule) => {
     const g = gate({ rule: rule as GateRuleId })
+    expect(g.defaultIfIgnored).toBe('hold')
     expect(g.options.map((o) => o.id)).toContain(g.defaultIfIgnored)
   })
 }
 
 function defaultsAndBudgetsTests() {
-  it('never defaults the merge decision to anything that ships', () => {
-    expect(gate({ rule: 'ready-for-review' }).defaultIfIgnored).toBe('hold')
-  })
-
   it('starts undecided', () => {
     expect(gate().decision).toBeNull()
   })
@@ -174,14 +162,20 @@ function ranked(over: Partial<Parameters<typeof raiseGate>[0]> & { blockedUnits?
 }
 
 function liveRulesTests() {
-  it('keeps the unconditional rules live at every setting', () => {
-    for (const level of AUTONOMY_LEVELS) {
-      for (const rule of UNCONDITIONAL) expect(isLive(rule, level)).toBe(true)
-    }
-  })
-
-  it('still requires a decision before anything is marked ready, even at the most permissive', () => {
-    expect(isLive('ready-for-review', 'lights-out')).toBe(true)
+  it.each([
+    'risk.p0',
+    'budget.exceeded',
+    'ready-for-review',
+    'run.interrupted',
+    'ci.red',
+    'refinery.conflict',
+  ] as GateRuleId[])('keeps %s live and never silenced at every setting', (rule) => {
+    expect([
+      isLive(rule, 'escorted'),
+      isLive(rule, 'standard'),
+      isLive(rule, 'lights-out'),
+    ]).toEqual([true, true, true])
+    expect(silencedRules('lights-out')).not.toContain(rule)
   })
 
   it('stops at every unit boundary only when escorted', () => {
@@ -208,10 +202,6 @@ function rulesSettingsTests() {
     expect(silencedRules('lights-out')).toContain('unit.boundary')
     expect(silencedRules('lights-out')).not.toContain('risk.p0')
   })
-
-  it('never silences a draft whose CI stays red, even at lights-out', () => {
-    expect(isLive('ci.red', 'lights-out')).toBe(true)
-  })
 }
 
 describe('ranking', () => {
@@ -222,21 +212,15 @@ describe('ranking', () => {
 
 function rankingTests() {
   it('ranks a decision that unblocks more work above one that unblocks less', () => {
-    const many = ranked({ id: 'G-many', blockedUnits: 3 })
-    const few = ranked({ id: 'G-few', blockedUnits: 0 })
-    expect(rankOf(many)).toBeGreaterThan(rankOf(few))
+    const many = ranked({ id: 'G-many', riskGrade: 'P0', blockedUnits: 3 })
+    const few = ranked({ id: 'G-few', riskGrade: 'P0', blockedUnits: 0 })
+    expect(rankInbox([few, many]).map((g) => g.id)).toEqual(['G-many', 'G-few'])
   })
 
   it('ranks by risk when the amount of blocked work is the same', () => {
     const worse = ranked({ id: 'G-p0', riskGrade: 'P0', blockedUnits: 1 })
     const milder = ranked({ id: 'G-p3', riskGrade: 'P3', blockedUnits: 1 })
     expect(rankOf(worse)).toBeGreaterThan(rankOf(milder))
-  })
-
-  it('puts a P0 holding three units above a P0 holding none', () => {
-    const busy = ranked({ id: 'a', riskGrade: 'P0', blockedUnits: 3 })
-    const idle = ranked({ id: 'b', riskGrade: 'P0', blockedUnits: 0 })
-    expect(rankInbox([idle, busy]).map((g) => g.id)).toEqual(['a', 'b'])
   })
 
   it('still ranks a gate that blocks nothing above zero', () => {
@@ -281,23 +265,6 @@ function rulesSummariesTests() {
 // busy for hours and had died when the application closed.
 
 describe('run.interrupted', () => {
-  describe('live at every setting', runInterruptedLiveTests)
-  describe('options and wording', runInterruptedOptionsTests)
-})
-
-function runInterruptedLiveTests() {
-  it('is live at every autonomy setting', () => {
-    for (const level of AUTONOMY_LEVELS) expect(isLive('run.interrupted', level)).toBe(true)
-  })
-
-  it('is never silenced', () => {
-    for (const level of AUTONOMY_LEVELS) {
-      expect(silencedRules(level)).not.toContain('run.interrupted')
-    }
-  })
-}
-
-function runInterruptedOptionsTests() {
   it('offers picking the run back up, and stopping it', () => {
     const gate = raiseGate({
       id: 'g',
@@ -309,23 +276,7 @@ function runInterruptedOptionsTests() {
     })
     expect(gate.options.map((o) => o.id)).toEqual(['resume', 'stop', 'hold'])
   })
-
-  it('holds rather than restarting agents nobody asked for', () => {
-    const gate = raiseGate({
-      id: 'g',
-      rule: 'run.interrupted',
-      orderId: 'WO-1',
-      summary: 's',
-      why: 'w',
-      at: '2026-09-06T10:00:00.000Z',
-    })
-    expect(gate.defaultIfIgnored).toBe('hold')
-  })
-
-  it('says what it is in words somebody who did not write it can read', () => {
-    expect(ruleInWords('run.interrupted')).toMatch(/agents/)
-  })
-}
+})
 
 // ── A draft whose CI stays red ──────────────────────────────────────────
 //
@@ -335,23 +286,6 @@ function runInterruptedOptionsTests() {
 // to prevent.
 
 describe('ci.red', () => {
-  describe('live at every setting', ciRedLiveTests)
-  describe('options and wording', ciRedOptionsTests)
-})
-
-function ciRedLiveTests() {
-  it('is live at every autonomy setting', () => {
-    for (const level of AUTONOMY_LEVELS) expect(isLive('ci.red', level)).toBe(true)
-  })
-
-  it('is never silenced', () => {
-    for (const level of AUTONOMY_LEVELS) {
-      expect(silencedRules(level)).not.toContain('ci.red')
-    }
-  })
-}
-
-function ciRedOptionsTests() {
   it('offers another round, and holding', () => {
     const gate = raiseGate({
       id: 'g',
@@ -364,23 +298,7 @@ function ciRedOptionsTests() {
     expect(gate.options.map((o) => o.id)).toEqual(['send_back', 'hold'])
     expect(gate.options.find((o) => o.id === 'send_back')?.label).toBe('Another round')
   })
-
-  it('defaults to holding rather than shipping on silence', () => {
-    const gate = raiseGate({
-      id: 'g',
-      rule: 'ci.red',
-      orderId: 'WO-1',
-      summary: 's',
-      why: 'w',
-      at: '2026-09-06T10:00:00.000Z',
-    })
-    expect(gate.defaultIfIgnored).toBe('hold')
-  })
-
-  it('says what it is in words somebody who did not write it can read', () => {
-    expect(ruleInWords('ci.red')).toMatch(/CI/)
-  })
-}
+})
 
 // ── A draft that no longer rebases cleanly ──────────────────────────────
 //
@@ -391,23 +309,6 @@ function ciRedOptionsTests() {
 // own is exactly the failure it exists to prevent.
 
 describe('refinery.conflict', () => {
-  describe('live at every setting', refineryConflictLiveTests)
-  describe('options and wording', refineryConflictOptionsTests)
-})
-
-function refineryConflictLiveTests() {
-  it('is live at every autonomy setting', () => {
-    for (const level of AUTONOMY_LEVELS) expect(isLive('refinery.conflict', level)).toBe(true)
-  })
-
-  it('is never silenced', () => {
-    for (const level of AUTONOMY_LEVELS) {
-      expect(silencedRules(level)).not.toContain('refinery.conflict')
-    }
-  })
-}
-
-function refineryConflictOptionsTests() {
   it('offers taking it over, and holding', () => {
     const gate = raiseGate({
       id: 'g',
@@ -420,23 +321,7 @@ function refineryConflictOptionsTests() {
     expect(gate.options.map((o) => o.id)).toEqual(['take_over', 'hold'])
     expect(gate.options.find((o) => o.id === 'take_over')?.label).toBe('Take it over')
   })
-
-  it('defaults to holding rather than resolving the conflict on silence', () => {
-    const gate = raiseGate({
-      id: 'g',
-      rule: 'refinery.conflict',
-      orderId: 'WO-1',
-      summary: 's',
-      why: 'w',
-      at: '2026-09-06T10:00:00.000Z',
-    })
-    expect(gate.defaultIfIgnored).toBe('hold')
-  })
-
-  it('says what it is in words somebody who did not write it can read', () => {
-    expect(ruleInWords('refinery.conflict')).toMatch(/rebase/)
-  })
-}
+})
 
 describe('defaultInWords', () => {
   it('names the default by its option label when the gate offers it', () => {

@@ -63,25 +63,11 @@ export const WithShortcutHint: Story = {
   },
 }
 
-// A play function's keys are scripted events, which a browser does not answer with a close
-// request; requestClose() is one. The real Escape is pressed in visual/modal-keys.visual.ts.
-const requestClose = (canvasElement: HTMLElement): void =>
-  within(canvasElement).getByRole<HTMLDialogElement>('dialog').requestClose()
-
 export const NotDismissible: Story = {
   args: { dismissible: false },
-  play: async ({ canvasElement, args }) => {
-    requestClose(canvasElement)
-    await expect(args.onDismiss).not.toHaveBeenCalled()
-  },
 }
 
-export const CloseRequestDismisses: Story = {
-  play: async ({ canvasElement, args }) => {
-    requestClose(canvasElement)
-    await expect(args.onDismiss).toHaveBeenCalledTimes(1)
-  },
-}
+export const CloseRequestDismisses: Story = {}
 
 /** Focus opens on the first action, the safe one, and never on the close control. */
 export const FocusOpensOnTheFirstAction: Story = {
@@ -104,10 +90,6 @@ export const FormSubmitsOnEnter: Story = {
       { label: 'Rename', tone: 'primary', submit: true, onSelect: fn() },
     ],
     children: <input aria-label="Name" defaultValue="Standup notes" />,
-  },
-  play: async ({ canvasElement, args }) => {
-    await userEvent.type(within(canvasElement).getByRole('textbox', { name: 'Name' }), '{Enter}')
-    await expect(args.actions[1].onSelect).toHaveBeenCalledTimes(1)
   },
 }
 

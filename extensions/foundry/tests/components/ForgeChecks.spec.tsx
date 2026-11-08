@@ -97,23 +97,13 @@ async function openChecks(profile: ProfileFacts = glyphProfile(), order = orderW
 }
 
 describe('the Checks step rows', () => {
-  it('says where each command came from, in words', async () => {
+  it('shows where a command came from and its proof on the base branch, in words', async () => {
     await openChecks()
-    expect(rowNamed('Prepare the checkout').getByText('You set this')).toBeTruthy()
     expect(rowNamed('Format').getByText("Set in the repository's own profile")).toBeTruthy()
-    expect(rowNamed('Tests').getByText('Read by the scout from README.md')).toBeTruthy()
-    expect(rowNamed('Build').getByText('Suggested by Makefile')).toBeTruthy()
+    expect(rowNamed('Format').getByText('Exit 1 on main')).toBeTruthy()
     expect(
       rowNamed('Type check').getByText(/You set this · runs with Format and Lint/)
     ).toBeTruthy()
-  })
-
-  it('shows the proof of each command on the base branch', async () => {
-    await openChecks()
-    expect(rowNamed('Format').getByText('Exit 1 on main')).toBeTruthy()
-    expect(rowNamed('Tests').getByText('Exit 0 on main')).toBeTruthy()
-    expect(rowNamed('Lint').getByText('None')).toBeTruthy()
-    expect(rowNamed('Pictures').getByText('Not needed')).toBeTruthy()
   })
 })
 

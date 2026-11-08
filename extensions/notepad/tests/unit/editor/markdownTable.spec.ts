@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   ALERT_KINDS,
-  ALERT_LABELS,
   parseAlertMarker,
   parseInlineSpans,
   parseTable,
@@ -148,10 +147,6 @@ function parseInlineSpansMarkupTests() {
     expect(parseInlineSpans('*soft*')).toEqual([{ type: 'em', text: 'soft' }])
   })
 
-  it('prefers bold over italic so ** is not read as two delimiters', () => {
-    expect(parseInlineSpans('**bold**')[0].type).toBe('strong')
-  })
-
   it('parses inline code', () => {
     expect(parseInlineSpans('`code()`')).toEqual([{ type: 'code', text: 'code()' }])
   })
@@ -233,9 +228,5 @@ function parseAlertMarkerRejectingTests() {
 
   it('rejects a line that is not a blockquote', () => {
     expect(parseAlertMarker('[!NOTE]')).toBeNull()
-  })
-
-  it('has a label for every kind', () => {
-    for (const kind of ALERT_KINDS) expect(ALERT_LABELS[kind]).toBeTruthy()
   })
 }

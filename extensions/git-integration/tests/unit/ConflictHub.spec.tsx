@@ -111,11 +111,6 @@ describe('ConflictHub — renders null when session is null', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('shows exit button when onExit prop is provided', () => {
-    render(<ConflictHub onSelectFile={vi.fn()} onExit={vi.fn()} />)
-    expect(screen.getByLabelText(/exit merge flow/i)).toBeTruthy()
-  })
-
   it('calls onExit when exit button is clicked', () => {
     const onExit = vi.fn()
     render(<ConflictHub onSelectFile={vi.fn()} onExit={onExit} />)

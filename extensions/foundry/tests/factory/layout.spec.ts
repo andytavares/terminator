@@ -192,10 +192,6 @@ function forkTests() {
 }
 
 function seatsTests({ g, map }: LaidOut) {
-  it('has a non-empty graph to test against', () => {
-    expect(g.nodes.length).toBeGreaterThan(0)
-  })
-
   it('seats every rest seat on a bench or sofa prop, at the seat tile itself', () => {
     expect(map.restSeats.length).toBeGreaterThan(0)
     for (const seat of map.restSeats) {
@@ -357,10 +353,6 @@ describe('layoutHall', () => {
     })
   }
 
-  it('exposes TILE_PX as a positive pixel size', () => {
-    expect(TILE_PX).toBeGreaterThan(0)
-  })
-
   describe('hand-built graphs, for the shapes no real recipe happens to produce', () => {
     describe('no edges', noEdgesTests)
     describe('overlaps', overlapsTests)
@@ -375,17 +367,10 @@ describe('layoutHall', () => {
 })
 
 function stationsAndRowsTests({ graph }: Fixture) {
-  it('has a non-empty fixture to test against', () => {
-    expect(graph.nodes.length).toBeGreaterThan(0)
-  })
-
-  it('gives every node exactly one station prop, of the right kind', () => {
-    const map = layoutHall(graph)
-    for (const node of graph.nodes) {
-      const stations = map.props.filter((p) => p.nodeId === node.id)
-      expect(stations).toHaveLength(1)
-      expect(stations[0].kind).toBe(stationKind(node.kind))
-    }
+  it.each(graph.nodes)('gives node $id exactly one station prop, of the right kind', (node) => {
+    const stations = layoutHall(graph).props.filter((p) => p.nodeId === node.id)
+    expect(stations).toHaveLength(1)
+    expect(stations[0].kind).toBe(stationKind(node.kind))
   })
 
   it('turns lanes into rows, ascending', () => {

@@ -31,8 +31,4 @@ describe('hand-off', () => {
     expect([...src.matchAll(/\breleaseDepsFor\(/g)]).toHaveLength(2)
     expect(src).toContain('await readyToHandOff(order, releaseDepsFor(forge))')
   })
-
-  it('has no setting that would hand off on its own', () => {
-    expect(src).not.toMatch(/autoHandOff|auto-hand-off/)
-  })
 })

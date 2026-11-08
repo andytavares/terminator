@@ -136,12 +136,11 @@ describe('default branch pull', () => {
     return commands
   }
 
-  it('runs git in each repository on a refresh when the setting is on', async () => {
-    expect(await commandsRunOnRefresh(true)).toContain('/repo: symbolic-ref')
-  })
-
-  it('runs no git when the setting is off', async () => {
-    expect(await commandsRunOnRefresh(false)).toEqual([])
+  it.each([
+    [true, ['/repo: symbolic-ref', '/repo: worktree', '/repo: fetch']],
+    [false, []],
+  ])('with the setting %s, runs this git on a refresh: %j', async (autoPull, commands) => {
+    expect(await commandsRunOnRefresh(autoPull)).toEqual(commands)
   })
 
   it('names the head branch and merged commit of each merged pull request of one repository', () => {

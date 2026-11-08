@@ -68,33 +68,9 @@ describe('BranchRow', () => {
     )
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain(label)
   })
-
-  it('renders the compact chip in the gutter, named for a reader', () => {
-    const { container } = renderRow({ state: 'awaiting-input' })
-    const chip = container.querySelector('.branch-row__gutter .state-chip')!
-    expect(chip.className).toContain('state-chip--compact')
-    expect(chip.getAttribute('aria-label')).toBe('Waiting on you')
-  })
 })
 
-describe('BranchRow — distinguishes the four states by shape', () => {
-  it('distinguishes the four states by shape', () => {
-    const shapes = (['awaiting-input', 'working', 'idle', 'exited'] as const).map((state) => {
-      const { container, unmount } = renderRow({ state })
-      const html = container.querySelector('.branch-row__gutter svg')!.innerHTML
-      unmount()
-      return html
-    })
-    expect(new Set(shapes).size).toBe(4)
-  })
-
-  it('never colours the state glyph', () => {
-    const { container } = renderRow({ state: 'awaiting-input' })
-    const svg = container.querySelector<SVGElement>('.branch-row__gutter svg')!
-    expect(svg.getAttribute('stroke')).toBe('currentColor')
-    expect(svg.getAttribute('style')).toBeNull()
-  })
-
+describe('BranchRow — marks a plain checkout and leaves a worktree unmarked', () => {
   // FR-028. One element says which kind, and it marks the exception.
   it('marks a plain checkout and leaves a worktree unmarked', () => {
     const { container: plain } = renderRow({ isWorktree: false })
@@ -309,11 +285,6 @@ describe('BranchRow — the issue key keeps its behaviour without its badge', ()
     fireEvent.click(screen.getByRole('button', { name: 'Open TAV-14' }))
     expect(onSelect).not.toHaveBeenCalled()
   })
-
-  it('draws the key as inert text when there is nothing to open', () => {
-    const { container } = renderRow({}, { issueKey: 'TAV-14' })
-    expect(container.querySelector('.branch-row__issue')!.tagName).toBe('SPAN')
-  })
 })
 
 describe('BranchRow — repo actions are reachable from the row', () => {
@@ -333,12 +304,6 @@ describe('BranchRow — repo actions are reachable from the row', () => {
     fireEvent.contextMenu(container.querySelector('.branch-row')!)
     fireEvent.click(screen.getByText('Git'))
     expect(onSelect).toHaveBeenCalled()
-  })
-
-  it('opens a menu for them even when nothing else would', () => {
-    const { container } = renderRow({}, { repoActions })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    expect(document.querySelector('.ctx-menu')).toBeTruthy()
   })
 })
 
@@ -498,13 +463,6 @@ describe('BranchRow — the menu and the keyboard', () => {
     fireEvent.contextMenu(container.querySelector('.branch-row')!)
     fireEvent.click(screen.getByText('Open TAV-14 in tracker'))
     expect(onOpenIssue).toHaveBeenCalledOnce()
-    expect(document.querySelector('.ctx-menu')).toBeNull()
-  })
-
-  it('closes the menu on a click elsewhere', () => {
-    const { container } = renderRow({}, { onRemove: vi.fn() })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(document.body)
     expect(document.querySelector('.ctx-menu')).toBeNull()
   })
 

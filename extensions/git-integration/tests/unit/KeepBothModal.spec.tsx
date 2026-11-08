@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 
@@ -35,15 +36,6 @@ beforeEach(() => {
 })
 
 describe('KeepBothModal', () => {
-  it('renders both code blocks in preview', () => {
-    const { container } = render(
-      <KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />
-    )
-    // Text may be split across highlight.js spans — check textContent
-    expect(container.textContent).toContain('const x = 1')
-    expect(container.textContent).toContain('const y = 2')
-  })
-
   it('defaults to mine-first order', () => {
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
     const previewEl = document.querySelector('.keep-both-modal__preview') as HTMLElement
@@ -94,17 +86,12 @@ describe('KeepBothModal — calls onConfirm with both-theirs-first strategy when
     )
   })
 
-  it('calls onCancel when Cancel button clicked', () => {
+  it('calls onCancel and not onConfirm when Cancel is clicked', async () => {
     const onCancel = vi.fn()
-    render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={onCancel} />)
-    fireEvent.click(screen.getByText(/Cancel/i))
-    expect(onCancel).toHaveBeenCalledOnce()
-  })
-
-  it('does not call onConfirm when Cancel clicked', () => {
     const onConfirm = vi.fn()
-    render(<KeepBothModal block={uniqueBlock} onConfirm={onConfirm} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByText(/Cancel/i))
+    render(<KeepBothModal block={uniqueBlock} onConfirm={onConfirm} onCancel={onCancel} />)
+    await userEvent.click(screen.getByText(/Cancel/i))
+    expect(onCancel).toHaveBeenCalledOnce()
     expect(onConfirm).not.toHaveBeenCalled()
   })
 })

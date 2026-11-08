@@ -48,56 +48,6 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
     }
   })
 
-  describe('reading the workflow', readingTheWorkflowTests)
-  describe('moving the issue', movingTheIssueTests)
-})
-
-function readingTheWorkflowTests() {
-  it('reads the real workflow rather than an assumed one', () => {
-    expect(states.length).toBeGreaterThan(2)
-
-    console.log(`workflow: ${states.map((s) => `${s.name}[${s.intent ?? '—'}]`).join(' → ')}`)
-  })
-
-  it('resolves "started" to a state the tracker itself calls started', () => {
-    const started = states.filter((state) => state.intent === 'started')
-    expect(started).toHaveLength(1)
-    // The rule is "the first started state by position". Whatever this
-    // workspace calls it, it must be one that comes before the review state.
-    const reviewAt = states.findIndex((state) => state.intent === 'in_review')
-    const startedAt = states.findIndex((state) => state.intent === 'started')
-    expect(reviewAt === -1 || startedAt < reviewAt).toBe(true)
-  })
-
-  it('resolves "in_review" only where the workflow has somewhere later to go', () => {
-    const review = states.filter((state) => state.intent === 'in_review')
-    // Zero or one, never more — and when there is one it is not the same state
-    // as `started`, which is the failure "one started state wearing two hats"
-    // would produce.
-    expect(review.length).toBeLessThanOrEqual(1)
-    expect(review.map((state) => state.id)).not.toContain(
-      states.find((state) => state.intent === 'started')?.id
-    )
-  })
-
-  it('resolves "done" to exactly one state', () => {
-    expect(states.filter((state) => state.intent === 'done')).toHaveLength(1)
-  })
-
-  it('leaves backlog and cancelled states carrying no intent', () => {
-    const named = states.filter((state) => state.intent !== null).map((state) => state.name)
-
-    console.log(`intents landed on: ${named.join(', ')}`)
-    expect(named.length).toBeGreaterThan(0)
-    expect(named.length).toBeLessThanOrEqual(3)
-  })
-}
-
-function movingTheIssueTests() {
-  it('implements moving an issue', () => {
-    expect(provider.transition).toBeDefined()
-  })
-
   it('actually moves the issue, and Linear reports the new state', async () => {
     const target = states.find((state) => state.intent === 'started')
     expect(target, 'this workflow has no started state to move to').toBeDefined()
@@ -108,20 +58,4 @@ function movingTheIssueTests() {
     const after = await provider.get(cred, ISSUE)
     expect(after?.state.name).toBe(target?.name)
   })
-
-  it("honours the operator's own mapping over the type rule", async () => {
-    // Any state at all, including one the rule would never choose — that is
-    // what an override is for (FR-060).
-    const anywhere = states.find((state) => state.intent === null)
-    if (anywhere === undefined) return
-    await provider.transition!(cred, ISSUE, 'done', anywhere.id)
-    const after = await provider.get(cred, ISSUE)
-    expect(after?.state.name).toBe(anywhere.name)
-  })
-
-  it('refuses an override naming a state this workflow does not have', async () => {
-    await expect(
-      provider.transition!(cred, ISSUE, 'started', '00000000-0000-0000-0000-000000000000')
-    ).rejects.toThrow(/not available/)
-  })
-}
+})

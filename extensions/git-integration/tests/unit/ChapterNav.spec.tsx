@@ -52,13 +52,6 @@ describe('ChapterNav', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders tabs for multiple chapters', () => {
-    const chapters = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests')]
-    render(<ChapterNav chapters={chapters} />)
-    expect(screen.getByText('Core')).toBeTruthy()
-    expect(screen.getByText('Tests')).toBeTruthy()
-  })
-
   it('calls setCurrentChapter when a tab is clicked', () => {
     const chapters = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests')]
     render(<ChapterNav chapters={chapters} />)
@@ -92,13 +85,7 @@ describe('ChapterNav — marks active chapter with aria-selected=true', () => {
   })
 })
 
-describe('ChapterNav — renders tablist with correct aria-label', () => {
-  it('renders tablist with correct aria-label', () => {
-    const chapters = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests')]
-    render(<ChapterNav chapters={chapters} />)
-    expect(screen.getByRole('tablist')).toBeTruthy()
-  })
-
+describe('ChapterNav — accessible tab names', () => {
   it('names each chapter tab with its name, file count and whether it is viewed', () => {
     setupStore({ currentChapterId: null, viewedFiles: new Set(['a.ts']) })
     const chapters = [

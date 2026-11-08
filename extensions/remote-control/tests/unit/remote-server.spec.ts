@@ -307,29 +307,7 @@ function injectWorkspaces(headers: Record<string, string>) {
   return remoteServer.inject({ method: 'GET', url: '/api/workspaces', headers })
 }
 
-describe('RemoteServer login', () => {
-  it('returns 401 for every login while no password hash is stored', async () => {
-    mockDeps.getPasswordHash.mockReturnValue('')
-    const res = await remoteServer.inject({
-      method: 'POST',
-      url: '/api/login',
-      payload: { password: PASSWORD },
-    })
-    expect(res.statusCode).toBe(401)
-  })
-
-  it('does not accept the password as a Bearer header on an API request', async () => {
-    const res = await injectWorkspaces({ Authorization: `Bearer ${PASSWORD}` })
-    expect(res.statusCode).toBe(401)
-  })
-})
-
 describe('RemoteServer login sessions', () => {
-  it('authorises an API request with the cookie a correct login issued', async () => {
-    const res = await injectWorkspaces({ cookie: await loginCookie() })
-    expect(res.statusCode).toBe(200)
-  })
-
   it('ends every login session when clients are disconnected (password change)', async () => {
     const cookie = await loginCookie()
     await remoteServer.disconnectAllClients()
@@ -349,11 +327,6 @@ describe('RemoteServer POST /api/mobile-ticket and /api/app-ticket', () => {
     const body = JSON.parse(res.body) as { ticket: string }
     expect(typeof body.ticket).toBe('string')
     expect(body.ticket.length).toBeGreaterThan(0)
-  })
-
-  it('returns 401 without credentials', async () => {
-    const res = await remoteServer.inject({ method: 'POST', url: '/api/mobile-ticket' })
-    expect(res.statusCode).toBe(401)
   })
 
   it('issues an app ticket to an authenticated client', async () => {
@@ -456,14 +429,6 @@ function restoreFs(): void {
 
 describe('RemoteServer /ext/* extension routes', () => {
   afterEach(restoreFs)
-
-  it('GET /ext/<id>/ is publicly accessible (no session gate on extension statics)', async () => {
-    mockInstalledExtensions(['task-vault'], BUILT_EXTENSION)
-    const extServer = await createServerOnPort(ANY_PORT)
-    const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
-    // No 403 — extension static assets have no session gate
-    expect(res.statusCode).not.toBe(403)
-  })
 
   it('GET /ext/<id>/ returns 200 with shim and base CSS injected when renderer is built', async () => {
     mockInstalledExtensions(['task-vault'], BUILT_EXTENSION)

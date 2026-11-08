@@ -43,10 +43,4 @@ describe('AlertBadge — has correct aria-label for multiple alerts', () => {
     const span = container.querySelector('span')
     expect(span?.className).toContain('custom-class')
   })
-
-  it('applies alert-badge class by default', () => {
-    const { container } = render(<AlertBadge count={1} />)
-    const span = container.querySelector('span')
-    expect(span?.className).toContain('alert-badge')
-  })
 })

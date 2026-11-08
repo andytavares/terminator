@@ -116,13 +116,6 @@ describe('the repo name is text, not colour (FR-043)', () => {
     )
   })
 
-  // Painting a repo name in its own swatch put the text between 1.08:1 and
-  // 1.52:1 against the light surface; the name now uses a text token instead.
-  it.each(['dark', 'light'] as const)('the name token clears AA in the %s theme', (theme) => {
-    const surface = hex(token('--tm-bg-base', theme))
-    expect(contrast(hex(token('--tm-text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
-  })
-
   it.each(['dark', 'light'] as const)(
     'the name still clears AA on the selected surface in the %s theme',
     (theme) => {

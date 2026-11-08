@@ -33,11 +33,15 @@ describe('buildChapters()', () => {
 })
 
 describe('buildChapters() — assigns semantic group names for canonical directories', () => {
-  it('assigns semantic group names for canonical directories', () => {
-    const chapters = buildChapters([f('services/auth.ts'), f('components/Button.tsx')])
-    const names = chapters.map((c) => c.name)
-    expect(names).toContain('Business Logic')
-    expect(names).toContain('UI')
+  it.each([
+    ['services/auth.ts', 'Business Logic'],
+    ['components/Button.tsx', 'UI'],
+    ['routes/users.ts', 'API Layer'],
+    ['types/payment.ts', 'Types & Contracts'],
+  ])('names the chapter of %s "%s"', (path, name) => {
+    const chapters = buildChapters([f(path), f('src/auth/login.ts')])
+    const chapter = chapters.find((c) => c.files.some((file) => file.path === path))
+    expect(chapter?.name).toBe(name)
   })
 
   it('sub-splits semantic groups that exceed 15 files', () => {
@@ -70,10 +74,10 @@ describe('buildChapters() — places type/interface files in tier 0', () => {
     expect(files.find((f) => f.path === 'src/auth.ts')?.tier).toBe(1)
   })
 
-  it('places lock files and generated files in tier 3', () => {
+  it('places lock files in tier 3, in a chapter of their own', () => {
     const chapters = buildChapters([f('package-lock.json'), f('src/auth.ts')])
-    const files = chapters.flatMap((c) => c.files)
-    expect(files.find((f) => f.path === 'package-lock.json')?.tier).toBe(3)
+    const lockChapter = chapters.find((c) => c.files.some((f) => f.path === 'package-lock.json'))
+    expect(lockChapter?.files.map((f) => [f.path, f.tier])).toEqual([['package-lock.json', 3]])
   })
 })
 
@@ -103,13 +107,7 @@ describe('buildChapters() — implementation files (tier 1) appear before type f
   })
 })
 
-describe('buildChapters() — all-mechanical files form their own chapter with tier 3', () => {
-  it('all-mechanical files form their own chapter with tier 3', () => {
-    const chapters = buildChapters([f('package-lock.json'), f('src/auth.ts')])
-    const mechChapter = chapters.find((c) => c.files.every((f) => f.tier === 3))
-    expect(mechChapter).toBeDefined()
-  })
-
+describe('buildChapters() — file order overrides and labels', () => {
   it('applies fileOrderOverrides when provided', () => {
     const chapters = buildChapters([f('src/types.ts'), f('src/service.ts'), f('src/utils.ts')], {
       src: ['src/utils.ts', 'src/service.ts', 'src/types.ts'],
@@ -135,20 +133,6 @@ describe('buildChapters() — sets estimatedMinutes on each chapter as sum of fi
     ])
     const chap = chapters.find((c) => c.id === 'src')
     expect(chap?.estimatedMinutes).toBe(3)
-  })
-
-  // ─── Signal 1: Semantic grouping ────────────────────────────────────────────
-
-  it('uses canonical group name for well-known directories', () => {
-    const chapters = buildChapters([
-      f('services/auth.ts'),
-      f('routes/users.ts'),
-      f('types/payment.ts'),
-    ])
-    const names = chapters.map((c) => c.name)
-    expect(names).toContain('Business Logic')
-    expect(names).toContain('API Layer')
-    expect(names).toContain('Types & Contracts')
   })
 })
 
@@ -219,11 +203,5 @@ describe('buildChapters() — merges groups connected by an import in patch text
     const paths = chapters[0].files.map((f) => f.path)
     expect(paths).toContain('components/Bar.tsx')
     expect(paths).toContain('utils/foo.ts')
-  })
-
-  it('files without patches are still grouped by other signals', () => {
-    // No patch provided — falls back to semantic + stem signals
-    const chapters = buildChapters([f('types/auth.ts'), f('services/auth.ts')])
-    expect(chapters).toHaveLength(1)
   })
 })

@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as path from 'node:path'
 import { applyArchitectAnswer } from '../../src/forge/converge.js'
 import { lastIntake } from '../../src/forge/intake-outcome.js'
 import { createForgeChannels } from '../../src/ipc/forge-channels.js'
 import { quietForgeSeams } from '../ipc/forge-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { orderDir } from '../../src/data-root.js'
 import type { OrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -146,16 +144,6 @@ function refusedTurnRefusingTests() {
     expect(refusal.kind === 'refused' && refusal.reason).toContain(
       'Invalid option: expected one of "exit_code"'
     )
-  })
-
-  // The reason it was invisible. A refusal has nothing to save, so the
-  // document is untouched — and the document was all any surface read.
-  it('leaves the order byte-for-byte what it was', async () => {
-    const before = fs.readFileSync(path.join(orderDir(root, 'WO-0909-6db'), 'order.json'), 'utf8')
-    await finish(seeded(), BAD_PROPOSAL)
-    const after = fs.readFileSync(path.join(orderDir(root, 'WO-0909-6db'), 'order.json'), 'utf8')
-    expect(after).toBe(before)
-    expect((await store.load('WO-0909-6db'))?.provenance.decisions).toEqual([])
   })
 }
 

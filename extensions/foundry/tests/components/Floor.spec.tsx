@@ -178,14 +178,11 @@ function thePositionTests() {
 }
 
 function nothingQueuedTests() {
-  it('says nothing when it is not queued behind anything', async () => {
-    mount(reply({ queue: null }))
-    await screen.findByText(/WO-1/)
-    expect(screen.queryByLabelText('Refinery queue')).toBeNull()
-  })
-
-  it('says nothing when the run predates queue reporting', async () => {
-    mount(reply({}))
+  it.each([
+    { run: 'is not queued behind anything', over: { queue: null } },
+    { run: 'predates queue reporting', over: {} },
+  ])('says nothing about the queue when the run $run', async ({ over }) => {
+    mount(reply(over))
     await screen.findByText(/WO-1/)
     expect(screen.queryByLabelText('Refinery queue')).toBeNull()
   })
@@ -433,6 +430,7 @@ function sessionsAndBlocksTests() {
     await screen.findByText('Merge order')
     const buttons = screen.getAllByRole('button', { name: /^Attach to/ })
     expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Attach to builder'])
+    expect(screen.getAllByRole('button', { name: 'Transcript' })).toHaveLength(1)
 
     fireEvent.click(buttons[0])
     await waitFor(() =>
@@ -538,29 +536,23 @@ function theAskTests() {
 }
 
 function answeringAndRefusingTests() {
-  it('can be answered without leaving the surface', async () => {
-    mount(reply(), { pending: [ASK] })
-    await screen.findByText('Waiting on you — 1')
-    fireEvent.click(await screen.findByRole('button', { name: 'Allow' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:permission-resolve', {
-        requestId: 'r-1',
-        decision: 'allow',
-      })
-    )
-  })
-
-  it('can be refused', async () => {
-    mount(reply(), { pending: [ASK] })
-    await screen.findByText('Waiting on you — 1')
-    fireEvent.click(await screen.findByRole('button', { name: 'Deny' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:permission-resolve', {
-        requestId: 'r-1',
-        decision: 'deny',
-      })
-    )
-  })
+  it.each([
+    { button: 'Allow', decision: 'allow' },
+    { button: 'Deny', decision: 'deny' },
+  ])(
+    'sends $decision when the operator presses $button on the ask',
+    async ({ button, decision }) => {
+      mount(reply(), { pending: [ASK] })
+      await screen.findByText('Waiting on you — 1')
+      fireEvent.click(await screen.findByRole('button', { name: button }))
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith('foundry:permission-resolve', {
+          requestId: 'r-1',
+          decision,
+        })
+      )
+    }
+  )
 }
 
 function silentClicksAndTheTerminalTests() {
@@ -716,14 +708,6 @@ function finishedRunsAndNoSessionTests() {
     fireEvent.click(await screen.findByRole('button', { name: 'Interrupt' }))
     await screen.findByText('that run is no longer live')
   })
-
-  it('offers neither control for a unit with no session', async () => {
-    mount(reply())
-    await screen.findByText(/WO-1/)
-    // One chip has an agent behind it, so exactly one of each control exists.
-    expect(screen.getAllByRole('button', { name: 'Transcript' })).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: /^Attach to/ })).toHaveLength(1)
-  })
 }
 
 describe('what happened while you were away', () => {
@@ -785,14 +769,6 @@ describe('a mute you can find again', () => {
   it('shows the panel for a mute even when the feed is empty', async () => {
     mount(reply(), { mutes: [{ author: 'agent' }] })
     await screen.findByText('Activity')
-  })
-})
-
-describe('a finished run no longer holds a new one back', () => {
-  it('never asks for the review queue and says nothing about refusing a run', async () => {
-    mount(reply())
-    await screen.findByText(/WO-1/)
-    expect(screen.queryByText(/A new run is refused/)).toBeNull()
   })
 })
 
@@ -919,12 +895,13 @@ function labelAndIdTests() {
     expect(screen.queryByText('N-1')).toBeNull()
   })
 
-  it('keeps the id reachable, because it is what the record calls this node', async () => {
+  it('keeps the id as the tooltip of a step that was not skipped, describing nothing else', async () => {
     mount(reply({ labels: LABELS }))
     const chip = await waitFor(() =>
       screen.getByText(/builder · U-1 refresh/).closest('.fdry-unit')
     )
     expect(chip?.getAttribute('title')).toBe('N-1')
+    expect(chip?.getAttribute('aria-describedby')).toBeNull()
   })
 }
 
@@ -1165,12 +1142,6 @@ function terminalsAndNothingGoneTests() {
     expect(screen.queryByRole('button', { name: /Attach to/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Transcript' })).toBeNull()
   })
-
-  it('says nothing when every agent is where it should be', async () => {
-    mount(reply())
-    await screen.findByText(/WO-1/)
-    expect(screen.queryByText(/Nothing is running this/)).toBeNull()
-  })
 }
 
 describe('getting into a running agent’s terminal', () => {
@@ -1250,7 +1221,6 @@ describe('the standing band', () => {
   describe('raising the budget it stopped at', raisingTheBudgetItStoppedAtTests)
   describe('options and whose move', optionsAndWhoseMoveTests)
   describe('refetching', refetchingTests)
-  describe('reading transcripts', readingTranscriptsTests)
   describe('live state', liveStateTests)
   describe('handed back terminals', handedBackTerminalsTests)
   describe('no standing', noStandingTests)
@@ -1362,26 +1332,7 @@ function answeringTheGateTests() {
   })
 }
 
-function raisingTheBudgetItStoppedAtTests() {
-  describe('asking for a limit', askingForALimitTests)
-
-  describe('no limit and cancel', noLimitAndCancelTests)
-}
-
 function optionsAndWhoseMoveTests() {
-  it('says what happens to each option, and what happens if you do nothing', async () => {
-    mount(
-      reply({
-        standing: standing({ kind: 'halted', turn: 'you', headline: 'Halted — your move' }),
-        waiting: [GATE],
-      })
-    )
-    await screen.findByText(GATE.summary)
-    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
-    fireEvent.click(screen.getByText(GATE.summary))
-    expect(screen.getByText('Work continues with more room.')).toBeTruthy()
-  })
-
   it('marks the band as yours when the move is yours', async () => {
     mount(reply({ standing: standing({ turn: 'you' }) }))
     await waitFor(() => expect(document.querySelector('.fdry-standing.is-yours')).not.toBeNull())
@@ -1410,29 +1361,6 @@ function refetchingTests() {
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
     await vi.advanceTimersByTimeAsync(200)
     expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(before + 1)
-    vi.useRealTimers()
-  })
-}
-
-function readingTranscriptsTests() {
-  // What the agents are saying is written by their own processes, so it is the
-  // one thing still asked for on a timer.
-  it('keeps reading what the agents are saying, and stops while hidden', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    mount(reply({ standing: standing() }))
-    const transcriptReads = () =>
-      invoke.mock.calls.filter((c) => c[0] === 'foundry:run-transcript').length
-    await waitFor(() => expect(transcriptReads()).toBeGreaterThan(0))
-    const before = transcriptReads()
-    await vi.advanceTimersByTimeAsync(2100)
-    expect(transcriptReads()).toBeGreaterThan(before)
-
-    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
-    document.dispatchEvent(new Event('visibilitychange'))
-    const whileHidden = transcriptReads()
-    await vi.advanceTimersByTimeAsync(10_000)
-    expect(transcriptReads()).toBe(whileHidden)
-    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
     vi.useRealTimers()
   })
 }
@@ -1521,59 +1449,41 @@ function tryingAgainTests() {
   })
 }
 
-function askingForALimitTests() {
-  it('asks for the new limit instead of deciding', async () => {
-    halted()
-    await screen.findByText(RECORDED.summary)
-    fireEvent.click(await screen.findByRole('button', { name: /Raise the budget/ }))
-    const field = screen.getByRole('spinbutton', { name: 'Minutes' }) as HTMLInputElement
-    expect(Number(field.value)).toBeGreaterThanOrEqual(47)
-    expect(screen.getByText('At least 47.')).toBeTruthy()
-    expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
-  })
+/** The two ways to answer "how much more room": a number, or no limit at all. */
+const LIMIT_CHOICES = [
+  {
+    choice: '80 minutes',
+    choose: () =>
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
+        target: { value: '80' },
+      }),
+    limit: 80,
+  },
+  {
+    choice: 'no limit',
+    choose: () => fireEvent.click(screen.getByRole('checkbox', { name: 'No limit on minutes' })),
+    limit: null,
+  },
+]
 
-  it('sends the limit the operator chose with the decision', async () => {
-    halted()
-    await screen.findByText(RECORDED.summary)
-    fireEvent.click(await screen.findByRole('button', { name: /Raise the budget/ }))
-    fireEvent.change(await screen.findByRole('spinbutton', { name: 'Minutes' }), {
-      target: { value: '80' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
-        gateId: RECORDED.id,
-        option: 'raise',
-        limit: 80,
-      })
-    )
-  })
-}
-
-function noLimitAndCancelTests() {
-  it('sends no limit', async () => {
-    halted()
-    await screen.findByText(RECORDED.summary)
-    fireEvent.click(await screen.findByRole('button', { name: /Raise the budget/ }))
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'No limit on minutes' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
-        gateId: RECORDED.id,
-        option: 'raise',
-        limit: null,
-      })
-    )
-  })
-
-  it('goes back to the options on cancel', async () => {
-    halted()
-    await screen.findByText(RECORDED.summary)
-    fireEvent.click(await screen.findByRole('button', { name: /Raise the budget/ }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
-    expect(screen.getByRole('button', { name: /Stop here/ })).toBeTruthy()
-  })
+function raisingTheBudgetItStoppedAtTests() {
+  it.each(LIMIT_CHOICES)(
+    'sends limit $limit with the decision when the operator chooses $choice',
+    async ({ choose, limit }) => {
+      halted()
+      await screen.findByText(RECORDED.summary)
+      fireEvent.click(await screen.findByRole('button', { name: /Raise the budget/ }))
+      choose()
+      fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+          gateId: RECORDED.id,
+          option: 'raise',
+          limit,
+        })
+      )
+    }
+  )
 }
 
 // An agent's own words are markdown and shown as markdown; a command it wants
@@ -1619,17 +1529,14 @@ describe('where the order lives', () => {
     expect(pull.getAttribute('target')).toBeNull()
   })
 
-  it('shows neither for an order with no pull request and no ticket', async () => {
-    mount(reply({ pulls: [], source: null }))
+  it.each([
+    { host: 'sends an empty list and no ticket', over: { pulls: [], source: null } },
+    { host: 'sends neither', over: {} },
+  ])('shows no pull request and no ticket when the host $host', async ({ over }) => {
+    mount(reply(over))
     await screen.findByText(/WO-1/)
     expect(screen.queryByRole('link')).toBeNull()
     expect(screen.queryByRole('button', { name: /Review|Open on GitHub/ })).toBeNull()
-  })
-
-  it('shows neither when the host sends neither', async () => {
-    mount(reply())
-    await screen.findByText(/WO-1/)
-    expect(screen.queryByRole('link')).toBeNull()
   })
 })
 
@@ -1684,13 +1591,6 @@ function severalPullsAndNoPerHunkReviewTests() {
     mount(reply({ pulls: [PULL, { ...PULL, repo: 'cli', number: 41, url: 'https://x/pull/41' }] }))
     expect(await screen.findByRole('button', { name: 'Review #233' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Review #41' })).toBeTruthy()
-  })
-
-  it('no longer carries the per-hunk review that nothing could use', async () => {
-    mount(reply({ pulls: [PULL] }))
-    await screen.findByText(/WO-1/)
-    expect(screen.queryByText(/To review/)).toBeNull()
-    expect(invoke.mock.calls.some((c) => String(c[0]).startsWith('foundry:review-'))).toBe(false)
   })
 }
 
@@ -1798,13 +1698,6 @@ function skippedStepsTests() {
 }
 
 function tooltipsAndTheTerminalTests() {
-  it('keeps the id as the tooltip for a step that was not skipped', async () => {
-    mount(reply())
-    await screen.findAllByText('builder')
-    expect(chipOf('builder').getAttribute('title')).toBe('N-1')
-    expect(chipOf('builder').getAttribute('aria-describedby')).toBeNull()
-  })
-
   it('offers the terminal only while the step is running', async () => {
     mount(
       reply({

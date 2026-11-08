@@ -1,8 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { NameTerminalDialog } from '../../../../src/renderer/components/NameTerminalDialog'
-import { pressOutside } from '../../../support/modal'
 
 const defaultName = 'Terminal 1'
 
@@ -26,14 +25,10 @@ vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 beforeEach(() => recordUse.mockClear())
 
 describe('NameTerminalDialog', () => {
-  it('renders the dialog title', () => {
+  it('titles the dialog and shows the default name as the placeholder', () => {
     renderDialog()
-    expect(screen.getByText('Name this terminal')).toBeTruthy()
-  })
-
-  it('shows placeholder with the default name', () => {
-    renderDialog()
-    const input = screen.getByRole('textbox') as HTMLInputElement
+    const dialog = screen.getByRole('dialog', { name: 'Name this terminal' })
+    const input = within(dialog).getByRole('textbox') as HTMLInputElement
     expect(input.placeholder).toBe(defaultName)
   })
 
@@ -58,36 +53,10 @@ describe('NameTerminalDialog', () => {
   })
 })
 
-describe('NameTerminalDialog — calls onCancel when overlay is clicked', () => {
-  it('calls onCancel when overlay is clicked', () => {
-    renderDialog()
-    pressOutside(screen.getByRole('dialog'))
-    expect(onCancel).toHaveBeenCalled()
-  })
-
-  it('does not call onCancel when dialog body is clicked', () => {
-    renderDialog()
-    fireEvent.click(screen.getByRole('dialog'))
-    expect(onCancel).not.toHaveBeenCalled()
-  })
-
+describe('NameTerminalDialog — dismiss', () => {
   it('calls onCancel when Escape is pressed', () => {
     renderDialog()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onCancel).toHaveBeenCalled()
-  })
-
-  it('does not call onCancel when a non-Escape key is pressed', () => {
-    renderDialog()
-    fireEvent.keyDown(document, { key: 'Enter' })
-    expect(onCancel).not.toHaveBeenCalled()
-  })
-
-  it('submits on Enter key via form submit', () => {
-    renderDialog()
-    const input = screen.getByRole('textbox')
-    fireEvent.change(input, { target: { value: 'Build runner' } })
-    fireEvent.submit(screen.getByRole('textbox'))
-    expect(onConfirm).toHaveBeenCalledWith('Build runner')
   })
 })

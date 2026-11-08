@@ -50,7 +50,7 @@ describe('createRoleRegistry', () => {
 
 describe('assertResumable', () => {
   describe('who may resume', whoMayResumeTests)
-  describe('the reason and the exceptions', theReasonAndTheExceptionsTests)
+  describe('the exceptions', theExceptionsTests)
 })
 
 function whoMayResumeTests() {
@@ -58,10 +58,10 @@ function whoMayResumeTests() {
     expect(() => createRoleRegistry(sources()).assertResumable('builder', 'sess-1')).not.toThrow()
   })
 
-  it('refuses to resume a verifier', () => {
-    expect(() => createRoleRegistry(sources()).assertResumable('verifier', 'sess-1')).toThrow(
-      ResumeForbiddenError
-    )
+  it('refuses to resume a verifier, and says why so the refusal is not a mystery in a log', () => {
+    const resumeVerifier = () => createRoleRegistry(sources()).assertResumable('verifier', 'sess-1')
+    expect(resumeVerifier).toThrow(ResumeForbiddenError)
+    expect(resumeVerifier).toThrow(/already been persuaded/)
   })
 
   it('refuses to resume the red team or the inspector either', () => {
@@ -72,13 +72,7 @@ function whoMayResumeTests() {
   })
 }
 
-function theReasonAndTheExceptionsTests() {
-  it('says why, so the refusal is not a mystery in a log', () => {
-    expect(() => createRoleRegistry(sources()).assertResumable('verifier', 's')).toThrow(
-      /already been persuaded/
-    )
-  })
-
+function theExceptionsTests() {
   it('permits any role when there is no session to resume', () => {
     const registry = createRoleRegistry(sources())
     for (const role of ['verifier', 'red-team', 'inspector', 'builder']) {

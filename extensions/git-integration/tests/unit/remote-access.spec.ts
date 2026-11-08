@@ -17,37 +17,9 @@ vi.mock('electron-store', () => ({
 
 import { activateCapturingChannels } from './support/activate'
 
-describe('the remote browser client', () => {
-  // A logged-in remote browser reaches only what is opted in (ADR 094); a
-  // channel added here is a decision, so the list is spelled out.
-  it('may call exactly these read-only channels, and nothing that writes or runs', () => {
-    const remote = activateCapturingChannels()
-      .channels.filter((c) => c.remoteAccessible)
-      .map((c) => c.spec.channel)
-    expect(remote.sort()).toEqual([
-      'git:conflicts-list',
-      'git:pr-status',
-      'git:status',
-      'github:accessible-repos',
-      'github:active-reviews-for-repo',
-      'github:current-user',
-      'github:dashboard-search',
-      'github:list-open-prs',
-      'github:pr-compare',
-      'github:pr-inline-comments',
-      'github:pr-issue-comments',
-      'github:pr-review-detail',
-      'github:review-settings',
-      'github:session-get',
-      'github:sessions-for-repo',
-      'review-agent:list',
-      'review-agent:settings',
-    ])
-  })
-})
-
-// A valid payload for each remote channel, naming `root` as its checkout; null
-// for a channel that takes no directory.
+// A logged-in remote browser reaches only what is opted in (ADR 094); a channel
+// added here is a decision, so the list is spelled out. A valid payload for each
+// remote channel, naming `root` as its checkout; null for one that takes no directory.
 const PAYLOAD_AT: Record<string, ((root: string) => unknown) | null> = {
   'git:conflicts-list': (root) => ({ repoRoot: root }),
   'git:pr-status': (root) => ({ repoRoot: root }),
@@ -68,6 +40,15 @@ const PAYLOAD_AT: Record<string, ((root: string) => unknown) | null> = {
   'review-agent:list': (root) => ({ repoRoot: root, prNumber: 7, headSHA: 'abc' }),
   'review-agent:settings': null,
 }
+
+describe('the remote browser client', () => {
+  it('may call exactly the read-only channels PAYLOAD_AT lists, and nothing that writes or runs', () => {
+    const remote = activateCapturingChannels()
+      .channels.filter((c) => c.remoteAccessible)
+      .map((c) => c.spec.channel)
+    expect(remote.sort()).toEqual(Object.keys(PAYLOAD_AT).sort())
+  })
+})
 
 interface ScratchDirs {
   scratch: string
@@ -108,14 +89,6 @@ function remoteChannelsIn(dirs: ScratchDirs) {
 describe("a remote-accessible channel's repoRoot", () => {
   const dirs = useScratchDirs()
   const remoteChannels = () => remoteChannelsIn(dirs)
-
-  it('is checked for every remote channel that takes a directory', () => {
-    expect(Object.keys(PAYLOAD_AT).sort()).toEqual(
-      remoteChannels()
-        .map((s) => s.channel)
-        .sort()
-    )
-  })
 
   it('is refused outside the workspace, even through a symlink, before the channel runs', async () => {
     for (const spec of remoteChannels()) {

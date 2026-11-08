@@ -90,7 +90,6 @@ import {
   setMenuRebuildCallback,
   listExtensionSettingsSections,
   listExtensionCommands,
-  executeExtensionCommand,
   listNativeViewMenuItems,
   getPanelMenuItemId,
 } from '../../../src/main/extensions/api'
@@ -501,12 +500,23 @@ describe('api.ipc.registerHandler', () => {
     expect(ipcInvokeRegistry.has('test.ext:bare')).toBe(false)
   })
 
-  it('keeps a channel registered without the option local-only', () => {
-    const api = createExtensionAPI('test.ext')
-    const disposable = api.ipc.registerHandler(anyPayload('test.ext:no-option'))
-    expect(ipcInvokeRegistry.get('test.ext:no-option')?.remoteAccessible).toBe(false)
+  // Registry presence alone is not enough: the flag declared at registration decides.
+  it.each([
+    ['without the option', undefined],
+    ['with remoteAccessible: false', { remoteAccessible: false }],
+  ])('keeps a channel registered %s local-only', async (_how, options) => {
+    const api = createExtensionAPI('test.ext', {
+      bridge: {
+        invokeRegistry: ipcInvokeRegistry,
+        sendRegistry: new Map(),
+        eventBus: new EventEmitter(),
+      },
+    })
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:local-only'), options)
+    expect(ipcInvokeRegistry.get('test.ext:local-only')?.remoteAccessible).toBe(false)
+    expect(await api.ipc.isRemoteAccessible('test.ext:local-only')).toBe(false)
     disposable.dispose()
-    expect(ipcInvokeRegistry.has('test.ext:no-option')).toBe(false)
+    expect(ipcInvokeRegistry.has('test.ext:local-only')).toBe(false)
   })
 })
 
@@ -585,17 +595,6 @@ describe('api.ipc.registerHandler — rejected payloads', () => {
   })
 })
 
-describe('api.ipc.registerHandler — local-only channels', () => {
-  it('honors remoteAccessible: false for local-only channels', () => {
-    const api = createExtensionAPI('test.ext')
-    const disposable = api.ipc.registerHandler(anyPayload('test.ext:local-only'), {
-      remoteAccessible: false,
-    })
-    expect(ipcInvokeRegistry.get('test.ext:local-only')?.remoteAccessible).toBe(false)
-    disposable.dispose()
-  })
-})
-
 describe('registry query functions', () => {
   it('lists a settings section under its extension, with its label, description and properties', () => {
     const api = createExtensionAPI('com.query.settings')
@@ -613,23 +612,6 @@ describe('registry query functions', () => {
       label: 'Query Test',
       description: 'What the query extension can be told',
       properties: { 'com.query.settings.flag': flag },
-    })
-    d.dispose()
-  })
-})
-
-describe('registry query functions — commands and menu items', () => {
-  it('commands are listed with their key and executed through it', async () => {
-    const api = createExtensionAPI('com.query.cmd')
-    const handler = vi.fn()
-    const d = api.commands.register({ id: 'q-cmd', label: 'Run' }, handler)
-    const cmd = listExtensionCommands().find((c) => c.id === 'q-cmd')
-    const ctx = { projectId: 'p1', sessionId: null, repoRoot: null }
-    expect(await executeExtensionCommand(cmd!.key, ctx)).toEqual({ ok: true })
-    expect(handler).toHaveBeenCalledWith(ctx)
-    expect(await executeExtensionCommand('unknown-key', ctx)).toEqual({
-      ok: false,
-      reason: 'not-registered',
     })
     d.dispose()
   })

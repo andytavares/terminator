@@ -23,27 +23,16 @@ function renderBand(props: Partial<React.ComponentProps<typeof AppBand>> = {}) {
 }
 
 describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
-  it('names every entry for a reader, since the band is icons only (FR-036)', () => {
-    // The 8px text label went: at that size it was barely legible and doubled
-    // the band's height for what the accessible name already carries.
-    const { container } = renderBand()
-    for (const label of ['Overview', 'Notes', 'Task Vault']) {
-      expect(screen.getByRole('button', { name: label })).toBeTruthy()
-    }
-    for (const entry of container.querySelectorAll('.app-band__entry')) {
-      expect(entry.getAttribute('aria-label')).toBeTruthy()
-      expect(entry.getAttribute('title')).toBeTruthy()
-      // No drawn label: the band is icons only.
-      expect(entry.textContent).toBe('')
-    }
-  })
-
-  it('gives every entry an accessible name', () => {
-    const { container } = renderBand()
-    const names = [...container.querySelectorAll('.app-band__entry')].map((el) =>
-      el.getAttribute('aria-label')
-    )
-    expect(names).toEqual(['Overview', 'Notes', 'Task Vault'])
+  it('names every entry as a reachable button with no drawn text, since the band is icons only (FR-036)', () => {
+    renderBand()
+    const entries = screen
+      .getAllByRole('button')
+      .map((el) => [el.getAttribute('aria-label'), el.title, el.textContent, el.tabIndex])
+    expect(entries).toEqual([
+      ['Overview', 'Overview', '', 0],
+      ['Notes', 'Notes', '', 0],
+      ['Task Vault', 'Task Vault', '', 0],
+    ])
   })
 
   it('hides the icon from assistive technology — the label carries it', () => {
@@ -52,48 +41,28 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
       expect(icon.getAttribute('aria-hidden')).toBe('true')
     }
   })
-})
 
-describe('AppBand — one labelled home for app-level surfaces (US4) — falls back to a neutral glyph when a contribution supplies no icon', () => {
   it('falls back to a neutral glyph when a contribution supplies no icon', () => {
-    const { container } = renderBand()
-    const vault = [...container.querySelectorAll('.app-band__entry')].find(
-      (el) => el.getAttribute('aria-label') === 'Task Vault'
-    )!
+    renderBand()
     // Renders something, and does not throw — an extension must not be able to
     // break the sidebar by omitting an icon.
-    expect(vault.querySelector('.app-band__icon')).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Task Vault' }).querySelector('.app-band__icon')
+    ).toBeTruthy()
   })
+})
 
+describe('AppBand — selection', () => {
   it('selects a global tab by id', () => {
     renderBand()
     fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
     expect(onSelect).toHaveBeenCalledWith('notes')
   })
 
-  it('marks the active global tab', () => {
-    const { container } = renderBand({ activeId: 'notes' })
-    const active = container.querySelectorAll('.app-band__entry--active')
-    expect(active).toHaveLength(1)
-    expect(active[0].getAttribute('aria-label')).toBe('Notes')
-  })
-
-  it('exposes selection state to assistive technology as well as visually', () => {
-    const { container } = renderBand({ activeId: 'notes' })
-    const notes = [...container.querySelectorAll('.app-band__entry')].find(
-      (el) => el.getAttribute('aria-label') === 'Notes'
-    )!
-    expect(notes.getAttribute('aria-current')).toBe('page')
-  })
-})
-
-describe('AppBand — one labelled home for app-level surfaces (US4) — keeps every entry keyboard reachable in reading order', () => {
-  it('keeps every entry keyboard reachable in reading order', () => {
-    const { container } = renderBand()
-    for (const el of container.querySelectorAll('.app-band__entry')) {
-      expect(el.tagName).toBe('BUTTON')
-      expect(el.getAttribute('tabindex')).not.toBe('-1')
-    }
+  it('marks only the active global tab as the current page', () => {
+    renderBand({ activeId: 'notes' })
+    const current = screen.getAllByRole('button').map((el) => el.getAttribute('aria-current'))
+    expect(current).toEqual([null, 'page', null])
   })
 
   it('omits a global tab that asked to be hidden', () => {
@@ -107,14 +76,6 @@ describe('AppBand — one labelled home for app-level surfaces (US4) — keeps e
   it('renders nothing at all when nothing is contributed', () => {
     const { container } = renderBand({ globalTabs: [] })
     expect(container.querySelector('.app-band')).toBeNull()
-  })
-
-  it('names no extension in its own markup — it renders registry data only', () => {
-    const { container } = renderBand({
-      globalTabs: [{ id: 'x', label: 'Anything At All', component: noop }],
-    })
-    expect(screen.getByRole('button', { name: 'Anything At All' })).toBeTruthy()
-    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(1)
   })
 })
 

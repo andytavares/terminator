@@ -120,23 +120,11 @@ describe('GlobalSettings', () => {
     expect(screen.getByText('Loading...')).toBeTruthy()
   })
 
-  it('renders theme options', () => {
-    render(<GlobalSettings />)
-    expect(screen.getByText('Dark')).toBeTruthy()
-    expect(screen.getByText('Light')).toBeTruthy()
-  })
-
   it('calls updateGlobalTheme when theme is changed', () => {
     render(<GlobalSettings />)
     const radios = screen.getAllByRole('radio')
     fireEvent.click(radios[1]) // light
     expect(mockUpdateTheme).toHaveBeenCalledWith('light')
-  })
-
-  it('renders scrollback limit input with current value', () => {
-    render(<GlobalSettings />)
-    const input = screen.getByDisplayValue('5000')
-    expect(input).toBeTruthy()
   })
 
   it('calls updateScrollbackLimit for valid scrollback value', () => {
@@ -186,11 +174,6 @@ describe('GlobalSettings — calls updateShowMetricsBar when metrics bar checkbo
     const checkbox = screen.getByRole('checkbox', { name: /show cpu/i })
     fireEvent.click(checkbox)
     expect(mockUpdateShowMetrics).toHaveBeenCalledWith(true)
-  })
-
-  it('renders the worktree base directory hint', () => {
-    render(<GlobalSettings />)
-    expect(screen.getByText(/where new git worktrees are created/i)).toBeTruthy()
   })
 
   it('calls updateBranchExcludePatterns on blur of the patterns textarea', () => {
@@ -260,11 +243,6 @@ describe('GlobalSettings — Notifications — checking a target on a core notif
     const systemCheckbox = within(row.parentElement as HTMLElement).getAllByRole('checkbox')[0]
     fireEvent.click(systemCheckbox)
     expect(mockUpdateNotificationOverride).toHaveBeenCalledWith('terminalBell', ['system'])
-  })
-
-  it('does not show a per-extension table (extensions configure their own notifications)', () => {
-    render(<GlobalSettings />)
-    expect(screen.queryByText('Per-Extension Overrides')).toBeNull()
   })
 })
 

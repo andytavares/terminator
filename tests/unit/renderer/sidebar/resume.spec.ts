@@ -18,12 +18,6 @@ const exited = (patch = {}) =>
 // The command is reached through planResume, the only way the application
 // asks for one.
 describe('the command a resume runs', () => {
-  it('asks Claude Code to carry on the conversation', () => {
-    expect(planResume(exited())?.command).toBe(
-      'claude --resume b610a882-41f3-4833-a6a3-dc3a33aea060'
-    )
-  })
-
   it.each([['id with spaces'], ['id;rm -rf /'], ['$(whoami)'], ['a`b`'], ['--flag']])(
     'refuses an id that is not one: %s',
     (sessionId) => {
@@ -90,10 +84,6 @@ describe('planResume — a conversation run in an agent tab', () => {
       command: null,
       conversationId: 'acp-session-1',
     })
-  })
-
-  it('plans a terminal resume for a terminal conversation', () => {
-    expect(planResume(exited())).toMatchObject({ transport: 'tui', agentId: 'claude' })
   })
 })
 

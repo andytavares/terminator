@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import {
-  PERIOD_PRESETS,
   periodRange,
   periodLabel,
   customRange,
@@ -87,11 +86,5 @@ describe('customRange', () => {
   it('rejects an empty or malformed date', () => {
     expect(customRange('', '2026-10-16', FRIDAY)).toBeNull()
     expect(customRange('not-a-date', '2026-10-16', FRIDAY)).toBeNull()
-  })
-})
-
-describe('PERIOD_PRESETS', () => {
-  it('defaults to This year, as the design shows', () => {
-    expect(PERIOD_PRESETS[0]).toMatchObject({ preset: 'year', label: 'This year' })
   })
 })

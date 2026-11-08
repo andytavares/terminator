@@ -33,16 +33,14 @@ describe('layer scale — the nesting rule', () => {
     }
   })
 
-  it('emits a declaration for every layer', () => {
-    const css = layerCssDeclarations()
-    for (const name of LAYER_NAMES) {
-      expect(css).toContain(`--tm-layer-${name}: ${LAYERS[name]};`)
-    }
-  })
-
   // The declarations are pasted into the core token block, so they must match
   // what the module says the scale is — not a second copy that can drift.
-  it('emits exactly one declaration per layer and nothing else', () => {
-    expect(layerCssDeclarations().split('\n')).toHaveLength(LAYER_NAMES.length)
+  it('emits exactly one declaration per layer, with its value from the scale', () => {
+    expect(layerCssDeclarations().split('\n  ')).toEqual([
+      `--tm-layer-panel: ${LAYERS.panel};`,
+      `--tm-layer-overlay: ${LAYERS.overlay};`,
+      `--tm-layer-modal: ${LAYERS.modal};`,
+      `--tm-layer-toast: ${LAYERS.toast};`,
+    ])
   })
 })

@@ -232,9 +232,14 @@ describe('OverviewScreen — the Monitor wall — saves a description typed on a
     expect(overviewTileOf('vitest').textContent).toContain('12.5%')
     expect(useMetricsStore.getState().processesBySessionId.has('a')).toBe(false)
   })
+})
 
-  it('shows no load when the pid lookup fails', async () => {
-    metricsApi.getPids.mockRejectedValue(new Error('gone'))
+describe('OverviewScreen — the Monitor wall — when the pid lookup fails', () => {
+  it.each([
+    ['rejects', () => metricsApi.getPids.mockRejectedValue(new Error('gone'))],
+    ['reports an error', () => metricsApi.getPids.mockResolvedValue({ error: 'nope' })],
+  ])('shows no load when the pid lookup %s', async (_case, failLookup) => {
+    failLookup()
     render(<OverviewScreen />)
     await act(async () => {})
     expect(useMetricsStore.getState().pollingActive).toBe(true)
@@ -243,16 +248,7 @@ describe('OverviewScreen — the Monitor wall — saves a description typed on a
   })
 })
 
-describe('OverviewScreen — the Monitor wall — shows no load when the pid lookup reports an error', () => {
-  it('shows no load when the pid lookup reports an error', async () => {
-    metricsApi.getPids.mockResolvedValue({ error: 'nope' })
-    render(<OverviewScreen />)
-    await act(async () => {})
-    expect(useMetricsStore.getState().pollingActive).toBe(true)
-    expect(metricsApi.getProcesses).not.toHaveBeenCalled()
-    expect(overviewTileOf('vitest').textContent).not.toContain('%')
-  })
-
+describe('OverviewScreen — the Monitor wall — closing it, and with nothing open', () => {
   it('stops polling when the wall closes', async () => {
     const { unmount } = render(<OverviewScreen />)
     await act(async () => {})

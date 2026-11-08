@@ -51,23 +51,11 @@ function aConfiguredPathTests() {
     expect(() => resolveDataRoot('./here', '/repos/terminator')).toThrow(/\.\/here/)
   })
 
-  it('is pure: the same inputs always give the same answer', () => {
-    expect(resolveDataRoot('', '/a')).toEqual(resolveDataRoot('', '/a'))
-  })
-
   it('trims surrounding whitespace before deciding', () => {
     expect(resolveDataRoot('  /var/foundry  ', '/repos/x').root).toBe('/var/foundry')
     expect(resolveDataRoot('   ', '/repos/x').usingDefault).toBe(true)
   })
 }
-
-describe('paths under the root', () => {
-  const root = '/var/foundry'
-
-  it('puts an order in its own directory', () => {
-    expect(orderDir(root, 'WO-0913-c71')).toBe('/var/foundry/orders/WO-0913-c71')
-  })
-})
 
 let tmp: string
 

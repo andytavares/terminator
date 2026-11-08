@@ -139,10 +139,3 @@ test('a task across three repos shows on Home, asks, grows and groups the sideba
   await test.step('Display → Group → Task lists the task with its lanes', () =>
     sidebarGroupsByTask(page))
 })
-
-test('Home with nothing asking says so', async () => {
-  handle = await launchApp(undefined, NO_GITHUB())
-  const { page } = handle
-  await openHome(page)
-  await expect(page.getByText('Nothing needs you.')).toBeVisible()
-})

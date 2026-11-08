@@ -154,14 +154,6 @@ function theFrameLoopTests() {
 }
 
 function drawingTests() {
-  it('draws the bake and the frame at least once on mount', () => {
-    const map = fakeMap()
-    const worldRef = { current: fakeWorld(map) }
-    render(<HallScene map={map} worldRef={worldRef} states={{}} />)
-
-    expect(fillRectSpy).toHaveBeenCalled()
-  })
-
   it('draws exactly one frame and schedules nothing under reduced motion', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }

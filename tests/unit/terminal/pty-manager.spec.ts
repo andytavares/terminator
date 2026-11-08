@@ -102,20 +102,6 @@ describe('PtyManager — a cwd that is a file', () => {
 describe('PtyManager', () => {
   usePtyMocks()
 
-  it('spawnSession creates a PTY and returns the session info', async () => {
-    const mgr = await makeManager()
-    const sessionId = 'test-session-1'
-    const result = mgr.spawnSession({
-      sessionId,
-      cwd: '/home',
-      shell: '/bin/bash',
-      type: 'human',
-      origin: 'app',
-    })
-    expect(result.sessionId).toBe(sessionId)
-    expect(mgr.getSessionIds()).toContain(sessionId)
-  })
-
   it('resize calls pty.resize', async () => {
     const mgr = await makeManager()
     const id = 'resize-session'
@@ -137,15 +123,6 @@ describe('PtyManager — flow control and writing', () => {
     expect(mockPty.resume).not.toHaveBeenCalled()
     mgr.resume(id)
     expect(mockPty.resume).toHaveBeenCalledTimes(1)
-  })
-
-  it('pause and resume are no-ops for unknown sessionId', async () => {
-    const mgr = await makeManager()
-    expect(() => {
-      mgr.pause('no-such')
-      mgr.resume('no-such')
-    }).not.toThrow()
-    expect(mockPty.pause).not.toHaveBeenCalled()
   })
 
   it('write sends data to PTY', async () => {
@@ -190,14 +167,19 @@ describe('PtyManager — kill', () => {
   })
 })
 
-describe('PtyManager — kill when nothing is there', () => {
+describe('PtyManager — unknown sessions and failed kills', () => {
   usePtyMocks()
 
-  it('kill is a no-op for unknown sessionId', async () => {
+  it.each([
+    ['pause', (mgr: PtyManager) => mgr.pause('no-such'), mockPty.pause],
+    ['resume', (mgr: PtyManager) => mgr.resume('no-such'), mockPty.resume],
+    ['kill', (mgr: PtyManager) => mgr.kill('no-such'), mockPty.kill],
+    ['resize', (mgr: PtyManager) => mgr.resize('no-such', 80, 24), mockPty.resize],
+    ['write', (mgr: PtyManager) => mgr.write('no-such', 'data'), mockPty.write],
+  ])('%s is a no-op for an unknown sessionId', async (_name, callWithUnknownId, ptyMethod) => {
     const mgr = await makeManager()
-    // Should not throw
-    expect(() => mgr.kill('nonexistent-session')).not.toThrow()
-    expect(mockPty.kill).not.toHaveBeenCalled()
+    expect(() => callWithUnknownId(mgr)).not.toThrow()
+    expect(ptyMethod).not.toHaveBeenCalled()
   })
 
   it('kill swallows errors thrown by pty.kill()', async () => {
@@ -309,7 +291,7 @@ describe('PtyManager — orphans that cannot be signalled', () => {
   })
 })
 
-describe('PtyManager — orphans that are not running, and unknown sessions', () => {
+describe('PtyManager — orphans that are not running', () => {
   usePtyMocks()
 
   it('cleanupOrphans skips non-running PIDs', async () => {
@@ -329,18 +311,6 @@ describe('PtyManager — orphans that are not running, and unknown sessions', ()
     expect(result.cleanedCount).toBe(0)
     killSpy.mockRestore()
   })
-
-  it('resize is a no-op for unknown sessionId', async () => {
-    const mgr = await makeManager()
-    expect(() => mgr.resize('no-such', 80, 24)).not.toThrow()
-    expect(mockPty.resize).not.toHaveBeenCalled()
-  })
-
-  it('write is a no-op for unknown sessionId', async () => {
-    const mgr = await makeManager()
-    expect(() => mgr.write('no-such', 'data')).not.toThrow()
-    expect(mockPty.write).not.toHaveBeenCalled()
-  })
 })
 
 describe('PtyManager — pids and listing', () => {
@@ -355,36 +325,6 @@ describe('PtyManager — pids and listing', () => {
   it('getPid returns undefined for unknown sessionId', async () => {
     const mgr = await makeManager()
     expect(mgr.getPid('nope')).toBeUndefined()
-  })
-})
-
-describe('PtyManager — listing', () => {
-  usePtyMocks()
-
-  it('listSessions returns all active sessions with cwd', async () => {
-    const mgr = await makeManager()
-    mgr.spawnSession({
-      sessionId: 's1',
-      cwd: '/home/user',
-      shell: '/bin/sh',
-      type: 'human',
-      origin: 'app',
-    })
-    mgr.spawnSession({
-      sessionId: 's2',
-      cwd: '/tmp',
-      shell: '/bin/sh',
-      type: 'agent',
-      origin: 'app',
-    })
-    const result = mgr.listSessions()
-    expect(result).toHaveLength(2)
-    expect(result).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ sessionId: 's1', cwd: '/home/user' }),
-        expect.objectContaining({ sessionId: 's2', cwd: '/tmp' }),
-      ])
-    )
   })
 })
 

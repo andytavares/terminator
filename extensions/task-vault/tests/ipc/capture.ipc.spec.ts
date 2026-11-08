@@ -29,10 +29,6 @@ function taskVaultVaultCaptureIPCTests() {
 }
 
 function taskVaultVaultCaptureIPCStoringTests() {
-  it('registers the capture handler', () => {
-    expect(harness.channels()).toContain('task-vault:vault:capture')
-  })
-
   it('stores an open inbox task and returns its id', async () => {
     const { taskId } = (await captureVia({ text: 'New task' })) as { taskId: string }
 

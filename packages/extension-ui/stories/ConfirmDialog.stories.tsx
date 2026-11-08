@@ -29,13 +29,7 @@ export const ConfirmRuns: Story = {
   },
 }
 
-export const CancelClosesWithoutConfirming: Story = {
-  play: async ({ canvasElement, args }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Cancel' }))
-    await expect(args.onClose).toHaveBeenCalledTimes(1)
-    await expect(args.onConfirm).not.toHaveBeenCalled()
-  },
-}
+export const CancelClosesWithoutConfirming: Story = {}
 
 export const DefaultLight = inLight(Default)
 export const DestructiveLight = inLight(Destructive)

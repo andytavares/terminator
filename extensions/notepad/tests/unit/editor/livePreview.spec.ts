@@ -15,7 +15,6 @@ function makeStateGFM(doc: string) {
 describe('buildDecorations', buildDecorationsTests)
 
 function buildDecorationsTests() {
-  describe('headings', buildDecorationsHeadingsTests)
   describe('the cursor line', buildDecorationsCursorLineTests)
   describe('plain text and bold', buildDecorationsPlainTextBoldTests)
   describe('italic', buildDecorationsItalicTests)
@@ -27,25 +26,6 @@ function buildDecorationsTests() {
   describe('multi-line code and images', buildDecorationsMultiLineCodeTests)
   describe('lists and links', buildDecorationsListsLinksTests)
   describe('list items', buildDecorationsListItemsTests)
-}
-
-function buildDecorationsHeadingsTests() {
-  it('marks heading # text with a heading decoration (cursor off heading line)', () => {
-    // Put heading on line 1, cursor on line 2
-    const state = makeState('# Hello World\nother line\n')
-    const decos = buildDecorations(state, { anchor: 14 }) // "other line" starts at 14
-    let found = false
-    decos.between(0, 13, (_from, _to, deco) => {
-      if ((deco.spec as { class?: string })?.class?.includes('notepad-heading')) found = true
-    })
-    expect(found).toBe(true)
-  })
-
-  it('returns a decoration set without throwing for heading with marker', () => {
-    const state = makeState('## Section\n')
-    const decos = buildDecorations(state, { anchor: 0 })
-    expect(decos).toBeDefined()
-  })
 }
 
 function buildDecorationsCursorLineTests() {
@@ -159,17 +139,6 @@ function buildDecorationsCodeMarkersTests() {
 }
 
 function buildDecorationsFencedCodeTests() {
-  it('produces a line deco for fenced code block content (cursor outside block)', () => {
-    const state = makeState('other\n```\ncode\n```\n')
-    const decos = buildDecorations(state, { anchor: 0 })
-    let foundLineDeco = false
-    decos.between(0, state.doc.length, (_from, _to, deco) => {
-      if ((deco.spec as { class?: string })?.class?.includes('notepad-code-block-line'))
-        foundLineDeco = true
-    })
-    expect(foundLineDeco).toBe(true)
-  })
-
   it('does NOT hide fenced code fences when cursor is inside block', () => {
     const state = makeState('```\ncode\n```\n')
     // Cursor at position 4 (inside "code"). The body is still styled as code,

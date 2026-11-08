@@ -1,4 +1,3 @@
-import { isSurfaceOpen } from '@shared/double-escape'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
@@ -146,22 +145,15 @@ describe('SessionLinkDialog — says where to connect a tracker when none is', (
 })
 
 describe('SessionLinkDialog — keeps its keys from reaching the row or tile behind it', () => {
-  it('keeps its keys from reaching the row or tile behind it', () => {
+  it.each(['Enter', 'a'])('keeps the %s key from reaching the row or tile behind it', (key) => {
     const behind = vi.fn()
     render(
       <div onKeyDown={behind}>
         <SessionLinkDialog facts={fact()} onClose={onClose} />
       </div>
     )
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('dialog'), { key })
     expect(behind).not.toHaveBeenCalled()
-  })
-
-  it('counts as an open modal until it closes', () => {
-    const { unmount } = render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
-    expect(isSurfaceOpen(document)).toBe(true)
-    unmount()
-    expect(isSurfaceOpen(document)).toBe(false)
   })
 
   it('closes on Escape, wherever the focus is', () => {
@@ -175,18 +167,5 @@ describe('SessionLinkDialog — keeps its keys from reaching the row or tile beh
     unmount()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
-  })
-})
-
-describe('SessionLinkDialog — leaves other keys to the dialog, without reaching the row behind it', () => {
-  it('leaves other keys to the dialog, without reaching the row behind it', () => {
-    const behind = vi.fn()
-    render(
-      <div onKeyDown={behind}>
-        <SessionLinkDialog facts={fact()} onClose={onClose} />
-      </div>
-    )
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'a' })
-    expect(behind).not.toHaveBeenCalled()
   })
 })

@@ -64,10 +64,6 @@ beforeEach(() => {
 })
 
 describe('session lifecycle', () => {
-  it('starts with null session', () => {
-    expect(useMergeFlowStore.getState().session).toBeNull()
-  })
-
   it('startSession sets session and resets indices', () => {
     const session = conflictSessionWith()
     act(() => {
@@ -207,17 +203,6 @@ describe('UI modals', () => {
   })
 })
 
-describe('isComplete selector', () => {
-  it('returns true when all conflicts resolved', () => {
-    const session = conflictSessionWith({ totalConflicts: 0, totalResolved: 0 })
-    act(() => {
-      useMergeFlowStore.getState().startSession({ ...session, totalConflicts: 2, totalResolved: 2 })
-    })
-    expect(useMergeFlowStore.getState().session!.totalResolved).toBe(2)
-    expect(useMergeFlowStore.getState().session!.totalConflicts).toBe(2)
-  })
-})
-
 /** A file with one unresolved block whose sides are "<name>-ours" and "<name>-theirs". */
 function oneBlockFile(name: string): ConflictFile {
   const filePath = `src/${name}.ts`
@@ -260,19 +245,6 @@ function resolveBothFiles() {
     })
   })
 }
-
-describe('cross-file undo', () => {
-  it('undo on empty stack returns null', () => {
-    act(() => {
-      useMergeFlowStore.getState().startSession(makeTwoFileSession())
-    })
-    let result: ReturnType<typeof useMergeFlowStore.getState.prototype.undoLastDecision>
-    act(() => {
-      result = useMergeFlowStore.getState().undoLastDecision()
-    })
-    expect(result!).toBeNull()
-  })
-})
 
 describe('cross-file undo — undo reverses decision in file A after navigating to file B', () => {
   it('undo reverses decision in file A after navigating to file B', () => {

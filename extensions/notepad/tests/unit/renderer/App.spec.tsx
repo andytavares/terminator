@@ -93,16 +93,6 @@ function notepadRendererAppWindowViewsTests() {
 }
 
 function notepadRendererAppQuickCreateCommandTests() {
-  it('subscribes to terminator.notepad:ui.openQuickCreate on mount', async () => {
-    setView('main')
-    const { App } = await import('../../../src/renderer/App')
-    render(<App />)
-    expect(mockBridgeOn).toHaveBeenCalledWith(
-      'terminator.notepad:ui.openQuickCreate',
-      expect.any(Function)
-    )
-  })
-
   it('calls setShowQuickCreate(true) when command fires', async () => {
     setView('main')
     const { App } = await import('../../../src/renderer/App')
@@ -129,16 +119,12 @@ function notepadRendererAppUnsubscribingTests() {
 }
 
 function notepadRendererAppPendingQuickCreateTests() {
-  it('invokes consumePendingQuickCreate on mount', async () => {
-    setView('main')
-    const { App } = await import('../../../src/renderer/App')
-    render(<App />)
-    await act(async () => {})
-    expect(mockBridgeInvoke).toHaveBeenCalledWith('terminator.notepad:ui.consumePendingQuickCreate')
-  })
-
   it('calls setShowQuickCreate(true) when pending flag is set', async () => {
-    mockBridgeInvoke.mockResolvedValue({ data: { pending: true } })
+    mockBridgeInvoke.mockImplementation(async (channel: string) =>
+      channel === 'terminator.notepad:ui.consumePendingQuickCreate'
+        ? { data: { pending: true } }
+        : undefined
+    )
     setView('main')
     const { App } = await import('../../../src/renderer/App')
     render(<App />)

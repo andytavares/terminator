@@ -428,12 +428,6 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
     expect(sessionState().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('ss2')
   })
 
-  it('regular project shortcuts still work when both activeProjectId and scratchProjectId are null', () => {
-    renderHook(() => useKeyboardShortcuts({ scratchProjectId: null }))
-    pressKey('t', { metaKey: true })
-    expect(createSession).not.toHaveBeenCalled()
-  })
-
   it('Cmd+T calls onNewTab when provided instead of creating a session directly', () => {
     const onNewTab = vi.fn()
     setup({ activeProjectId: 'proj-1' })

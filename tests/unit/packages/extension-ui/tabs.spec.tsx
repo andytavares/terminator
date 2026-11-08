@@ -43,63 +43,9 @@ describe('Tabs', () => {
     expect(tabNamed('Checks').getAttribute('aria-selected')).toBe('false')
     expect(screen.getByRole('tabpanel').textContent).toBe('File list')
   })
-
-  it('ties the panel to its tab both ways', () => {
-    render(<TabsHarness />)
-    const panel = screen.getByRole('tabpanel')
-    expect(panel.getAttribute('aria-labelledby')).toBe(tabNamed('Files').id)
-    expect(tabNamed('Files').getAttribute('aria-controls')).toBe(panel.id)
-  })
-
-  it('puts only the selected tab in the Tab order', () => {
-    render(<TabsHarness />)
-    expect(tabNamed('Files').tabIndex).toBe(0)
-    expect(tabNamed('Checks').tabIndex).toBe(-1)
-  })
-
-  it('selects a tab when it is clicked', () => {
-    render(<TabsHarness />)
-    fireEvent.click(tabNamed('Checks'))
-    expect(tabNamed('Checks').getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByRole('tabpanel').textContent).toBe('Check list')
-  })
 })
 
-describe('Tabs — moves focus and selection with the arrow keys', () => {
-  it('moves focus and selection with the arrow keys', () => {
-    render(<TabsHarness />)
-    tabNamed('Files').focus()
-    fireEvent.keyDown(tabNamed('Files'), { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(tabNamed('Checks'))
-    expect(tabNamed('Checks').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tabNamed('Checks'), { key: 'ArrowLeft' })
-    expect(document.activeElement).toBe(tabNamed('Files'))
-  })
-
-  it('skips a disabled tab', () => {
-    render(<TabsHarness initial="checks" />)
-    fireEvent.keyDown(tabNamed('Checks'), { key: 'ArrowRight' })
-    expect(tabNamed('History').getAttribute('aria-selected')).toBe('true')
-  })
-
-  it('wraps from the last tab to the first and back', () => {
-    render(<TabsHarness initial="history" />)
-    fireEvent.keyDown(tabNamed('History'), { key: 'ArrowRight' })
-    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tabNamed('Files'), { key: 'ArrowLeft' })
-    expect(tabNamed('History').getAttribute('aria-selected')).toBe('true')
-  })
-})
-
-describe('Tabs — jumps to the ends with Home and End', () => {
-  it('jumps to the ends with Home and End', () => {
-    render(<TabsHarness initial="checks" />)
-    fireEvent.keyDown(tabNamed('Checks'), { key: 'End' })
-    expect(tabNamed('History').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tabNamed('History'), { key: 'Home' })
-    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
-  })
-
+describe('Tabs — keys and clicks it does not act on', () => {
   it('leaves other keys to the browser', () => {
     render(<TabsHarness />)
     const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true })

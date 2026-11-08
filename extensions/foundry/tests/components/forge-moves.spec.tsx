@@ -306,26 +306,3 @@ describe('a hand-off compile turns down', () => {
     expect(onStarted).not.toHaveBeenCalled()
   })
 })
-
-describe('what this order writes back', () => {
-  it('turns one off for this order alone', async () => {
-    const shown = compilableOrder({
-      source: { kind: 'tracker', tracker: 'linear', key: 'TAV-42', url: 'https://x' },
-      writeBack: ['summary_comment', 'status'],
-    })
-    mountForgeOver(shown, {
-      answers: {
-        'foundry:order.states': () => ({
-          capability: { transitions: 'supported', states: [], unreachable: [] },
-        }),
-      },
-    })
-    await openForgeStep('Tracker')
-    fireEvent.click(await screen.findByLabelText(/Move its workflow state/))
-    await waitFor(() =>
-      expect(payloadsSentOn(invoke, 'foundry:order.writeBack')).toEqual([
-        { id: 'WO-1', writeBack: ['summary_comment'] },
-      ])
-    )
-  })
-})

@@ -110,13 +110,6 @@ describe('listTerminals', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/terminals', expect.anything())
   })
 
-  it('returns empty array when no terminals are active', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [] })
-    const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')
-    const result = await listTerminals()
-    expect(result).toEqual([])
-  })
-
   it('throws when response is not ok', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
     const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')

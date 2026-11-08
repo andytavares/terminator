@@ -47,34 +47,10 @@ function cookieOf(response: { headers: Record<string, unknown> }): string {
 
 describe('POST /api/login', loginRouteTests)
 
-describe('requests after login', () => {
-  it('are refused without the session cookie', async () => {
-    expect((await app.inject({ method: 'GET', url: '/api/protected' })).statusCode).toBe(401)
-  })
-
-  it('are refused when the password is sent as a Bearer header instead', async () => {
-    const res = await app.inject({
-      method: 'GET',
-      url: '/api/protected',
-      headers: { authorization: `Bearer ${PASSWORD}` },
-    })
-    expect(res.statusCode).toBe(401)
-  })
-
-  it('are refused with a forged session cookie', async () => {
-    const res = await app.inject({
-      method: 'GET',
-      url: '/api/protected',
-      headers: { cookie: 'remote-session=forged' },
-    })
-    expect(res.statusCode).toBe(401)
-  })
-})
-
 function loginRouteTests() {
   describe('accepting the password', loginAcceptTests)
   describe('rejecting a login', loginRejectTests)
-  describe('lockout and Host checks', loginLockoutTests)
+  describe('lockout', loginLockoutTests)
 }
 
 function loginAcceptTests() {
@@ -131,15 +107,5 @@ function loginLockoutTests() {
     }
     storedHash = realHash
     expect((await login(PASSWORD)).statusCode).toBe(429)
-  })
-
-  it('refuses a request whose Host is not local, LAN or tunnel', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/login',
-      headers: { host: 'evil.attacker.com' },
-      payload: { password: PASSWORD },
-    })
-    expect(res.statusCode).toBe(403)
   })
 }

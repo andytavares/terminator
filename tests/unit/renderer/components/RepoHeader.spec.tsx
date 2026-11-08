@@ -89,13 +89,11 @@ describe('RepoHeader — carries the repo colour as a swatch, not as the name co
   })
 
   // FR-027.
-  it('draws no more than three elements at rest', () => {
-    const { container } = renderHeader()
-    expect(restingElements(container)).toBeLessThanOrEqual(3)
-  })
-
-  it('still draws no more than three when collapsed and something is waiting', () => {
-    const { container } = renderHeader({ needsYou: true }, { collapsed: true })
+  it.each([
+    ['at rest', {}, {}],
+    ['when collapsed and something is waiting', { needsYou: true }, { collapsed: true }],
+  ])('draws no more than three elements %s', (_case, patch, props) => {
+    const { container } = renderHeader(patch, props)
     expect(restingElements(container)).toBeLessThanOrEqual(3)
   })
 
@@ -127,13 +125,6 @@ describe('RepoHeader — interaction', () => {
     const onToggleCollapse = vi.fn()
     const { container } = renderHeader({}, { onToggleCollapse })
     fireEvent.click(container.querySelector('.repo-header')!)
-    expect(onToggleCollapse).toHaveBeenCalled()
-  })
-
-  it.each(['Enter', ' '])('collapses on %s', (key) => {
-    const onToggleCollapse = vi.fn()
-    const { container } = renderHeader({}, { onToggleCollapse })
-    fireEvent.keyDown(container.querySelector('.repo-header')!, { key })
     expect(onToggleCollapse).toHaveBeenCalled()
   })
 

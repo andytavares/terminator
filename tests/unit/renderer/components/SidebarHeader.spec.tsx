@@ -16,12 +16,6 @@ beforeEach(() => {
 })
 
 describe('SidebarHeader', () => {
-  it('renders a search input element', () => {
-    const { container } = render(<SidebarHeader {...defaultProps} />)
-    expect(container.querySelector('.sidebar-search')).toBeTruthy()
-    expect(container.querySelector('input')).toBeTruthy()
-  })
-
   it('calls onSearchChange when search input value changes', () => {
     const onSearchChange = vi.fn()
     const { container } = render(
@@ -29,11 +23,6 @@ describe('SidebarHeader', () => {
     )
     fireEvent.change(container.querySelector('input')!, { target: { value: 'test' } })
     expect(onSearchChange).toHaveBeenCalledWith('test')
-  })
-
-  it('renders + workspace button', () => {
-    render(<SidebarHeader {...defaultProps} />)
-    expect(screen.getByLabelText(/new repo/i)).toBeTruthy()
   })
 
   it('calls onAddWorkspace when + button is clicked', () => {

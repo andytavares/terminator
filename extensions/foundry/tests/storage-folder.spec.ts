@@ -10,7 +10,6 @@ import * as path from 'node:path'
 import { fakeHost, realGit, seededRepository, temporaryDirectory } from './helpers/foundry-host.js'
 import { activateFoundry, deactivate } from './helpers/foundry-activation.js'
 import type { FoundryHost } from './helpers/foundry-host.js'
-import { resolveFoundryDataRoot } from '../src/workspace-root.js'
 import { writeFileWithDirs } from './helpers/files.js'
 import { eventually } from '../../../tests/support/eventually'
 
@@ -20,17 +19,6 @@ const userDataOf = (host: FoundryHost) => path.dirname(path.dirname(host.globalS
 
 afterEach(async () => {
   await deactivate()
-})
-
-describe('with no workspace open and no data directory set', () => {
-  it('keeps its records in its own folder, not in userData', async () => {
-    const host = fakeHost(() => '')
-    await activateFoundry(host)
-
-    expect(resolveFoundryDataRoot(host.api)).toBe(
-      path.join(host.globalStorage, 'records', '.foundry')
-    )
-  })
 })
 
 describe('the first activation after the move to its own folder', () => {

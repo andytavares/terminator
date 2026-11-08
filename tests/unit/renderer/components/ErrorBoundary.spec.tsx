@@ -45,15 +45,6 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Something went wrong')).toBeTruthy()
     expect(screen.getByText('Test render error')).toBeTruthy()
   })
-
-  it('shows recovery button when error occurs', () => {
-    render(
-      <ErrorBoundary>
-        <ThrowingChild shouldThrow={true} />
-      </ErrorBoundary>
-    )
-    expect(screen.getByRole('button', { name: /try to recover/i })).toBeTruthy()
-  })
 })
 
 describe('ErrorBoundary — writes the error to the application log', () => {

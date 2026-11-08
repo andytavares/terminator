@@ -172,21 +172,19 @@ function decidedElsewhereTests() {
   // every climb reported them "not measured" — three phantom gaps in every
   // pull request body, on the one signal the design cannot afford to have
   // people skim.
-  it('reports the rungs decided elsewhere as decided, never as a gap', () => {
-    const steps = ladderFor({ toolchain: toolchain(), risk: risky, touchesUi: false })
-    for (const rung of ['L3', 'L4', 'L6'] as const) {
+  it.each([
+    ['L3', /verifier/],
+    ['L4', /findings/],
+    ['L6', /decision/],
+  ] as const)(
+    'reports %s as decided elsewhere, never as a gap, and says where (%s)',
+    (rung, where) => {
+      const steps = ladderFor({ toolchain: toolchain(), risk: risky, touchesUi: false })
       const step = steps.find((s) => s.rung === rung)
       expect(step?.status).toBe('elsewhere')
-      expect(step?.reason).not.toBe('')
+      expect(step?.reason).toMatch(where)
     }
-  })
-
-  it('says where each of them was decided, rather than only that it was', () => {
-    const steps = ladderFor({ toolchain: toolchain(), risk: risky, touchesUi: false })
-    expect(steps.find((s) => s.rung === 'L3')?.reason).toMatch(/verifier/)
-    expect(steps.find((s) => s.rung === 'L4')?.reason).toMatch(/findings/)
-    expect(steps.find((s) => s.rung === 'L6')?.reason).toMatch(/decision/)
-  })
+  )
 }
 
 function anEmptyRepositoryTests() {

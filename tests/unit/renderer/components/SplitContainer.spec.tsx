@@ -52,98 +52,54 @@ describe('SplitContainer', () => {
     expect(getByTestId('second')).toBeTruthy()
   })
 
-  it('applies vertical direction class', () => {
-    const { container } = renderSplit('vertical', 0.5)
-    expect(container.querySelector('.split-container--vertical')).toBeTruthy()
-  })
+  it.each(['vertical', 'horizontal'] as const)(
+    'marks a %s split and its divider with the direction',
+    (direction) => {
+      const { container } = renderSplit(direction, 0.5)
+      expect(container.querySelector(`.split-container--${direction}`)).toBeTruthy()
+      expect(container.querySelector(`.split-container__divider--${direction}`)).toBeTruthy()
+    }
+  )
 
-  it('applies horizontal direction class', () => {
-    const { container } = renderSplit('horizontal', 0.5)
-    expect(container.querySelector('.split-container--horizontal')).toBeTruthy()
-  })
-
-  it('renders a vertical divider for vertical splits', () => {
-    const { container } = renderSplit('vertical', 0.5)
-    expect(container.querySelector('.split-container__divider--vertical')).toBeTruthy()
-  })
-
-  it('renders a horizontal divider for horizontal splits', () => {
-    const { container } = renderSplit('horizontal', 0.5)
-    expect(container.querySelector('.split-container__divider--horizontal')).toBeTruthy()
-  })
-
-  it('applies ratio to flex style of first child', () => {
+  it('gives the first child the ratio and the second child the rest', () => {
     const { container } = renderSplit('vertical', 0.3)
     const children = container.querySelectorAll('.split-container__child')
     expect(parseFloat((children[0] as HTMLElement).style.flex)).toBeCloseTo(0.3)
-  })
-})
-
-describe('SplitContainer — applies complementary ratio to second child', () => {
-  it('applies complementary ratio to second child', () => {
-    const { container } = renderSplit('vertical', 0.3)
-    const children = container.querySelectorAll('.split-container__child')
     expect(parseFloat((children[1] as HTMLElement).style.flex)).toBeCloseTo(0.7)
   })
 })
 
-describe('SplitContainer — calls onRatioChange on mouse drag', () => {
-  it('calls onRatioChange on mouse drag', () => {
+describe('SplitContainer — dragging the divider', () => {
+  // The split is 400 wide and 200 high, so a move to (300, 100) is 0.75 across and 0.5 down.
+  it.each([
+    ['vertical', 'split-v', 0.75],
+    ['horizontal', 'split-h', 0.5],
+  ] as const)("reports a %s split's new ratio along its own axis", (direction, splitId, ratio) => {
     const onRatioChange = vi.fn()
-    const divider = renderDraggable('vertical', onRatioChange)
+    const divider = renderDraggable(direction, onRatioChange, splitId)
 
-    fireEvent.mouseDown(divider, { clientX: 200, clientY: 100 })
+    fireEvent.mouseDown(divider, { clientX: 200, clientY: 50 })
     fireEvent.mouseMove(document, { clientX: 300, clientY: 100 })
     fireEvent.mouseUp(document)
 
-    expect(onRatioChange).toHaveBeenCalled()
-    const [splitId, ratio] = onRatioChange.mock.calls[0]
-    expect(splitId).toBe('split-1')
-    expect(ratio).toBeCloseTo(0.75)
+    const [reportedSplitId, reportedRatio] = onRatioChange.mock.calls[0]
+    expect(reportedSplitId).toBe(splitId)
+    expect(reportedRatio).toBeCloseTo(ratio)
   })
-})
 
-describe('SplitContainer — clamps ratio to minimum 0.1', () => {
-  it('clamps ratio to minimum 0.1', () => {
+  it.each([
+    [-100, 0.1],
+    [9999, 0.9],
+  ])('clamps a drag to x=%i at a ratio of %d', (clientX, ratio) => {
     const onRatioChange = vi.fn()
     const divider = renderDraggable('vertical', onRatioChange)
 
     fireEvent.mouseDown(divider, { clientX: 200 })
-    fireEvent.mouseMove(document, { clientX: -100 })
+    fireEvent.mouseMove(document, { clientX })
     fireEvent.mouseUp(document)
 
-    const [, ratio] = onRatioChange.mock.calls[0]
-    expect(ratio).toBe(0.1)
-  })
-})
-
-describe('SplitContainer — clamps ratio to maximum 0.9', () => {
-  it('clamps ratio to maximum 0.9', () => {
-    const onRatioChange = vi.fn()
-    const divider = renderDraggable('vertical', onRatioChange)
-
-    fireEvent.mouseDown(divider, { clientX: 200 })
-    fireEvent.mouseMove(document, { clientX: 9999 })
-    fireEvent.mouseUp(document)
-
-    const [, ratio] = onRatioChange.mock.calls[0]
-    expect(ratio).toBe(0.9)
-  })
-})
-
-describe('SplitContainer — calls onRatioChange using clientY for horizontal splits', () => {
-  it('calls onRatioChange using clientY for horizontal splits', () => {
-    const onRatioChange = vi.fn()
-    // Half way down the 200px-high split.
-    const divider = renderDraggable('horizontal', onRatioChange, 'split-h')
-    fireEvent.mouseDown(divider, { clientY: 50 })
-    fireEvent.mouseMove(document, { clientY: 100 })
-    fireEvent.mouseUp(document)
-
-    expect(onRatioChange).toHaveBeenCalled()
-    const [splitId, ratio] = onRatioChange.mock.calls[0]
-    expect(splitId).toBe('split-h')
-    expect(ratio).toBeCloseTo(0.5)
+    const [, reportedRatio] = onRatioChange.mock.calls[0]
+    expect(reportedRatio).toBe(ratio)
   })
 })
 

@@ -71,10 +71,6 @@ function reduceStatusTests() {
 }
 
 function reduceStatusStartupTests() {
-  it('starts off', () => {
-    expect(OFF.kind).toBe('off')
-  })
-
   it('goes off when the server reports disabled', () => {
     expect(reduceStatus(ON, { enabled: false }).kind).toBe('off')
   })
@@ -82,16 +78,6 @@ function reduceStatusStartupTests() {
   it('is starting once enabled but before any address exists', () => {
     const next = reduceStatus(OFF, { enabled: true, port: 7681 })
     expect(next).toEqual({ kind: 'starting', port: 7681 })
-  })
-
-  it('is on once a local address arrives', () => {
-    const next = reduceStatus(OFF, {
-      enabled: true,
-      port: 7681,
-      lanUrl: 'http://192.168.1.4:7681',
-      publicUrl: null,
-    })
-    expect(next.kind).toBe('on')
   })
 }
 
@@ -157,18 +143,16 @@ function reduceStatusNoPasswordTests() {
 
 function reduceStatusPortInUseTests() {
   describe('port already in use', () => {
-    it('fails, naming the port', () => {
+    it('fails, naming the port and offering a way forward', () => {
       const next = reduceStatus(OFF, { error: 'PORT_IN_USE', port: 7681 })
-      expect(next.kind).toBe('failed')
-      if (next.kind !== 'failed') throw new Error('unreachable')
-      expect(next.failure.reason).toBe('port-in-use')
-      expect(next.failure.message).toContain('7681')
-    })
-
-    it('offers a way forward rather than only the error', () => {
-      const next = reduceStatus(OFF, { error: 'PORT_IN_USE', port: 7681 })
-      if (next.kind !== 'failed') throw new Error('unreachable')
-      expect(next.failure.resolution).toBeTruthy()
+      expect(next).toMatchObject({
+        kind: 'failed',
+        failure: {
+          reason: 'port-in-use',
+          message: expect.stringContaining('7681'),
+          resolution: expect.stringMatching(/\S/),
+        },
+      })
     })
 
     it('remembers the port from the previous status when the error omits it', () => {

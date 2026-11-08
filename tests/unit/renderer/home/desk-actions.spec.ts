@@ -67,18 +67,15 @@ describe('untilLabel', () => {
 })
 
 describe('replyToSession', () => {
-  it('pastes the text and presses Enter in that session', () => {
+  // Bracketed paste keeps a reply that starts with a digit from picking that menu option.
+  it.each([
+    ['use staging', '\x1b[200~use staging\x1b[201~\r'],
+    ['2 would be safer', '\x1b[200~2 would be safer\x1b[201~\r'],
+  ])('pastes %j and presses Enter in that session', (reply, sent) => {
     const input = vi.fn()
     installElectronApi({ terminal: { input } })
-    replyToSession('s1', 'use staging')
-    expect(input).toHaveBeenCalledWith('s1', '\x1b[200~use staging\x1b[201~\r')
-  })
-
-  it('keeps a reply that starts with a digit from picking that menu option', () => {
-    const input = vi.fn()
-    installElectronApi({ terminal: { input } })
-    replyToSession('s1', '2 would be safer')
-    expect(input).toHaveBeenCalledWith('s1', '\x1b[200~2 would be safer\x1b[201~\r')
+    replyToSession('s1', reply)
+    expect(input).toHaveBeenCalledWith('s1', sent)
   })
 })
 

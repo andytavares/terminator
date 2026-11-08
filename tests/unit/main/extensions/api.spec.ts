@@ -88,11 +88,6 @@ beforeEach(() => {
 })
 
 describe('api.commands.register', () => {
-  it('has no keyboard.register member — the interface was deleted', () => {
-    const api = createExtensionAPI('test.ext')
-    expect('keyboard' in api).toBe(false)
-  })
-
   it('registers a command with mnemonic and requires', () => {
     const api = createExtensionAPI('test.ext')
     api.commands.register({ id: 'push', label: 'Push', mnemonic: 'p', requires: 'repo' }, vi.fn())
@@ -138,12 +133,6 @@ describe('api.commands.register — context', () => {
 })
 
 describe('executeExtensionCommand', () => {
-  it('is a no-op for an unknown key', async () => {
-    await expect(
-      executeExtensionCommand('unknown-key', { projectId: null, sessionId: null, repoRoot: null })
-    ).resolves.toEqual({ ok: false, reason: 'not-registered' })
-  })
-
   it('logs, and does not throw, when the handler rejects', async () => {
     const api = createExtensionAPI('test.ext')
     api.commands.register(

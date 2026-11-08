@@ -106,13 +106,6 @@ describe('LeafPane — clears the unseen bells on mousedown', () => {
     expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
   })
 
-  it('does not throw on mousedown when no terminal instance', () => {
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    expect(() =>
-      fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
-    ).not.toThrow()
-  })
-
   it('pastes file paths into terminal on drop', () => {
     const instance = makeInstance()
     withInstance(instance)

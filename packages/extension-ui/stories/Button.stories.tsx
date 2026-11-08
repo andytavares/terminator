@@ -79,5 +79,6 @@ export const GhostLight = inLight(Ghost)
 export const DangerLight = inLight(Danger)
 export const SmallLight = inLight(Small)
 export const WithIconLight = inLight(WithIcon)
-export const DisabledLight = inLight(Disabled)
+// Keeps its play: the disabled background is a theme token, so the light run checks a different colour.
+export const DisabledLight: Story = { ...Disabled, globals: { theme: 'light' } }
 export const EveryVariantAndSizeLight = inLight(EveryVariantAndSize)

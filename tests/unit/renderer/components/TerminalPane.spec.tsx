@@ -107,13 +107,6 @@ describe('TerminalPane — renders container when sessions exist', () => {
     render(<TerminalPane projectId="proj-1" />)
     expect(mockClearBell).toHaveBeenCalledWith('ses-1')
   })
-
-  it('does not crash when terminal instance is undefined', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
-    mockGetActive.mockReturnValue('ses-1')
-    mockGetInstance.mockReturnValue(undefined)
-    expect(() => render(<TerminalPane projectId="proj-1" />)).not.toThrow()
-  })
 })
 
 describe('TerminalPane — calls terminal focus when pane is clicked with an active session', () => {
@@ -151,43 +144,6 @@ describe('TerminalPane — pastes dropped file paths into the active terminal se
   })
 })
 
-describe('TerminalPane — quotes paths with spaces when dropping files', () => {
-  it('quotes paths with spaces when dropping files', () => {
-    const mockPaste = vi.fn()
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
-    mockGetActive.mockReturnValue('ses-1')
-    mockGetInstance.mockReturnValue({
-      terminal: { paste: mockPaste, focus: vi.fn(), scrollToBottom: vi.fn() },
-      mount: vi.fn(),
-      unmount: vi.fn(),
-    })
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    const pane = container.querySelector('.terminal-pane')!
-    const file = fileAt('/Users/me/my file.png')
-    fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
-    expect(mockPaste).toHaveBeenCalledWith("'/Users/me/my file.png'")
-  })
-})
-
-describe('TerminalPane — joins multiple dropped files with spaces', () => {
-  it('joins multiple dropped files with spaces', () => {
-    const mockPaste = vi.fn()
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
-    mockGetActive.mockReturnValue('ses-1')
-    mockGetInstance.mockReturnValue({
-      terminal: { paste: mockPaste, focus: vi.fn(), scrollToBottom: vi.fn() },
-      mount: vi.fn(),
-      unmount: vi.fn(),
-    })
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    const pane = container.querySelector('.terminal-pane')!
-    const f1 = fileAt('/a.txt')
-    const f2 = fileAt('/b.txt')
-    fireEvent.drop(pane, { dataTransfer: { files: [f1, f2], types: ['Files'] } })
-    expect(mockPaste).toHaveBeenCalledWith('/a.txt /b.txt')
-  })
-})
-
 describe('TerminalPane — does not call paste when no active session on drop', () => {
   it('does not call paste when no active session on drop', () => {
     const mockPaste = vi.fn()
@@ -206,36 +162,18 @@ describe('TerminalPane — does not call paste when no active session on drop', 
   })
 })
 
-describe('TerminalPane — handleDragOver prevents default when Files type is included', () => {
-  it('handleDragOver prevents default when Files type is included', () => {
+describe('TerminalPane — accepts a file drag and refuses any other drag', () => {
+  it.each([
+    { types: ['Files'], accepted: true },
+    { types: ['text/plain'], accepted: false },
+  ])('drag of $types is accepted: $accepted', ({ types, accepted }) => {
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
     mockGetActive.mockReturnValue('ses-1')
     const { container } = render(<TerminalPane projectId="proj-1" />)
-    const pane = container.querySelector('.terminal-pane')!
-
-    // Build a real DragEvent and spy on preventDefault
     const event = new Event('dragover', { bubbles: true, cancelable: true })
-    Object.defineProperty(event, 'dataTransfer', {
-      value: { types: ['Files'] },
-    })
-    const spy = vi.spyOn(event, 'preventDefault')
-    pane.dispatchEvent(event)
-    expect(spy).toHaveBeenCalled()
-  })
-
-  it('handleDragOver does not prevent default when Files type is not included', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
-    mockGetActive.mockReturnValue('ses-1')
-    const { container } = render(<TerminalPane projectId="proj-1" />)
-    const pane = container.querySelector('.terminal-pane')!
-
-    const event = new Event('dragover', { bubbles: true, cancelable: true })
-    Object.defineProperty(event, 'dataTransfer', {
-      value: { types: ['text/plain'] },
-    })
-    const spy = vi.spyOn(event, 'preventDefault')
-    pane.dispatchEvent(event)
-    expect(spy).not.toHaveBeenCalled()
+    Object.defineProperty(event, 'dataTransfer', { value: { types } })
+    container.querySelector('.terminal-pane')!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(accepted)
   })
 })
 

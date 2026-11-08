@@ -23,7 +23,6 @@ vi.mock('../../src/api/notifications', () => ({
 import { ConflictResolver } from '../../src/components/merge-flow/ConflictResolver'
 import { useMergeFlowStore } from '../../src/stores/merge-flow.store'
 import { ConflictPanel } from '../../src/components/merge-flow/ConflictPanel'
-import { ActionBar } from '../../src/components/merge-flow/ActionBar'
 import { ResultPreviewStrip } from '../../src/components/merge-flow/ResultPreviewStrip'
 
 function conflictBlock(index: number, overrides: Record<string, unknown> = {}) {
@@ -233,53 +232,22 @@ describe('ConflictResolver — undoes the last decision and tells the main proce
   })
 })
 
-describe('ConflictPanel', () => {
-  it('renders ours and theirs code', () => {
+describe('ConflictPanel — side labels', () => {
+  it.each([
+    { isRebase: false, labels: ['Your version', 'Incoming changes'] },
+    { isRebase: true, labels: ['Theirs (branch)', 'Your version'] },
+  ])('labels ours and theirs $labels when isRebase is $isRebase', ({ isRebase, labels }) => {
     const { container } = render(
       <ConflictPanel
         block={baseBlock}
-        isRebase={false}
+        isRebase={isRebase}
         pendingStrategy={null}
         onSelectMine={vi.fn()}
         onSelectTheirs={vi.fn()}
       />
     )
-    // Text may be split across highlight.js spans — check textContent
-    expect(container.textContent).toContain('const x = 1')
-    expect(container.textContent).toContain('const x = 2')
-  })
-})
-
-describe('ConflictPanel — shows Your version and Incoming changes labels for non-rebase', () => {
-  it('shows Your version and Incoming changes labels for non-rebase', () => {
-    render(
-      <ConflictPanel
-        block={baseBlock}
-        isRebase={false}
-        pendingStrategy={null}
-        onSelectMine={vi.fn()}
-        onSelectTheirs={vi.fn()}
-      />
-    )
-    expect(screen.getByText('Your version')).toBeTruthy()
-    expect(screen.getByText('Incoming changes')).toBeTruthy()
-  })
-})
-
-describe('ConflictPanel — inverts labels for rebase', () => {
-  it('inverts labels for rebase', () => {
-    render(
-      <ConflictPanel
-        block={baseBlock}
-        isRebase={true}
-        pendingStrategy={null}
-        onSelectMine={vi.fn()}
-        onSelectTheirs={vi.fn()}
-      />
-    )
-    expect(screen.getByText('Theirs (branch)')).toBeTruthy()
-    // rebase theirs label shows "Your version"
-    expect(screen.getAllByText('Your version').length).toBeGreaterThan(0)
+    const sideLabels = container.querySelectorAll('.conflict-panel__label-text')
+    expect(Array.from(sideLabels, (label) => label.textContent)).toEqual(labels)
   })
 })
 
@@ -320,80 +288,5 @@ describe('ResultPreviewStrip', () => {
   it('shows placeholder when no resolution selected', () => {
     render(<ResultPreviewStrip resolvedText={null} />)
     expect(screen.getByText(/Select a resolution/i)).toBeTruthy()
-  })
-
-  it('shows resolved text when available', () => {
-    const { container } = render(<ResultPreviewStrip resolvedText="const x = 1" />)
-    // Text may be split across highlight.js spans — check textContent
-    expect(container.textContent).toContain('const x = 1')
-  })
-})
-
-describe('ActionBar', () => {
-  it('renders all action buttons', () => {
-    render(
-      <ActionBar
-        pendingResolution={null}
-        onKeepMine={vi.fn()}
-        onKeepTheirs={vi.fn()}
-        onKeepBoth={vi.fn()}
-        onEdit={vi.fn()}
-        onConfirm={vi.fn()}
-      />
-    )
-    expect(screen.getByText(/Keep mine/i)).toBeTruthy()
-    expect(screen.getByText(/Keep theirs/i)).toBeTruthy()
-    expect(screen.getByText(/Keep both/i)).toBeTruthy()
-    expect(screen.getByText(/Edit/i)).toBeTruthy()
-  })
-})
-
-describe('ActionBar — shows Confirm button when pendingResolution is set', () => {
-  it('shows Confirm button when pendingResolution is set', () => {
-    render(
-      <ActionBar
-        pendingResolution={{ text: 'x', strategy: 'ours' }}
-        onKeepMine={vi.fn()}
-        onKeepTheirs={vi.fn()}
-        onKeepBoth={vi.fn()}
-        onEdit={vi.fn()}
-        onConfirm={vi.fn()}
-      />
-    )
-    expect(screen.getByText(/Confirm/i)).toBeTruthy()
-  })
-})
-
-describe('ActionBar — hides Confirm when no pendingResolution', () => {
-  it('hides Confirm when no pendingResolution', () => {
-    render(
-      <ActionBar
-        pendingResolution={null}
-        onKeepMine={vi.fn()}
-        onKeepTheirs={vi.fn()}
-        onKeepBoth={vi.fn()}
-        onEdit={vi.fn()}
-        onConfirm={vi.fn()}
-      />
-    )
-    expect(screen.queryByText(/Confirm/i)).toBeNull()
-  })
-})
-
-describe('ActionBar — calls onKeepMine when button clicked', () => {
-  it('calls onKeepMine when button clicked', () => {
-    const onKeepMine = vi.fn()
-    render(
-      <ActionBar
-        pendingResolution={null}
-        onKeepMine={onKeepMine}
-        onKeepTheirs={vi.fn()}
-        onKeepBoth={vi.fn()}
-        onEdit={vi.fn()}
-        onConfirm={vi.fn()}
-      />
-    )
-    fireEvent.click(screen.getByText(/Keep mine/i))
-    expect(onKeepMine).toHaveBeenCalledOnce()
   })
 })

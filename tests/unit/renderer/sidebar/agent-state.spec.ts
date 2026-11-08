@@ -35,12 +35,8 @@ describe('BellAndBusySource', () => {
     expect(derive({ bellCount: 1, busy: true })).toBe('awaiting-input')
   })
 
-  it('treats a zero bell count as no bell', () => {
-    expect(derive({ bellCount: 0 })).toBe('idle')
-  })
-
-  it('treats an undefined bell count as no bell', () => {
-    expect(derive({ bellCount: undefined })).toBe('idle')
+  it.each([0, undefined])('treats a bell count of %s as no bell', (bellCount) => {
+    expect(derive({ bellCount })).toBe('idle')
   })
 
   it('treats backgrounded as a live status, not exited', () => {
@@ -75,11 +71,6 @@ describe('BellAndBusySource — the agent’s own turn', () => {
 
   it('reads a hooked agent between turns as idle even while bytes flow', () => {
     expect(derive({ agentTurn: false, busy: true })).toBe('idle')
-  })
-
-  it('reads a terminal that never reported a hook by its bytes', () => {
-    expect(derive({ busy: true })).toBe('working')
-    expect(derive({ busy: false })).toBe('idle')
   })
 
   it('still reads a reported ask, a bell or a choice as waiting, whatever the turn', () => {

@@ -65,11 +65,6 @@ describe('frame-shim outside a frame', () => {
 })
 
 describe('frame-shim port handshake', () => {
-  it('installs window.electronAPI before the port arrives', async () => {
-    await loadShimInFrame()
-    expect(frameApi()).toBeDefined()
-  })
-
   it('ignores a message from a source other than the parent window', async () => {
     const { port } = await loadShimInFrame()
     deliverPort(port as unknown as MessagePort, {})

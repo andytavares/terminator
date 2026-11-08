@@ -179,20 +179,11 @@ const CHECK_FAILED: RunNode['feedback'][number] = {
 }
 
 function standingOrdinaryWorkTests() {
-  it('leaves the ordinary working detail alone when nothing has been sent back', () => {
-    const standing = standingOf(
-      input({ graph: graph([node({ id: 'a', state: 'running' }), node({ id: 'b' })]) })
-    )
-    expect(standing.detail).not.toContain('Reworking')
-  })
-
   // The defect this whole module exists for. A running order's row read
   // "ready to hand off" from a draft-time compile result, which is 0 for every
   // running order for ever, so the badge was a constant wearing a status.
-  it('never calls a running order ready to hand off', () => {
-    const standing = standingOf(input())
-    expect(standing.kind).not.toBe('done')
-    expect(standing.label).not.toContain('hand off')
+  it('never calls a running order ready to hand off: it is working between steps', () => {
+    expect(standingOf(input())).toMatchObject({ kind: 'working', label: 'building 0/2' })
   })
 }
 
@@ -316,11 +307,6 @@ function stoppedForNoReasonTests() {
 }
 
 function betweenStepsAndDraftsTests() {
-  it('leaves a running order between steps when nothing has failed', () => {
-    const standing = standingOf(input({ runFailure: null }))
-    expect(standing.kind).toBe('working')
-  })
-
   // Only a running order's run can have failed; a draft's compile checks are
   // a different thing entirely and this field means nothing there.
   it('ignores runFailure on a draft', () => {
@@ -642,10 +628,6 @@ function notRunningTests() {
       sources
     )
     expect(draft.kind).toBe('shaping')
-  })
-
-  it('is working as before when no document is ready', () => {
-    expect(standingOf(input({ documentReady: null })).kind).toBe('working')
   })
 }
 

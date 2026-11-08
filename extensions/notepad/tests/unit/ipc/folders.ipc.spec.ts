@@ -58,14 +58,6 @@ describe('createFolder', () => {
     const data = (result as { data: { name: string } }).data
     expect(data.name).toBe('Projects')
   })
-
-  it('assigns incrementing sort_order for multiple folders', async () => {
-    await createFolder(db, { name: 'A' })
-    await createFolder(db, { name: 'B' })
-    const listResult = await listFolders(db)
-    const folders = (listResult as { data: { name: string; sortOrder: number }[] }).data
-    expect(folders[0].sortOrder).toBeLessThan(folders[1].sortOrder)
-  })
 })
 
 describe('listFolders', () => {
@@ -74,23 +66,16 @@ describe('listFolders', () => {
     expect((result as { data: unknown[] }).data).toEqual([])
   })
 
-  it('returns folders ordered by sort_order', async () => {
+  it('lists folders in creation order with incrementing sortOrder', async () => {
     await createFolder(db, { name: 'First' })
     await createFolder(db, { name: 'Second' })
     const result = await listFolders(db)
-    const folders = (result as { data: { name: string }[] }).data
-    expect(folders[0].name).toBe('First')
-    expect(folders[1].name).toBe('Second')
-  })
-
-  it('includes id, name, sortOrder, createdAt fields', async () => {
-    await createFolder(db, { name: 'Test' })
-    const result = await listFolders(db)
-    const [f] = (result as { data: Record<string, unknown>[] }).data
-    expect(f).toHaveProperty('id')
-    expect(f).toHaveProperty('name')
-    expect(f).toHaveProperty('sortOrder')
-    expect(f).toHaveProperty('createdAt')
+    expect(result).toEqual({
+      data: [
+        { id: expect.any(String), name: 'First', sortOrder: 0, createdAt: expect.any(String) },
+        { id: expect.any(String), name: 'Second', sortOrder: 1, createdAt: expect.any(String) },
+      ],
+    })
   })
 })
 
@@ -244,18 +229,5 @@ function registerFoldersIpcHandlersTests() {
     })
     expect(await invokeFolders('delete', { id })).toHaveProperty('data')
     cleanup()
-  })
-
-  it('registers and returns a cleanup function', () => {
-    const cleanup = registerFoldersIpcHandlers(mockApi, db)
-    expect(typeof cleanup).toBe('function')
-    for (const action of ['create', 'list', 'rename', 'delete', 'move']) {
-      expect(ipcMain.handle).toHaveBeenCalledWith(
-        `terminator.notepad:folders.${action}`,
-        expect.any(Function)
-      )
-    }
-    cleanup()
-    expect(ipcMain.removeHandler).toHaveBeenCalledWith('terminator.notepad:folders.create')
   })
 }

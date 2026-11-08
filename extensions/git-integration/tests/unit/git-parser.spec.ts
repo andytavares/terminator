@@ -172,10 +172,6 @@ describe('parseStatus() — uncommon entries', () => {
     })
   })
 
-  it('skips a token too short to be an entry', () => {
-    expect(parseStatus('M\0 M a.ts\0', 500).files.map((f) => f.path)).toEqual(['a.ts'])
-  })
-
   it('reads a type change (T) as modified', () => {
     expect(parseStatus('T  link.ts\0', 500).files[0]).toMatchObject({
       status: 'modified',

@@ -20,21 +20,17 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('loadWallPrefs — ordering by task', () => {
-  it('reads back ordering by task', () => {
-    saveWallPrefs({ size: 'm', pinNeeds: true, thenBy: 'task' })
-    expect(loadWallPrefs().thenBy).toBe('task')
-  })
-})
-
 describe('loadWallPrefs', () => {
   it('defaults to medium tiles, pinned needs, then by state', () => {
     expect(loadWallPrefs()).toEqual({ size: 'm', pinNeeds: true, thenBy: 'state' })
   })
 
-  it('reads back what was saved', () => {
-    saveWallPrefs({ size: 'l', pinNeeds: false, thenBy: 'recent' })
-    expect(loadWallPrefs()).toEqual({ size: 'l', pinNeeds: false, thenBy: 'recent' })
+  it.each([
+    [{ size: 'l', pinNeeds: false, thenBy: 'recent' }],
+    [{ size: 'm', pinNeeds: true, thenBy: 'task' }],
+  ] as const)('reads back what was saved: %j', (prefs) => {
+    saveWallPrefs(prefs)
+    expect(loadWallPrefs()).toEqual(prefs)
   })
 
   it.each([['{nope'], ['4'], ['null'], ['[]']])('falls back for unreadable storage: %s', (raw) => {
@@ -46,7 +42,9 @@ describe('loadWallPrefs', () => {
     storage.set(WALL_PREFS_KEY, JSON.stringify({ size: 'xl', pinNeeds: false, thenBy: 'colour' }))
     expect(loadWallPrefs()).toEqual({ size: 'm', pinNeeds: false, thenBy: 'state' })
   })
+})
 
+describe('loadWallPrefs — storage that throws', () => {
   it('falls back when storage throws, and never throws on save', () => {
     vi.stubGlobal('localStorage', {
       getItem: () => {

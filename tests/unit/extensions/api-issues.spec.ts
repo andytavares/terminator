@@ -177,16 +177,6 @@ describe('api.issues — the surface itself (FR-034)', () => {
       ].sort()
     )
   })
-
-  it('offers no way to delete an issue, or to set any field of one', async () => {
-    const api = await makeApi()
-    // `transition` and `create` are the sanctioned exceptions, and neither is
-    // a field write: one takes an intent, the other makes a new issue.
-    const forbidden = /^(update|set(?!ting)|assign|close|move|delete|archive|label)/i
-    for (const method of Object.keys(api.issues)) {
-      expect(forbidden.test(method), `api.issues.${method} looks like a field write`).toBe(false)
-    }
-  })
 })
 
 describe('api.workspace.addProject — attaching an issue (v2.2.0)', () => {

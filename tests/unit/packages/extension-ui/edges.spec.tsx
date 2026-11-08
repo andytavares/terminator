@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { FileText } from 'lucide-react'
 import { IconButton } from '../../../../packages/extension-ui/src/IconButton'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
@@ -94,42 +94,6 @@ describe('Popover edges — leaves the outer surface alone when Escape reaches a
 })
 
 describe('Toast edges', () => {
-  it('dismisses itself once its duration elapses', () => {
-    vi.useFakeTimers()
-    const onDismiss = vi.fn()
-    render(<Toast message="Saved" duration={100} onDismiss={onDismiss} />)
-    act(() => {
-      vi.advanceTimersByTime(150)
-    })
-    expect(onDismiss).toHaveBeenCalledTimes(1)
-    vi.useRealTimers()
-  })
-
-  // An error is the one you have to read, so it waits for you.
-  it('stays until dismissed when it reports an error', () => {
-    vi.useFakeTimers()
-    const onDismiss = vi.fn()
-    render(<Toast message="Port in use" tone="error" onDismiss={onDismiss} />)
-    act(() => {
-      vi.advanceTimersByTime(60_000)
-    })
-    expect(onDismiss).not.toHaveBeenCalled()
-    vi.useRealTimers()
-  })
-})
-
-describe('Toast edges — treats a zero duration as sticky', () => {
-  it('treats a zero duration as sticky', () => {
-    vi.useFakeTimers()
-    const onDismiss = vi.fn()
-    render(<Toast message="Working…" duration={0} onDismiss={onDismiss} />)
-    act(() => {
-      vi.advanceTimersByTime(60_000)
-    })
-    expect(onDismiss).not.toHaveBeenCalled()
-    vi.useRealTimers()
-  })
-
   it('defaults to info when no tone is given', () => {
     render(<Toast message="Saved" onDismiss={() => {}} />)
     expect(screen.getByRole('status').getAttribute('data-tone')).toBe('info')

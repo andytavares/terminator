@@ -28,15 +28,6 @@ describe('pruneRecords', () => {
     expect(pruneRecords([open], NOW, RETENTION_MS)).toEqual([open])
   })
 
-  it('keeps a record closed exactly 30 days ago', () => {
-    const edge = record('a', NOW - RETENTION_MS)
-    expect(pruneRecords([edge], NOW, RETENTION_MS)).toEqual([edge])
-  })
-
-  it('drops a record closed 30 days and 1ms ago', () => {
-    expect(pruneRecords([record('a', NOW - RETENTION_MS - 1)], NOW, RETENTION_MS)).toEqual([])
-  })
-
   it('keeps survivors in their original order', () => {
     const records = [
       record('c', NOW - 1000),
@@ -58,16 +49,14 @@ describe('pruneRecords', () => {
 })
 
 describe('pruneRecords — the retention it is given', () => {
-  const DAY = 24 * 60 * 60 * 1000
-
-  it('keeps a record closed exactly one retention ago and drops one closed a moment earlier', () => {
-    const edge = record('edge', NOW - DAY)
-    const gone = record('gone', NOW - DAY - 1)
-    expect(pruneRecords([edge, gone], NOW, DAY)).toEqual([edge])
-  })
-
-  it('keeps an open record whatever the retention', () => {
-    const open = record('open')
-    expect(pruneRecords([open], NOW, 1)).toEqual([open])
+  // 30 days and 1 day in ms: a record closed exactly one retention ago is kept.
+  it.each([
+    [2_592_000_000, 2_592_000_000, ['closed']],
+    [2_592_000_000, 2_592_000_001, []],
+    [86_400_000, 86_400_000, ['closed']],
+    [86_400_000, 86_400_001, []],
+  ])('with a retention of %i ms, keeps a record closed %i ms ago: %j', (retention, ago, kept) => {
+    const closed = record('closed', NOW - ago)
+    expect(pruneRecords([closed], NOW, retention).map((r) => r.sessionId)).toEqual(kept)
   })
 })

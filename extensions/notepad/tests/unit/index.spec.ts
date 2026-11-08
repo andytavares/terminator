@@ -62,24 +62,6 @@ describe(
   notepadActivateGlobalShortcutRegistrationsTests
 )
 
-describe('notepad manifest quick action', () => {
-  it('declares a Notes group and a mnemonic on the quick-create command', () => {
-    const manifest = JSON.parse(readFileSync(join(__dirname, '../../manifest.json'), 'utf-8')) as {
-      contributes: {
-        quickActions?: { group?: { mnemonic?: string; label?: string } }
-        commands?: { id: string; mnemonic?: string; shortcut?: string; label?: string }[]
-      }
-    }
-
-    expect(manifest.contributes.quickActions?.group).toEqual({ mnemonic: 'n', label: 'Notes' })
-
-    const command = manifest.contributes.commands?.find((c) => c.id === 'notepad:quick-create')
-    expect(command?.mnemonic).toBe('n')
-    expect(command?.shortcut).toBe('⌘⇧N')
-    expect(command?.label).toBe('New note')
-  })
-})
-
 describe(
   'notepad activate() quick-actions command registration',
   notepadActivateQuickActionsCommandTests
@@ -95,16 +77,6 @@ function notepadActivateGlobalShortcutRegistrationsTests() {
 }
 
 function notepadActivateGlobalShortcutRegistrationsGlobalShortcutsTests() {
-  it('does not claim Cmd+Shift+F as an OS-level global shortcut', async () => {
-    const { api, register } = makeApi()
-    const { activate } = await import('../../src/index.ts')
-
-    await activate(api)
-
-    const accelerators = register.mock.calls.map((c) => c[0])
-    expect(accelerators).not.toContain('CommandOrControl+Shift+F')
-  })
-
   it('registers no OS-global shortcuts at all — nothing here needs to fire while backgrounded', async () => {
     const { api, register } = makeApi()
     const { activate } = await import('../../src/index.ts')
@@ -154,23 +126,28 @@ function notepadActivateQuickActionsCommandTests() {
 }
 
 function notepadActivateQuickActionsCommandRegistrationTests() {
-  it('registers the manifest command id with its label and mnemonic', async () => {
+  it('registers the manifest quick-create command under the manifest quick-action group', async () => {
+    const manifest = JSON.parse(readFileSync(join(__dirname, '../../manifest.json'), 'utf-8')) as {
+      contributes: {
+        quickActions: { group: { label: string } }
+        commands: { id: string }[]
+      }
+    }
+    const declared = manifest.contributes.commands.find((c) => c.id === 'notepad:quick-create')
     const { api } = makeApi()
     const { activate } = await import('../../src/index.ts')
 
     await activate(api)
 
-    const commandsRegister = vi.mocked(api.commands.register)
-    expect(commandsRegister).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'notepad:quick-create',
-        label: 'New note',
-        mnemonic: 'n',
-        shortcut: '⌘⇧N',
-        category: 'Notes',
-      }),
-      expect.any(Function)
-    )
+    const registered = vi
+      .mocked(api.commands.register)
+      .mock.calls.map((c) => c[0])
+      .find((c) => c.id === 'notepad:quick-create')
+    expect(declared).toBeDefined()
+    expect(registered).toMatchObject({
+      ...declared,
+      category: manifest.contributes.quickActions.group.label,
+    })
   })
 }
 

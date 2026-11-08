@@ -111,12 +111,6 @@ describe('MoveSessionDialog', () => {
     fireEvent.click(screen.getByText('+ New workspace'))
     expect(screen.getByTestId('create-workspace-dialog')).toBeTruthy()
   })
-
-  it('shows new project form when new project button clicked', () => {
-    render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
-    fireEvent.click(screen.getByText('+ New branch in Alpha'))
-    expect(screen.getByPlaceholderText('My branch')).toBeTruthy()
-  })
 })
 
 describe('MoveSessionDialog — moves the session to the chosen branch and shows it there', () => {
@@ -131,21 +125,17 @@ describe('MoveSessionDialog — moves the session to the chosen branch and shows
     expect(mockOnMoved).toHaveBeenCalledWith('proj-1', 'ws-1')
   })
 
-  it('shows Back button in new project form to return to list', () => {
+  it.each([
+    ['Back is clicked', () => fireEvent.click(screen.getByText('Back'))],
+    [
+      'Escape is pressed',
+      () => fireEvent.keyDown(screen.getByPlaceholderText('My branch'), { key: 'Escape' }),
+    ],
+  ])('returns to the branch list when %s in the new branch form', (_case, leaveForm) => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
-    expect(screen.getByText('Back')).toBeTruthy()
-    fireEvent.click(screen.getByText('Back'))
+    leaveForm()
     expect(screen.getByText('Proj One')).toBeTruthy()
-  })
-
-  it('shows error when creating project with empty name', async () => {
-    render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
-    fireEvent.click(screen.getByText('+ New branch in Alpha'))
-    fireEvent.click(screen.getByText('Create & move'))
-    await waitFor(() => {
-      expect(screen.getByText('Name is required')).toBeTruthy()
-    })
   })
 })
 
@@ -160,32 +150,22 @@ describe('MoveSessionDialog — creates the branch and moves the session into it
     expect(projectOfSession()).toBe('proj-new')
   })
 
-  it('shows duplicate name error when createProject returns DUPLICATE_NAME', async () => {
-    mockCreateProject.mockResolvedValueOnce({ error: 'DUPLICATE_NAME' })
+  it.each([
+    ['DUPLICATE_NAME', 'Name already in use'],
+    ['UNKNOWN', 'Could not create the branch'],
+  ])('shows "%s" from createProject as "%s"', async (error, message) => {
+    mockCreateProject.mockResolvedValueOnce({ error })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     fireEvent.change(screen.getByPlaceholderText('My branch'), {
       target: { value: 'Existing Proj' },
     })
     fireEvent.click(screen.getByText('Create & move'))
-    await waitFor(() => {
-      expect(screen.getByText('Name already in use')).toBeTruthy()
-    })
+    expect(await screen.findByText(message)).toBeTruthy()
   })
 })
 
-describe('MoveSessionDialog — shows generic error when createProject returns a non-duplicate error', () => {
-  it('shows generic error when createProject returns a non-duplicate error', async () => {
-    mockCreateProject.mockResolvedValueOnce({ error: 'UNKNOWN' })
-    render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
-    fireEvent.click(screen.getByText('+ New branch in Alpha'))
-    fireEvent.change(screen.getByPlaceholderText('My branch'), { target: { value: 'My Proj' } })
-    fireEvent.click(screen.getByText('Create & move'))
-    await waitFor(() => {
-      expect(screen.getByText('Could not create the branch')).toBeTruthy()
-    })
-  })
-
+describe('MoveSessionDialog — the branch the session is in', () => {
   it('shows "current" label on the active project button', () => {
     setupMocks('proj-1')
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
@@ -214,14 +194,6 @@ describe('MoveSessionDialog — submits new project form on Enter key', () => {
     await waitFor(() => {
       expect(mockCreateProject).toHaveBeenCalledWith({ workspaceId: 'ws-1', name: 'Via Enter' })
     })
-  })
-
-  it('returns to project list on Escape key in new project form', () => {
-    render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
-    fireEvent.click(screen.getByText('+ New branch in Alpha'))
-    const input = screen.getByPlaceholderText('My branch')
-    fireEvent.keyDown(input, { key: 'Escape' })
-    expect(screen.getByText('Proj One')).toBeTruthy()
   })
 
   it('clears error when name input changes', async () => {

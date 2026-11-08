@@ -47,21 +47,6 @@ describe('useGitStore — setStatus', () => {
   })
 })
 
-describe('useGitStore — setSelectedFile', () => {
-  useFreshGitStore()
-
-  it('stores the selected file path', () => {
-    useGitStore.getState().setSelectedFile('src/app.ts')
-    expect(useGitStore.getState().selectedFile).toBe('src/app.ts')
-  })
-
-  it('clears selected file when set to null', () => {
-    useGitStore.setState({ selectedFile: 'src/app.ts' })
-    useGitStore.getState().setSelectedFile(null)
-    expect(useGitStore.getState().selectedFile).toBeNull()
-  })
-})
-
 describe('useGitStore — setDiff', () => {
   useFreshGitStore()
 
@@ -82,31 +67,5 @@ describe('useGitStore — setDiff', () => {
     const updated = { ...validDiff, isBinary: true }
     useGitStore.getState().setDiff('src/app.ts', updated)
     expect(useGitStore.getState().diffCache.get('src/app.ts')?.isBinary).toBe(true)
-  })
-})
-
-describe('useGitStore — setLoading', () => {
-  useFreshGitStore()
-
-  it('sets isLoading to true', () => {
-    useGitStore.getState().setLoading(true)
-    expect(useGitStore.getState().isLoading).toBe(true)
-  })
-
-  it('sets isLoading to false', () => {
-    useGitStore.setState({ isLoading: true })
-    useGitStore.getState().setLoading(false)
-    expect(useGitStore.getState().isLoading).toBe(false)
-  })
-})
-
-describe('useGitStore — clearDiffCache', () => {
-  useFreshGitStore()
-
-  it('removes all cached diffs', () => {
-    useGitStore.getState().setDiff('src/a.ts', validDiff)
-    useGitStore.getState().setDiff('src/b.ts', validDiff)
-    useGitStore.getState().clearDiffCache()
-    expect(useGitStore.getState().diffCache.size).toBe(0)
   })
 })

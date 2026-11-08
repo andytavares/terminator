@@ -13,11 +13,6 @@ describe('useResizePanel', () => {
     expect(result.current.size).toBe(300)
   })
 
-  it('returns handleMouseDown function', () => {
-    const { result } = renderHook(() => useResizePanel(300, { min: 100, max: 600 }))
-    expect(typeof result.current.handleMouseDown).toBe('function')
-  })
-
   it('handleMouseDown stores starting position and prevents default', () => {
     const { result } = renderHook(() => useResizePanel(300, { min: 100, max: 600 }))
     const preventDefault = vi.fn()
@@ -30,30 +25,6 @@ describe('useResizePanel', () => {
       )
     })
     expect(preventDefault).toHaveBeenCalled()
-  })
-})
-
-describe('useResizePanel — onMove updates size when dragging (direction=1)', () => {
-  it('onMove updates size when dragging (direction=1)', () => {
-    const { result } = renderHook(() => useResizePanel(300, { min: 100, max: 600 }, 1))
-    const preventDefault = vi.fn()
-
-    // Start drag
-    act(() => {
-      result.current.handleMouseDown(
-        partialFake<React.MouseEvent>({
-          clientX: 500,
-          preventDefault,
-        })
-      )
-    })
-
-    // Simulate mousemove event
-    act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 550 }))
-    })
-
-    expect(result.current.size).toBe(350) // 300 + (550 - 500) * 1
   })
 })
 
@@ -140,8 +111,8 @@ describe('useResizePanel — onMove does nothing when not dragging', () => {
   })
 })
 
-describe('useResizePanel — onUp stops dragging so subsequent moves have no effect', () => {
-  it('onUp stops dragging so subsequent moves have no effect', () => {
+describe('useResizePanel — drag with direction=1', () => {
+  it('onMove grows the size with the drag, and onUp stops it so later moves have no effect', () => {
     const { result } = renderHook(() => useResizePanel(300, { min: 100, max: 600 }, 1))
     const preventDefault = vi.fn()
 

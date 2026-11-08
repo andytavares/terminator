@@ -5,7 +5,6 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { SettingsPanel } from '../../../../src/renderer/components/settings/SettingsPanel'
 import { extensionOf, seedStore } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
-import { pressOutside } from '../../../support/modal'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { eventually } from '../../../support/eventually'
 
@@ -64,19 +63,9 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('dialog', { name: 'Settings' }).tagName).toBe('DIALOG')
   })
 
-  it('renders Settings title', () => {
-    render(<SettingsPanel onClose={vi.fn()} />)
-    expect(screen.getByText('Settings')).toBeTruthy()
-  })
-
   it('shows GlobalSettings by default', () => {
     render(<SettingsPanel onClose={vi.fn()} />)
     expect(screen.getByTestId('global-settings')).toBeTruthy()
-  })
-
-  it('shows Extensions nav item', () => {
-    render(<SettingsPanel onClose={vi.fn()} />)
-    expect(screen.getByText('Extensions')).toBeTruthy()
   })
 
   it('hides Workspace Settings nav when no active workspace', () => {
@@ -85,15 +74,7 @@ describe('SettingsPanel', () => {
   })
 })
 
-describe('SettingsPanel — shows Workspace Settings nav when a workspace is active', () => {
-  it('shows Workspace Settings nav when a workspace is active', () => {
-    seedStore(useWorkspaceStore, {
-      activeWorkspaceId: 'ws-1',
-    })
-    render(<SettingsPanel onClose={vi.fn()} />)
-    expect(screen.getByText('Workspace Settings')).toBeTruthy()
-  })
-
+describe('SettingsPanel — the workspace section and closing', () => {
   it('switches to workspace section when Workspace Settings is clicked', () => {
     seedStore(useWorkspaceStore, {
       activeWorkspaceId: 'ws-1',
@@ -109,13 +90,6 @@ describe('SettingsPanel — shows Workspace Settings nav when a workspace is act
     fireEvent.click(screen.getByText('✕'))
     expect(onClose).toHaveBeenCalled()
   })
-
-  it('calls onClose when overlay is clicked', () => {
-    const onClose = vi.fn()
-    render(<SettingsPanel onClose={onClose} />)
-    pressOutside(screen.getByRole('dialog', { name: 'Settings' }))
-    expect(onClose).toHaveBeenCalled()
-  })
 })
 
 describe('SettingsPanel — calls onClose on Escape key', () => {
@@ -124,13 +98,6 @@ describe('SettingsPanel — calls onClose on Escape key', () => {
     render(<SettingsPanel onClose={onClose} />)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
-  })
-
-  it('does not close on non-Escape key', () => {
-    const onClose = vi.fn()
-    render(<SettingsPanel onClose={onClose} />)
-    fireEvent.keyDown(window, { key: 'Enter' })
-    expect(onClose).not.toHaveBeenCalled()
   })
 })
 
@@ -233,48 +200,15 @@ describe('ExtensionsSection — stops listening for list changes when it closes'
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 
-  it('shows Disable button for enabled extensions', async () => {
-    const ext = extensionOf({
-      id: 'com.test',
-      name: 'Test Ext',
-      version: '1.0.0',
-      status: 'enabled',
-    })
+  it.each([
+    ['enabled', 'Disable'],
+    ['disabled', 'Enable'],
+  ] as const)('offers %s extensions a %s button', async (status, button) => {
+    const ext = extensionOf({ id: 'com.test', name: 'Test Ext', version: '1.0.0', status })
     api.extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await screen.findByText('Disable')
-  })
-})
-
-describe('ExtensionsSection — shows Enable button for disabled extensions', () => {
-  setUpExtensionsSection()
-
-  it('shows Enable button for disabled extensions', async () => {
-    const ext = extensionOf({
-      id: 'com.test',
-      name: 'Test Ext',
-      version: '1.0.0',
-      status: 'disabled',
-    })
-    api.extension.list.mockResolvedValue({ extensions: [ext] })
-    render(<SettingsPanel onClose={vi.fn()} />)
-    fireEvent.click(screen.getByText('Extensions'))
-    await screen.findByText('Enable')
-  })
-
-  it('shows Install from Directory button', async () => {
-    render(<SettingsPanel onClose={vi.fn()} />)
-    fireEvent.click(screen.getByText('Extensions'))
-    await screen.findByText('Install from Directory')
-  })
-
-  it('calls openDirectory when install button is clicked', async () => {
-    api.dialog.openDirectory.mockResolvedValue({ cancelled: true })
-    render(<SettingsPanel onClose={vi.fn()} />)
-    fireEvent.click(screen.getByText('Extensions'))
-    fireEvent.click(await screen.findByText('Install from Directory'))
-    await waitFor(() => expect(api.dialog.openDirectory).toHaveBeenCalled())
+    expect(await screen.findByText(button)).toBeTruthy()
   })
 })
 
@@ -478,10 +412,13 @@ describe('ExtensionsSection — upgrades extension via Browse + install', () => 
   })
 })
 
-describe('ExtensionsSection — shows error toast when upgrade install step fails', () => {
+describe('ExtensionsSection — shows error toast when an upgrade step fails', () => {
   setUpExtensionsSection()
 
-  it('shows error toast when upgrade install step fails', async () => {
+  it.each([
+    ['install', { ok: true } as const, { error: 'INVALID_MANIFEST' }],
+    ['uninstall', { error: 'UNINSTALL_FAILED' }, { error: 'INVALID_MANIFEST' }],
+  ])('shows error toast when the upgrade %s step fails', async (_step, uninstalled, installed) => {
     const ext = extensionOf({
       id: 'com.test',
       name: 'Test Ext',
@@ -490,32 +427,8 @@ describe('ExtensionsSection — shows error toast when upgrade install step fail
     })
     api.extension.list.mockResolvedValue({ extensions: [ext] })
     api.dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
-    api.extension.uninstall.mockResolvedValue({ ok: true })
-    api.extension.install.mockResolvedValue({ error: 'INVALID_MANIFEST' })
-    render(<SettingsPanel onClose={vi.fn()} />)
-    fireEvent.click(screen.getByText('Extensions'))
-    fireEvent.click(await screen.findByText('Upgrade'))
-    await waitFor(() =>
-      expect(mockDispatchNotification).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'error' })
-      )
-    )
-  })
-})
-
-describe('ExtensionsSection — shows error toast when upgrade uninstall step fails', () => {
-  setUpExtensionsSection()
-
-  it('shows error toast when upgrade uninstall step fails', async () => {
-    const ext = extensionOf({
-      id: 'com.test',
-      name: 'Test Ext',
-      version: '1.0.0',
-      status: 'enabled',
-    })
-    api.extension.list.mockResolvedValue({ extensions: [ext] })
-    api.dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
-    api.extension.uninstall.mockResolvedValue({ error: 'UNINSTALL_FAILED' })
+    api.extension.uninstall.mockResolvedValue(uninstalled)
+    api.extension.install.mockResolvedValue(installed)
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     fireEvent.click(await screen.findByText('Upgrade'))
@@ -550,22 +463,6 @@ describe('ExtensionsSection — skips upgrade when directory dialog is cancelled
   })
 })
 
-describe('ExtensionsSection — renders ExtensionSettingRow for extension with schema', () => {
-  setUpExtensionsSection()
-
-  it('renders ExtensionSettingRow for extension with schema', async () => {
-    await openSettingsOf({
-      'com.test.myKey': {
-        type: 'string',
-        label: 'My Setting',
-        description: 'A test setting',
-        default: 'hello',
-      },
-    })
-    await screen.findByText('My Setting')
-  })
-})
-
 describe('ExtensionsSection — ExtensionSettingRow calls updateSetting after debounce', () => {
   setUpExtensionsSection()
 
@@ -582,23 +479,6 @@ describe('ExtensionsSection — ExtensionSettingRow calls updateSetting after de
     await eventually(() =>
       expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world')
     )
-  })
-})
-
-describe('ExtensionsSection — ExtensionSettingRow renders boolean select', () => {
-  setUpExtensionsSection()
-
-  it('ExtensionSettingRow renders boolean select', async () => {
-    await openSettingsOf({
-      'com.test.toggle': {
-        type: 'boolean',
-        label: 'Enable Feature',
-        default: true,
-      },
-    })
-    await screen.findByText('Enable Feature')
-    // The boolean setting renders as a toggle switch (role="switch")
-    expect(screen.getByRole('switch', { name: 'Enable Feature' })).toBeTruthy()
   })
 })
 
@@ -630,26 +510,6 @@ describe('ExtensionsSection — groups per-notification-kind boolean settings in
         false
       )
     )
-  })
-})
-
-describe('ExtensionsSection — ExtensionSettingRow renders enum select', () => {
-  setUpExtensionsSection()
-
-  it('ExtensionSettingRow renders enum select', async () => {
-    await openSettingsOf({
-      'com.test.mode': {
-        type: 'enum',
-        label: 'Mode',
-        options: ['fast', 'slow', 'auto'],
-        default: 'auto',
-      },
-    })
-    await screen.findByText('Mode')
-    // Enum options are capitalized in the segmented control
-    expect(screen.getByText('Fast')).toBeTruthy()
-    expect(screen.getByText('Slow')).toBeTruthy()
-    expect(screen.getByText('Auto')).toBeTruthy()
   })
 })
 

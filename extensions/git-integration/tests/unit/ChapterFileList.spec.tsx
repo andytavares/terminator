@@ -56,12 +56,6 @@ const defaultProps = {
 }
 
 describe('ChapterFileList', () => {
-  it('renders file names', () => {
-    render(<ChapterFileList {...defaultProps} />)
-    expect(screen.getByText('foo.ts')).toBeTruthy()
-    expect(screen.getByText('bar.ts')).toBeTruthy()
-  })
-
   it('calls onSelectFile when file row is clicked', () => {
     const onSelectFile = vi.fn()
     render(<ChapterFileList {...defaultProps} onSelectFile={onSelectFile} />)

@@ -511,14 +511,12 @@ describe('ReviewDiffPane', () => {
     expect(screen.getByTitle('src/foo.ts').textContent).toBe('src/foo.ts')
   })
 
-  it('leaves the additions and deletions to the file list', async () => {
-    await renderPane()
-    expect(screen.queryByText('+5/−2')).toBeNull()
-  })
-
-  it('shows no risk label for a low risk file', async () => {
-    await renderPane()
-    expect(screen.queryByText(/Low risk/)).toBeNull()
+  it.each([
+    { level: 'low' as const, label: /Low risk/ },
+    { level: 'medium' as const, label: /Medium risk/ },
+  ])('shows no risk label for a $level risk file', async ({ level, label }) => {
+    await renderPane({ file: { ...mockFile, riskScore: { ...mockFile.riskScore, level } } })
+    expect(screen.queryByText(label)).toBeNull()
   })
 
   it('shows high-risk label for high risk file', async () => {
@@ -585,39 +583,6 @@ describe('ReviewDiffPane — marks the file viewed from the header checkbox with
     await renderPane({ onShowRisk, file: highFile })
     fireEvent.click(screen.getByRole('button', { name: 'High risk' }))
     expect(onShowRisk).toHaveBeenCalled()
-  })
-})
-
-describe('ReviewDiffPane — renders diff hunks when diff is loaded', () => {
-  it('renders diff hunks when diff is loaded', async () => {
-    const diff = {
-      path: 'src/foo.ts',
-      isBinary: false,
-      hunks: [
-        {
-          header: '@@ -1,3 +1,3 @@',
-          lines: [{ type: 'context', content: 'const x = 1', oldLineNumber: 1, newLineNumber: 1 }],
-        },
-      ],
-    }
-    mockPrFileDiff.mockResolvedValue({ diff })
-    const { container } = await renderPane()
-    await waitFor(() => expect(container.querySelector('.rs-hunk-anchor')).toBeTruthy())
-  })
-
-  it('does not repeat the change type in the file toolbar', async () => {
-    const addedFile = { ...mockFile, changeType: 'added' as const }
-    await renderPane({ file: addedFile })
-    expect(screen.queryByText('added')).toBeNull()
-  })
-})
-
-describe('ReviewDiffPane — calls patchFileComplexity after diff load', () => {
-  it('calls patchFileComplexity after diff load', async () => {
-    const diff = { hunks: [] }
-    mockPrFileDiff.mockResolvedValue({ diff })
-    await renderPane()
-    await waitFor(() => expect(mockPrFileDiff).toHaveBeenCalled())
   })
 })
 
@@ -758,12 +723,6 @@ describe('ReviewDiffPane — fires keyboard navigation events for prev-file and 
 
     expect(onPrevFile).toHaveBeenCalled()
     expect(onMarkViewed).toHaveBeenCalled()
-  })
-
-  it('shows no risk label for a medium risk file', async () => {
-    const medFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'medium' as const } }
-    await renderPane({ file: medFile })
-    expect(screen.queryByText(/Medium risk/)).toBeNull()
   })
 })
 

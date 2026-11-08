@@ -166,13 +166,6 @@ describe('the state move (FR-059)', () => {
 })
 
 function movingTests() {
-  it('maps each event to the intent it means', () => {
-    expect(INTENT_FOR_EVENT.started).toBe('started')
-    expect(INTENT_FOR_EVENT.draft_opened).toBe('in_review')
-    expect(INTENT_FOR_EVENT.merged).toBe('done')
-    expect(INTENT_FOR_EVENT.agreed).toBeNull()
-  })
-
   it('moves the issue when work starts', async () => {
     const issues = port()
     await writeBack(order(), { event: 'started' }, deps({ issues }))

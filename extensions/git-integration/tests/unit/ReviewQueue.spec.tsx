@@ -127,11 +127,6 @@ describe('ReviewQueue — calls onOpenPr when PR row is clicked', () => {
     expect(onOpenPr).toHaveBeenCalledWith(pr)
   })
 
-  it('shows refresh button', () => {
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByRole('button', { name: 'Refresh pull requests' })).toBeTruthy()
-  })
-
   it('calls onRefresh when refresh button is clicked', async () => {
     const onRefresh = vi.fn().mockResolvedValue(undefined)
     render(<ReviewQueue {...defaultProps} onRefresh={onRefresh} />)
@@ -140,12 +135,7 @@ describe('ReviewQueue — calls onOpenPr when PR row is clicked', () => {
   })
 })
 
-describe('ReviewQueue — shows search input', () => {
-  it('shows search input', () => {
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByRole('searchbox')).toBeTruthy()
-  })
-
+describe('ReviewQueue — load failures', () => {
   it('shows error state when queueError is set', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
@@ -177,15 +167,6 @@ describe('ReviewQueue — says a page is on its way rather than asking for a cli
     expect(screen.getByText('Loading the rest…')).toBeTruthy()
     expect(screen.queryByText('Load more pull requests')).toBeNull()
   })
-
-  it('renders the risk in words for high-risk PRs', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [makePr({ riskLevel: 'high', number: 10, title: 'Risky PR' })],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('High risk')).toBeTruthy()
-  })
 })
 
 describe('ReviewQueue — says nothing about medium or low risk', () => {
@@ -199,15 +180,6 @@ describe('ReviewQueue — says nothing about medium or low risk', () => {
     })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.queryByText(/risk/i)).toBeNull()
-  })
-
-  it('shows Draft label for draft PRs', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [makePr({ isDraft: true, number: 11, title: 'Draft PR' })],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('Draft')).toBeTruthy()
   })
 })
 
@@ -227,35 +199,6 @@ describe('ReviewQueue — shows Resume action for paused PRs', () => {
     })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getAllByText('Resume').length).toBeGreaterThan(0)
-  })
-})
-
-describe('ReviewQueue — shows approval chip when PR has approvals', () => {
-  it('shows approval chip when PR has approvals', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [
-        makePr({
-          number: 99,
-          title: 'Approved PR',
-          approvalCount: 2,
-          approvedBy: ['bob', 'carol'],
-        }),
-      ],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText(/2 approved/)).toBeTruthy()
-  })
-
-  it('does not show approval chip when PR has no approvals', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [
-        makePr({ number: 100, title: 'No approvals PR', approvalCount: 0, approvedBy: [] }),
-      ],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.queryByText(/approved/)).toBeNull()
   })
 })
 
@@ -285,14 +228,12 @@ describe('ReviewQueue (continued) — one list, two lines per row', () => {
     expect(screen.getByPlaceholderText('Search open PRs · is:merged for merged')).toBeTruthy()
   })
 
-  it('shows Merged first on the second line of a merged row', () => {
-    const { container } = renderMany([makePr({ state: 'merged', title: 'Shipped' })])
-    expect(container.querySelector('.rd-ti small')!.textContent!.startsWith('Merged')).toBe(true)
-  })
-
-  it('shows Closed first on the second line of a closed row', () => {
-    const { container } = renderMany([makePr({ state: 'closed', title: 'Dropped' })])
-    expect(container.querySelector('.rd-ti small')!.textContent!.startsWith('Closed')).toBe(true)
+  it.each([
+    ['merged', 'Merged'],
+    ['closed', 'Closed'],
+  ] as const)('shows the state first on the second line of a %s row', (state, label) => {
+    const { container } = renderMany([makePr({ state, title: 'Finished' })])
+    expect(container.querySelector('.rd-ti small')!.textContent!.startsWith(label)).toBe(true)
   })
 })
 

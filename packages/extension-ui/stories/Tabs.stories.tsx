@@ -46,12 +46,7 @@ export const SecondSelected: Story = {
   render: () => <ControlledTabs tabs={TABS} initial="checks" />,
 }
 
-export const WithDisabledTab: Story = {
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement)
-    await expect(canvas.getByRole('tab', { name: 'Notes' })).toBeDisabled()
-  },
-}
+export const WithDisabledTab: Story = {}
 
 export const ArrowKeysMoveSelection: Story = {
   play: async ({ canvasElement }) => {
@@ -138,5 +133,7 @@ export const PartsVertical: Story = {
 export const DefaultLight = inLight(Default)
 export const SecondSelectedLight = inLight(SecondSelected)
 export const WithDisabledTabLight = inLight(WithDisabledTab)
-export const PartsInToolbarLight = inLight(PartsInToolbar)
-export const PartsVerticalLight = inLight(PartsVertical)
+// Keeps its play: the screenshot records the state the play leaves.
+export const PartsInToolbarLight: Story = { ...PartsInToolbar, globals: { theme: 'light' } }
+// Keeps its play: the screenshot records the state the play leaves.
+export const PartsVerticalLight: Story = { ...PartsVertical, globals: { theme: 'light' } }

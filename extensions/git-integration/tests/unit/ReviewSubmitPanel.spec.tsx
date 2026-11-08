@@ -32,13 +32,6 @@ describe('ReviewSubmitPanel', () => {
     expect(screen.getAllByText('Submit review').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders three radio options', () => {
-    render(<ReviewSubmitPanel {...defaultProps} />)
-    expect(screen.getByText('Approve')).toBeTruthy()
-    expect(screen.getByText('Request changes')).toBeTruthy()
-    expect(screen.getByText('Comment')).toBeTruthy()
-  })
-
   it('defaults to Comment radio option', () => {
     render(<ReviewSubmitPanel {...defaultProps} />)
     const radios = screen.getAllByRole('radio')

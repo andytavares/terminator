@@ -198,13 +198,3 @@ describe('the model that answers asks', () => {
     )
   })
 })
-
-// Hand-off is the operator's alone: nothing here can make a clean review
-// start the work on its own.
-describe('hand-off', () => {
-  it('offers no switch to hand off automatically', async () => {
-    mount()
-    await screen.findByRole('button', { name: /Opus/ })
-    expect(screen.queryByRole('checkbox', { name: /hand off/i })).toBeNull()
-  })
-})

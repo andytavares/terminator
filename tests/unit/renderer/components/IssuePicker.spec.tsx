@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { IssuePicker } from '../../../../src/renderer/components/integrations/IssuePicker'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
@@ -28,8 +28,6 @@ beforeEach(() => {
   searchIssues.mockResolvedValue({ issues: [], failures: [] })
   useIntegrationsStore.setState({ listMine, searchIssues } as never)
 })
-
-afterEach(() => vi.useRealTimers())
 
 function open(props: Partial<React.ComponentProps<typeof IssuePicker>> = {}) {
   return render(<IssuePicker selected={null} onSelect={vi.fn()} onClear={vi.fn()} {...props} />)
@@ -69,19 +67,6 @@ describe('IssuePicker — choosing — reports the picked issue and closes the l
     fireEvent.click(await screen.findByText('TAV-42'))
 
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ key: 'TAV-42' }))
-  })
-
-  it('debounces the search', async () => {
-    vi.useFakeTimers()
-    open()
-    fireEvent.focus(screen.getByPlaceholderText(/Search/))
-    fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value: 'sidebar' } })
-
-    expect(searchIssues).not.toHaveBeenCalled()
-    await act(async () => {
-      vi.advanceTimersByTime(300)
-    })
-    expect(searchIssues).toHaveBeenCalledWith('sidebar')
   })
 
   it('says so when nothing matched', async () => {

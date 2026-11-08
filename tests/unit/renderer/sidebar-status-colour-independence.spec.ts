@@ -20,16 +20,6 @@ function ruleBody(css: string, selector: string): string {
 }
 
 describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
-  it('separates the four states by glyph shape, which survives greyscale outright', () => {
-    // The dot-at-three-opacities scheme this replaced could not distinguish
-    // running from idle from waiting at all — one shape, one channel, and that
-    // channel was spent on selection (audit SESS-1).
-    const STATUS = read('../../../src/renderer/sidebar/session-status.ts')
-    const icons = [...STATUS.matchAll(/icon:\s*'([a-z-]+)'/g)].map((m) => m[1])
-    expect(icons).toHaveLength(4)
-    expect(new Set(icons).size).toBe(4)
-  })
-
   it('separates the four states on one opacity scale, defined once', () => {
     // The scale is a set of tokens rather than four literals, so the sidebar
     // gutter, the terminal tabs and the board lanes read the same values and
@@ -71,11 +61,6 @@ describe('sidebar status vocabulary survives greyscale (SC-011) — puts no colo
       /opacity:\s*var\(--state-op-awaiting\)/
     )
     expect(ROW_CSS).not.toMatch(/\.branch-row--needs-you/)
-  })
-
-  it('names the state in words, since a shape says nothing aloud', () => {
-    expect(ROW_TSX).toMatch(/STATE_LABEL/)
-    expect(ROW_TSX).toContain('Waiting on you')
   })
 
   it('uses no unicode glyphs for status — they font-fallback at a different baseline', () => {

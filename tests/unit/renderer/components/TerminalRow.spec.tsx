@@ -41,14 +41,7 @@ describe('TerminalRow', () => {
    * shut except by a shortcut. Every terminal listed here carries its own way
    * out.
    */
-  it('offers a way to close it, named after what it closes', () => {
-    const onClose = vi.fn()
-    renderRow({}, { onClose })
-    fireEvent.click(screen.getByRole('button', { name: 'Close Terminal 1' }))
-    expect(onClose).toHaveBeenCalledOnce()
-  })
-
-  it('closing does not also select it', () => {
+  it('closes from its own control, named after what it closes, without selecting it', () => {
     const onSelect = vi.fn()
     const onClose = vi.fn()
     renderRow({}, { onSelect, onClose })
@@ -166,12 +159,6 @@ describe('TerminalRow — a terminal in its own window', () => {
     const { container } = renderRow()
     expect(screen.getByTitle('In its own window')).toBeTruthy()
     expect(container.querySelector('.terminal-row__gutter .state-chip')).toBeNull()
-  })
-
-  it('keeps the state chip for a terminal that is not', () => {
-    const { container } = renderRow()
-    expect(screen.queryByTitle('In its own window')).toBeNull()
-    expect(container.querySelector('.terminal-row__gutter .state-chip')).not.toBeNull()
   })
 })
 

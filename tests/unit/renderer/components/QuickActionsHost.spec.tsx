@@ -125,7 +125,7 @@ describe('QuickActionsHost — extension commands', () => {
     await waitFor(() => expect(action).toHaveBeenCalled())
   })
 
-  it('asks main to run a command an extension registered, with where it was run', async () => {
+  it('asks main to run a command an extension registered, with where it was run, and leaves its count to main', async () => {
     api.getCommands.mockResolvedValue({
       commands: [{ key: 'ext:hello', extensionId: 'ext', id: 'hello', label: 'Say hello' }],
     })
@@ -140,6 +140,7 @@ describe('QuickActionsHost — extension commands', () => {
         expect.objectContaining({ projectId: 'p1', via: 'palette' })
       )
     )
+    expect(recorded().map((r) => r.feature)).not.toContain('ext:ext.command.hello')
   })
 })
 
@@ -230,19 +231,6 @@ describe('QuickActionsHost — usage of runs', () => {
       )
     )
   })
-
-  it('leaves an extension command to main', async () => {
-    api.getCommands.mockResolvedValue({
-      commands: [{ key: 'ext:hello', extensionId: 'ext', id: 'hello', label: 'Say hello' }],
-    })
-    renderHost()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Say hello' } })
-    await screen.findByText('Say hello')
-    fireEvent.keyDown(window, { key: 'Enter' })
-    await waitFor(() => expect(api.executeCommand).toHaveBeenCalled())
-    expect(recorded().map((r) => r.feature)).not.toContain('ext:ext.command.hello')
-  })
 })
 
 describe('QuickActionsHost — usage of custom actions and pins', () => {
@@ -270,25 +258,12 @@ describe('QuickActionsHost — usage of custom actions and pins', () => {
 })
 
 describe('paletteFeature', () => {
-  it('counts a session under one fixed id, without its title', () => {
-    expect(paletteFeature({ id: 'session:abc123', label: 'fix login bug' })).toEqual([
-      'core.go-to-session',
-      'Go to session',
-    ])
-  })
-
-  it('counts a workspace switch under one fixed id', () => {
-    expect(paletteFeature({ id: 'core.switch-workspace-ws9', label: 'Acme' })).toEqual([
-      'core.switch-workspace',
-      'Switch workspace',
-    ])
-  })
-
-  it('leaves extension commands to main and keeps a core action as it is', () => {
-    expect(paletteFeature({ id: 'ext:terminator.notepad.command.x', label: 'New' })).toBeNull()
-    expect(paletteFeature({ id: 'core.split-vertical', label: 'Split' })).toEqual([
-      'core.split-vertical',
-      'Split',
-    ])
+  it.each([
+    ['session:abc123', 'fix login bug', ['core.go-to-session', 'Go to session']],
+    ['core.switch-workspace-ws9', 'Acme', ['core.switch-workspace', 'Switch workspace']],
+    ['ext:terminator.notepad.command.x', 'New', null],
+    ['core.split-vertical', 'Split', ['core.split-vertical', 'Split']],
+  ])('counts the palette item %s (%s) as %j', (id, label, feature) => {
+    expect(paletteFeature({ id, label })).toEqual(feature)
   })
 })

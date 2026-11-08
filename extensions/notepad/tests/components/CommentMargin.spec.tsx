@@ -75,11 +75,6 @@ function commentMarginHeaderEmptyStateTests() {
     expect(container.querySelector('.notepad-comment-margin--empty')).toBeTruthy()
   })
 
-  it('renders Comments header', () => {
-    render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    expect(screen.getByText('Comments')).toBeDefined()
-  })
-
   it('shows open count badge when there are open comments', () => {
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)

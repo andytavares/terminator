@@ -19,7 +19,6 @@ describe('disconnecting', deviceDisconnectTests)
 
 function deviceLabelTests() {
   describe('phones, tablets and desktops', deviceLabelPlatformTests)
-  describe('telling browsers apart', deviceLabelBrowserTests)
   describe('an unrecognisable agent', deviceLabelUnknownTests)
 }
 
@@ -44,28 +43,10 @@ function deviceLabelPlatformTests() {
   })
 }
 
-function deviceLabelBrowserTests() {
-  // Chrome and Edge both claim Safari in their user agent, so order matters.
-  it('does not mistake Chrome for Safari', () => {
-    expect(deviceLabel('Macintosh Chrome/120 Safari/537.36')).toBe('Chrome on Mac')
-  })
-
-  it('does not mistake Edge for Chrome', () => {
-    expect(deviceLabel('Windows Chrome/120 Safari/537.36 Edg/120')).toBe('Edge on Windows')
-  })
-}
-
 function deviceLabelUnknownTests() {
   it('says so rather than guessing when it cannot tell', () => {
     expect(deviceLabel(undefined)).toBe('Unknown device')
     expect(deviceLabel('curl/8.1.2')).toBe('Unknown device')
-  })
-
-  // The screen this appears on also carries an access credential; a raw user
-  // agent string is noise worth not printing there.
-  it('never returns the raw user agent', () => {
-    const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit/605.1'
-    expect(deviceLabel(ua)).not.toContain('Mozilla')
   })
 }
 

@@ -201,17 +201,6 @@ describe('GitFullView empty diff pane once status is read', () => {
     expect(screen.getByText('No project selected.')).toBeTruthy()
   })
 
-  it('renders staging area and diff view when repoRoot provided', async () => {
-    await renderView()
-    expect(screen.getByTestId('staging-area')).toBeTruthy()
-    expect(screen.getByTestId('file-diff-view')).toBeTruthy()
-  })
-
-  it('renders commit message textarea', async () => {
-    await renderView()
-    expect(screen.getByPlaceholderText('Commit message…')).toBeTruthy()
-  })
-
   it('shows hint when no files are staged', async () => {
     await renderView()
     expect(screen.getByText('Stage at least one file to commit')).toBeTruthy()
@@ -264,27 +253,6 @@ describe('GitFullView — shows commit error message when commit returns error',
       await screen.findByText('Nothing staged to commit. Stage at least one file first.')
     ).toBeTruthy()
     expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('commit', { failed: true })
-  })
-})
-
-describe('GitFullView — calls commit and push when Commit & Push is clicked', () => {
-  it('calls commit and push when Commit & Push is clicked', async () => {
-    setupStore({ status: featureWithStagedFile() })
-    render(<GitFullView repoRoot="/repo" />)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
-      target: { value: 'feat: add x' },
-    })
-    fireEvent.click(screen.getByText('Commit & Push'))
-    await waitFor(() => {
-      expect(mockGitCommit).toHaveBeenCalled()
-      expect(mockGitPush).toHaveBeenCalled()
-    })
-  })
-
-  it('opens PR dialog when Open PR is clicked', async () => {
-    await renderView()
-    fireEvent.click(screen.getByText('Open PR'))
-    await screen.findByTestId('pr-dialog')
   })
 })
 

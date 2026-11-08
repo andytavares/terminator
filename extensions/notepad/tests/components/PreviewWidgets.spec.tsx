@@ -78,10 +78,6 @@ function tableWidgetTests() {
 }
 
 function tableWidgetRenderingTests() {
-  it('renders a real table element', () => {
-    expect(renderTable(SOURCE).querySelector('table')).not.toBeNull()
-  })
-
   it('renders one header cell per column', () => {
     const ths = renderTable(SOURCE).querySelectorAll('thead th')
     expect(Array.from(ths).map((th) => th.textContent)).toEqual(['Name', 'Notes', 'Count'])
@@ -156,20 +152,6 @@ function tableWidgetEditingTests() {
 }
 
 function tableWidgetEditingPlacingCaretTests() {
-  it('puts the caret in the clicked header cell', () => {
-    const { dispatch } = clickCell('thead th', 0)
-    expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ selection: { anchor: EDIT_SOURCE.indexOf('Name') } })
-    )
-  })
-
-  it('puts the caret in the clicked body cell', () => {
-    const { dispatch } = clickCell('tbody td', 0)
-    expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ selection: { anchor: EDIT_SOURCE.indexOf('apples') } })
-    )
-  })
-
   it('distinguishes columns within a row', () => {
     const { dispatch } = clickCell('tbody td', 1)
     expect(dispatch).toHaveBeenCalledWith(

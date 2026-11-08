@@ -60,21 +60,13 @@ describe('PromptPane — the scheduled runs line', () => {
 })
 
 describe('PromptPane — when the scheduled runs line is not shown', () => {
-  it('is not shown for Now, with no saved runs, or while editing a run', async () => {
-    const { unmount } = render(
-      <PromptPane query="" onType={vi.fn()} when={startingWhen('2099-01-02')} onWhen={vi.fn()} />
-    )
-    await act(async () => {})
-    expect(screen.queryByRole('button', { name: 'Manage on Home' })).toBeNull()
-    unmount()
-    useStartWorkStore.getState().openLauncher('', triage)
-    await shown(once)
-    expect(screen.queryByRole('button', { name: 'Manage on Home' })).toBeNull()
-  })
-
-  it('is not shown when no run is saved', async () => {
-    list.mockResolvedValue({ data: [] })
-    await shown(once)
+  it.each([
+    ['for Now', () => {}, startingWhen('2099-01-02')],
+    ['while editing a run', () => useStartWorkStore.getState().openLauncher('', triage), once],
+    ['when no run is saved', () => list.mockResolvedValue({ data: [] }), once],
+  ])('is not shown %s', async (_case, arrange, when) => {
+    arrange()
+    await shown(when)
     expect(screen.queryByRole('button', { name: 'Manage on Home' })).toBeNull()
   })
 })

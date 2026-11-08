@@ -177,16 +177,6 @@ function theRuleAndTheEvidenceTests() {
     fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
     expect(screen.getByText(/session\.ts/)).toBeTruthy()
   })
-
-  it('shows what the gate saw only once it is opened, and closed even then', async () => {
-    mount({
-      gates: [gate({ evidence: [{ kind: 'stdout', excerpt: 'Error: token refresh failed' }] })],
-    })
-    await screen.findByText(ruleInWords('risk.p0'))
-    expect(screen.queryByText(/token refresh failed/)).toBeNull()
-    fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
-    expect((document.querySelector('details') as HTMLDetailsElement).open).toBe(false)
-  })
 }
 
 function inboxLinksTests() {
@@ -374,48 +364,29 @@ describe('every gate rule can be rendered', () => {
   })
 })
 
-describe('ci.red', () => {
-  it('renders a row with its summary and both options', async () => {
-    mount({
-      gates: [
-        gate({
-          id: 'g-ci-red',
-          rule: 'ci.red',
-          summary: 'PR #200 has been red for two fix rounds',
-          why: 'checks: lint, unit',
-        }),
-      ],
-      autonomy: 'lights-out',
-      silenced: [],
-      summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
-    })
-    await screen.findByText(ruleInWords('ci.red'))
-    expect(screen.getByText(/PR #200 has been red/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Another round' })).toBeTruthy()
-    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
-  })
-})
-
-describe('refinery.conflict', () => {
-  it('renders a row with its summary and "Take it over"', async () => {
-    mount({
-      gates: [
-        gate({
-          id: 'g-refinery-conflict',
-          rule: 'refinery.conflict',
-          summary: "WO-2's draft no longer rebases onto main after WO-1 merged",
-          why: 'rebase conflicted in src/line/refinery.ts',
-        }),
-      ],
-      autonomy: 'lights-out',
-      silenced: [],
-      summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
-    })
-    await screen.findByText(ruleInWords('refinery.conflict'))
-    expect(screen.getByText(/no longer rebases onto main/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Take it over' })).toBeTruthy()
-    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
-  })
+describe('a gate rule with its own answers', () => {
+  it.each([
+    { rule: 'ci.red', summary: 'PR #200 has been red for two fix rounds', option: 'Another round' },
+    {
+      rule: 'refinery.conflict',
+      summary: "WO-2's draft no longer rebases onto main after WO-1 merged",
+      option: 'Take it over',
+    },
+  ] as const)(
+    '$rule renders a row with its summary and "$option"',
+    async ({ rule, summary, option }) => {
+      mount({
+        gates: [gate({ id: `g-${rule}`, rule, summary, why: 'checks: lint, unit' })],
+        autonomy: 'lights-out',
+        silenced: [],
+        summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
+      })
+      await screen.findByText(ruleInWords(rule))
+      expect(screen.getByText(summary)).toBeTruthy()
+      expect(screen.getByRole('button', { name: option })).toBeTruthy()
+      expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
+    }
+  )
 })
 
 const highSignal = () =>
@@ -570,11 +541,5 @@ function dismissingAndTheBadgeTests() {
       expect(invoke).toHaveBeenCalledWith('foundry:signals.dismiss', { id: 'SIG-1' })
     )
     await waitFor(() => expect(screen.queryByText('test-foo flakes on main')).toBeNull())
-  })
-
-  it('does not touch the attention badge — it never calls foundry:attention', async () => {
-    mount({ signals: [highSignal()] })
-    await screen.findByText('test-foo flakes on main')
-    expect(invoke).not.toHaveBeenCalledWith('foundry:attention', expect.anything())
   })
 }

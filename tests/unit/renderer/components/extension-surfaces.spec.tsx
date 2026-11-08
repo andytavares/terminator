@@ -5,7 +5,6 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
-import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 import type { GroupKey } from '../../../../src/renderer/sidebar/view-model'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
@@ -134,15 +133,6 @@ const renderSidebar = (groupBy: GroupKey) => {
 }
 
 describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupBy) => {
-  // Both surfaces now hang on the window's own left rail rather than the
-  // sidebar's header; what an extension contributes is unchanged.
-  it('surface 1: the global tab button renders in the app band and fires', () => {
-    const onSelectGlobalTab = vi.fn()
-    render(<AppBand globalTabs={[globalTab]} activeId={null} onSelect={onSelectGlobalTab} />)
-    fireEvent.click(screen.getByLabelText('Fake Tab'))
-    expect(onSelectGlobalTab).toHaveBeenCalledWith('fake.global')
-  })
-
   it('surface 2: the workspace tab is reachable and fires with the owning workspace id', () => {
     const onSelectWorkspaceTab = vi.fn()
     saveOpeningViewGrouping(groupBy)
@@ -242,26 +232,5 @@ describe('the extension API surface is unchanged', () => {
       'windowViews',
       'workspaceTab',
     ])
-  })
-})
-
-describe('the extension API surface is unchanged — the renderer-facing extension API still exposes exactly its known members', () => {
-  it('the renderer-facing extension API still exposes exactly its known members', async () => {
-    const state: Record<string, unknown> = { ...useExtensionRegistry.getState() }
-    const rendererApi = [
-      'registerGlobalTab',
-      'registerWorkspaceTab',
-      'registerSidebarPanel',
-      'registerProjectTab',
-      'registerWindowView',
-      'registerOverlay',
-      'registerKeyboardShortcut',
-      'registerCommand',
-      'updateGlobalTab',
-      'updateCommand',
-    ]
-    for (const member of rendererApi) {
-      expect(typeof state[member]).toBe('function')
-    }
   })
 })

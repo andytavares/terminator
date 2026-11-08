@@ -90,7 +90,7 @@ vi.mock('../../../src/main/logger', () => ({
 import { createExtensionAPI } from '../../../src/main/extensions/api'
 import { setExtensionSetting } from '../../../src/main/storage/extension-settings-store'
 import { EventEmitter } from 'events'
-import type { SessionInfo } from '@terminator/extension-sdk'
+import type { ExtensionAPI, SessionInfo } from '@terminator/extension-sdk'
 import type { PtyManager } from '../../../src/main/terminal/pty-manager'
 import { partialFake } from '../../support/fakes'
 
@@ -272,23 +272,6 @@ describe('api.ipc bridge channels — declared remote access', () => {
     // channels not in registry remain blocked even with a bridge
     expect(await api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
   })
-
-  it('isRemoteAccessible: registry presence alone is NOT sufficient — the declared flag decides', async () => {
-    // Regression test for the declared-authority design: a channel registered
-    // without remoteAccessible: true stays unreachable from the bridge. The old
-    // rule ("any registered channel is accessible") also exposed every internal
-    // core invoke channel to authenticated remote clients.
-    const invokeRegistry = new Map([
-      ['dialog:open-directory', { handler: vi.fn(), remoteAccessible: false }],
-      ['my-ext:local-only', { handler: vi.fn(), remoteAccessible: false }],
-    ])
-    const eventBus = new EventEmitter()
-    const api = createExtensionAPI('test.ipc6', {
-      bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
-    })
-    expect(await api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
-    expect(await api.ipc.isRemoteAccessible('my-ext:local-only')).toBe(false)
-  })
 })
 
 // ── pty ──────────────────────────────────────────────────────────────────────
@@ -365,23 +348,32 @@ describe('api.pty — session authority surface, streams and lookups', () => {
   })
 })
 
+type Pty = ExtensionAPI['pty']
+
 describe('api.pty — with ptyManager', () => {
-  it('write delegates to ptyManager.write', () => {
+  it.each([
+    {
+      name: 'write',
+      call: (pty: Pty) => pty.write('s1', 'hello'),
+      managerMethod: mockPtyManager.write,
+      args: ['s1', 'hello'],
+    },
+    {
+      name: 'resize',
+      call: (pty: Pty) => pty.resize('s1', 80, 24),
+      managerMethod: mockPtyManager.resize,
+      args: ['s1', 80, 24],
+    },
+    {
+      name: 'kill',
+      call: (pty: Pty) => pty.kill('s1'),
+      managerMethod: mockPtyManager.kill,
+      args: ['s1'],
+    },
+  ])('$name delegates to the same ptyManager method', ({ call, managerMethod, args }) => {
     const api = createExtensionAPI('test.pty2', { ptyManager: mockPtyManager })
-    api.pty.write('s1', 'hello')
-    expect(mockPtyManager.write).toHaveBeenCalledWith('s1', 'hello')
-  })
-
-  it('resize delegates to ptyManager.resize', () => {
-    const api = createExtensionAPI('test.pty3', { ptyManager: mockPtyManager })
-    api.pty.resize('s1', 80, 24)
-    expect(mockPtyManager.resize).toHaveBeenCalledWith('s1', 80, 24)
-  })
-
-  it('kill delegates to ptyManager.kill', () => {
-    const api = createExtensionAPI('test.pty4', { ptyManager: mockPtyManager })
-    api.pty.kill('s1')
-    expect(mockPtyManager.kill).toHaveBeenCalledWith('s1')
+    call(api.pty)
+    expect(managerMethod).toHaveBeenCalledWith(...args)
   })
 
   it('listSessions returns the manager session list', async () => {
@@ -396,19 +388,13 @@ describe('api.pty — without ptyManager', () => {
     expect(await api.pty.listSessions()).toEqual([])
   })
 
-  it('write is a no-op and does not throw', () => {
+  it.each([
+    ['write', (pty: Pty) => pty.write('s1', 'hello')],
+    ['resize', (pty: Pty) => pty.resize('s1', 80, 24)],
+    ['kill', (pty: Pty) => pty.kill('s1')],
+  ])('%s is a no-op and does not throw', (_name, call) => {
     const api = createExtensionAPI('test.pty.nopty2')
-    expect(() => api.pty.write('s1', 'hello')).not.toThrow()
-  })
-
-  it('resize is a no-op and does not throw', () => {
-    const api = createExtensionAPI('test.pty.nopty3')
-    expect(() => api.pty.resize('s1', 80, 24)).not.toThrow()
-  })
-
-  it('kill is a no-op and does not throw', () => {
-    const api = createExtensionAPI('test.pty.nopty4')
-    expect(() => api.pty.kill('s1')).not.toThrow()
+    expect(() => call(api.pty)).not.toThrow()
   })
 })
 

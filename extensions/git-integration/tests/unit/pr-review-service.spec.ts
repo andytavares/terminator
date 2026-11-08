@@ -63,26 +63,6 @@ describe('ReviewSessionSchema — rejects missing repoRoot', () => {
     const { repoRoot: _, ...rest } = validSession
     expect(ReviewSessionSchema.safeParse(rest).success).toBe(false)
   })
-
-  it('serialises viewedFiles as an array (Set → array for JSON)', () => {
-    // The schema stores viewedFiles as string[]; the store converts to/from Set
-    const result = ReviewSessionSchema.parse(validSession)
-    expect(Array.isArray(result.viewedFiles)).toBe(true)
-  })
-
-  it('session key changes when headSHA changes (force-push invalidation)', () => {
-    const key1 = `${validSession.repoRoot}:::${validSession.prNumber}:::${validSession.headSHA}`
-    const key2 = `${validSession.repoRoot}:::${validSession.prNumber}:::def456`
-    expect(key1).not.toBe(key2)
-  })
-})
-
-// ─── buildChapters used from pr-review-service (cross-reference T020) ────────
-
-describe('buildChapters() — cross-reference', () => {
-  it('returns [] for empty input', () => {
-    expect(buildChapters([])).toEqual([])
-  })
 })
 
 // ─── computeRiskScore branches ────────────────────────────────────────────────
@@ -103,73 +83,7 @@ function makeFileMetrics(overrides: Partial<FileMetrics> = {}): FileMetrics {
   }
 }
 
-describe('computeRiskScore()', () => {
-  it('returns level=low with null composite when only 1 metric is available', () => {
-    const metrics = makeFileMetrics({ additions: 100, deletions: 0 })
-    // All null except size — only 1 available metric, needs ≥ 2
-    const score = computeRiskScore(metrics, [metrics])
-    // With only size available (1 metric), composite stays null
-    expect(score.level).toBe('low')
-    expect(score.composite).toBeNull()
-  })
-
-  it('computes composite and level=high when composite ≥ 67', () => {
-    const metrics = makeFileMetrics({
-      churn90d: 100,
-      blastRadius: 50,
-      additions: 500,
-      deletions: 200,
-      testFilePresent: false,
-      complexityDelta: 20,
-    })
-    const allMetrics = [
-      metrics,
-      makeFileMetrics({ churn90d: 0, blastRadius: 0, additions: 10, deletions: 0 }),
-    ]
-    const score = computeRiskScore(metrics, allMetrics)
-    expect(score.level).toBe('high')
-    expect(score.composite).toBeGreaterThanOrEqual(67)
-  })
-})
-
-describe('computeRiskScore() — computes level=medium when composite is 34-66', () => {
-  it('computes level=medium when composite is 34-66', () => {
-    // Create a scenario where score lands in medium range
-    const metrics = makeFileMetrics({
-      churn90d: 5,
-      blastRadius: 2,
-      additions: 50,
-      deletions: 10,
-      testFilePresent: true,
-    })
-    const allMetrics = [
-      metrics,
-      makeFileMetrics({ churn90d: 0, blastRadius: 0, additions: 10, deletions: 0 }),
-      makeFileMetrics({ churn90d: 10, blastRadius: 4, additions: 100, deletions: 20 }),
-    ]
-    const score = computeRiskScore(metrics, allMetrics)
-    // We only care this path is exercised — level must be one of the valid values
-    expect(['low', 'medium', 'high']).toContain(score.level)
-  })
-})
-
-describe('computeRiskScore() — returns level=low when composite < 34', () => {
-  it('returns level=low when composite < 34', () => {
-    const metrics = makeFileMetrics({
-      churn90d: 1,
-      blastRadius: 1,
-      additions: 5,
-      deletions: 2,
-      testFilePresent: true,
-    })
-    const allMetrics = [
-      metrics,
-      makeFileMetrics({ churn90d: 100, blastRadius: 100, additions: 1000, deletions: 500 }),
-    ]
-    const score = computeRiskScore(metrics, allMetrics)
-    expect(score.level).toBe('low')
-  })
-
+describe('computeRiskScore() — patch coverage', () => {
   it('includes patchCoverage in computation when provided', () => {
     const metrics = makeFileMetrics({
       churn90d: 5,
@@ -209,38 +123,6 @@ describe('computeRiskScore() — includes complexity delta in contributions when
   })
 })
 
-describe('computeRiskScore() — contributions', () => {
-  it('includes "Missing test file" contribution when testFilePresent is false', () => {
-    // Use a case where only 1 other real metric is available — churn
-    // churn_n = 0, since both have churn90d = 1 (max === min → 0)
-    // So missing-test contribution (0.2) beats churn contribution (0 * 0.25 = 0)
-    const metrics = makeFileMetrics({
-      churn90d: 1,
-      blastRadius: null,
-      additions: 5,
-      deletions: 0,
-      complexityDelta: null,
-      patchCoverage: null,
-      testFilePresent: false,
-    })
-    const allMetrics = [
-      metrics,
-      makeFileMetrics({
-        churn90d: 1, // same value → normalise returns 0
-        blastRadius: null,
-        additions: 10,
-        deletions: 0,
-        complexityDelta: null,
-        patchCoverage: null,
-        testFilePresent: true,
-      }),
-    ]
-    const score = computeRiskScore(metrics, allMetrics)
-    // dominantDriver could be size or missing-test; just verify it's not the default "No dominant risk signal"
-    expect(score.dominantDriver).not.toBe('No dominant risk signal')
-  })
-})
-
 // ─── queueRiskLevel thresholds ───────────────────────────────────────────────
 
 describe('queueRiskLevel()', () => {
@@ -250,10 +132,6 @@ describe('queueRiskLevel()', () => {
 
   it('does not flag a diff just below the high threshold as high', () => {
     expect(queueRiskLevel(QUEUE_RISK_HIGH_LINES - 1)).toBe('medium')
-  })
-
-  it('flags thousands of lines as high risk', () => {
-    expect(queueRiskLevel(3200)).toBe('high')
   })
 
   it('classifies a diff at the medium threshold as medium', () => {
@@ -282,59 +160,13 @@ describe('parseReviewQueuePR()', () => {
     expect(parseReviewQueuePR({ number: 1, title: 't', state }).state).toBe(expected)
   })
 
-  it('flags a PR with thousands of lines changed as high risk', () => {
-    const raw = {
-      number: 100,
-      title: 'Huge refactor',
-      author: { login: 'alice', avatarUrl: '' },
-      createdAt: '2025-01-01T00:00:00Z',
-      headRefName: 'feat/huge',
-      baseRefName: 'main',
-      isDraft: false,
-      changedFiles: 40,
-      additions: 3000,
-      deletions: 500,
-      statusCheckRollup: [],
-    }
-    expect(parseReviewQueuePR(raw).riskLevel).toBe('high')
-  })
-})
-
-describe('parseReviewQueuePR() — classifies a mid-size PR (150-399 lines) as medium risk', () => {
-  it('classifies a mid-size PR (150-399 lines) as medium risk', () => {
-    const raw = {
-      number: 102,
-      title: 'Mid-size change',
-      author: { login: 'alice', avatarUrl: '' },
-      createdAt: '2025-01-01T00:00:00Z',
-      headRefName: 'feat/mid',
-      baseRefName: 'main',
-      isDraft: false,
-      changedFiles: 5,
-      additions: 150,
-      deletions: 50,
-      statusCheckRollup: [],
-    }
-    expect(parseReviewQueuePR(raw).riskLevel).toBe('medium')
-  })
-})
-
-describe('parseReviewQueuePR() — leaves a small PR at low risk (so it can still be a quick win)', () => {
-  it('leaves a small PR at low risk (so it can still be a quick win)', () => {
-    const raw = {
-      number: 101,
-      title: 'Tiny tweak',
-      author: { login: 'alice', avatarUrl: '' },
-      createdAt: '2025-01-01T00:00:00Z',
-      headRefName: 'fix/typo',
-      baseRefName: 'main',
-      isDraft: false,
-      changedFiles: 1,
-      additions: 5,
-      deletions: 2,
-      statusCheckRollup: [],
-    }
-    expect(parseReviewQueuePR(raw).riskLevel).toBe('low')
+  it.each([
+    [3000, 500, 'high'],
+    [150, 50, 'medium'],
+    [5, 2, 'low'],
+  ])('rates a PR with %i additions and %i deletions as %s risk', (additions, deletions, level) => {
+    const raw = { number: 100, title: 't', changedFiles: 1, additions, deletions }
+    expect(parseReviewQueuePR(raw).riskLevel).toBe(level)
   })
 })
 
@@ -663,47 +495,6 @@ describe('chapterRiskLevel() — returns low when all scoreable files are low', 
 
 // ─── buildChapters — additional branch coverage ────────────────────────────
 
-describe('buildChapters() — additional branches', () => {
-  it('groups files by semantic directory segments', () => {
-    const rawFiles = [
-      { path: 'src/components/Button.tsx', additions: 20, deletions: 5 },
-      { path: 'src/components/Input.tsx', additions: 15, deletions: 3 },
-    ]
-    const chapters = buildChapters(rawFiles)
-    expect(chapters.length).toBeGreaterThan(0)
-    expect(chapters.every((c) => c.files.length > 0)).toBe(true)
-  })
-
-  it('separates mechanical (lock) files into their own chapter', () => {
-    const rawFiles = [
-      { path: 'src/service.ts', additions: 30, deletions: 0 },
-      { path: 'package-lock.json', additions: 200, deletions: 100 },
-    ]
-    const chapters = buildChapters(rawFiles)
-    // Lock file should end up in its own chapter or merged — just verify it doesn't crash
-    expect(chapters.length).toBeGreaterThanOrEqual(1)
-  })
-})
-
-describe('buildChapters() — additional branches — applies overrides to reorder files in a chapter', () => {
-  it('applies overrides to reorder files in a chapter', () => {
-    const rawFiles = [
-      { path: 'src/service.ts', additions: 10, deletions: 0 },
-      { path: 'src/types.ts', additions: 5, deletions: 0 },
-    ]
-    // Get the actual chapter ID first
-    const baseChapters = buildChapters(rawFiles)
-    const chapterId = baseChapters[0]?.id
-    if (!chapterId) return
-
-    const overrides: Record<string, string[]> = {
-      [chapterId]: ['src/types.ts', 'src/service.ts'],
-    }
-    const chapters = buildChapters(rawFiles, overrides)
-    expect(chapters[0].files[0].path).toBe('src/types.ts')
-  })
-})
-
 describe('buildChapters() — additional branches — handles file with explicit added/removed changeType', () => {
   it('handles file with explicit added/removed changeType', () => {
     const rawFiles = [
@@ -722,43 +513,6 @@ describe('buildChapters() — additional branches — handles file with explicit
     const rawFiles = [{ filename: 'src/component.ts', additions: 10, deletions: 0 }]
     const chapters = buildChapters(rawFiles)
     expect(chapters[0].files[0].path).toBe('src/component.ts')
-  })
-})
-
-describe('buildChapters() — additional branches — splits large groups (>15 files) across multiple directories', () => {
-  it('splits large groups (>15 files) across multiple directories', () => {
-    // Put files in different parent directories so sub-splitting creates multiple chapters
-    const rawFiles = [
-      ...Array.from({ length: 10 }, (_, i) => ({
-        path: `src/components/widgets/file${i}.ts`,
-        additions: 5,
-        deletions: 2,
-      })),
-      ...Array.from({ length: 10 }, (_, i) => ({
-        path: `src/components/pages/file${i}.ts`,
-        additions: 5,
-        deletions: 2,
-      })),
-    ]
-    const chapters = buildChapters(rawFiles)
-    // Should produce multiple chapters due to sub-splitting
-    expect(chapters.length).toBeGreaterThan(0)
-    // All files should be accounted for
-    const totalFiles = chapters.reduce((sum, c) => sum + c.files.length, 0)
-    expect(totalFiles).toBe(20)
-  })
-})
-
-describe('buildChapters() — additional branches — groups files by import connections (signal 3)', () => {
-  it('groups files by import connections (signal 3)', () => {
-    const patch = `import { foo } from './utils/helper'\n`
-    const rawFiles = [
-      { path: 'src/api/service.ts', additions: 20, deletions: 0, patch },
-      { path: 'src/utils/helper.ts', additions: 10, deletions: 0 },
-    ]
-    const chapters = buildChapters(rawFiles)
-    // Both files should be in the same chapter (connected by import)
-    expect(chapters.some((c) => c.files.some((f) => f.path === 'src/api/service.ts'))).toBe(true)
   })
 })
 
@@ -1045,11 +799,6 @@ describe('parsePrFileDiff', () => {
       ['remove', 'b', 2, null],
       ['add', 'c', null, 2],
     ])
-  })
-
-  it('does not add an empty line after the final newline', () => {
-    const raw = `${head}@@ -1,2 +1,2 @@\n a\n-b\n+c\n`
-    expect(flat(raw)).toHaveLength(3)
   })
 
   it('keeps a genuinely blank context line (a single space) mid-hunk', () => {

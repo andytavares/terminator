@@ -12,7 +12,7 @@ import type { Rung } from '../verify/ladder.js'
 // for the same reason, and here are the entries. The operator decides.
 
 /** Actions that mean "the operator turned work away". @internal */
-export const REJECTION_ACTIONS = [
+const REJECTION_ACTIONS = [
   'gate.decided',
   'verify.failed',
   'review.rejected',

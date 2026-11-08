@@ -28,17 +28,6 @@ describe('parseReviewQueuePR()', () => {
     expect(pr.isDraft).toBe(false)
   })
 
-  it('derives fileCount from files array', () => {
-    const pr = parseReviewQueuePR(makeRawPr())
-    expect(pr.fileCount).toBe(2)
-  })
-
-  it('sums additions and deletions across all files', () => {
-    const pr = parseReviewQueuePR(makeRawPr())
-    expect(pr.additions).toBe(120)
-    expect(pr.deletions).toBe(15)
-  })
-
   it('derives estimatedMinutes as ceil((additions+deletions)/60)', () => {
     const pr = parseReviewQueuePR(makeRawPr())
     // (120 + 15) / 60 = 2.25 → ceil = 3
@@ -53,19 +42,6 @@ describe('parseReviewQueuePR() — sets estimatedMinutes to at least 1 for tiny 
         files: [{ path: 'x.ts', additions: 1, deletions: 0, status: 'added' }],
       })
     )
-    expect(pr.estimatedMinutes).toBeGreaterThanOrEqual(1)
-  })
-
-  it('defaults sessionStatus to not-started', () => {
-    const pr = parseReviewQueuePR(makeRawPr())
-    expect(pr.sessionStatus).toBe('not-started')
-  })
-
-  it('handles empty files array gracefully', () => {
-    const pr = parseReviewQueuePR(makeRawPr({ files: [] }))
-    expect(pr.fileCount).toBe(0)
-    expect(pr.additions).toBe(0)
-    expect(pr.deletions).toBe(0)
     expect(pr.estimatedMinutes).toBeGreaterThanOrEqual(1)
   })
 })

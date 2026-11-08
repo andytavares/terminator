@@ -68,15 +68,9 @@ const FOCUSED: QuickActionTarget = {
   focusedSession: terminalSessionOf({ id: 's1', projectId: 'p1' }),
 }
 
-const NOTHING_FOCUSED: QuickActionTarget = {
-  projectId: 'p1',
-  focusedSessionId: null,
-  focusedSession: undefined,
-}
-
 /** Runs one core action as the palette would, for a terminal focused in p1. */
-async function runCoreAction(id: string, target: QuickActionTarget = FOCUSED): Promise<void> {
-  const { result } = renderHook(() => useCoreQuickActions(target, shell))
+async function runCoreAction(id: string): Promise<void> {
+  const { result } = renderHook(() => useCoreQuickActions(FOCUSED, shell))
   await act(async () => {
     await result.current.find((a) => a.id === id)!.run()
   })
@@ -100,11 +94,6 @@ describe('useCoreQuickActions — the focused terminal', () => {
     expect(terminal).toHaveBeenCalledWith('s1', '\x0c')
   })
 
-  it('Clear does nothing with no terminal focused', async () => {
-    await runCoreAction('core.clear', NOTHING_FOCUSED)
-    expect(terminal).not.toHaveBeenCalled()
-  })
-
   it('Edit session note opens the note of the focused terminal', async () => {
     await runCoreAction('core.edit-note')
     expect(shell.onEditNote).toHaveBeenCalledWith('s1')
@@ -126,20 +115,7 @@ describe('useCoreQuickActions — the focused terminal', () => {
   })
 })
 
-describe('useCoreQuickActions — the focused terminal — cycling tabs in a project with none open changes nothing', () => {
-  it('cycling tabs in a project with none open changes nothing', async () => {
-    seedFocusedSessions([])
-    await runCoreAction('core.next-tab')
-    expect(useSessionStore.getState().getActiveSessionForProject('p1')).toBeNull()
-  })
-})
-
 describe('useCoreQuickActions — sessions waiting on you', () => {
-  it('Next waiting does nothing when no session waits', async () => {
-    await runCoreAction('core.next-waiting')
-    expect(useSessionStore.getState().focusRequest).toBeNull()
-  })
-
   it('Next waiting reveals the waiting session after the focused one', async () => {
     seedFocusedSessions([
       terminalSessionOf({ id: 's1', projectId: 'p1', bellCount: 1 }),

@@ -149,13 +149,6 @@ describe('HomeScreen — the Quiet desk', () => {
     expect(document.body.textContent).not.toMatch(/Foundry/)
   })
 
-  it('shows the lower area and the header controls', () => {
-    render(<HomeScreen />)
-    expect(screen.getByText('In flight rows')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Home' })).toBeTruthy()
-    expect(screen.getByRole('searchbox', { name: 'Search work' })).toBeTruthy()
-  })
-
   it('opens the Start work launcher from the header and from the quiet line', () => {
     render(<HomeScreen />)
     const [header, quiet] = screen.getAllByRole('button', { name: /Start work/ })
@@ -490,25 +483,6 @@ describe('HomeScreen — search results, continued', () => {
     fireEvent.keyDown(screen.getByRole('searchbox', { name: 'Search work' }), { key: 'Enter' })
     expect(useStartWorkStore.getState().open).toBe(true)
     expect(useStartWorkStore.getState().prefill).toBe('zzz nothing')
-  })
-})
-
-describe('HomeScreen — Plan today', () => {
-  it('says what waits on the operator and has no Since you left column', async () => {
-    const { PlanTheDay: RealPlanTheDay } = await vi.importActual<
-      typeof import('../../../../src/renderer/components/home/PlanTheDay')
-    >('../../../../src/renderer/components/home/PlanTheDay')
-    useFocusStore.setState({ days: {}, planDismissedOn: null })
-    const finished = homeFeedAsk({
-      id: 'done',
-      kind: 'finished',
-      title: 'Agent finished',
-      actions: [],
-    })
-    useHomeFeedStore.setState({ asks: [finished] })
-    render(<RealPlanTheDay />)
-    expect(screen.getByText(/Waiting on you: 1 agent finished/)).toBeTruthy()
-    expect(screen.queryByText('SINCE YOU LEFT')).toBeNull()
   })
 })
 

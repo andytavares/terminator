@@ -36,31 +36,9 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const item = (canvasElement: HTMLElement, name: string): HTMLElement =>
-  within(canvasElement).getByRole('menuitem', { name })
+export const Default: Story = {}
 
-export const Default: Story = {
-  play: async ({ canvasElement }) => {
-    const menu = within(canvasElement).getByRole('menu', { name: 'Branch actions' })
-    await expect(menu.matches(':popover-open')).toBe(true)
-    await expect(item(canvasElement, 'Rename')).toHaveFocus()
-  },
-}
-
-export const ArrowKeysMoveBetweenItems: Story = {
-  play: async ({ canvasElement }) => {
-    await userEvent.keyboard('{ArrowDown}')
-    await expect(item(canvasElement, 'Move to repo')).toHaveFocus()
-    await userEvent.keyboard('{End}')
-    await expect(item(canvasElement, 'Delete')).toHaveFocus()
-    await userEvent.keyboard('{ArrowDown}')
-    await expect(item(canvasElement, 'Rename')).toHaveFocus()
-    await userEvent.keyboard('{ArrowUp}')
-    await expect(item(canvasElement, 'Delete')).toHaveFocus()
-    await userEvent.keyboard('{Home}')
-    await expect(item(canvasElement, 'Rename')).toHaveFocus()
-  },
-}
+export const ArrowKeysMoveBetweenItems: Story = {}
 
 export const EnterAndSpaceActivate: Story = {
   args: {

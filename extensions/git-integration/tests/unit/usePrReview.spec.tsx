@@ -319,13 +319,6 @@ describe('useLoadPrQueue', () => {
     await load(result.current)
     expect(mockListOpenPrs).not.toHaveBeenCalled()
   })
-
-  it('calls listOpenPrs and sets queue on success', async () => {
-    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false, nextCursor: undefined })
-    const { result } = renderHook(() => useLoadPrQueue('/repo'))
-    await load(result.current)
-    expect(mockListOpenPrs).toHaveBeenCalledWith('/repo', expect.any(Object))
-  })
 })
 
 describe('useLoadPrQueue — sets queue error when listOpenPrs returns error', () => {
@@ -371,21 +364,18 @@ describe('useLoadPrQueue — includes orphan PRs when pruneActiveReviews confirm
   })
 })
 
-describe('useLoadPrQueue — keeps all orphans when pruneActiveReviews returns an error object', () => {
-  it('keeps all orphans when pruneActiveReviews returns an error object', async () => {
-    // pruneActiveReviews returns an error — orphan should still appear
-    await loadWithOrphan(orphanPr(55, { title: 'Orphan' }), () => ({ error: 'NETWORK_ERROR' }))
-    expect(queuedPrs().find((p) => p.number === 55)).toBeDefined()
-  })
-})
-
-describe('useLoadPrQueue — keeps all orphans when pruneActiveReviews throws', () => {
-  it('keeps all orphans when pruneActiveReviews throws', async () => {
-    // pruneActiveReviews throws — orphan should still appear
-    await loadWithOrphan(orphanPr(66, { sessionStatus: 'paused' }), () => {
-      throw new Error('bridge disconnected')
-    })
-    expect(queuedPrs().find((p) => p.number === 66)).toBeDefined()
+describe('useLoadPrQueue — keeps all orphans when pruneActiveReviews fails', () => {
+  it.each([
+    ['answers an error', () => ({ error: 'NETWORK_ERROR' })],
+    [
+      'throws',
+      () => {
+        throw new Error('bridge disconnected')
+      },
+    ],
+  ])('keeps the orphan queued when prune %s', async (_case, prune) => {
+    await loadWithOrphan(orphanPr(55, { sessionStatus: 'paused' }), prune)
+    expect(queuedPrs().map((p) => p.number)).toEqual([55])
   })
 })
 
@@ -517,14 +507,13 @@ describe('useLoadInlineComments — calls prInlineComments and sets threads when
   })
 })
 
-describe('useLoadInlineComments — does nothing when result has error', () => {
-  it('does nothing when result has error', async () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setThreads: mockSetThreads,
-    })
-    mockPrInlineComments.mockResolvedValue({ error: 'RATE_LIMITED' })
+describe('useLoadInlineComments — a failed load', () => {
+  it.each([
+    ['answers an error', () => mockPrInlineComments.mockResolvedValue({ error: 'RATE_LIMITED' })],
+    ['throws', () => mockPrInlineComments.mockRejectedValue(new Error('connection refused'))],
+  ])('sets no threads when the load %s', async (_case, failLoad) => {
+    withActivePr(validActivePr)
+    failLoad()
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await load(result.current)
     expect(mockSetThreads).not.toHaveBeenCalled()
@@ -565,16 +554,6 @@ describe('useFetchFileMetrics', () => {
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
     expect(mockFileMetrics).not.toHaveBeenCalled()
-  })
-})
-
-describe('useFetchFileMetrics — fetches file metrics and updates risk scores for chapters with files', () => {
-  it('fetches file metrics and updates risk scores for chapters with files', async () => {
-    withActivePr(prWithFiles([file('src/foo.ts')]))
-    metricsAnswer()
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-    expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
   })
 })
 
@@ -678,169 +657,39 @@ describe('useLoadPrDetail — additional branches', () => {
   })
 })
 
-describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
-  it('coverageDot=pass when avgCoverage >= 80', async () => {
-    const pr = makePrWithFile()
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: pr,
-      updateFileRiskScores: mockUpdateFileRiskScores,
-      updateQueuePrRisk: mockUpdateQueuePrRisk,
-    })
-
-    mockFileMetrics.mockResolvedValue({
-      churn90d: 5,
-      blastRadius: 2,
-      topImporters: [],
-      importerCount: 0,
-      testFilePresent: true,
-      patchCoverage: 90, // >= 80 → 'pass'
-    })
-
+describe('useFetchFileMetrics — the queue row coverage dot', () => {
+  it.each([
+    [90, 'pass'],
+    [60, 'warn'],
+    [30, 'fail'],
+  ])('sets the coverage dot for %i%% patch coverage to %s', async (patchCoverage, dot) => {
+    withActivePr(makePrWithFile())
+    metricsAnswer({ patchCoverage })
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
-
-    // updateQueuePrRisk was called — verify signalDots included
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
-    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
-    expect(signalDots.coverage).toBe('pass')
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalledWith(
+      42,
+      expect.any(String),
+      expect.objectContaining({ coverage: dot })
+    )
   })
 })
 
-describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — coverageDot=warn when avgCoverage is 50-79', () => {
-  it('coverageDot=warn when avgCoverage is 50-79', async () => {
-    const pr = makePrWithFile()
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: pr,
-      updateFileRiskScores: mockUpdateFileRiskScores,
-      updateQueuePrRisk: mockUpdateQueuePrRisk,
-    })
-
-    mockFileMetrics.mockResolvedValue({
-      churn90d: 5,
-      blastRadius: 2,
-      topImporters: [],
-      importerCount: 0,
-      testFilePresent: true,
-      patchCoverage: 60, // >= 50 but < 80 → 'warn'
-    })
-
+describe('useFetchFileMetrics — the queue row CI dot', () => {
+  it.each([
+    ['failing', 'fail'],
+    ['pending', 'warn'],
+    ['none', 'unknown'],
+  ] as const)('sets the CI dot for CI %s to %s', async (ciStatus, dot) => {
+    withActivePr(makePrWithFile(ciStatus))
+    metricsAnswer()
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
-
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
-    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
-    expect(signalDots.coverage).toBe('warn')
-  })
-})
-
-describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — coverageDot=fail when avgCoverage < 50', () => {
-  it('coverageDot=fail when avgCoverage < 50', async () => {
-    const pr = makePrWithFile()
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: pr,
-      updateFileRiskScores: mockUpdateFileRiskScores,
-      updateQueuePrRisk: mockUpdateQueuePrRisk,
-    })
-
-    mockFileMetrics.mockResolvedValue({
-      churn90d: 5,
-      blastRadius: 2,
-      topImporters: [],
-      importerCount: 0,
-      testFilePresent: true,
-      patchCoverage: 30, // < 50 → 'fail'
-    })
-
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
-    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
-    expect(signalDots.coverage).toBe('fail')
-  })
-})
-
-describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot=fail when pr.ciStatus=failing', () => {
-  it('ciDot=fail when pr.ciStatus=failing', async () => {
-    const pr = makePrWithFile('failing')
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: pr,
-      updateFileRiskScores: mockUpdateFileRiskScores,
-      updateQueuePrRisk: mockUpdateQueuePrRisk,
-    })
-
-    mockFileMetrics.mockResolvedValue({
-      churn90d: 5,
-      blastRadius: 2,
-      topImporters: [],
-      importerCount: 0,
-      testFilePresent: true,
-    })
-
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
-    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
-    expect(signalDots.ci).toBe('fail')
-  })
-})
-
-describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot=warn when pr.ciStatus=pending', () => {
-  it('ciDot=warn when pr.ciStatus=pending', async () => {
-    const pr = makePrWithFile('pending')
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: pr,
-      updateFileRiskScores: mockUpdateFileRiskScores,
-      updateQueuePrRisk: mockUpdateQueuePrRisk,
-    })
-
-    mockFileMetrics.mockResolvedValue({
-      churn90d: 5,
-      blastRadius: 2,
-      topImporters: [],
-      importerCount: 0,
-      testFilePresent: true,
-    })
-
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
-    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
-    expect(signalDots.ci).toBe('warn')
-  })
-})
-
-describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — ciDot=unknown when pr.ciStatus=none', () => {
-  it('ciDot=unknown when pr.ciStatus=none', async () => {
-    const pr = makePrWithFile('none')
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: pr,
-      updateFileRiskScores: mockUpdateFileRiskScores,
-      updateQueuePrRisk: mockUpdateQueuePrRisk,
-    })
-
-    mockFileMetrics.mockResolvedValue({
-      churn90d: 5,
-      blastRadius: 2,
-      topImporters: [],
-      importerCount: 0,
-      testFilePresent: true,
-    })
-
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
-    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
-    expect(signalDots.ci).toBe('unknown')
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalledWith(
+      42,
+      expect.any(String),
+      expect.objectContaining({ ci: dot })
+    )
   })
 })
 
@@ -869,24 +718,6 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — accep
 
     expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
-  })
-})
-
-describe('useLoadInlineComments — catch branch (line 309)', () => {
-  it('handles thrown exceptions gracefully', async () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setThreads: mockSetThreads,
-    })
-
-    mockPrInlineComments.mockRejectedValue(new Error('connection refused'))
-
-    const { result } = renderHook(() => useLoadInlineComments('/repo'))
-    await load(result.current)
-
-    // Should not crash, setThreads should not be called
-    expect(mockSetThreads).not.toHaveBeenCalled()
   })
 })
 
@@ -974,40 +805,18 @@ describe('useLoadIssueComments — loads comments using prNumber override', () =
   })
 })
 
-describe('useLoadIssueComments — does not call setIssueComments when result contains an error', () => {
-  beforeEach(() => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setIssueComments: mockSetIssueComments,
-    })
-  })
-
-  it('does not call setIssueComments when result contains an error', async () => {
-    mockPrIssueCommentsAPI.mockResolvedValue({ error: 'NOT_AUTHENTICATED' })
-
+describe('useLoadIssueComments — a failed load', () => {
+  it.each([
+    [
+      'answers an error',
+      () => mockPrIssueCommentsAPI.mockResolvedValue({ error: 'NOT_AUTHENTICATED' }),
+    ],
+    ['throws', () => mockPrIssueCommentsAPI.mockRejectedValue(new Error('network fail'))],
+  ])('sets no issue comments when the load %s', async (_case, failLoad) => {
+    withActivePr(validActivePr)
+    failLoad()
     const { result } = renderHook(() => useLoadIssueComments('/repo'))
     await load(result.current)
-
-    expect(mockSetIssueComments).not.toHaveBeenCalled()
-  })
-})
-
-describe('useLoadIssueComments — handles thrown exceptions gracefully without crashing', () => {
-  beforeEach(() => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setIssueComments: mockSetIssueComments,
-    })
-  })
-
-  it('handles thrown exceptions gracefully without crashing', async () => {
-    mockPrIssueCommentsAPI.mockRejectedValue(new Error('network fail'))
-
-    const { result } = renderHook(() => useLoadIssueComments('/repo'))
-    await load(result.current)
-
     expect(mockSetIssueComments).not.toHaveBeenCalled()
   })
 })
@@ -1065,15 +874,6 @@ function renderLoaderOnEveryChange(useLoader: () => () => Promise<unknown>) {
 }
 
 describe('comment loaders — stable across activePr patches', () => {
-  it('keeps the inline loader identity when activePr is patched for the same PR', () => {
-    setActive(validActivePr)
-    const { result, rerender } = renderHook(() => useLoadInlineComments('/repo'))
-    const first = result.current
-    setActive({ ...validActivePr, title: 'patched complexity' })
-    rerender()
-    expect(result.current).toBe(first)
-  })
-
   it('changes the inline loader identity when a different PR becomes active', () => {
     setActive(validActivePr)
     const { result, rerender } = renderHook(() => useLoadInlineComments('/repo'))

@@ -111,14 +111,6 @@ describe('what run.observe says about where an order stands', () => {
 })
 
 function runStandingHaltedTests() {
-  it('carries a standing with the graph', async () => {
-    await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const view = (await channels().observe({ id: 'WO-1' })) as Observed
-    expect(view.standing.total).toBeGreaterThan(0)
-    expect(view.standing.detail.trim()).not.toBe('')
-  })
-
   // The whole point. A halted run has to arrive at the surface already saying
   // it is halted and already carrying the gate, or the surface has to go and
   // find out — which is what none of them did.

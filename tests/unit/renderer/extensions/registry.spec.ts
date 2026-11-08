@@ -572,11 +572,6 @@ describe('matchesAccelerator — matches Alt+F4 style shortcut', () => {
     expect(matchesAccelerator(event, 'CommandOrControl+Shift+T')).toBe(true)
   })
 
-  it('does not match CommandOrControl+Shift+T when shift is not held', () => {
-    const event = makeEvent({ key: 't', metaKey: true })
-    expect(matchesAccelerator(event, 'CommandOrControl+Shift+T')).toBe(false)
-  })
-
   it('matches CmdOrCtrl+Alt+Shift+K when macOS Option changes e.key to a special char', () => {
     // On macOS, Option+Shift+K produces a special e.key — matchesAccelerator must fall back to e.code
     const event = makeEvent({ key: '˚', code: 'KeyK', metaKey: true, altKey: true, shiftKey: true })

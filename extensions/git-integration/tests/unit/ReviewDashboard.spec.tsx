@@ -158,10 +158,13 @@ describe('ReviewDashboard', () => {
     expect(row.querySelector('.rd-ti small')!.textContent).toContain('alice · 3d')
   })
 
-  it('opens a pull request when its row is clicked', async () => {
+  it.each([
+    ['its title', () => screen.findByText('Foundry: the red team argues before agreement')],
+    ['its Review button', () => screen.findByRole('button', { name: 'Review' })],
+  ])('opens a pull request when %s is clicked', async (_target, findTarget) => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
-    fireEvent.click(await screen.findByText('Foundry: the red team argues before agreement'))
+    fireEvent.click(await findTarget())
     await waitFor(() => {
       expect(window.electronAPI.extensionBridge.invoke).toHaveBeenCalledWith(
         'window:open-pr-review',
@@ -288,25 +291,6 @@ describe('ReviewDashboard — reloads when a review is submitted elsewhere', () 
   })
 })
 
-describe('ReviewDashboard — renders the three tabs with counts', () => {
-  it('renders the three tabs with counts', async () => {
-    mockInvoke({
-      prs: [pr211, pr210, pr212, pr213],
-      login: 'andytavares',
-      fetchedAt: new Date().toISOString(),
-    })
-    render(<ReviewDashboard />)
-    // The tab list renders while loading with zero counts; wait for the data.
-    within(await screen.findByRole('tablist')).getByText('3')
-    const tablist = screen.getByRole('tablist')
-    expect(within(tablist).getByText('3')).toBeTruthy() // needs you: 211,210,212
-    expect(within(tablist).getByText('1')).toBeTruthy() // mine: 213
-    expect(screen.getByRole('tab', { name: /Needs you/ })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: /My PRs/ })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: /Involved/ })).toBeTruthy()
-  })
-})
-
 describe('ReviewDashboard — names each tab with its count, read apart from the words', () => {
   it('names each tab with its count, read apart from the words', async () => {
     mockInvoke({
@@ -317,6 +301,7 @@ describe('ReviewDashboard — names each tab with its count, read apart from the
     render(<ReviewDashboard />)
     expect(await screen.findByRole('tab', { name: 'Needs you, 3' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'My PRs, 1' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Involved, 0' })).toBeTruthy()
   })
 
   it('moves between sections with the arrow keys and shows the selected one', async () => {
@@ -387,19 +372,6 @@ describe('ReviewDashboard — keeps the Open label and notes Not cloned when loc
     fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
     expect(await screen.findByRole('button', { name: 'Open' })).toBeTruthy()
     expect(screen.getByText(/Not cloned.*diff only/)).toBeTruthy()
-  })
-
-  it('invokes window:open-pr-review with the right payload on row click', async () => {
-    mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
-    render(<ReviewDashboard />)
-    const btn = await screen.findByRole('button', { name: 'Review' })
-    fireEvent.click(btn)
-    await waitFor(() => {
-      expect(window.electronAPI.extensionBridge.invoke).toHaveBeenCalledWith(
-        'window:open-pr-review',
-        { repoRoot: '/repo/terminator', prNumber: '210', showOverview: 'true' }
-      )
-    })
   })
 })
 

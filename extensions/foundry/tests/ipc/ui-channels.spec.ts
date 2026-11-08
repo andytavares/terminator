@@ -22,6 +22,7 @@ beforeAll(() => {
 beforeEach(() => {
   host.settings.clear()
   host.broadcast.mockClear()
+  vi.mocked(host.api.window.showSelf).mockClear()
   clearPendingNewOrder()
   create.mockReset()
 })
@@ -43,9 +44,10 @@ describe('which view draws the Forge', () => {
     expect(host.broadcast).toHaveBeenCalledWith('foundry:ui.view-changed', { view: 'factory' })
   })
 
-  it('flips each time the palette command runs', async () => {
+  it('flips each time the palette command runs, bringing Foundry forward', async () => {
     host.commands.get('toggle-view')?.()
     expect(await host.call('foundry:ui.view')).toEqual({ view: 'factory' })
+    expect(host.api.window.showSelf).toHaveBeenCalledWith('main')
     host.commands.get('toggle-view')?.()
     expect(await host.call('foundry:ui.view')).toEqual({ view: 'list' })
     expect(host.broadcast).toHaveBeenLastCalledWith('foundry:ui.view-changed', { view: 'list' })

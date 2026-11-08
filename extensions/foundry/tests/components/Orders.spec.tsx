@@ -84,22 +84,6 @@ function standingsTests() {
     await screen.findByText('halted')
     expect(container.querySelectorAll('.fdry-order-state.is-waiting')).toHaveLength(1)
   })
-
-  // The defect the standing exists to remove. The badge read
-  // `failures === 0 ? 'ready to hand off' : ...`, and `failures` is a
-  // draft-time compile result that is zero for every running order for ever —
-  // so a run halted at a gate two hours earlier said it was ready to hand off.
-  it('does not call a running order ready to hand off just because it compiled', async () => {
-    mount([
-      row({
-        status: 'running',
-        failures: 0,
-        standing: standing({ kind: 'halted', turn: 'you', label: 'halted' }),
-      }),
-    ])
-    await screen.findByText('halted')
-    expect(screen.queryByText('ready to hand off')).toBeNull()
-  })
 }
 
 function refetchingTests() {

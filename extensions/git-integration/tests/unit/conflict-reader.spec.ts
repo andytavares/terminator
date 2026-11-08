@@ -85,16 +85,13 @@ describe('readConflictBlocks — undo text and clean files', () => {
 })
 
 describe('listConflictedFiles', () => {
-  it('returns list of conflicted file paths', async () => {
-    mockGit.mockReturnValueOnce('src/foo.ts\nsrc/bar.ts\n')
+  it.each([
+    { stdout: 'src/foo.ts\nsrc/bar.ts\n', expected: ['src/foo.ts', 'src/bar.ts'] },
+    { stdout: '', expected: [] },
+  ])('returns $expected for git output $stdout', async ({ stdout, expected }) => {
+    mockGit.mockReturnValueOnce(stdout)
     const files = await listConflictedFiles('/repo')
-    expect(files).toEqual(['src/foo.ts', 'src/bar.ts'])
-  })
-
-  it('returns empty array when no conflicts', async () => {
-    mockGit.mockReturnValueOnce('')
-    const files = await listConflictedFiles('/repo')
-    expect(files).toEqual([])
+    expect(files).toEqual(expected)
   })
 })
 
@@ -149,24 +146,14 @@ function fileWith(
 }
 
 describe('buildConflictSession', () => {
-  it('detects rebase context when REBASE_HEAD exists', async () => {
+  it.each([true, false])('sets isRebase %s from whether REBASE_HEAD exists', async (isRebase) => {
     setupBuildSessionMocks({
       filePaths: 'src/foo.ts\n',
-      isRebase: true,
+      isRebase,
       files: [fileWith(CONFLICT_TEXT)],
     })
     const session = await buildConflictSession('/repo')
-    expect(session.isRebase).toBe(true)
-  })
-
-  it('sets isRebase false when no REBASE_HEAD', async () => {
-    setupBuildSessionMocks({
-      filePaths: 'src/foo.ts\n',
-      isRebase: false,
-      files: [fileWith(CONFLICT_TEXT)],
-    })
-    const session = await buildConflictSession('/repo')
-    expect(session.isRebase).toBe(false)
+    expect(session.isRebase).toBe(isRebase)
   })
 })
 

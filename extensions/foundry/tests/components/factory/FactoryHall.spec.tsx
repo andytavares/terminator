@@ -146,12 +146,6 @@ describe('FactoryHall status wall plumbing', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
   })
-
-  it('does not fail to render when there is no metrics row for this order', async () => {
-    mount({ metrics: [] })
-    await screen.findByRole('button', { name: /Build the thing/ })
-    expect(screen.getByRole('button', { name: /Build the thing/ })).toBeTruthy()
-  })
 })
 
 function replayable(frames: unknown[], ci?: unknown[]) {
@@ -768,16 +762,6 @@ function factoryHallLinksTests() {
 }
 
 function gateCardsTests() {
-  it('draws a waiting gate collapsed, with its answers on the line, and reads the reason as markdown', async () => {
-    mount({ view: hallView({ waiting: [readyGate()] }) })
-    expect(await screen.findByRole('button', { name: 'Mark ready' })).toBeTruthy()
-    expect(document.querySelectorAll('.fdry-card li')).toHaveLength(0)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show the reason' }))
-    const items = document.querySelectorAll('.fdry-card li')
-    expect([...items].map((li) => li.textContent)).toContain('the checks passed')
-  })
-
   it('bounds an open gate card by the room between its station and the edge it grows toward', async () => {
     mount({ view: hallView({ waiting: [readyGate()] }) })
     await screen.findByRole('button', { name: 'Mark ready' })

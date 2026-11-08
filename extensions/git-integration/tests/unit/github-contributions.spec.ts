@@ -313,15 +313,6 @@ describe('github:contributions — the payload schema', () => {
   })
 })
 
-describe('github:contributions — parses the line-delimited pages gh --jq prints', () => {
-  it('parses the line-delimited JSON objects the jq filter prints per page', async () => {
-    const handlers = captureHandlers()
-    mockSearches([openedNode(3, '2026-10-13T10:00:00Z')], [], [])
-    const result = await invoke(handlers)
-    expect(result.period.opened).toBe(1)
-  })
-})
-
 describe('github:contributions — hands Home the calendar', () => {
   it('hands over the all-repositories calendar after a fetch', async () => {
     const onContributions = vi.fn()

@@ -45,11 +45,6 @@ function headingTextStartTests() {
 }
 
 function headingTextStartFindingTextTests() {
-  it('points just past the marker and its space', () => {
-    const state = makeState('# Hello', 0)
-    expect(headingTextStart(state, 0)).toBe(2)
-  })
-
   it('handles every heading level', () => {
     for (let level = 1; level <= 6; level++) {
       const marker = '#'.repeat(level)

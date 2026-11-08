@@ -16,6 +16,7 @@ import {
 import { foundryChannel, makeFixtureRepo } from './foundry-harness'
 import { answerFolderPicker } from './main-stubs'
 import { openExtensionSettings, settingRow } from './extension-settings-page'
+import { openHome } from './session-views'
 
 // Every bundled extension's settings, written one control at a time on its ⚙ page, read
 // back from the page and main after a restart, then checked for any effect that can be seen.
@@ -313,6 +314,29 @@ async function remoteControlViewerLimitMatchesPage(): Promise<void> {
     .toContain('13')
 }
 
+const contributionsHeight = async (): Promise<number> =>
+  (await handle.page.getByRole('region', { name: 'Contributions' }).boundingBox())?.height ?? 0
+
+/** Flips "Show contributions on Insights" from its settings page; the caller knows its state. */
+async function flipShowContributions(on: boolean): Promise<void> {
+  const panel = await openExtensionSettings(handle.page, 'Git Integration')
+  const toggle = settingRow(panel, 'Show contributions on Insights').getByRole('switch')
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-checked', String(on))
+  await closeSettingsPanel(handle.page)
+}
+
+// Written off above. Insights regains the section and drops it again, without a reload.
+async function contributionsFollowTheirSetting(): Promise<void> {
+  await openHome(handle.page)
+  await handle.page.getByRole('radio', { name: 'Insights' }).click()
+  await expect.poll(contributionsHeight).toBe(0)
+  await flipShowContributions(true)
+  await expect.poll(contributionsHeight).toBeGreaterThan(40)
+  await flipShowContributions(false)
+  await expect.poll(contributionsHeight).toBe(0)
+}
+
 const EFFECT_STEPS: Steps = [
   [
     'Git Integration switched off keeps its settings page, and registers no commands',
@@ -331,6 +355,7 @@ const EFFECT_STEPS: Steps = [
     notificationSwitchRoutesIt,
   ],
   ["Remote Control's viewer limit is the one its page shows", remoteControlViewerLimitMatchesPage],
+  ['the Contributions section on Insights follows its setting', contributionsFollowTheirSetting],
 ]
 
 // The effects are read from what the writes left, so both are steps of one test on one profile.

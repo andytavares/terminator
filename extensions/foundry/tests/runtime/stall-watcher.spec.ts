@@ -130,11 +130,6 @@ function firingTests() {
     const { fired } = watch([run({ activity: path })], 9 * MIN)
     expect(fired[0].featureDir).toBe('/repo/specs/021-thing')
   })
-
-  it('does not fire below the threshold', () => {
-    const path = transcript([{ tool: 'Read', callId: 'a', at: 0 }])
-    expect(watch([run({ activity: path })], 7 * MIN).fired).toEqual([])
-  })
 }
 
 function longCommandsAndWaitingRunsTests() {

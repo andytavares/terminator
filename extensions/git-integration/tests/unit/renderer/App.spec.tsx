@@ -57,32 +57,19 @@ describe('git-integration renderer App', () => {
     )
   })
 
-  it('renders GitFullView for ?view=project', async () => {
-    setSearch({ view: 'project', repoRoot: '/my/repo' })
+  it.each([
+    { view: 'code-reviews', repoRoot: '' },
+    { view: 'pr-review', repoRoot: '/my/repo' },
+  ])('renders PrReviewTab with repoRoot $repoRoot for ?view=$view', async ({ view, repoRoot }) => {
+    setSearch({ view, repoRoot })
     render(<App />)
-    expect(await screen.findByTestId('git-full-view')).toBeDefined()
-  })
-
-  it('renders PrReviewTab for ?view=code-reviews', async () => {
-    setSearch({ view: 'code-reviews', repoRoot: '' })
-    render(<App />)
-    expect(await screen.findByTestId('pr-review-tab')).toBeDefined()
+    expect((await screen.findByTestId('pr-review-tab')).getAttribute('data-repo-root')).toBe(
+      repoRoot
+    )
   })
 })
 
-describe('git-integration renderer App — renders PrReviewTab for ?view=pr-review', () => {
-  it('renders PrReviewTab for ?view=pr-review', async () => {
-    setSearch({ view: 'pr-review', repoRoot: '/my/repo' })
-    render(<App />)
-    expect(await screen.findByTestId('pr-review-tab')).toBeDefined()
-  })
-
-  it('subscribes to workspace:changed for live repoRoot updates', async () => {
-    setSearch({ view: 'project', repoRoot: '/my/repo' })
-    render(<App />)
-    await expectSubscribedToWorkspaceChanges()
-  })
-
+describe('git-integration renderer App — live repoRoot', () => {
   it('updates repoRoot when workspace:changed fires', async () => {
     setSearch({ view: 'project', repoRoot: '/initial/repo' })
     render(<App />)

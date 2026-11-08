@@ -42,24 +42,6 @@ function prNode(overrides: Record<string, unknown> = {}) {
   }
 }
 
-describe('DASHBOARD_QUERIES', () => {
-  it('defines a search query for every dashboard section', () => {
-    expect(DASHBOARD_QUERIES['re-review']).toBe(
-      'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-desc'
-    )
-    expect(DASHBOARD_QUERIES.requested).toBe(
-      'is:pr is:open archived:false user-review-requested:@me sort:created-desc'
-    )
-    expect(DASHBOARD_QUERIES.team).toBe(
-      'is:pr is:open archived:false team-review-requested-user:LOGIN sort:created-desc'
-    )
-    expect(DASHBOARD_QUERIES.mine).toBe('is:pr is:open author:@me sort:created-desc')
-    expect(DASHBOARD_QUERIES.involved).toBe(
-      'is:pr is:open involves:@me -author:@me sort:created-desc'
-    )
-  })
-})
-
 const sections = ['involved', 'mine', 're-review', 'requested', 'team']
 
 const repoCount = (search: string) => search.match(/ repo:/g)?.length ?? 0
@@ -247,23 +229,20 @@ describe('parseDashboard — computes commitsSinceMyReview by counting commits a
 })
 
 describe('parseDashboard — reviewedByMe from my latest reviews', () => {
-  it('flags a pull request whose latestReviews include the viewer', () => {
-    const node = prNode({
-      latestReviews: {
-        nodes: [
-          { author: { login: 'alice' }, submittedAt: '2026-01-02T00:00:00Z', commit: { oid: 'a' } },
-        ],
-      },
-    })
+  const reviewByAlice = {
+    author: { login: 'alice' },
+    submittedAt: '2026-01-02T00:00:00Z',
+    commit: { oid: 'a' },
+  }
+
+  it.each([
+    ['flags a pull request whose latestReviews include the viewer', [reviewByAlice], true],
+    ['does not flag a pull request the viewer never reviewed', [], false],
+  ])('%s', (_name, reviews, reviewedByMe) => {
+    const node = prNode({ latestReviews: { nodes: reviews } })
     const raw = { data: { requested: { nodes: [node] } } }
     const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
-    expect(pr.reviewedByMe).toBe(true)
-  })
-
-  it('does not flag a pull request the viewer never reviewed', () => {
-    const raw = { data: { requested: { nodes: [prNode()] } } }
-    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
-    expect(pr.reviewedByMe).toBe(false)
+    expect(pr.reviewedByMe).toBe(reviewedByMe)
   })
 })
 

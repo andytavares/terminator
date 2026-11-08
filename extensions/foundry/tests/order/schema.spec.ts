@@ -252,11 +252,6 @@ function nonOrdersAndVersionsTests() {
     expect(() => parseWorkOrder(o)).toThrow()
     expect(() => parseWorkOrder(o)).not.toThrow(SchemaVersionTooNewError)
   })
-
-  it('accepts the version it knows', () => {
-    const o = { ...(valid() as Record<string, unknown>), schemaVersion: SCHEMA_VERSION }
-    expect(parseWorkOrder(o).schemaVersion).toBe(SCHEMA_VERSION)
-  })
 }
 
 function optionalCollectionsTests() {

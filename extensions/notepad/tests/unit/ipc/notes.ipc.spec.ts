@@ -135,14 +135,6 @@ describe('listNotes with tagId filter', () => {
   })
 })
 
-describe('registerNotesIpcHandlers', () => {
-  it('registers and disposes without error', () => {
-    const dispose = registerNotesIpcHandlers(mockApi, db)
-    expect(typeof dispose).toBe('function')
-    expect(() => dispose()).not.toThrow()
-  })
-})
-
 describe('listTags', () => {
   it('returns tags with noteCount', async () => {
     await createNote(db, { title: 'A', body: '', tags: ['alpha', 'beta'] })
@@ -192,14 +184,6 @@ describe('deleteTag', () => {
 
 describe('inline #tag parsing on autosave', inlineTagParsingAutosaveTests)
 describe('reorderItems', reorderItemsTests)
-
-describe('registerTagsIpcHandlers', () => {
-  it('registers and disposes without error', () => {
-    const dispose = registerTagsIpcHandlers(mockApi, db)
-    expect(typeof dispose).toBe('function')
-    expect(() => dispose()).not.toThrow()
-  })
-})
 
 describe('IPC handler structure', iPCHandlerStructureTests)
 
@@ -302,79 +286,32 @@ function autosaveNoteMissingNotesCallbacksTests() {
 }
 
 function reorderItemsTests() {
-  describe('writing the order', reorderItemsWritingOrderTests)
-  describe('reading the order', reorderItemsReadingOrderTests)
-}
-
-function reorderItemsWritingOrderTests() {
-  it('sets sort_order on notes in given order', async () => {
-    const n1 = await createNote(db, { title: 'A', body: '' })
-    const n2 = await createNote(db, { title: 'B', body: '' })
-    const id1 = (n1 as { data: { id: string } }).data.id
-    const id2 = (n2 as { data: { id: string } }).data.id
-    const result = await reorderItems(db, {
-      items: [
-        { id: id2, type: 'note' },
-        { id: id1, type: 'note' },
-      ],
-    })
-    expect((result as { data: { ok: boolean } }).data.ok).toBe(true)
-
-    const row1 = await db.get<{ sort_order: number }>('SELECT sort_order FROM notes WHERE id=?', [
-      id1,
-    ])
-    const row2 = await db.get<{ sort_order: number }>('SELECT sort_order FROM notes WHERE id=?', [
-      id2,
-    ])
-    expect(row2?.sort_order).toBe(0)
-    expect(row1?.sort_order).toBe(1)
-  })
-}
-
-function reorderItemsReadingOrderTests() {
-  it('listNotes returns items ordered by sort_order asc', async () => {
+  it('reorders notes so listNotes returns them in the given sort_order', async () => {
     const n1 = await createNote(db, { title: 'First', body: '' })
     const n2 = await createNote(db, { title: 'Second', body: '' })
     const id1 = (n1 as { data: { id: string } }).data.id
     const id2 = (n2 as { data: { id: string } }).data.id
 
-    await reorderItems(db, {
+    const reordered = await reorderItems(db, {
       items: [
         { id: id2, type: 'note' },
         { id: id1, type: 'note' },
       ],
     })
 
+    expect(reordered).toHaveProperty('data.ok', true)
     const result = await listNotes(db, { includeArchived: false })
     const data = (result as { data: { title: string; sortOrder: number }[] }).data
-    expect(data[0].title).toBe('Second')
-    expect(data[1].title).toBe('First')
-    expect(data[0].sortOrder).toBe(0)
-    expect(data[1].sortOrder).toBe(1)
+    expect(data.map((n) => [n.title, n.sortOrder])).toEqual([
+      ['Second', 0],
+      ['First', 1],
+    ])
   })
 }
 
 function iPCHandlerStructureTests() {
-  describe('notes channels', iPCHandlerStructureNotesChannelsTests)
   describe('notes wrappers', iPCHandlerStructureNotesWrappersTests)
   describe('tags wrappers', iPCHandlerStructureTagsWrappersTests)
-}
-
-function iPCHandlerStructureNotesChannelsTests() {
-  it('registerNotesIpcHandlers calls ipcMain.handle for all channels', () => {
-    vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerNotesIpcHandlers(mockApi, db)
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:notes.create',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:notes.list',
-      expect.any(Function)
-    )
-    dispose()
-    expect(ipcMain.removeHandler).toHaveBeenCalledWith('terminator.notepad:notes.create')
-  })
 }
 
 /** The ipc-backed API plus the window surface the notes handlers broadcast through. */

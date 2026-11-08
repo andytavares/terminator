@@ -53,24 +53,21 @@ function replaceDocument(container: HTMLElement, text: string) {
 }
 
 describe('ManualEditor', () => {
-  it('pre-populates with ours when ours is longer', () => {
-    const { container } = renderEditor(
-      makeBlock({ oursText: 'longer ours text', theirsText: 'short' })
-    )
-    expect(documentText(container)).toBe('longer ours text')
-  })
-
-  it('pre-populates with theirs when theirs is longer', () => {
-    const { container } = renderEditor(
-      makeBlock({ oursText: 'short', theirsText: 'much longer theirs text here' })
-    )
-    expect(documentText(container)).toBe('much longer theirs text here')
-  })
-
-  it('pre-populates with theirs when both are equal length', () => {
-    const { container } = renderEditor(makeBlock({ oursText: 'abc', theirsText: 'xyz' }))
-    expect(documentText(container)).toBe('xyz')
-  })
+  it.each([
+    { oursText: 'longer ours text', theirsText: 'short', expected: 'longer ours text' },
+    {
+      oursText: 'short',
+      theirsText: 'much longer theirs text',
+      expected: 'much longer theirs text',
+    },
+    { oursText: 'abc', theirsText: 'xyz', expected: 'xyz' },
+  ])(
+    'pre-populates with the longer side, theirs on a tie ($oursText / $theirsText)',
+    ({ oursText, theirsText, expected }) => {
+      const { container } = renderEditor(makeBlock({ oursText, theirsText }))
+      expect(documentText(container)).toBe(expected)
+    }
+  )
 })
 
 describe('ManualEditor — strips conflict markers from pre-populated content', () => {

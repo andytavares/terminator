@@ -55,9 +55,11 @@ function gateCardWhatItShowsTests() {
     expect(screen.queryByText(/token refresh failed/)).toBeNull()
   })
 
-  it('says the grade in words, not as a code', () => {
-    render(<GateCard gate={gate()} onDecide={vi.fn()} />)
-    expect(document.body.textContent).not.toMatch(/\bP0\b/)
+  it('names the grade once, in words, not as a code', () => {
+    const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
+    expect(container.textContent).toContain('highest risk')
+    expect(container.textContent).not.toContain('risk risk')
+    expect(container.textContent).not.toMatch(/\bP0\b/)
   })
 }
 
@@ -135,14 +137,6 @@ function gateCardTheReasonTests() {
 }
 
 function evidenceAndAnswersTests() {
-  it('keeps the evidence closed until it is asked for', () => {
-    const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
-    open()
-    const details = container.querySelector('details') as HTMLDetailsElement
-    expect(details).not.toBeNull()
-    expect(details.open).toBe(false)
-  })
-
   it('says what each answer does', () => {
     render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     open()
@@ -200,11 +194,5 @@ function gateCardTheNewLimitTests() {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Raise the budget' })).toBeTruthy()
-  })
-
-  it('names the grade once, in words', () => {
-    const { container } = render(<GateCard gate={gate({ riskGrade: 'P2' })} onDecide={vi.fn()} />)
-    expect(container.textContent).toContain('ordinary risk')
-    expect(container.textContent).not.toContain('risk risk')
   })
 }

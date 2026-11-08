@@ -148,21 +148,12 @@ describe('compiling an order with a collision', () => {
 })
 
 function lanesRefusingTests() {
-  it('refuses one where nobody owns the shared change', () => {
+  it('refuses one where nobody owns the shared change, naming the file, the lanes and the units', () => {
     const result = compileOrder(order())
+    const failure = result.failures.find((f) => f.check === 'coverage')
     expect(result.ok).toBe(false)
-    expect(result.failures.map((f) => f.check)).toContain('coverage')
-  })
-
-  it('names the file and the lanes, so the operator can act on it', () => {
-    const detail = compileOrder(order()).failures.find((f) => f.check === 'coverage')?.detail ?? ''
-    expect(detail).toContain('proto/session.proto')
-    expect(detail).toContain('proto')
-    expect(detail).toContain('cli')
-  })
-
-  it('names the units that touch it', () => {
-    const failure = compileOrder(order()).failures.find((f) => f.check === 'coverage')
+    expect(failure?.detail).toContain('proto/session.proto')
+    expect(failure?.detail).toContain('cli')
     expect(failure?.subjectIds).toEqual(['U-1', 'U-2'])
   })
 }
@@ -327,14 +318,6 @@ describe('a change somebody can see needs a picture of it (FR-040)', () => {
 })
 
 function commandsAndScreenshotsTests() {
-  it('refuses one whose criteria are all commands', () => {
-    const result = compileOrder(uiOrder())
-    expect(result.ok).toBe(false)
-    expect(result.failures.find((f) => f.check === 'verifiable')?.detail).toMatch(
-      /picture of the running application/
-    )
-  })
-
   it('accepts a screenshot criterion', () => {
     const withPicture = uiOrder({
       acceptance: [

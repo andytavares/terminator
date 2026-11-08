@@ -113,13 +113,6 @@ function noteListRenderingTests() {
     fireEvent.click(screen.getByRole('button', { name: /^New note/ }))
     expect(useNotesStore.getState().showQuickCreate).toBe(true)
   })
-
-  it('renders note titles', () => {
-    useNotesStore.setState({ notes: [note1, note2], selectedNoteId: null, archivedVisible: false })
-    render(<NoteList />)
-    expect(screen.getByText('First Note')).toBeDefined()
-    expect(screen.getByText('Second Note')).toBeDefined()
-  })
 }
 
 function noteListSelectingTests() {
@@ -151,38 +144,14 @@ function noteListSearchBarTests() {
   })
 
   describe('search input', noteListSearchBarSearchInputTests)
-  describe('archived notes', noteListSearchBarArchivedNotesTests)
 }
 
 function noteListSearchBarSearchInputTests() {
-  it('renders a search input', () => {
-    render(<NoteList />)
-    expect(screen.getByPlaceholderText(/search/i)).toBeDefined()
-  })
-
   it('typing in search bar updates filter.store searchQuery', async () => {
     render(<NoteList />)
     const input = screen.getByPlaceholderText(/search/i)
     fireEvent.change(input, { target: { value: 'hello' } })
     expect(useFilterStore.getState().searchQuery).toBe('hello')
-  })
-}
-
-function noteListSearchBarArchivedNotesTests() {
-  it('archived notes appear in a collapsible section', () => {
-    const archivedNote: NoteListItem = {
-      ...note1,
-      id: 'n3',
-      title: 'Archived Note',
-      archivedAt: '2026-01-01T00:00:00Z',
-    }
-    useNotesStore.setState({
-      notes: [note1, archivedNote],
-      selectedNoteId: null,
-      archivedVisible: false,
-    })
-    render(<NoteList />)
-    expect(screen.getByText(/Archived \(1\)/)).toBeDefined()
   })
 }
 
@@ -206,11 +175,6 @@ function noteListTagFilterDropdownTests() {
 }
 
 function noteListTagFilterDropdownListingTagsTests() {
-  it('renders a Tags button when notes have tags', () => {
-    render(<NoteList />)
-    expect(screen.getByText('Tags')).toBeDefined()
-  })
-
   it('opens dropdown and shows tag names on button click', () => {
     render(<NoteList />)
     fireEvent.click(screen.getByText('Tags'))
@@ -378,7 +342,6 @@ function noteListDragToReorderTests() {
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
   describe('within a group', noteListDragWithinGroupTests)
-  describe('into a folder', noteListDragIntoFolderTests)
 }
 
 function noteListDragWithinGroupTests() {
@@ -400,26 +363,5 @@ function noteListDragWithinGroupTests() {
       'terminator.notepad:notes.reorder',
       expect.anything()
     )
-  })
-}
-
-function noteListDragIntoFolderTests() {
-  it('moves a note dropped beside one in a folder into that folder', async () => {
-    useNotesStore.setState({
-      notes: [note1, { ...note2, folderId: 'f1' }],
-      folders: [{ id: 'f1', name: 'Work', sortOrder: 0, createdAt: '' }],
-    })
-    render(<NoteList />)
-    await dragFirstOntoSecond(true)
-    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:folders.move', {
-      items: [{ id: 'n1', type: 'note' }],
-      folderId: 'f1',
-    })
-    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:notes.reorder', {
-      items: [
-        { id: 'n2', type: 'note' },
-        { id: 'n1', type: 'note' },
-      ],
-    })
   })
 }

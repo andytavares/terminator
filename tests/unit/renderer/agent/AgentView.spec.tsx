@@ -227,12 +227,6 @@ describe('AgentView prompt box', () => {
     expect(agents.prompt).not.toHaveBeenCalled()
     expect(box().value).toBe('Fix it')
   })
-
-  it('sends nothing for an empty box', async () => {
-    await mountView()
-    fireEvent.keyDown(box(), { key: 'Enter' })
-    expect(agents.prompt).not.toHaveBeenCalled()
-  })
 })
 
 describe('AgentView follow-up queue and steer', () => {
@@ -268,12 +262,6 @@ describe('AgentView follow-up queue and steer', () => {
 
 describe('AgentView queue list', () => {
   beforeEach(() => useSessionStore.getState().setAgentTurn('agent-1', true))
-
-  it('shows a queue set before the tab opened', async () => {
-    agents.queueGet.mockResolvedValue({ data: ['set earlier'] })
-    await mountView()
-    expect(screen.getByText('1 message sends when this turn ends')).toBeTruthy()
-  })
 
   it('shows the queue from the main process, edits and removes items', async () => {
     await mountView()

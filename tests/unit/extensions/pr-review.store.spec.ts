@@ -93,78 +93,10 @@ function useFreshPrReviewStore(): void {
 describe('usePrReviewStore — queue management', () => {
   useFreshPrReviewStore()
 
-  it('setQueue replaces the PR queue', () => {
-    usePrReviewStore.getState().setQueue([makePR(1), makePR(2)])
-    expect(usePrReviewStore.getState().prQueue).toHaveLength(2)
-  })
-
   it('appendQueue adds to existing queue', () => {
     usePrReviewStore.setState({ prQueue: [makePR(1)] })
     usePrReviewStore.getState().appendQueue([makePR(2), makePR(3)])
     expect(usePrReviewStore.getState().prQueue).toHaveLength(3)
-  })
-
-  it('setQueueLoading updates queueLoading', () => {
-    usePrReviewStore.getState().setQueueLoading(true)
-    expect(usePrReviewStore.getState().queueLoading).toBe(true)
-    usePrReviewStore.getState().setQueueLoading(false)
-    expect(usePrReviewStore.getState().queueLoading).toBe(false)
-  })
-
-  it('setLoadingMorePrs updates loadingMorePrs', () => {
-    usePrReviewStore.getState().setLoadingMorePrs(true)
-    expect(usePrReviewStore.getState().loadingMorePrs).toBe(true)
-  })
-})
-
-describe('usePrReviewStore — queue errors and paging', () => {
-  useFreshPrReviewStore()
-
-  it('setQueueError sets error message', () => {
-    usePrReviewStore.getState().setQueueError('API error')
-    expect(usePrReviewStore.getState().queueError).toBe('API error')
-  })
-
-  it('setQueueError clears error with null', () => {
-    usePrReviewStore.setState({ queueError: 'old error' })
-    usePrReviewStore.getState().setQueueError(null)
-    expect(usePrReviewStore.getState().queueError).toBeNull()
-  })
-
-  it('setHasMorePrs updates flag', () => {
-    usePrReviewStore.getState().setHasMorePrs(true)
-    expect(usePrReviewStore.getState().hasMorePrs).toBe(true)
-  })
-
-  it('setNextPrCursor stores cursor', () => {
-    usePrReviewStore.getState().setNextPrCursor('cursor-abc')
-    expect(usePrReviewStore.getState().nextPrCursor).toBe('cursor-abc')
-  })
-})
-
-describe('usePrReviewStore — active review state', () => {
-  useFreshPrReviewStore()
-
-  it('setActivePr stores the PR detail', () => {
-    const pr = makeDetail()
-    usePrReviewStore.getState().setActivePr(pr)
-    expect(usePrReviewStore.getState().activePr?.number).toBe(42)
-  })
-
-  it('setActivePr clears with null', () => {
-    usePrReviewStore.setState({ activePr: makeDetail() })
-    usePrReviewStore.getState().setActivePr(null)
-    expect(usePrReviewStore.getState().activePr).toBeNull()
-  })
-
-  it('setCurrentChapter updates currentChapterId', () => {
-    usePrReviewStore.getState().setCurrentChapter('ch-1')
-    expect(usePrReviewStore.getState().currentChapterId).toBe('ch-1')
-  })
-
-  it('setCurrentFile updates currentFilePath', () => {
-    usePrReviewStore.getState().setCurrentFile('src/app.ts')
-    expect(usePrReviewStore.getState().currentFilePath).toBe('src/app.ts')
   })
 })
 
@@ -219,19 +151,8 @@ describe('usePrReviewStore — file reordering', () => {
   })
 })
 
-describe('usePrReviewStore — scroll and pause state', () => {
+describe('usePrReviewStore — pause state', () => {
   useFreshPrReviewStore()
-
-  it('setScrollPosition stores position', () => {
-    usePrReviewStore.getState().setScrollPosition(250)
-    expect(usePrReviewStore.getState().scrollPosition).toBe(250)
-  })
-
-  it('setScrollPosition clears with null', () => {
-    usePrReviewStore.setState({ scrollPosition: 100 })
-    usePrReviewStore.getState().setScrollPosition(null)
-    expect(usePrReviewStore.getState().scrollPosition).toBeNull()
-  })
 
   it('setPaused stores timestamp', () => {
     usePrReviewStore
@@ -353,22 +274,6 @@ describe('usePrReviewStore — updateQueuePrRisk', () => {
     }
     usePrReviewStore.getState().updateQueuePrRisk(1, 'high', dots)
     expect(usePrReviewStore.getState().prQueue[1].riskLevel).toBe('low')
-  })
-})
-
-describe('usePrReviewStore — setRateLimitState', () => {
-  useFreshPrReviewStore()
-
-  it('stores rate limit state', () => {
-    const state = { resetAt: Date.now() + 60000 }
-    usePrReviewStore.getState().setRateLimitState(state)
-    expect(usePrReviewStore.getState().rateLimitState).toEqual(state)
-  })
-
-  it('clears rate limit state with null', () => {
-    usePrReviewStore.setState({ rateLimitState: { resetAt: 9999 } })
-    usePrReviewStore.getState().setRateLimitState(null)
-    expect(usePrReviewStore.getState().rateLimitState).toBeNull()
   })
 })
 

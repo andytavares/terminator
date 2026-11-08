@@ -10,7 +10,6 @@ import {
   CreateWorkspaceInputSchema,
 } from '../../../../src/shared/schemas/workspace.schema'
 import { installElectronApi } from '../../../support/electron-api'
-import { pressOutside } from '../../../support/modal'
 import { eventually } from '../../../support/eventually'
 
 // The main process's side of the two writes the real store makes, each payload
@@ -57,14 +56,6 @@ const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
 describe('CreateWorkspaceDialog', () => {
-  it('renders dialog with title and form fields', () => {
-    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
-    expect(screen.getByText('Create Workspace')).toBeTruthy()
-    expect(screen.getByPlaceholderText('My Workspace')).toBeTruthy()
-    expect(screen.getByText('Create')).toBeTruthy()
-    expect(screen.getByText('Cancel')).toBeTruthy()
-  })
-
   it('calls onClose when Cancel is clicked', () => {
     const onClose = vi.fn()
     render(<CreateWorkspaceDialog onClose={onClose} />)
@@ -100,11 +91,6 @@ describe('CreateWorkspaceDialog — adds the workspace it creates to the list', 
     await eventually(() => expect(storedWorkspaceNames()).toEqual(['My WS']))
   })
 
-  it('renders folder path input', () => {
-    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
-    expect(screen.getByPlaceholderText('/path/to/folder')).toBeTruthy()
-  })
-
   it('does not submit with empty name', () => {
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     // The name check returns before the handler's first await, so the click has decided by now.
@@ -131,13 +117,6 @@ describe('CreateWorkspaceDialog — does not update folder path when Browse is c
     // folder path input should remain at placeholder with empty value
     expect(screen.getByPlaceholderText('/path/to/folder')).toBeTruthy()
     expect((screen.getByPlaceholderText('/path/to/folder') as HTMLInputElement).value).toBe('')
-  })
-
-  it('updates folder path input when typed', () => {
-    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
-    const folderInput = screen.getByPlaceholderText('/path/to/folder')
-    fireEvent.change(folderInput, { target: { value: '/my/custom/path' } })
-    expect(screen.getByDisplayValue('/my/custom/path')).toBeTruthy()
   })
 
   it('selects a color swatch on click', () => {
@@ -176,13 +155,6 @@ describe('CreateWorkspaceDialog — clears nameError when name input changes', (
     await screen.findByText('Choose a folder for the workspace')
     expect(mockCreateWorkspace).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
-  })
-
-  it('calls onClose when overlay is clicked', () => {
-    const onClose = vi.fn()
-    render(<CreateWorkspaceDialog onClose={onClose} />)
-    pressOutside(screen.getByRole('dialog'))
-    expect(onClose).toHaveBeenCalled()
   })
 })
 

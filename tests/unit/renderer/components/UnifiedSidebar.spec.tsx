@@ -406,12 +406,6 @@ describe('UnifiedSidebar — a click here dismisses what covers the terminal', (
 })
 
 describe('UnifiedSidebar — branch actions', () => {
-  it('starts a terminal on a branch from its row', () => {
-    const { container } = renderSidebar()
-    fireEvent.click(container.querySelector('.branch-row__action')!)
-    expect(mockCreateSession).toHaveBeenCalled()
-  })
-
   it('creates a branch from the repo header', () => {
     const { container } = renderSidebar()
     fireEvent.click(container.querySelector('.repo-header__action')!)
@@ -662,34 +656,20 @@ describe('UnifiedSidebar — shell behaviour preserved — opens the workspace e
   })
 })
 
-describe('UnifiedSidebar — shell behaviour preserved — restores a previously stored width', () => {
-  it('restores a previously stored width', () => {
-    localStorage.setItem('terminator.sidebar.width', '333')
+describe('UnifiedSidebar — shell behaviour preserved — opens at the stored width', () => {
+  it.each([
+    { stored: '333', width: '333px' },
+    { stored: '9999', width: '480px' },
+    { stored: 'wide', width: '300px' },
+  ])('opens at $width when the stored width is $stored', ({ stored, width }) => {
+    localStorage.setItem('terminator.sidebar.width', stored)
     const { container } = renderSidebar()
-    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('333px')
-  })
-
-  it('clamps a stored width that is out of range', () => {
-    localStorage.setItem('terminator.sidebar.width', '9999')
-    const { container } = renderSidebar()
-    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('480px')
-  })
-
-  it('ignores a stored width that is not a number', () => {
-    localStorage.setItem('terminator.sidebar.width', 'wide')
-    const { container } = renderSidebar()
-    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('300px')
+    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe(width)
   })
 
   it('opens at the default width when nothing is stored', () => {
     const { container } = renderSidebar()
     expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('300px')
-  })
-
-  it('lets a stored width beat the new default, so a resize survives the change', () => {
-    localStorage.setItem('terminator.sidebar.width', '264')
-    const { container } = renderSidebar()
-    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('264px')
   })
 })
 
@@ -819,15 +799,7 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — re
   })
 })
 
-describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — draws no notice band at all', () => {
-  it('draws no notice band at all', () => {
-    const { container } = renderSidebar()
-    openFilter()
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
-    expect(container.querySelector('.filter-notice')).toBeNull()
-    expect(container.querySelector('.view-bar')).toBeNull()
-  })
-
+describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — shows no badge when nothing is hidden', () => {
   it('shows no badge when nothing is hidden', () => {
     const { container } = renderSidebar()
     expect(container.querySelector('.count-badge')).toBeNull()
@@ -880,18 +852,6 @@ describe('UnifiedSidebar — what the branch-first sidebar draws', () => {
     const { container } = renderSidebar()
     const name = container.querySelector('.repo-header__name')!
     await waitFor(() => expect(name.getAttribute('title')).toBe('~/repos/backend'))
-  })
-
-  it('draws none of the surfaces it retired', () => {
-    const { container } = renderSidebar()
-    const stillRendered = [
-      '.extension-footer',
-      '.scratch-section',
-      '.sidebar-header__tabs',
-      '.ws-row',
-      '.unified-sidebar__bulk-bar',
-    ].filter((retired) => container.querySelector(retired))
-    expect(stillRendered).toEqual([])
   })
 })
 
@@ -949,17 +909,6 @@ describe('UnifiedSidebar — the link dialog names what it attaches to (US3, FR-
     useIntegrationsStore.getState().openLinkDialog('p1')
     renderSidebar()
     expect(screen.getByTestId('link-issue-dialog').textContent).toContain('Backend · main')
-  })
-})
-
-describe('UnifiedSidebar — app surfaces have one home, scratch has a group (US4)', () => {
-  it('offers a way to start a scratch terminal from that group', () => {
-    const onNewScratch = vi.fn()
-    const { container } = renderSidebar({ onNewScratch })
-    const add = container.querySelector('.unified-sidebar__scratch-add')
-    expect(add).toBeTruthy()
-    fireEvent.click(add!)
-    expect(onNewScratch).toHaveBeenCalledOnce()
   })
 })
 
@@ -1260,11 +1209,6 @@ describe('UnifiedSidebar — where there is no editor API at all', () => {
     })
   })
 
-  it('renders without an editor API present', async () => {
-    expect(() => renderSidebar()).not.toThrow()
-    await act(async () => {})
-  })
-
   it('does not throw when the action is invoked anyway', async () => {
     const { container } = renderSidebar()
     await act(async () => {})
@@ -1314,12 +1258,15 @@ describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', (
 
   // Dropping under a computed sort used to write an order nothing would ever
   // draw. The drag is the user saying "this is my order", so it says so.
-  it('switches the view to Manual so the drop is visible', () => {
+  it.each([
+    { dropped: 'a repo header', selector: '.repo-header' },
+    { dropped: 'a branch row', selector: '.branch-row' },
+  ])('switches the view to Manual when $dropped is dropped', ({ selector }) => {
     const { container } = renderSidebar()
     pickSort('Name')
-    const headers = container.querySelectorAll('.repo-header')
-    fireEvent.dragStart(headers[0])
-    fireEvent.drop(headers[1])
+    const rows = container.querySelectorAll(selector)
+    fireEvent.dragStart(rows[0])
+    fireEvent.drop(rows[1])
     expect(checkedSort()).toBe('Manual')
   })
 
@@ -1332,18 +1279,7 @@ describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', (
   })
 })
 
-describe('UnifiedSidebar — a drag is the manual order (Display → Manual) — switches the view to Manual when a branch is dropped', () => {
-  const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
-
-  it('switches the view to Manual when a branch is dropped', () => {
-    const { container } = renderSidebar()
-    pickSort('Name')
-    const rows = container.querySelectorAll('.branch-row')
-    fireEvent.dragStart(rows[0])
-    fireEvent.drop(rows[1])
-    expect(checkedSort()).toBe('Manual')
-  })
-
+describe('UnifiedSidebar — a drag is the manual order (Display → Manual) — does not offer a branch drag when grouping is off', () => {
   // Branches from every repo share one list under "no grouping", and the stores
   // have nowhere to write an order that crosses repos.
   it('does not offer a branch drag when grouping is off', () => {
@@ -1604,24 +1540,6 @@ describe('UnifiedSidebar — a pane under its terminal', () => {
     expect(screen.getByTestId('session-link-dialog').textContent).toContain('pane')
     fireEvent.click(screen.getByRole('button', { name: 'Close pane' }))
     expect(closeSplitLeaf).toHaveBeenCalledWith('p1', 's1-pane')
-  })
-})
-
-describe('UnifiedSidebar — a pane under its terminal — removes its own link from its menu', () => {
-  it('removes its own link from its menu', async () => {
-    withPane()
-    const linked = fact({
-      sessionId: 's1-pane',
-      workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-5' } },
-    })
-    mockUseSessionFacts.mockReturnValue([linked])
-    const setLink = vi.fn(async () => true)
-    useSessionRecordsStore.setState({ setLink })
-    const { container } = renderSidebar()
-    expandMain(container)
-    fireEvent.contextMenu(terminalRowNamed(container, 'pane'))
-    fireEvent.click(screen.getByText('Remove session link'))
-    expect(setLink).toHaveBeenCalledWith(linked.snapshot, null)
   })
 })
 

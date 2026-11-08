@@ -68,12 +68,6 @@ function addSubscriberLimitTests() {
     expect(accepted).toBe(true)
     expect(ws2.close).not.toHaveBeenCalled()
   })
-
-  it('returns true for accepted subscriber', () => {
-    const ws = mockWs()
-    const result = mgr.addSubscriber('s1', ws as never, 5)
-    expect(result).toBe(true)
-  })
 }
 
 function addSubscriberGetPrimaryTests() {
@@ -116,13 +110,6 @@ function removeSubscriberTests() {
 }
 
 function removeSubscriberSetTests() {
-  it('removes the subscriber from the set', () => {
-    const ws = mockWs()
-    mgr.addSubscriber('s1', ws as never, 5)
-    mgr.removeSubscriber('s1', ws as never)
-    expect(mgr.isPrimary('s1', ws as never)).toBe(false)
-  })
-
   it('promotes next subscriber to primary when primary disconnects', () => {
     const ws1 = mockWs()
     const ws2 = mockWs()

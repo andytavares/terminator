@@ -1,9 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ipcMain } from 'electron'
-
-import { apiOverIpcMain } from '../support/ipc-main-api'
-
-const mockApi = apiOverIpcMain()
 import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({
@@ -22,7 +17,6 @@ import {
   resolveComment,
   updateAnchor,
   markOrphaned,
-  registerCommentsIpcHandlers,
 } from '../../../src/ipc/comments.ipc'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 
@@ -41,14 +35,6 @@ beforeEach(async () => {
     'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
     [noteId, 'Test Note', 'Hello world this is test content', now, now]
   )
-})
-
-describe('registerCommentsIpcHandlers', () => {
-  it('returns a dispose function', () => {
-    const dispose = registerCommentsIpcHandlers(mockApi, db)
-    expect(typeof dispose).toBe('function')
-    dispose()
-  })
 })
 
 describe('listComments', listCommentsTests)
@@ -155,19 +141,6 @@ describe('markOrphaned', () => {
   })
 })
 
-describe('IPC handler registration', () => {
-  it('registerCommentsIpcHandlers calls ipcMain.handle for all channels', () => {
-    vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerCommentsIpcHandlers(mockApi, db)
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:comments.list',
-      expect.any(Function)
-    )
-    dispose()
-    expect(ipcMain.removeHandler).toHaveBeenCalledWith('terminator.notepad:comments.list')
-  })
-})
-
 function listCommentsTests() {
   describe('nesting', listCommentsNestingTests)
   describe('excluding resolved', listCommentsExcludingResolvedTests)
@@ -242,25 +215,7 @@ function listCommentsIncludingResolvedTests() {
 }
 
 function replyCommentTests() {
-  describe('replying', replyCommentReplyingTests)
   describe('depth and parents', replyCommentDepthParentsTests)
-}
-
-function replyCommentReplyingTests() {
-  it('adds a reply to a top-level comment', async () => {
-    const parent = await createComment(db, {
-      noteId,
-      body: 'parent',
-      startOffset: 0,
-      endOffset: 5,
-      quote: 'Hello',
-      prefix: '',
-      suffix: '',
-    })
-    const parentId = (parent as { data: { id: string } }).data.id
-    const reply = await replyComment(db, { noteId, parentId, body: 'I am a reply' })
-    expect((reply as { data: { id: string } }).data.id).toBeTruthy()
-  })
 }
 
 function replyCommentDepthParentsTests() {

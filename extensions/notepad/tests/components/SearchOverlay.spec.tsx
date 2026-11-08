@@ -37,11 +37,6 @@ function searchOverlayTests() {
 }
 
 function searchOverlayClosingTests() {
-  it('renders search input', () => {
-    render(<SearchOverlay onClose={vi.fn()} />)
-    expect(screen.getByPlaceholderText(/search across all notes/i)).toBeTruthy()
-  })
-
   it('calls onClose on Escape key', () => {
     const onClose = vi.fn()
     render(<SearchOverlay onClose={onClose} />)

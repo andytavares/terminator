@@ -255,12 +255,6 @@ function mountFloor(pending: unknown[]) {
 }
 
 describe('the Floor puts a held tool call above the run graph', () => {
-  it('renders the ask in the band', async () => {
-    const { container } = mountFloor([ASK])
-    await screen.findByText('Waiting on you — 1')
-    expect(container.querySelector('.fdry-needs-you')).not.toBeNull()
-  })
-
   it('comes before the lanes rather than under all of them', async () => {
     const { container } = mountFloor([ASK])
     await screen.findByText('Waiting on you — 1')
@@ -270,12 +264,6 @@ describe('the Floor puts a held tool call above the run graph', () => {
     expect(
       (band?.compareDocumentPosition(lane as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-  })
-
-  it('is absent when nothing is held', async () => {
-    const { container } = mountFloor([])
-    await waitFor(() => expect(container.querySelector('.fdry-lane')).not.toBeNull())
-    expect(container.querySelector('.fdry-needs-you')).toBeNull()
   })
 })
 

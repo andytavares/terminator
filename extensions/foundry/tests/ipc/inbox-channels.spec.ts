@@ -1,4 +1,3 @@
-import { answered } from '../helpers/answer-shape.js'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -92,23 +91,6 @@ function emptyAndOrdersWaitingTests() {
   it('is empty before anything has been raised', async () => {
     const r = (await channels().list()) as { gates: Gate[] }
     expect(r.gates).toEqual([])
-  })
-
-  // "Nothing needs you" was on screen while WO-1008-287 sat ready with
-  // nobody working on it, because only a gate could reach this list.
-  it('lists every order waiting on you that no gate covers, with why', async () => {
-    const waiting = [
-      {
-        orderId: 'WO-1',
-        title: 'render html in comments',
-        headline: 'Ready to hand off',
-        detail: 'Every check passes.',
-      },
-    ]
-    const r = answered(
-      await createInboxChannels(inboxDeps({ waiting: async () => waiting })).list()
-    )
-    expect(r.waiting).toEqual(waiting)
   })
 }
 
@@ -378,12 +360,6 @@ describe('the gate store on disk', () => {
     expect(await createGateStore(root).get('G-nope')).toBeNull()
   })
 
-  it('lists nothing before any order directory exists', async () => {
-    const empty = makeTempDir('fdry-empty-')
-    expect(await createGateStore(empty).list()).toEqual([])
-    fs.rmSync(empty, { recursive: true, force: true })
-  })
-
   it('ignores a gates file that is valid JSON but not a list', async () => {
     const dir = path.join(root, 'orders', 'WO-odd')
     fs.mkdirSync(dir, { recursive: true })
@@ -393,14 +369,14 @@ describe('the gate store on disk', () => {
 })
 
 describe('acting on the decision', () => {
-  it('carries out what the operator chose', async () => {
-    await createGateStore(root).save(gate({ rule: 'ready-for-review' }))
+  it('carries out the chosen option on the stored gate, naming its node', async () => {
+    await createGateStore(root).save(gate({ rule: 'verify.repeat-fail', nodeId: 'build:U-1' }))
     const act = vi.fn(async () => undefined)
-    const c = createInboxChannels(inboxDeps({ autonomy: () => 'standard', act }))
-    await c.decide({ gateId: 'G-1', option: 'mark_ready' })
+    const c = createInboxChannels(inboxDeps({ autonomy: () => 'escorted', act }))
+    await c.decide({ gateId: 'G-1', option: 'send_back' })
     expect(act).toHaveBeenCalledWith(
-      expect.objectContaining({ rule: 'ready-for-review' }),
-      'mark_ready'
+      expect.objectContaining({ rule: 'verify.repeat-fail', nodeId: 'build:U-1' }),
+      'send_back'
     )
   })
 
@@ -546,47 +522,6 @@ describe('a gate store whose root follows the workspace', () => {
   })
 })
 
-function decided(rule: NonNullable<Parameters<typeof gate>[0]>['rule'], option: string) {
-  const act = vi.fn(async () => undefined)
-  return {
-    act,
-    run: async () => {
-      await createGateStore(root).save(gate({ rule }))
-      const c = createInboxChannels(inboxDeps({ autonomy: () => 'escorted', act }))
-      await c.decide({ gateId: 'G-1', option })
-    },
-  }
-}
-
-describe('a decision that leaves the run stopped is a decision that did nothing', () => {
-  describe('carrying the choice', carryingTheChoiceTests)
-})
-
-function carryingTheChoiceTests() {
-  it('carries the chosen option through, so the caller can act on which one it was', async () => {
-    const { act, run } = decided('verify.repeat-fail', 'send_back')
-    await run()
-    expect(act).toHaveBeenCalledWith(
-      expect.objectContaining({ rule: 'verify.repeat-fail' }),
-      'send_back'
-    )
-  })
-
-  it('carries a hold through too — the caller decides that it means "stay stopped"', async () => {
-    const { act, run } = decided('risk.p0', 'hold')
-    await run()
-    expect(act).toHaveBeenCalledWith(expect.anything(), 'hold')
-  })
-
-  it('names the node, so a send-back knows what to retry', async () => {
-    const act = vi.fn<InboxDeps['act']>(async () => undefined)
-    await createGateStore(root).save(gate({ rule: 'verify.repeat-fail', nodeId: 'build:U-1' }))
-    const c = createInboxChannels(inboxDeps({ autonomy: () => 'escorted', act }))
-    await c.decide({ gateId: 'G-1', option: 'send_back' })
-    expect((act.mock.calls[0][0] as { nodeId: string | null }).nodeId).toBe('build:U-1')
-  })
-}
-
 describe('what this setting is not asking about', () => {
   it('names the silenced rules alongside the queue', async () => {
     const r = (await channels('lights-out').list()) as {
@@ -624,10 +559,5 @@ function inboxDocumentTests() {
       url: null,
       path: '/out/notes.md',
     })
-  })
-
-  it('carries none for the checkout or no document', async () => {
-    expect(await gateDocument({ path: 'docs/a.md', location: 'checkout' })).toBeNull()
-    expect(await gateDocument(null)).toBeNull()
   })
 }

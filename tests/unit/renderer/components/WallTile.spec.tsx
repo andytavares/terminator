@@ -64,11 +64,6 @@ describe('WallTile', () => {
     expect(within(tile).getByText('6m')).toBeTruthy()
     expect(within(tile).getByTestId('preview-s1')).toBeTruthy()
   })
-
-  it('asks what the session is for in its footer', () => {
-    render(<WallTile {...props} />)
-    expect(screen.getByRole('textbox', { name: 'What is this session doing?' })).toBeTruthy()
-  })
 })
 
 describe('WallTile — names a session with no project', () => {
@@ -119,17 +114,11 @@ describe('WallTile — carries its position and span as style alone', () => {
     expect(screen.getByRole('article').style.getPropertyValue('--rail')).toBe('#3fa39a')
   })
 
-  it('shows process load when it is known', () => {
-    render(
-      <WallTile {...props} metrics={{ pid: 1, cpuPercent: 12.5, rssBytes: 48 * 1024 * 1024 }} />
-    )
-    expect(screen.getByText('12.5% 48 MB')).toBeTruthy()
-  })
-
   it.each([
+    [48 * 1024 * 1024, '12.5% 48 MB'],
     [2 * 1024 * 1024 * 1024, '12.5% 2.0 GB'],
     [512 * 1024, '12.5% 512 KB'],
-  ])('formats memory at its scale: %d bytes', (rssBytes, text) => {
+  ])('shows process load with memory at its scale: %d bytes', (rssBytes, text) => {
     render(<WallTile {...props} metrics={{ pid: 1, cpuPercent: 12.5, rssBytes }} />)
     expect(screen.getByText(text)).toBeTruthy()
   })

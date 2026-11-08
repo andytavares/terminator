@@ -36,13 +36,27 @@ beforeEach(() => {
   })
 })
 
-describe('QuickActionsSettings — global scope', () => {
-  it('shows an empty state with no custom actions', () => {
-    mockStore([])
-    render(<QuickActionsSettings scope="global" />)
+describe('QuickActionsSettings — the empty state', () => {
+  it.each([
+    ['with no custom actions', () => mockStore([]), { scope: 'global' }],
+    [
+      'while global settings have not loaded',
+      () => seedStore(useSettingsStore, { globalSettings: null, workspaceSettings: new Map() }),
+      { scope: 'global' },
+    ],
+    [
+      'for a workspace with no settings of its own',
+      () => mockStore([]),
+      { scope: 'workspace', workspaceId: 'ws-unknown' },
+    ],
+  ] as const)('shows the empty state %s', (_case, seed, props) => {
+    seed()
+    render(<QuickActionsSettings {...props} />)
     expect(screen.getByText('No custom actions yet.')).toBeTruthy()
   })
+})
 
+describe('QuickActionsSettings — global scope', () => {
   it('lists existing custom actions', () => {
     mockStore([
       {
@@ -135,29 +149,42 @@ describe('QuickActionsSettings — global scope — deletes an action', () => {
     fireEvent.click(screen.getByText('Delete'))
     expect(settings.updateQuickActions).toHaveBeenCalledWith({ custom: [] })
   })
+})
 
-  it('requires a label', () => {
-    mockStore([])
+const existing: CustomAction = {
+  id: 'a1',
+  label: 'Existing',
+  mnemonic: 't',
+  kind: 'shell',
+  target: 'focused',
+  body: 'echo hi',
+}
+
+describe('QuickActionsSettings — global scope — validation', () => {
+  it.each([
+    { reason: 'a missing label', label: '', key: '', body: 'echo hi', error: 'Label is required' },
+    { reason: 'a missing body', label: 'Run tests', key: '', body: '', error: 'Body is required' },
+    {
+      reason: 'a key already used by another action',
+      label: 'New',
+      key: 't',
+      body: 'echo new',
+      error: 'Key already used by Existing',
+    },
+  ])('refuses to save $reason', (row) => {
+    mockStore([existing])
     render(<QuickActionsSettings scope="global" />)
     fireEvent.click(screen.getByText('Add action'))
-    fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'echo hi' } })
+    fireEvent.change(screen.getByLabelText('Label'), { target: { value: row.label } })
+    fireEvent.change(screen.getByLabelText('Key'), { target: { value: row.key } })
+    fireEvent.change(screen.getByLabelText('Body'), { target: { value: row.body } })
     fireEvent.click(screen.getByText('Save'))
-    expect(screen.getByText('Label is required')).toBeTruthy()
+    expect(screen.getByText(row.error)).toBeTruthy()
     expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 })
 
-describe('QuickActionsSettings — global scope — requires a body', () => {
-  it('requires a body', () => {
-    mockStore([])
-    render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Add action'))
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Run tests' } })
-    fireEvent.click(screen.getByText('Save'))
-    expect(screen.getByText('Body is required')).toBeTruthy()
-    expect(settings.updateQuickActions).not.toHaveBeenCalled()
-  })
-
+describe('QuickActionsSettings — global scope — the Key field', () => {
   it('keeps only the first character typed into Key', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -165,29 +192,6 @@ describe('QuickActionsSettings — global scope — requires a body', () => {
     const keyInput = screen.getByLabelText('Key') as HTMLInputElement
     fireEvent.change(keyInput, { target: { value: 'ab' } })
     expect(keyInput.value).toBe('a')
-  })
-})
-
-describe('QuickActionsSettings — global scope — rejects a key already used by another action', () => {
-  it('rejects a key already used by another action', () => {
-    mockStore([
-      {
-        id: 'a1',
-        label: 'Existing',
-        mnemonic: 't',
-        kind: 'shell',
-        target: 'focused',
-        body: 'echo hi',
-      },
-    ])
-    render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Add action'))
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'New' } })
-    fireEvent.change(screen.getByLabelText('Key'), { target: { value: 't' } })
-    fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'echo new' } })
-    fireEvent.click(screen.getByText('Save'))
-    expect(screen.getByText('Key already used by Existing')).toBeTruthy()
-    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 })
 
@@ -252,17 +256,5 @@ describe('QuickActionsSettings — actions without a key, and scopes with nothin
     expect(settings.updateQuickActions).toHaveBeenCalledWith({
       custom: [{ ...askClaude, mnemonic: undefined }],
     })
-  })
-
-  it('shows no actions while global settings have not loaded', () => {
-    seedStore(useSettingsStore, { globalSettings: null, workspaceSettings: new Map() })
-    render(<QuickActionsSettings scope="global" />)
-    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
-  })
-
-  it('shows no actions for a workspace with no settings of its own', () => {
-    mockStore([])
-    render(<QuickActionsSettings scope="workspace" workspaceId="ws-unknown" />)
-    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
   })
 })

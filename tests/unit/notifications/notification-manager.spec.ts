@@ -127,15 +127,6 @@ describe('NotificationManager.create — extension targets', () => {
 })
 
 describe('NotificationManager.create — errors always toast', () => {
-  it('force-includes toast for an error even when settings omit it', () => {
-    withDefaultTargets('system')
-    notificationManager.create({ type: 'error', title: 'Uh oh', key: 'errKey' })
-    expect(mockSend).toHaveBeenCalledWith(
-      'notifications:push',
-      expect.objectContaining({ targets: ['system', 'toast'] })
-    )
-  })
-
   it('force-includes toast for an extension error even when its settings omit it', () => {
     setExtensionNotificationSettingReader(() => ['system'])
     notificationManager.create({
@@ -179,15 +170,6 @@ describe('NotificationManager.create — persistent targets', () => {
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
       expect.objectContaining({ targets: ['center'] })
-    )
-  })
-
-  it('broadcasts when resolved targets includes toast', () => {
-    withDefaultTargets('toast')
-    notificationManager.create({ type: 'info', title: 'Toast only', key: 'toastKey' })
-    expect(mockSend).toHaveBeenCalledWith(
-      'notifications:push',
-      expect.objectContaining({ targets: ['toast'] })
     )
   })
 })

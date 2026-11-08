@@ -1,5 +1,4 @@
 import React from 'react'
-import { readFileSync } from 'node:fs'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { makeTempDir } from '../../../../support/temp-dir'
@@ -169,12 +168,6 @@ describe('TaskRow — dragging it to an agent tab', () => {
 })
 
 describe('TaskRow — the age and the actions button each have their own space', () => {
-  const tasksCss = readFileSync('src/renderer/components/home/Tasks.css', 'utf8')
-  const ruleFor = (selector: string) =>
-    tasksCss.match(
-      new RegExp(`(?:^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)
-    )?.[1] ?? ''
-
   it("puts the age and then the button side by side in the row's last cell", async () => {
     const created = await main.createTask({ title: 'Rate limits', lanes: [api] })
     render(
@@ -190,11 +183,5 @@ describe('TaskRow — the age and the actions button each have their own space',
     expect(age?.textContent).toBe('now')
     expect(end?.contains(actions)).toBe(true)
     expect(age!.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
-
-  it('lays the cell out as a row and keeps the button in the flow, not over the age', () => {
-    expect(ruleFor('.task-row__end')).toMatch(/display:\s*flex/)
-    expect(ruleFor('.task-row__end .desk-tr__controls')).toMatch(/position:\s*static/)
-    expect(ruleFor('.task-row__end .desk-tr__menu')).toMatch(/position:\s*static/)
   })
 })

@@ -53,10 +53,14 @@ describe('"Enable Git Integration" off globally', () => {
   })
 
   it('registers nothing but its settings page when it is off globally and in every workspace', () => {
-    const { channels } = activateInWorkspaces([workspaceSetting(false), workspaceSetting()], {
-      [ENABLED]: false,
-    })
+    const { channels, registerSettingsPage } = activateInWorkspaces(
+      [workspaceSetting(false), workspaceSetting()],
+      { [ENABLED]: false }
+    )
 
     expect(channels).toEqual([])
+    expect(registerSettingsPage).toHaveBeenCalledWith(
+      expect.objectContaining({ label: 'Git Integration' })
+    )
   })
 })

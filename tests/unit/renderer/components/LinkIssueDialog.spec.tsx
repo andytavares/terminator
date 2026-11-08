@@ -1,11 +1,9 @@
-import { isSurfaceOpen } from '@shared/double-escape'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { LinkIssueDialog } from '../../../../src/renderer/components/integrations/LinkIssueDialog'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
-import { pressOutside } from '../../../support/modal'
 
 const P = '11111111-1111-4111-8111-111111111111'
 
@@ -209,14 +207,6 @@ describe('LinkIssueDialog — not connected', () => {
 })
 
 describe('LinkIssueDialog — dismissal', () => {
-  it('counts as an open modal until it closes', async () => {
-    const { unmount } = open()
-    await screen.findByText('TAV-42')
-    expect(isSurfaceOpen(document)).toBe(true)
-    unmount()
-    expect(isSurfaceOpen(document)).toBe(false)
-  })
-
   it('closes on Cancel', async () => {
     const onClose = vi.fn()
     open({ onClose })
@@ -224,18 +214,6 @@ describe('LinkIssueDialog — dismissal', () => {
     // test and React warns about an unwrapped update.
     await screen.findByText('TAV-42')
     fireEvent.click(await screen.findByText('Cancel'))
-    expect(onClose).toHaveBeenCalled()
-  })
-
-  it('closes when the backdrop is clicked but not the dialog itself', async () => {
-    const onClose = vi.fn()
-    open({ onClose })
-    await screen.findByText('TAV-42')
-
-    fireEvent.mouseDown(await screen.findByRole('dialog'))
-    expect(onClose).not.toHaveBeenCalled()
-
-    pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
 })

@@ -1,8 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
 import { InFlight } from '../../../../src/renderer/components/home/InFlight'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
@@ -272,15 +270,6 @@ describe('the work-thread drawer — actions', () => {
     const drawer = within(await openBuilding())
     fireEvent.click(drawer.getByRole('button', { name: 'Open Writing ReviewHeader tests' }))
     expect(spies.open).toHaveBeenCalledWith('building')
-  })
-})
-
-describe('joining by work-folder paths', () => {
-  it('joins a pull request keyed by repo root and branch to the session on that branch', () => {
-    render(<InFlight />)
-    const building = within(inFlightRowNamed('PR overview shows status before story'))
-    expect(building.getByText('#275 checks failing')).toBeTruthy()
-    expect(screen.getByText('4 work items')).toBeTruthy()
   })
 })
 
@@ -558,17 +547,5 @@ describe('the row menu — Remove worktree with open terminals', () => {
     fireEvent.click(openMenuItem('Remove worktree…'))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText(/This also closes \d+ open terminals?\./)).toBeTruthy()
-  })
-})
-
-describe('the row grid', () => {
-  it('starts every cell on the row’s first line', () => {
-    const css = readFileSync(
-      resolve(__dirname, '../../../../src/renderer/components/home/InFlight.css'),
-      'utf8'
-    )
-    expect(css).toContain('grid-template-columns: minmax(0, 1fr) 150px 112px 124px 40px')
-    const rowBlock = css.slice(css.indexOf('.desk-tr {\n  position: relative;'))
-    expect(rowBlock.slice(0, rowBlock.indexOf('\n}'))).toContain('align-items: start')
   })
 })

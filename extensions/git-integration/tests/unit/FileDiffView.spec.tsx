@@ -65,13 +65,7 @@ describe('FileDiffView', () => {
   })
 })
 
-describe('FileDiffView — shows Unified and Split toggle buttons', () => {
-  it('shows Unified and Split toggle buttons', async () => {
-    await renderDiff()
-    expect(screen.getByText('Unified')).toBeTruthy()
-    expect(screen.getByText('Split')).toBeTruthy()
-  })
-
+describe('FileDiffView — Unified and Split toggle', () => {
   it('switches to split view when Split is clicked', async () => {
     const { container } = await renderDiff()
     fireEvent.click(screen.getByText('Split'))
@@ -84,19 +78,15 @@ describe('FileDiffView — shows Unified and Split toggle buttons', () => {
     fireEvent.click(screen.getByText('Unified'))
     expect(container.querySelector('.diff-table:not(.diff-table--split)')).toBeTruthy()
   })
-
-  it('shows stale banner when isStale is true', async () => {
-    await renderDiff({ isStale: true })
-    expect(screen.getByText(/File changed while viewing/)).toBeTruthy()
-  })
 })
 
-describe('FileDiffView — calls onRefresh when Refresh is clicked in stale banner', () => {
-  it('calls onRefresh when Refresh is clicked in stale banner', async () => {
+describe('FileDiffView — stale banner and notices', () => {
+  it('shows the stale banner when isStale is true, and its Refresh calls onRefresh', async () => {
     const onRefresh = vi.fn()
     await renderDiff({ isStale: true, onRefresh })
+    expect(screen.getByText(/File changed while viewing/)).toBeTruthy()
     fireEvent.click(screen.getByText('Refresh'))
-    expect(onRefresh).toHaveBeenCalled()
+    expect(onRefresh).toHaveBeenCalledOnce()
   })
 
   it('shows truncation notice for truncated diffs', async () => {

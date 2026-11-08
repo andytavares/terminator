@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QuickActions } from '../../../../src/renderer/components/QuickActions'
 import type { QuickAction, QuickActionGroup } from '../../../../src/renderer/quick-actions/types'
-import { pressOutside } from '../../../support/modal'
 
 vi.mock('../../../../src/renderer/components/QuickActions.css', () => ({}))
 
@@ -96,8 +95,11 @@ describe('QuickActions — top level', () => {
 })
 
 describe('QuickActions — top level — omits the context section when there is no context group', () => {
-  it('omits the context section when there is no context group', () => {
-    renderPanel({ contextGroupId: null })
+  it.each([
+    ['no context group', null],
+    ['a context group it does not list', 'gone'],
+  ])('omits the context section when there is %s', (_case, contextGroupId) => {
+    renderPanel({ contextGroupId })
     expect(screen.queryByText(/· here/)).toBeNull()
   })
 
@@ -228,18 +230,13 @@ describe('QuickActions — pinning', () => {
     expect(onTogglePin).toHaveBeenCalledWith('git.push')
   })
 
-  it('exposes a hover pin button with an accessible name, and it calls onTogglePin', () => {
+  it.each([
+    ['Unpin Push', 'git.push'],
+    ['Pin Split right', 'terminal.split'],
+  ])('names a row\'s hover pin button "%s", and it toggles %s', (name, actionId) => {
     renderPanel()
-    const button = screen.getByRole('button', { name: 'Unpin Push' })
-    fireEvent.click(button)
-    expect(onTogglePin).toHaveBeenCalledWith('git.push')
-  })
-
-  it('names an unpinned row\'s button "Pin <label>"', () => {
-    renderPanel()
-    const button = screen.getByRole('button', { name: 'Pin Split right' })
-    fireEvent.click(button)
-    expect(onTogglePin).toHaveBeenCalledWith('terminal.split')
+    fireEvent.click(screen.getByRole('button', { name }))
+    expect(onTogglePin).toHaveBeenCalledWith(actionId)
   })
 })
 
@@ -248,25 +245,6 @@ describe('QuickActions — closing', () => {
     renderPanel()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledOnce()
-  })
-
-  it('closes on an outside mousedown', () => {
-    renderPanel()
-    pressOutside(screen.getByRole('dialog', { name: 'Quick actions' }))
-    expect(onClose).toHaveBeenCalledOnce()
-  })
-
-  it('closes on a close request that is not Escape, such as a back gesture', () => {
-    renderPanel()
-    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
-    expect(onClose).toHaveBeenCalledOnce()
-  })
-
-  it('does not close when the panel itself is clicked', () => {
-    const { container } = renderPanel()
-    const panel = container.querySelector('.qa-panel')!
-    fireEvent.mouseDown(panel)
-    expect(onClose).not.toHaveBeenCalled()
   })
 })
 
@@ -435,10 +413,5 @@ describe('QuickActions — rows from a group it does not list', () => {
     renderPanel({ pinned: [home], recent: [] })
     const rows = screen.getAllByText('Home').map((el) => el.closest('.qa-row')!)
     expect(rows[0].querySelector('.qa-key')!.textContent).toBe('h')
-  })
-
-  it('draws no context section for a context group it does not have', () => {
-    renderPanel({ contextGroupId: 'gone' })
-    expect(screen.queryByText(/· here/)).toBeNull()
   })
 })

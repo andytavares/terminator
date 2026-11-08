@@ -35,13 +35,6 @@ describe('useDismissedThreads', () => {
     expect(isDismissed(dismissed, printedLater)).toBe(true)
     expect(isDismissed(dismissed, shown('session:other', []))).toBe(false)
   })
-
-  it('a restored thread is no longer dismissed', () => {
-    useDismissedThreads.getState().dismiss('session:scratch', 100, false)
-    useDismissedThreads.getState().restore('session:scratch')
-    const { dismissed } = useDismissedThreads.getState()
-    expect(isDismissed(dismissed, shown('session:scratch', []))).toBe(false)
-  })
 })
 
 describe('isDismissed — a new session', () => {

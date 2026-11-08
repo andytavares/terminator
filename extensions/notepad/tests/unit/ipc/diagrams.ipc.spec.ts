@@ -210,12 +210,6 @@ function registerDiagramsIpcHandlersTests() {
 }
 
 function registerDiagramsIpcHandlersRegistrationTests() {
-  it('registers and disposes without error', () => {
-    const dispose = registerDiagramsIpcHandlers(mockApi, db)
-    expect(typeof dispose).toBe('function')
-    dispose()
-  })
-
   it('wrappers route to underlying handlers', async () => {
     const { ipcMain } = await import('electron')
     vi.mocked(ipcMain.handle).mockClear()
@@ -255,21 +249,8 @@ function registerDiagramsIpcHandlersDefaultsTests() {
 }
 
 function diagramTagsRelationalStorageTests() {
-  describe('writing tags', diagramTagsRelationalStorageWritingTagsTests)
   describe('reading tags', diagramTagsRelationalStorageReadingTagsTests)
   describe('replacing tags', diagramTagsRelationalStorageReplacingTagsTests)
-}
-
-function diagramTagsRelationalStorageWritingTagsTests() {
-  it('createDiagram with tags inserts rows into diagram_tags', async () => {
-    const r = await createDiagram(db, { title: 'Tagged', tags: ['a', 'b'] })
-    const id = (r as { data: { id: string } }).data.id
-    const tagRows = await db.query<{ tag: string }>(
-      `SELECT tag FROM diagram_tags WHERE diagram_id=? ORDER BY tag`,
-      [id]
-    )
-    expect(tagRows.map((t) => t.tag)).toEqual(['a', 'b'])
-  })
 }
 
 function diagramTagsRelationalStorageReadingTagsTests() {
@@ -300,13 +281,6 @@ function diagramTagsRelationalStorageReplacingTagsTests() {
       [id]
     )
     expect(tagRows.map((t) => t.tag)).toEqual(['new1', 'new2'])
-  })
-
-  it('listDiagrams returns empty tags when no diagram_tags rows exist', async () => {
-    await createDiagram(db, { title: 'No tags' })
-    const result = await listDiagrams(db, {})
-    const data = (result as { data: { tags: string[] }[] }).data
-    expect(data[0].tags).toEqual([])
   })
 }
 

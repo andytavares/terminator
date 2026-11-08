@@ -388,6 +388,7 @@ describe('TabBar — context menu', () => {
     fireEvent.contextMenu(tab)
     expect(screen.getByText('Rename')).toBeTruthy()
     expect(screen.getByText('Move to branch…')).toBeTruthy()
+    expect(screen.queryByText(/Move to project/i)).toBeNull()
     expect(screen.getByText('Close tab')).toBeTruthy()
   })
 
@@ -558,14 +559,6 @@ describe('TabBar — the session bar states whose terminals it shows (US3, FR-01
     expect(scope).toBeTruthy()
     expect(scope!.textContent).toContain('main')
   })
-
-  it('says branch, not project, in the session context menu', () => {
-    const { container } = renderTabBar()
-    const tab = container.querySelector('.tab-bar__tab--session')!
-    fireEvent.contextMenu(tab)
-    expect(screen.queryByText(/Move to project/i)).toBeNull()
-    expect(screen.getByText(/Move to branch/i)).toBeTruthy()
-  })
 })
 
 const session = (id: string, patch: Record<string, unknown> = {}) => ({
@@ -673,22 +666,7 @@ describe('TabBar — the terminals the sidebar stopped listing (US3) — draws n
   })
 })
 
-describe('TabBar — the terminals the sidebar stopped listing (US3) — still renames, closes and moves from the tab', () => {
-  // FR-024. Everything the sidebar row could do, the tab still can.
-  it('still renames, closes and moves from the tab', () => {
-    mockGetSessions.mockReturnValue([session('a')])
-    mockGetActive.mockReturnValue('a')
-    const { container } = renderTabBar()
-    const tab = tabs(container)[0]
-
-    fireEvent.click(tab.querySelector('.tab-bar__close')!)
-    expect(mockCloseSession).toHaveBeenCalledWith('a')
-
-    fireEvent.contextMenu(tab)
-    expect(screen.getByText(/Move to branch/i)).toBeTruthy()
-    expect(screen.getByText(/Rename/i)).toBeTruthy()
-  })
-
+describe('TabBar — the terminals the sidebar stopped listing (US3) — marks the row overflowed so the hidden tabs are discoverable', () => {
   it('marks the row overflowed so the hidden tabs are discoverable', () => {
     mockGetSessions.mockReturnValue(Array.from({ length: 12 }, (_, i) => session(`s${i}`)))
     const { container } = renderTabBar()

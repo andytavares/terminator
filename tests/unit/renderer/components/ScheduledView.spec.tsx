@@ -123,46 +123,59 @@ describe('ScheduledView — the table', () => {
 })
 
 describe('ScheduledView — the table, paused runs and editing', () => {
-  it('marks a paused run Paused, and its menu offers Resume', async () => {
+  it.each([
+    ['Summarise merged pull requests', 1, ['Run now', 'Resume', 'Edit…', 'Remove…']],
+    ['Triage the inbox', 0, ['Run now', 'Pause', 'Edit…', 'Remove…']],
+  ])('marks "%s" Paused %i time(s), and its menu offers %j', async (prompt, badges, items) => {
     await shown()
-    expect(within(rowOf('Summarise merged pull requests')).getByText('Paused')).toBeTruthy()
-    openMenu('Summarise merged pull requests')
-    expect(menuItems()).toEqual(['Run now', 'Resume', 'Edit…', 'Remove…'])
+    expect(within(rowOf(prompt)).queryAllByText('Paused')).toHaveLength(badges)
+    openMenu(prompt)
+    expect(menuItems()).toEqual(items)
   })
 
-  it('offers Pause for a run that is not paused', async () => {
+  it.each([
+    ['its row is clicked', () => fireEvent.click(rowOf('Triage the inbox'))],
+    [
+      'Edit… is chosen from its menu',
+      () => {
+        openMenu('Triage the inbox')
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit…' }))
+      },
+    ],
+  ])('opens Start work to edit the run when %s', async (_case, edit) => {
     await shown()
-    expect(within(rowOf('Triage the inbox')).queryByText('Paused')).toBeNull()
-    openMenu('Triage the inbox')
-    expect(menuItems()).toEqual(['Run now', 'Pause', 'Edit…', 'Remove…'])
-  })
-
-  it('opens Start work to edit the run when its row is clicked', async () => {
-    await shown()
-    fireEvent.click(rowOf('Triage the inbox'))
+    edit()
     expect(useStartWorkStore.getState()).toMatchObject({ open: true, editing: triage })
   })
 })
 
+describe('ScheduledView — pausing and resuming from the row menu', () => {
+  it.each([
+    {
+      action: 'Pause',
+      prompt: 'Triage the inbox',
+      data: [{ ...triage, paused: true }, summarise],
+      saved: { id: 's1', paused: true },
+      badges: 1,
+    },
+    {
+      action: 'Resume',
+      prompt: 'Summarise merged pull requests',
+      data: [triage, { ...summarise, paused: false }],
+      saved: { id: 's2', paused: false },
+      badges: 0,
+    },
+  ])('$action on "$prompt" saves it and shows the list read again', async (row) => {
+    await shown()
+    schedules.list.mockResolvedValue({ data: row.data })
+    openMenu(row.prompt)
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: row.action })))
+    expect(schedules.pause).toHaveBeenCalledWith(row.saved)
+    expect(within(rowOf(row.prompt)).queryAllByText('Paused')).toHaveLength(row.badges)
+  })
+})
+
 describe('ScheduledView — the row menu', () => {
-  it('pauses a run and shows the list read again', async () => {
-    await shown()
-    schedules.list.mockResolvedValue({ data: [{ ...triage, paused: true }, summarise] })
-    openMenu('Triage the inbox')
-    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Pause' })))
-    expect(schedules.pause).toHaveBeenCalledWith({ id: 's1', paused: true })
-    expect(within(rowOf('Triage the inbox')).getByText('Paused')).toBeTruthy()
-  })
-
-  it('resumes a paused run', async () => {
-    await shown()
-    schedules.list.mockResolvedValue({ data: [triage, { ...summarise, paused: false }] })
-    openMenu('Summarise merged pull requests')
-    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Resume' })))
-    expect(schedules.pause).toHaveBeenCalledWith({ id: 's2', paused: false })
-    expect(within(rowOf('Summarise merged pull requests')).queryByText('Paused')).toBeNull()
-  })
-
   it('runs a run now and shows its new last run', async () => {
     await shown()
     schedules.list.mockResolvedValue({
@@ -175,14 +188,7 @@ describe('ScheduledView — the row menu', () => {
   })
 })
 
-describe('ScheduledView — the row menu, editing and failures', () => {
-  it('opens Start work to edit from Edit…', async () => {
-    await shown()
-    openMenu('Triage the inbox')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit…' }))
-    expect(useStartWorkStore.getState()).toMatchObject({ open: true, editing: triage })
-  })
-
+describe('ScheduledView — the row menu, failures and runs that come due', () => {
   it('says in plain words when a run could not start now', async () => {
     schedules.runNow.mockResolvedValue({ error: 'failed', message: 'ZodError: id' })
     await shown()

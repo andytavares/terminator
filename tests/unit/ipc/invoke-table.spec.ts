@@ -167,11 +167,6 @@ describe('defineViewChannel — deriving the ViewCaller', () => {
     vi.clearAllMocks()
   })
 
-  it('passes run a ViewCaller derived from event.sender', async () => {
-    const { seen } = await callerFromEvent()
-    expect(seen).toBeDefined()
-  })
-
   it('ViewCaller.send forwards to sender.send', async () => {
     const { seen, view } = await callerFromEvent()
     seen.send('fs:changed', { filename: 'a.ts' })

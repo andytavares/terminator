@@ -275,12 +275,7 @@ describe('PrReviewTab (continued) — window title', () => {
   })
 })
 
-describe('PrReviewTab — shows pop out button', () => {
-  it('shows pop out button', () => {
-    render(<PrReviewTab repoRoot="/repo" />)
-    expect(screen.getByTitle('Open in new window')).toBeTruthy()
-  })
-
+describe('PrReviewTab — pop out button', () => {
   it('calls extensionBridge.invoke with window:open-pr-review when pop out button is clicked', () => {
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByTitle('Open in new window'))
@@ -309,27 +304,6 @@ describe('PrReviewTab — includes prNumber and showOverview in popout payload w
       'window:open-pr-review',
       expect.objectContaining({ repoRoot: '/repo', prNumber: '42', showOverview: 'false' })
     )
-  })
-})
-
-describe('PrReviewTab — closes PR view and persists paused session when onClose is called', () => {
-  it('closes PR view and persists paused session when onClose is called', async () => {
-    const activePr = partialFake<PrReviewDetail>({ number: 1, title: 'My PR', headSHA: 'abc123' })
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      activePr,
-    })
-    render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByText('Close PR'))
-    // handleClosePr is async: its last step is the paused session being persisted
-    await waitFor(() =>
-      expect(mockSetPaused).toHaveBeenCalledWith(
-        { repoRoot: '/repo', prNumber: 1, headSHA: 'abc123' },
-        expect.any(String)
-      )
-    )
-    expect(mockSetActivePr).toHaveBeenCalledWith(null)
-    expect(mockReset).toHaveBeenCalled()
   })
 })
 

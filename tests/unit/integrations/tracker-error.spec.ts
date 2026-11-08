@@ -2,18 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { TrackerError, toErrorKind } from '../../../src/main/integrations/tracker-error'
 
 describe('TrackerError', () => {
-  it('carries a kind and a message', () => {
-    const err = new TrackerError('auth-failed', 'token revoked')
-    expect(err.kind).toBe('auth-failed')
-    expect(err.message).toBe('token revoked')
-    expect(err).toBeInstanceOf(Error)
-  })
-
-  it('carries the tracker-stated retry period for a rate limit', () => {
-    const err = new TrackerError('rate-limited', 'slow down', { retryAfterMs: 30_000 })
-    expect(err.retryAfterMs).toBe(30_000)
-  })
-
   it('leaves retryAfterMs undefined for every other kind', () => {
     expect(new TrackerError('unavailable', 'offline').retryAfterMs).toBeUndefined()
   })

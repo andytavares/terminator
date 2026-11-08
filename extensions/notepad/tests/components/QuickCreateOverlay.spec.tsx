@@ -43,12 +43,6 @@ describe('QuickCreateOverlay', () => {
     expect(useNotesStore.getState().showQuickCreate).toBe(false)
   })
 
-  it('renders a Save button', () => {
-    useNotesStore.setState({ showQuickCreate: true })
-    render(<QuickCreateOverlay />)
-    expect(screen.getByRole('button', { name: /save/i })).toBeTruthy()
-  })
-
   it('Cancel button closes the overlay via store', () => {
     useNotesStore.setState({ showQuickCreate: true })
     render(<QuickCreateOverlay />)

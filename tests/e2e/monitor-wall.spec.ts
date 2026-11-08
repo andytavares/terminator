@@ -94,6 +94,40 @@ async function liveOutputArrives(page: Page): Promise<void> {
   await page.screenshot({ path: 'test-results/054/monitor-wall.png' })
 }
 
+const PROBE = 'SPACING-PROBE-0123456789'
+
+/** Run in the page: the probe row's drawn width, and the width of the same text set in its font. */
+function probeWidths(text: string): { drawn: number; expected: number } | null {
+  const row = [...document.querySelectorAll('.live-preview .xterm-rows > div')].find((r) =>
+    r.textContent?.includes(text)
+  )
+  if (!(row instanceof HTMLElement)) return null
+  const scale = row.getBoundingClientRect().width / row.offsetWidth
+  const range = document.createRange()
+  range.selectNodeContents(row.firstElementChild ?? row)
+  const reference = document.createElement('span')
+  reference.style.cssText = 'position:absolute;white-space:pre;visibility:hidden'
+  const { fontFamily, fontSize } = getComputedStyle(row)
+  Object.assign(reference.style, { fontFamily, fontSize })
+  reference.textContent = row.textContent
+  document.body.appendChild(reference)
+  const expected = reference.getBoundingClientRect().width
+  reference.remove()
+  return { drawn: range.getBoundingClientRect().width / scale, expected }
+}
+
+// A tile is the DOM renderer, which measures glyphs when it is built. The probe's session belongs
+// to a branch that is not on screen, so its tab is hidden when the preview takes the terminal.
+async function tileHasNoGapsBetweenLetters(page: Page): Promise<void> {
+  await addAndSelectProject(page, 'Wall', 'spacing')
+  await runInVisibleTerminal(page, `echo ${PROBE}`)
+  await addAndSelectProject(page, 'Wall', 'other')
+  await openOverview(page)
+  await expect.poll(() => page.evaluate(probeWidths, PROBE)).not.toBeNull()
+  const widths = (await page.evaluate(probeWidths, PROBE))!
+  expect(widths.drawn).toBeCloseTo(widths.expected, -1)
+}
+
 async function arrangementRemembered(page: Page): Promise<void> {
   await openOverview(page)
   await expect(largeTiles(page)).toHaveAttribute('aria-checked', 'true')
@@ -108,6 +142,8 @@ async function watchTheWall(page: Page, folder: string): Promise<void> {
   await test.step('a tile shows the line a fullscreen program is writing, not the empty middle', () =>
     fullscreenProgramLineShows(page, folder))
   await test.step("a tile shows its terminal's output as it arrives", () => liveOutputArrives(page))
+  await test.step('the wall draws a tile with no gaps between letters', () =>
+    tileHasNoGapsBetweenLetters(page))
 }
 
 test('the Overview wall watches every terminal, and keeps its arrangement across a restart', async () => {

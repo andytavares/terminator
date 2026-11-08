@@ -18,7 +18,6 @@ function ticketStoreTests() {
 
   describe('createTicket', createTicketTests)
   describe('consumeTicket', consumeTicketTests)
-  describe('startCleanup / stopCleanup', ticketCleanupTests)
 }
 
 function createTicketTests() {
@@ -80,25 +79,6 @@ function consumeTicketPurposeTests() {
   it('ticket is consumed even on purpose mismatch (no replay after wrong-purpose attempt)', () => {
     const ticket = store.createTicket('session-abc', 'terminal')
     store.consumeTicket(ticket, 'bridge')
-    expect(store.consumeTicket(ticket, 'terminal')).toBeNull()
-  })
-}
-
-function ticketCleanupTests() {
-  it('startCleanup removes expired tickets on interval', () => {
-    store.startCleanup()
-    const ticket = store.createTicket('session-cleanup', 'terminal')
-    vi.advanceTimersByTime(30_001)
-    vi.advanceTimersByTime(60_001)
-    expect(store.consumeTicket(ticket, 'terminal')).toBeNull()
-  })
-
-  it('stopCleanup prevents further pruning', () => {
-    store.startCleanup()
-    store.stopCleanup()
-    const ticket = store.createTicket('session-stop', 'terminal')
-    vi.advanceTimersByTime(30_001)
-    vi.advanceTimersByTime(60_001)
     expect(store.consumeTicket(ticket, 'terminal')).toBeNull()
   })
 }

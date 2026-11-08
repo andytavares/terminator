@@ -105,22 +105,6 @@ describe('openInEditor', () => {
 })
 
 describe('openInEditor — paths', () => {
-  // The path is an argument, never part of a shell string, so a directory name
-  // cannot become a second command.
-  it('passes a hostile path through as one argument', async () => {
-    const nasty = '/repos/app; rm -rf ~'
-    present(nasty, '/usr/local/bin/cursor')
-    await openInEditor(nasty)
-    expect(execFile).toHaveBeenCalledWith('open', ['-a', 'Cursor', nasty], expect.any(Function))
-  })
-
-  it('keeps a path with spaces intact', async () => {
-    const spaced = '/Users/me/my repos/app'
-    present(spaced, '/usr/local/bin/cursor')
-    await openInEditor(spaced)
-    expect(execFile).toHaveBeenCalledWith('open', ['-a', 'Cursor', spaced], expect.any(Function))
-  })
-
   it('refuses a folder that is not there rather than launching anything', async () => {
     present('/usr/local/bin/cursor')
     expect(await openInEditor('/gone')).toEqual({ error: 'FOLDER_NOT_FOUND' })

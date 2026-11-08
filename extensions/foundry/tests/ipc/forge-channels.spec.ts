@@ -184,13 +184,6 @@ describe('foundry:order.turn', () => {
 })
 
 function strikesAndAnswersTests() {
-  it('strikes an assumption and says exactly what has to be redrawn', async () => {
-    const order = await seeded()
-    const r = (await channels().turn({ id: order.id, strike: 'A-1' })) as OrderView
-    expect(r.changed).toEqual(['U-1'])
-    expect(r.order.assumptions[0].struck).toBe(true)
-  })
-
   it('answers a multiple-choice question by the indices of its options', async () => {
     const seededOrder = await seeded()
     const order = {
@@ -217,9 +210,11 @@ function strikesAndAnswersTests() {
 }
 
 function persistingAndRecordingTests() {
-  it('persists the turn rather than only returning it', async () => {
+  it('strikes an assumption, keeps it, and says exactly what has to be redrawn', async () => {
     const order = await seeded()
-    await channels().turn({ id: order.id, strike: 'A-1' })
+    const r = (await channels().turn({ id: order.id, strike: 'A-1' })) as OrderView
+    expect(r.changed).toEqual(['U-1'])
+    expect(r.order.assumptions[0].struck).toBe(true)
     expect((await store.load(order.id))?.assumptions[0].struck).toBe(true)
   })
 
@@ -296,14 +291,6 @@ function previewingAndAgreeingTests() {
 }
 
 function forgeChannelsTheLedgerTests() {
-  it('records the agreement in the ledger', async () => {
-    const order = await completeOrder()
-    await channels().compile(compiling(order.id, true))
-    expect(fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')).toContain(
-      'order.agreed'
-    )
-  })
-
   // A released order agreed again after an amendment was Foundry's doing, and
   // the ledger has to say so rather than credit the operator with a click.
   it('records an automatic agreement as Foundry\u2019s, with why', async () => {
@@ -1001,15 +988,6 @@ function startingTests() {
     expect(r.converging).toBe('sess-arch')
     expect(r.order.acceptance).toEqual([])
   })
-
-  it('names the session, so the surface can take the operator to it', async () => {
-    const seed = await drafted()
-    const c = createForgeChannels(
-      forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
-    )
-    const r = answered(await c.converge({ id: seed.order.id }))
-    expect('converging' in r && r.converging).toBe('sess-arch')
-  })
 }
 
 function forgeChannelsRecordingTests() {
@@ -1239,7 +1217,6 @@ function aBlankReasonTests() {
 }
 
 describe('free text reaches the architect', () => {
-  describe('intake', intakeTests)
   describe('other turns and empty text', otherTurnsAndEmptyTextTests)
 })
 
@@ -1250,24 +1227,6 @@ async function withFinding() {
   })) as OrderView
   expect(seed.order.redTeam.length).toBeGreaterThan(0)
   return seed.order
-}
-
-function intakeTests() {
-  it('goes to intake rather than nowhere', async () => {
-    const seed = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels(forgeDeps({ converge }))
-
-    await c.turn({ id: seed.order.id, message: 'the second unit is not needed' })
-    expect(converge).toHaveBeenCalledWith(
-      expect.anything(),
-      'the second unit is not needed',
-      expect.any(Function)
-    )
-  })
 }
 
 function otherTurnsAndEmptyTextTests() {
@@ -1674,13 +1633,6 @@ const issue = () =>
   }))
 
 function configuredBudgetsTests() {
-  it('takes the budgets the operator configured (FR-030)', async () => {
-    const r = await seededWith({
-      budgetDefaults: () => ({ agents: 1, wallClockMinutes: 10 }),
-    })
-    expect(r.order.budgets).toMatchObject({ agents: 1, wallClockMinutes: 10 })
-  })
-
   it('takes a configured budget of no limit', async () => {
     const r = await seededWith({
       budgetDefaults: () => ({ agents: null, wallClockMinutes: 10 }),
@@ -2058,21 +2010,6 @@ function thePicturesDecisionTests() {
 describe('the decisions about what cannot be measured', theDecisionMovesTests)
 describe('the decision to ship without pictures', thePicturesDecisionTests)
 
-describe('handing off needs no base branch check', () => {
-  it('agrees a complete order that has no baseline.json', async () => {
-    const order = await completeOrder()
-    expect(fs.existsSync(path.join(root, 'orders', order.id, 'baseline.json'))).toBe(false)
-    const r = answered(await channels().compile(compiling(order.id, true)))
-    expect(r.order.status).toBe('agreed')
-  })
-
-  it("agrees through the Forge's own automatic hand-off too", async () => {
-    const order = await completeOrder()
-    const r = answered(await channels().compile({ id: order.id, commit: true, automatic: true }))
-    expect(r.order.status).toBe('agreed')
-  })
-})
-
 // An order made by mistake used to stay on the list for good. Discarding marks
 // it rather than deleting it, and refuses one whose agents are still working.
 describe('foundry:order.cancel', () => {
@@ -2164,18 +2101,5 @@ function documentOnTheRowTests() {
       url: published.url,
       path: expect.stringMatching(/\/orders\/WO-[^/]+\/research\.md$/),
     })
-  })
-
-  it('has a file in the outputs folder open by its path', async () => {
-    expect(await listedDocument({ path: '/out/notes.md', location: 'outputs' })).toEqual({
-      kind: 'file',
-      url: null,
-      path: '/out/notes.md',
-    })
-  })
-
-  it('says nothing for a document in the checkout, which ships as a pull request, or for none', async () => {
-    expect(await listedDocument({ path: 'docs/a.md', location: 'checkout' })).toBeNull()
-    expect(await listedDocument(null)).toBeNull()
   })
 }

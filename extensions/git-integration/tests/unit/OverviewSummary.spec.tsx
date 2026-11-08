@@ -80,13 +80,8 @@ describe('OverviewSummary — summarizing a description', () => {
 })
 
 describe('OverviewSummary — a description with nothing to summarize', () => {
-  it('offers no Summarize for an empty description', () => {
-    renderDescription('')
-    expect(screen.queryByRole('button', { name: 'Summarize' })).toBeNull()
-  })
-
-  it('offers no Summarize for a missing description', () => {
-    renderDescription(null)
+  it.each(['', null])('offers no Summarize for the description %j', (description) => {
+    renderDescription(description)
     expect(screen.queryByRole('button', { name: 'Summarize' })).toBeNull()
   })
 })

@@ -6,7 +6,6 @@ import {
   useOrderedThreadKeys,
 } from '../../../../src/renderer/components/home/desk-selection'
 import { useParkedThreads } from '../../../../src/renderer/components/home/parked-threads'
-import { useHomeView } from '../../../../src/renderer/components/home/home-view'
 import {
   ageInWords,
   compactAge,
@@ -214,9 +213,5 @@ describe('focus options and usage', () => {
         models: [],
       })
     ).toBe('42k tokens · $0.50')
-  })
-
-  it('starts on the Desk', () => {
-    expect(useHomeView.getState().view).toBe('desk')
   })
 })

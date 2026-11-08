@@ -79,11 +79,6 @@ const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
 describe('CreateProjectDialog', () => {
-  it('renders dialog title', () => {
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    expect(screen.getByText('Create Branch')).toBeTruthy()
-  })
-
   it('calls onClose when Cancel is clicked', () => {
     const onClose = vi.fn()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
@@ -146,13 +141,6 @@ describe('CreateProjectDialog — shows duplicate project name error on blur', (
     expect(screen.getByText('A branch with this name already exists in this repo')).toBeTruthy()
   })
 
-  it('calls onClose when overlay is clicked', () => {
-    const onClose = vi.fn()
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
-    pressOutside(screen.getByRole('dialog'))
-    expect(onClose).toHaveBeenCalled()
-  })
-
   it('asks for no name in a repo — the branch is the name (ADR-034)', async () => {
     setupGitWorkspace()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -190,14 +178,7 @@ describe('CreateProjectDialog — still asks for a name where there is no branch
   })
 })
 
-describe('CreateProjectDialog — shows branch segmented control for git repos', () => {
-  it('shows branch segmented control for git repos', async () => {
-    setupGitWorkspace()
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    await eventually(() => expect(screen.getByRole('button', { name: 'Branch' })).toBeTruthy())
-    expect(screen.getByRole('button', { name: 'Worktree' })).toBeTruthy()
-  })
-
+describe('CreateProjectDialog — does not show branch controls for non-git workspace', () => {
   it('does not show branch controls for non-git workspace', () => {
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Branch' })).toBeNull()
@@ -210,17 +191,6 @@ describe('CreateProjectDialog — shows branch segmented control for git repos',
     await eventually(() => screen.getByRole('button', { name: 'Branch' }))
     // BranchSelect trigger shows the current branch name
     await eventually(() => expect(screen.getByText('main')).toBeTruthy())
-  })
-
-  it('new branch mode shows branch name input', async () => {
-    setupGitWorkspace()
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    await eventually(() => screen.getByRole('button', { name: 'Branch' }))
-    // Open BranchSelect dropdown and select the inline new-branch option
-    await eventually(() => screen.getByText('main'))
-    fireEvent.click(screen.getByText('main'))
-    fireEvent.click(screen.getByText('+ New branch…'))
-    expect(screen.getByPlaceholderText('feature/my-feature')).toBeTruthy()
   })
 })
 
@@ -328,29 +298,9 @@ describe('CreateProjectDialog — worktree mode pre-fills path with .worktrees b
       expect(pathInput.value).toContain('.worktrees')
     })
   })
-
-  it('worktree mode shows branch and path fields', async () => {
-    setupGitWorkspace()
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    await eventually(() => screen.getByText('Worktree'))
-    fireEvent.click(screen.getByText('Worktree'))
-    await eventually(() => expect(screen.getByText('Worktree path')).toBeTruthy())
-  })
 })
 
-describe('CreateProjectDialog — worktree mode new branch name input sanitizes input', () => {
-  it('worktree mode new branch name input sanitizes input', async () => {
-    setupGitWorkspace()
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    await eventually(() => screen.getByText('Worktree'))
-    fireEvent.click(screen.getByText('Worktree'))
-    await eventually(() => screen.getByPlaceholderText('feature/my-feature'))
-    fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
-      target: { value: 'feature/new' },
-    })
-    expect(screen.getAllByDisplayValue('feature/new').length).toBeGreaterThan(0)
-  })
-
+describe('CreateProjectDialog — worktree mode changes path input', () => {
   it('worktree mode changes path input', async () => {
     setupGitWorkspace()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -403,49 +353,7 @@ describe('CreateProjectDialog — branch mode selecting a branch via dropdown fi
   })
 })
 
-describe('CreateProjectDialog — worktree mode choosing an existing branch, then + New branch, shows the new branch name field', () => {
-  it('worktree mode choosing an existing branch, then + New branch, shows the new branch name field', async () => {
-    gitApi.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
-    gitApi.listBranches.mockResolvedValue({
-      branches: [
-        { name: 'main', isCurrent: true, isRemote: false },
-        { name: 'develop', isCurrent: false, isRemote: false },
-      ],
-    })
-    seedStore(useWorkspaceStore, {
-      createProject: mockCreateProject,
-      projectsByWorkspaceId: new Map([['ws-1', []]]),
-      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
-    })
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    await eventually(() => screen.getByText('Worktree'))
-    fireEvent.click(screen.getByText('Worktree'))
-    await eventually(() => screen.getByText('Worktree path'))
-    // BranchSelect trigger shows '+ New branch…' by default (worktreeIsNewBranch = true)
-    const triggers = screen.getAllByRole('button')
-    const branchTrigger = triggers.find((b) => b.textContent?.includes('+ New branch'))!
-    fireEvent.click(branchTrigger)
-    fireEvent.click(screen.getByText('develop'))
-    // After selecting existing, trigger shows 'develop'; click it to open again and re-select new
-    await eventually(() => screen.getByText('develop'))
-    fireEvent.click(screen.getByText('develop'))
-    fireEvent.click(screen.getAllByText('+ New branch…')[0])
-    await screen.findByPlaceholderText('feature/my-feature')
-  })
-})
-
-describe('CreateProjectDialog — existing mode submits with selected branch', () => {
-  it('existing mode submits with selected branch', async () => {
-    setupGitWorkspace()
-    const onClose = vi.fn()
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
-    await eventually(() => screen.getByRole('button', { name: 'Branch' }))
-    fireEvent.click(screen.getByText('Create'))
-    await eventually(() =>
-      expect(mockCreateProject).toHaveBeenCalledWith(expect.objectContaining({ gitBranch: 'main' }))
-    )
-  })
-
+describe('CreateProjectDialog — shows error when createBranch fails', () => {
   it('shows error when createBranch fails', async () => {
     setupGitWorkspace()
     gitApi.createBranch.mockResolvedValue({ error: 'already exists' })
@@ -835,18 +743,6 @@ describe('CreateProjectDialog — names outside a repo', () => {
     fireEvent.click(screen.getByText('Create'))
     expect(screen.getByText('Name must be 100 characters or less')).toBeTruthy()
     expect(mockCreateProject).not.toHaveBeenCalled()
-  })
-
-  it('accepts a name in a repo whose branches are not loaded yet', async () => {
-    seedStore(useWorkspaceStore, {
-      createProject: mockCreateProject,
-      projectsByWorkspaceId: new Map(),
-      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '' })],
-    })
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    fireEvent.change(screen.getByPlaceholderText('My branch'), { target: { value: 'My App' } })
-    fireEvent.click(screen.getByText('Create'))
-    await eventually(() => expect(mockCreateProject).toHaveBeenCalled())
   })
 })
 

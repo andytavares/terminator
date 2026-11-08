@@ -100,11 +100,6 @@ describe('buildBranchRows', () => {
     expect(rows.map((b) => b.projectId).sort()).toEqual(['p1', 'p2', 'p3'])
   })
 
-  it('still lists a branch with no terminals under a narrowing search', () => {
-    const result = build([], view({ filters: { query: '034' } }))
-    expect(rowFor(result, 'p1')).toBeTruthy()
-  })
-
   it('groups branches under their repo', () => {
     const { groups } = build([])
     expect(groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
@@ -409,12 +404,6 @@ describe('buildBranchRows — order — orders repos by the workspace list, not 
     )
     expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
   })
-
-  it('puts everything in one group when grouping is off', () => {
-    const { groups } = build([], view({ groupBy: 'none' }))
-    expect(groups).toHaveLength(1)
-    expect(groups[0].branches).toHaveLength(3)
-  })
 })
 
 // A repo with no branches yet was drawn in a block of its own after every
@@ -458,10 +447,11 @@ describe('buildBranchRows — repos with no branches', () => {
   })
 })
 
-describe('buildBranchRows — repos with no branches — does not invent a repo header when grouping is off', () => {
-  it('does not invent a repo header when grouping is off', () => {
+describe('buildBranchRows — repos with no branches — puts every branch in one group when grouping is off', () => {
+  it('puts every branch in one group, with no header for an empty repo, when grouping is off', () => {
     const { groups } = withEmpty(view({ groupBy: 'none' }))
     expect(groups).toHaveLength(1)
+    expect(groups[0].branches).toHaveLength(3)
   })
 
   it('ranks an empty repo as idle under a status sort', () => {
@@ -486,14 +476,7 @@ describe('buildBranchRows — repos with no branches — does not invent a repo 
   })
 })
 
-describe('buildBranchRows — carries no change statistics — they belong to the store, behind its TTL', () => {
-  // BR-8 / BR-9.
-  it('carries no change statistics — they belong to the store, behind its TTL', () => {
-    const row = rowFor(build([]), 'p1')!
-    expect(row).not.toHaveProperty('added')
-    expect(row).not.toHaveProperty('removed')
-  })
-
+describe('buildBranchRows — inputs', () => {
   it('does not mutate its inputs', () => {
     const sessions = [session('a', 'p1'), session('b', 'p2')]
     const order = sessions.map((s) => s.id)

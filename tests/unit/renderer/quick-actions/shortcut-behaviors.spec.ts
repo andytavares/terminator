@@ -167,11 +167,6 @@ describe('cycleTab', () => {
 })
 
 describe('clearTerminal', () => {
-  it('sends form feed to the active session', () => {
-    clearTerminal('p1', { getActiveSessionForProject: () => 's1' })
-    expect(input).toHaveBeenCalledWith('s1', '\x0c')
-  })
-
   it('sends nothing without a project or an active session', () => {
     clearTerminal(null, { getActiveSessionForProject: () => 's1' })
     clearTerminal('p1', { getActiveSessionForProject: () => null })

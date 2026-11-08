@@ -133,23 +133,7 @@ describe('pty.runInTerminal, over a real PTY and the extension host port', () =>
   })
 })
 
-function terminalExitCodeOf(script: string): Promise<number | null> {
-  ptyManager.spawnSession({
-    sessionId: 'exit-probe',
-    cwd: userData,
-    shell: '/bin/sh',
-    args: ['-c', script],
-    type: 'human',
-    origin: 'app',
-  })
-  return new Promise((resolve) => ptyManager.onExit('exit-probe', resolve))
-}
-
 describe('PtyManager exit status, over a real PTY', () => {
-  it('reports the exit code of a process that exited', async () => {
-    await expect(terminalExitCodeOf('exit 7')).resolves.toBe(7)
-  })
-
   it('reports null, not 0, for a shell killed while it was still running', async () => {
     ptyManager.spawnSession({
       sessionId: 'killed',
@@ -161,10 +145,6 @@ describe('PtyManager exit status, over a real PTY', () => {
     const exit = new Promise((resolve) => ptyManager.onExit('killed', resolve))
     ptyManager.kill('killed')
     await expect(exit).resolves.toBeNull()
-  })
-
-  it('reports null for a process ended by a signal', async () => {
-    await expect(terminalExitCodeOf('kill -TERM $$')).resolves.toBeNull()
   })
 })
 

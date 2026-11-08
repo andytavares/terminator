@@ -20,12 +20,6 @@ function editorStoreTests() {
 }
 
 function editorStoreActiveNoteTests() {
-  it('starts with no active note', () => {
-    expect(useEditorStore.getState().activeNoteId).toBeNull()
-    expect(useEditorStore.getState().isDirty).toBe(false)
-    expect(useEditorStore.getState().saveStatus).toBe('idle')
-  })
-
   it('setActiveNote updates activeNoteId and resets draft', () => {
     useEditorStore.getState().setActiveNote('n1', '# Hello')
     const s = useEditorStore.getState()

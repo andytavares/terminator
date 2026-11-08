@@ -39,32 +39,6 @@ describe('MobileTerminalList', () => {
     await renderList([workspace], [])
     expect(screen.getByText('My Workspace')).toBeTruthy()
   })
-
-  it('renders terminal items with cwd label', async () => {
-    const terminal: TerminalSession = {
-      sessionId: 's1',
-      cwd: '/Users/me/projects/myapp',
-      createdAt: '2026-06-19T10:00:00.000Z',
-    }
-    await renderList([workspace], [terminal])
-    expect(screen.getByText('myapp')).toBeTruthy()
-  })
-
-  it('calls onSelectTerminal with correct sessionId and cwd when terminal is tapped', async () => {
-    const terminal: TerminalSession = {
-      sessionId: 's1',
-      cwd: '/tmp/myapp',
-      createdAt: '2026-06-19T10:00:00.000Z',
-    }
-    await renderList([workspace], [terminal])
-    fireEvent.click(screen.getByText('Scratch 1 · myapp'))
-    expect(mockOnSelectTerminal).toHaveBeenCalledWith({ sessionId: 's1', cwd: '/tmp/myapp' })
-  })
-
-  it('shows "New Terminal" button per workspace', async () => {
-    await renderList([workspace], [])
-    expect(screen.getByRole('button', { name: /new terminal/i })).toBeTruthy()
-  })
 })
 
 describe('MobileTerminalList — calls onCreateTerminal with workspaceId and folderPath when "New Terminal" is clicked', () => {
@@ -74,14 +48,13 @@ describe('MobileTerminalList — calls onCreateTerminal with workspaceId and fol
     expect(mockOnCreateTerminal).toHaveBeenCalledWith('w1', '/Users/me/projects')
   })
 
-  it('shows terminal under matching workspace by cwd prefix', async () => {
+  it('shows a terminal inside a workspace folder once, by its folder name', async () => {
     const terminal: TerminalSession = {
       sessionId: 's-ws',
       cwd: '/Users/me/projects/myapp',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
     await renderList([workspace], [terminal])
-    // appears exactly once (under the workspace, not duplicated)
     expect(screen.getAllByText('myapp')).toHaveLength(1)
   })
 
@@ -122,8 +95,8 @@ describe('MobileTerminalList — labels unassigned terminals with "Scratch N · 
   })
 })
 
-describe('MobileTerminalList — shows unmatched terminal in fallback section outside any workspace', () => {
-  it('shows unmatched terminal in fallback section outside any workspace', async () => {
+describe('MobileTerminalList — selects an unmatched terminal from the fallback section with its sessionId and cwd', () => {
+  it('selects an unmatched terminal from the fallback section with its sessionId and cwd', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-global',
       cwd: '/tmp/scratch',

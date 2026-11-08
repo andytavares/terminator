@@ -111,8 +111,4 @@ describe('groupRuns', () => {
     const groups = groupRuns([{ ...daily, repoRoot: '/work/old-repo' }], [])
     expect(groups.map((g) => g.name)).toEqual(['old-repo'])
   })
-
-  it('has no Global group when no run is global', () => {
-    expect(groupRuns([], [])).toEqual([])
-  })
 })

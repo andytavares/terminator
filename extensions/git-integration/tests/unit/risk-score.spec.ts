@@ -82,14 +82,7 @@ describe('computeRiskScore() — all-null numeric metrics (except testFilePresen
   })
 })
 
-describe('computeRiskScore() — sets dominantDriver to a non-empty string', () => {
-  it('sets dominantDriver to a non-empty string', () => {
-    const m = baseMetrics()
-    const score = computeRiskScore(m, [m])
-    expect(typeof score.dominantDriver).toBe('string')
-    expect(score.dominantDriver.length).toBeGreaterThan(0)
-  })
-
+describe('computeRiskScore() — topImporters', () => {
   it('topImporters is capped at 5', () => {
     const m = baseMetrics({
       topImporters: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],

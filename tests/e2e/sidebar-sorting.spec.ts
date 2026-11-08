@@ -49,6 +49,30 @@ async function pickSort(label: string): Promise<void> {
   await handle.page.locator('.sidebar-menu__item', { hasText: new RegExp(`^${label}$`) }).click()
 }
 
+/** Opened from the keyboard, the menu is anchored under its button, not drawn at the window's
+ * corner (Chromium resolves anchor() only with position-anchor: auto). */
+async function menuOpensUnderItsButton(name: string): Promise<void> {
+  const { page } = handle
+  const trigger = page.getByRole('button', { name, exact: true }).first()
+  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+  await trigger.focus()
+  await page.keyboard.press('Enter')
+  const opened = page.getByRole('menu', { name })
+  await expect(opened).toBeVisible()
+  const [menuBox, buttonBox] = await Promise.all([opened.boundingBox(), trigger.boundingBox()])
+  expect(menuBox!.y).toBeGreaterThanOrEqual(buttonBox!.y + buttonBox!.height)
+  expect(Math.round(menuBox!.x)).toBe(Math.round(buttonBox!.x))
+  await expect(opened.locator('[role^="menuitem"]:not(:disabled)').first()).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(opened).toBeHidden()
+  await expect(trigger).toBeFocused()
+}
+
+async function displayAndFilterMenusOpenUnderTheirButtons(): Promise<void> {
+  await menuOpensUnderItsButton('Display')
+  await menuOpensUnderItsButton('Filter')
+}
+
 /** Run in the page: whether the open menu reaches past the sidebar, and is drawn on top there. */
 function menuPastSidebar(): { overhangs: boolean; onTop: boolean } {
   const sidebar = document.querySelector('.unified-sidebar')!.getBoundingClientRect()
@@ -153,6 +177,10 @@ async function draggedBranchOrderSurvivesReload(): Promise<void> {
 }
 
 async function theSidebarIsLaidOut(): Promise<void> {
+  await test.step(
+    'the Display and Filter menus open anchored under their buttons, and Escape gives focus back',
+    displayAndFilterMenusOpenUnderTheirButtons
+  )
   await test.step(
     'every view, grouping and sort control lives in two menus, drawn over the pane beside a narrow sidebar (FR-034)',
     displayMenuOffersEveryGroupingAndSort

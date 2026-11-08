@@ -46,7 +46,6 @@ function exportDialogTests() {
     })
   })
 
-  describe('the dialog', exportDialogDialogTests)
   describe('picking a folder', exportDialogPickingFolderTests)
   describe('scope', exportDialogScopeTests)
   describe('options', exportDialogOptionsTests)
@@ -54,59 +53,24 @@ function exportDialogTests() {
   describe('running', exportDialogRunningTests)
 }
 
-function exportDialogDialogTests() {
-  it('renders title "Export to markdown"', () => {
-    render(<ExportDialog onClose={vi.fn()} />)
-    expect(screen.getByText('Export to markdown')).toBeDefined()
-  })
-
-  it('renders folder input with default value', () => {
-    render(<ExportDialog onClose={vi.fn()} />)
-    const input = screen.getByDisplayValue('~/Documents/Terminator Notes')
-    expect(input).toBeDefined()
-  })
-
-  it('renders a Choose… button', () => {
-    render(<ExportDialog onClose={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /choose folder|choose…/i })).toBeTruthy()
-  })
-}
-
 function exportDialogPickingFolderTests() {
-  it('folder Choose… button calls export.pickFolder IPC', async () => {
+  it('Choose… asks export.pickFolder for a folder and shows the picked path', async () => {
     mockInvoke.mockResolvedValueOnce({ data: '/Users/test/notes' })
     render(<ExportDialog onClose={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /choose folder|choose…/i }))
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:export.pickFolder', {})
-    })
-  })
-
-  it('updates folder input after picking', async () => {
-    mockInvoke.mockResolvedValueOnce({ data: '/Users/test/notes' })
-    render(<ExportDialog onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /choose folder|choose…/i }))
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('/Users/test/notes')).toBeDefined()
-    })
+    expect(await screen.findByDisplayValue('/Users/test/notes')).toBeTruthy()
+    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:export.pickFolder', {})
   })
 }
 
 function exportDialogScopeTests() {
-  it('renders scope tab "All notes (0)" when no notes in store', () => {
+  it.each([
+    { notes: [], label: 'All notes (0)' },
+    { notes: [dummyNote], label: 'All notes (1)' },
+  ])('labels the all-notes scope tab $label from the store', ({ notes, label }) => {
+    useNotesStore.setState({ notes })
     render(<ExportDialog onClose={vi.fn()} />)
-    expect(screen.getByText('All notes (0)')).toBeDefined()
-  })
-
-  it('renders scope tab with correct count when notes exist', () => {
-    useNotesStore.setState({
-      notes: [dummyNote],
-      selectedNoteId: null,
-      archivedVisible: false,
-      showQuickCreate: false,
-    })
-    render(<ExportDialog onClose={vi.fn()} />)
-    expect(screen.getByText('All notes (1)')).toBeDefined()
+    expect(screen.getByText(label)).toBeTruthy()
   })
 
   it('shows "Selected (1)" tab when noteId prop is provided', () => {

@@ -61,14 +61,12 @@ describe('ReviewHeader', () => {
     expect(screen.getByText('Fix the thing')).toBeTruthy()
   })
 
-  it('shows a Draft badge when isDraft is true', () => {
-    render(<ReviewHeader {...baseProps({ isDraft: true })} />)
-    expect(screen.getByText(/draft/i)).toBeTruthy()
-  })
-
-  it('does not show a Draft badge when isDraft is false', () => {
-    render(<ReviewHeader {...baseProps({ isDraft: false })} />)
-    expect(screen.queryByText(/draft/i)).toBeNull()
+  it.each([
+    { isDraft: true, badgeCount: 1 },
+    { isDraft: false, badgeCount: 0 },
+  ])('shows $badgeCount Draft badge when isDraft is $isDraft', ({ isDraft, badgeCount }) => {
+    render(<ReviewHeader {...baseProps({ isDraft })} />)
+    expect(screen.queryAllByText(/draft/i)).toHaveLength(badgeCount)
   })
 })
 

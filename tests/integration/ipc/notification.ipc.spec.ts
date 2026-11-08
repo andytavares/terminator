@@ -66,16 +66,6 @@ describe('notifications:create', () => {
   })
 })
 
-describe('notifications:dismiss', () => {
-  it('takes the notification off the list', async () => {
-    const id = await invokeCreate({})
-
-    expect(await invoke('notifications:dismiss', { id })).toEqual({ ok: true })
-
-    expect(await invoke('notifications:list')).toEqual([])
-  })
-})
-
 describe('notifications:trigger-action', () => {
   it('opening a notification about a session reveals it in every live window and keeps the row', async () => {
     const minimized = fakeFocusableWindow({ minimized: true })
@@ -105,14 +95,5 @@ describe('notifications:trigger-action — refusals', () => {
     expect(
       await invoke('notifications:trigger-action', { notifId: id, actionId: '__open__' })
     ).toEqual({ error: 'UNKNOWN_ACTION' })
-  })
-
-  it('answers UNKNOWN_NOTIFICATION once the notification is gone', async () => {
-    const id = await invokeCreate({})
-    await invoke('notifications:dismiss', { id })
-
-    expect(await invoke('notifications:trigger-action', { notifId: id, actionId: 'go' })).toEqual({
-      error: 'UNKNOWN_NOTIFICATION',
-    })
   })
 })

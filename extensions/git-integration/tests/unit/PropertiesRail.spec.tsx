@@ -16,15 +16,10 @@ beforeEach(() => {
 })
 
 describe('PropertiesRail — Signals', () => {
-  it('shows the risk level with its hotspot underneath', () => {
+  it('shows a signal row with its value and its detail underneath', () => {
     render(<PropertiesRail pr={buildPr()} />)
     expect(rail().getByText('High')).toBeTruthy()
     expect(rail().getByText('playwright.config.ts (Wide blast radius — 41 importers)')).toBeTruthy()
-  })
-
-  it('shows how many changed functions have a test', () => {
-    render(<PropertiesRail pr={buildPr()} />)
-    expect(rail().getByText('5 of 7 functions')).toBeTruthy()
   })
 
   it('says the analysis is running while insights are missing', () => {

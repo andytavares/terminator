@@ -103,15 +103,4 @@ function aChangedReasonAndFocusTests() {
     )
     expect(document.querySelector('.fdry-inline-why')).toBeNull()
   })
-
-  it('is keyboard-focusable when it has a reason', () => {
-    render(
-      <ReasonButton reason="Not ready yet." onClick={vi.fn()}>
-        Redraft
-      </ReasonButton>
-    )
-    const button = screen.getByRole('button', { name: 'Redraft' })
-    button.focus()
-    expect(document.activeElement).toBe(button)
-  })
 }

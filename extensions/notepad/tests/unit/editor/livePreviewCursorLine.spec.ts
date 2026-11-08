@@ -41,11 +41,6 @@ const CONSTRUCTS: { name: string; line: string }[] = [
 ]
 
 describe('buildDecorations — raw reveal on the caret line', () => {
-  it.each(CONSTRUCTS)('decorates $name when the caret is elsewhere', ({ line }) => {
-    const doc = `${line}\nplain second line`
-    expect(countDecorations(doc, doc.length)).toBeGreaterThan(0)
-  })
-
   it.each(CONSTRUCTS)('reveals raw $name markdown when the caret is on its line', ({ line }) => {
     const doc = `${line}\nplain second line`
     const onLine = countDecorations(doc, 1)
@@ -82,22 +77,5 @@ function buildDecorationsDegenerateConstructsEmptyMarkersTests() {
 function buildDecorationsDegenerateConstructsFencesTests() {
   it('handles a fenced code block with no content', () => {
     expect(() => atEnd('```\n```\nsecond line')).not.toThrow()
-  })
-
-  it('renders a mermaid fence as a widget', () => {
-    const doc = '```mermaid\ngraph TD;\n```\nsecond line'
-    const state = makeState(doc)
-    const decos = buildDecorations(state, { anchor: doc.length })
-    let hasWidget = false
-    decos.between(0, state.doc.length, (_from, _to, deco: Decoration) => {
-      const widget = (deco.spec as { widget?: { constructor: { name: string } } }).widget
-      if (widget?.constructor.name === 'MermaidWidget') hasWidget = true
-    })
-    expect(hasWidget).toBe(true)
-  })
-
-  it('renders a non-mermaid fenced block as code lines', () => {
-    const doc = '```js\nconst a = 1\n```\nsecond line'
-    expect(countDecorations(doc, doc.length)).toBeGreaterThan(0)
   })
 }

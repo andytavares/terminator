@@ -989,26 +989,30 @@ describe('StartWork — When, Repeat, warning', () => {
   })
 })
 
-describe('StartWork — When, Repeat window ends before it starts', () => {
-  it('shows an error and disables Schedule', async () => {
+describe('StartWork — When, a time that cannot run', () => {
+  it.each([
+    [
+      'a Repeat window that ends before it starts',
+      () => {
+        fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+        fireEvent.change(screen.getByLabelText('To'), { target: { value: '08:00' } })
+      },
+      'The end time must be after the start time.',
+    ],
+    [
+      'Once in the past',
+      () => {
+        fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
+        fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2020-01-01' } })
+      },
+      'That time has passed.',
+    ],
+  ])('shows an error and disables Schedule for %s', async (_case, chooseWhen, error) => {
     await open()
     typePrompt('tidy the readme')
-    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
-    fireEvent.change(screen.getByLabelText('To'), { target: { value: '08:00' } })
-    expect(screen.getByText('The end time must be after the start time.')).toBeTruthy()
-    const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
-    expect(button.disabled).toBe(true)
-  })
-})
-
-describe('StartWork — When, Once in the past', () => {
-  it('shows an error and disables Schedule', async () => {
-    await open()
-    typePrompt('tidy the readme')
-    fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2020-01-01' } })
-    expect(screen.getByText('That time has passed.')).toBeTruthy()
+    chooseWhen()
+    expect(screen.getByText(error)).toBeTruthy()
     const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
   })

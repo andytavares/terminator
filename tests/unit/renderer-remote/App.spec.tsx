@@ -21,45 +21,27 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-describe('App', () => {
-  it('renders password input and Connect button', () => {
-    render(<App />)
-    expect(screen.getByPlaceholderText('Password')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Connect' })).toBeTruthy()
-  })
-
-  it('shows "Wrong password" on 401 response', async () => {
-    mockFetch.mockResolvedValueOnce({ status: 401 })
-    render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'bad' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await screen.findByText('Wrong password')
-  })
-
-  it('shows "Access denied" on 403 response', async () => {
-    mockFetch.mockResolvedValueOnce({ status: 403 })
-    render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await screen.findByText('Access denied')
-  })
-
-  it('shows "Could not connect" on fetch error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network failure'))
+describe('App — says why a login failed', () => {
+  it.each([
+    ['401', () => Promise.resolve({ status: 401 }), 'Wrong password'],
+    ['403', () => Promise.resolve({ status: 403 }), 'Access denied'],
+    [
+      'a fetch error',
+      () => Promise.reject(new Error('Network failure')),
+      'Could not connect to server',
+    ],
+    ['503', () => Promise.resolve({ status: 503, ok: false }), 'Could not connect to server'],
+    [
+      '429',
+      () => Promise.resolve({ status: 429, ok: false }),
+      'Too many attempts. Try again later',
+    ],
+  ])('names the failure on %s', async (_response, respond, message) => {
+    mockFetch.mockImplementationOnce(respond)
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await screen.findByText('Could not connect to server')
-  })
-})
-
-describe('App — shows "Could not connect" on non-success HTTP status (5xx)', () => {
-  it('shows "Could not connect" on non-success HTTP status (5xx)', async () => {
-    mockFetch.mockResolvedValueOnce({ status: 503, ok: false })
-    render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await screen.findByText('Could not connect to server')
+    await screen.findByText(message)
   })
 })
 
@@ -75,6 +57,7 @@ describe('App — logs in once with the password in the body, keeps nothing, and
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'correct' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=tok-abc'))
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/app-ticket')
 
     const [loginUrl, loginInit] = mockFetch.mock.calls[0] as [string, RequestInit]
     expect(loginUrl).toBe('/api/login')
@@ -96,15 +79,7 @@ describe('App — logs in once with the password in the body, keeps nothing, and
   })
 })
 
-describe('App — says to wait after too many attempts (429)', () => {
-  it('says to wait after too many attempts (429)', async () => {
-    mockFetch.mockResolvedValueOnce({ status: 429, ok: false })
-    render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await screen.findByText(/Too many attempts/)
-  })
-
+describe('App — redirects to /mobile/ when viewport is narrower than 1400px', () => {
   it('redirects to /mobile/ when viewport is narrower than 1400px', async () => {
     Object.defineProperty(window, 'innerWidth', { value: 375, configurable: true })
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
@@ -121,21 +96,7 @@ describe('App — says to wait after too many attempts (429)', () => {
   })
 })
 
-describe('App — redirects to /app/ when viewport is 1400px or wider', () => {
-  it('redirects to /app/ when viewport is 1400px or wider', async () => {
-    Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
-    mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
-      status: 201,
-      ok: true,
-      json: () => Promise.resolve({ ticket: 'desk-tok' }),
-    })
-    render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=desk-tok'))
-    expect(mockFetch.mock.calls[1][0]).toBe('/api/app-ticket')
-  })
-
+describe('App — disables button and shows "Connecting…" while loading', () => {
   it('disables button and shows "Connecting…" while loading', async () => {
     let resolvePromise: (v: unknown) => void
     mockFetch.mockReturnValueOnce(new Promise((r) => (resolvePromise = r)))

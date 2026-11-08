@@ -35,17 +35,11 @@ describe('ResumeButton', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('draws nothing for a session that never had a conversation', () => {
-    const { container } = render(
-      <ResumeButton facts={exited({ agent: null, resumable: false })} onResume={vi.fn()} />
-    )
-    expect(container.innerHTML).toBe('')
-  })
-
-  it('draws nothing while the agent is still running', () => {
-    const { container } = render(
-      <ResumeButton facts={exited({ state: 'working' })} onResume={vi.fn()} />
-    )
+  it.each([
+    ['a session that never had a conversation', { agent: null, resumable: false }],
+    ['an agent that is still running', { state: 'working' }],
+  ])('draws nothing for %s', (_case, patch) => {
+    const { container } = render(<ResumeButton facts={exited(patch)} onResume={vi.fn()} />)
     expect(container.innerHTML).toBe('')
   })
 })

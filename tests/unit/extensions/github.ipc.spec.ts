@@ -87,32 +87,6 @@ const QUEUE_PR = {
   changedFiles: 1,
 }
 
-describe('github:list-open-prs', () => {
-  it('returns RATE_LIMITED error on rate limit message', async () => {
-    mockReject('API rate limit exceeded')
-    const result = (await getHandler('github:list-open-prs')({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('RATE_LIMITED')
-  })
-
-  it('returns error string for non-rate-limit gh failure', async () => {
-    mockReject('network timeout')
-    const result = (await getHandler('github:list-open-prs')({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toContain('network timeout')
-  })
-
-  it('returns RATE_LIMITED for "rate limit" phrasing', async () => {
-    mockReject('rate limit hit')
-    const result = (await getHandler('github:list-open-prs')({ repoRoot: '/repo' })) as {
-      error: string
-    }
-    expect(result.error).toBe('RATE_LIMITED')
-  })
-})
-
 describe('github:list-open-prs — search', () => {
   it('looks up a single PR by number when search is a digit string', async () => {
     mockResolve(JSON.stringify(QUEUE_PR))
@@ -283,19 +257,6 @@ describe('github:pr-comment-reply — success', () => {
 const OWNER_REPO_MOCK = JSON.stringify({ owner: { login: 'test-owner' }, name: 'test-repo' })
 
 describe('github:pr-review-submit', () => {
-  it('returns reviewId on success', async () => {
-    customMock()
-      .mockResolvedValueOnce({ stdout: OWNER_REPO_MOCK, stderr: '' })
-      .mockResolvedValueOnce({ stdout: JSON.stringify({ id: 9999 }), stderr: '' })
-    const result = (await getHandler('github:pr-review-submit')({
-      repoRoot: '/repo',
-      prNumber: 42,
-      event: 'APPROVE',
-      body: 'LGTM!',
-    })) as { reviewId: number }
-    expect(result.reviewId).toBe(9999)
-  })
-
   it('accepts all valid event types', async () => {
     // Owner and name are looked up once per registration and then cached.
     customMock().mockResolvedValueOnce({ stdout: OWNER_REPO_MOCK, stderr: '' })

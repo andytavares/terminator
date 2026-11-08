@@ -76,7 +76,6 @@ describe('an open Floor with nothing happening', () => {
     await vi.advanceTimersByTimeAsync(60_000)
 
     const counts = perChannel(invoke)
-    console.info(`Floor, one minute: ${invoke.mock.calls.length} calls`, counts)
     expect(Object.keys(counts)).toEqual(['foundry:run-transcript'])
   })
 

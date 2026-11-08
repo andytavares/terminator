@@ -66,42 +66,6 @@ beforeEach(async () => {
   registerWorkspaceHandlers()
 })
 
-describe('workspaces', () => {
-  it('lists the workspaces that were created, in creation order', async () => {
-    await invokeCreateWorkspace('alpha')
-    await invokeCreateWorkspace('beta')
-
-    expect(await listedWorkspaceNames()).toEqual(['alpha', 'beta'])
-  })
-
-  it('renames a workspace', async () => {
-    const workspace = await invokeCreateWorkspace('alpha')
-
-    await invoke('workspace:update', { id: workspace.id, name: 'gamma' })
-
-    expect(await listedWorkspaceNames()).toEqual(['gamma'])
-  })
-
-  it('deletes a workspace together with its projects', async () => {
-    const workspace = await invokeCreateWorkspace('alpha')
-    await invokeCreateProject(workspace.id, 'app')
-
-    expect(await invoke('workspace:delete', { id: workspace.id })).toEqual({ success: true })
-
-    expect(await listedWorkspaceNames()).toEqual([])
-    expect(await projectNames(workspace.id)).toEqual([])
-  })
-
-  it('reorders workspaces', async () => {
-    const alpha = await invokeCreateWorkspace('alpha')
-    const beta = await invokeCreateWorkspace('beta')
-
-    await invoke('workspace:reorder', { ids: [beta.id, alpha.id] })
-
-    expect(await listedWorkspaceNames()).toEqual(['beta', 'alpha'])
-  })
-})
-
 describe('projects', () => {
   it('lists a project in its own workspace and tells every window it was added', async () => {
     const alpha = await invokeCreateWorkspace('alpha')
@@ -123,31 +87,6 @@ describe('projects', () => {
 
     expect(reply).toEqual({ error: 'DUPLICATE_NAME' })
     expect(sent).toEqual([])
-  })
-})
-
-describe('projects — branch, name and order', () => {
-  it('records the branch and the new name of a project', async () => {
-    const workspace = await invokeCreateWorkspace('alpha')
-    const project = await invokeCreateProject(workspace.id, 'app')
-
-    await invoke('project:update-branch', { id: project.id, gitBranch: 'feature' })
-    await invoke('project:rename', { id: project.id, name: 'web' })
-
-    const { projects } = await invoke<{ projects: Project[] }>('project:list', {
-      workspaceId: workspace.id,
-    })
-    expect(projects).toMatchObject([{ id: project.id, name: 'web', gitBranch: 'feature' }])
-  })
-
-  it('reorders the projects of a workspace', async () => {
-    const workspace = await invokeCreateWorkspace('alpha')
-    const app = await invokeCreateProject(workspace.id, 'app')
-    const docs = await invokeCreateProject(workspace.id, 'docs')
-
-    await invoke('project:reorder', { workspaceId: workspace.id, ids: [docs.id, app.id] })
-
-    expect(await projectNames(workspace.id)).toEqual(['docs', 'app'])
   })
 })
 

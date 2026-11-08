@@ -256,9 +256,10 @@ describe('Composer — the queue list', () => {
     expect(screen.getByText('Then lint · 1 attached')).toBeTruthy()
   })
 
-  it('shows a message with nothing attached as it is', async () => {
+  it('shows a queue set before the tab opened, a message with nothing attached as it is', async () => {
     agents.queueGet.mockResolvedValue({ data: ['Plain follow-up'] })
     await mountComposer(true)
+    expect(screen.getByText('1 message sends when this turn ends')).toBeTruthy()
     expect(screen.getByText('Plain follow-up')).toBeTruthy()
   })
 

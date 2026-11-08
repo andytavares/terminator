@@ -93,15 +93,9 @@ function outcomesAndScopeTests() {
 }
 
 function redTeamCriteriaAndUnitsTests() {
-  it('attacks a criterion whose statement is not falsifiable', () => {
+  it('attacks a criterion whose statement is not falsifiable, naming that criterion', () => {
     const o = order()
     o.acceptance[0].statement = 'the terminal works better'
-    expect(ids(o)).toContain('unfalsifiable-statement')
-  })
-
-  it('names the criterion it is attacking', () => {
-    const o = order()
-    o.acceptance[0].statement = 'it should be nicer'
     const finding = structuralFindings(o).find((f) => f.rule === 'unfalsifiable-statement')
     expect(finding?.subjectIds).toEqual(['AC-1'])
   })
@@ -167,10 +161,6 @@ function untouchedFilesAndUnavailableChecksTests() {
     const o = order()
     o.context.toolchain.test = null
     expect(ids(o)).toContain('no-runnable-check')
-  })
-
-  it('does not raise the unavailable-check finding when the repository has a test command', () => {
-    expect(ids(order())).not.toContain('no-runnable-check')
   })
 }
 

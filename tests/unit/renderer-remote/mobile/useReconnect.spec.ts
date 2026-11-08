@@ -40,21 +40,15 @@ describe('useReconnect', () => {
     rerender({ ws: { readyState: 1 } as WebSocket })
     expect(result.current.status).toBe('connected')
   })
-
-  it('returns status "connecting" when ws is null (not yet opened)', async () => {
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    const { result } = renderHook(() => useReconnect(mockOpenWs, null))
-    expect(result.current.status).toBe('connecting')
-  })
 })
 
-describe('useReconnect — calls openWs when page becomes visible and ws is closed', () => {
+describe('useReconnect — reopens the socket when the page becomes visible', () => {
   setUpUseReconnect()
 
-  it('calls openWs when page becomes visible and ws is closed', async () => {
+  it('reopens the socket and reports "reconnecting" when the page becomes visible and ws is closed', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     const ws = { readyState: 3 } as WebSocket // CLOSED
-    renderHook(() => useReconnect(mockOpenWs, ws))
+    const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
 
     // Simulate page becoming visible
     act(() => {
@@ -62,6 +56,7 @@ describe('useReconnect — calls openWs when page becomes visible and ws is clos
     })
 
     expect(mockOpenWs).toHaveBeenCalledTimes(1)
+    expect(result.current.status).toBe('reconnecting')
   })
 
   it('does not call openWs if ws is still open when page becomes visible', async () => {
@@ -74,22 +69,6 @@ describe('useReconnect — calls openWs when page becomes visible and ws is clos
     })
 
     expect(mockOpenWs).not.toHaveBeenCalled()
-  })
-})
-
-describe('useReconnect — sets status to "reconnecting" after first reconnect attempt', () => {
-  setUpUseReconnect()
-
-  it('sets status to "reconnecting" after first reconnect attempt', async () => {
-    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    const ws = { readyState: 3 } as WebSocket
-    const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
-
-    act(() => {
-      document.dispatchEvent(new Event('visibilitychange'))
-    })
-
-    expect(result.current.status).toBe('reconnecting')
   })
 })
 

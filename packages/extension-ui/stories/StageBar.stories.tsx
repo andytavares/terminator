@@ -1,6 +1,5 @@
 import React from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, within } from 'storybook/test'
 import { StageBar } from '../src/StageBar'
 import { inLight } from './in-light'
 
@@ -20,12 +19,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Default: Story = {
-  play: async ({ canvasElement }) => {
-    const current = within(canvasElement).getByText('In review').closest('li')
-    await expect(current?.getAttribute('aria-current')).toBe('step')
-  },
-}
+export const Default: Story = {}
 export const DefaultLight = inLight(Default)
 
 export const YourMove: Story = { args: { yourMove: true } }

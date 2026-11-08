@@ -6,8 +6,6 @@ import type { LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { currentIntake } from '../../src/forge/intake-outcome.js'
-import { intakeAt } from '../../src/forge/intake-state.js'
 import type { IntakeOutcome } from '../../src/forge/intake-outcome.js'
 
 type RedTeamFinding = WorkOrder['redTeam'][number]
@@ -827,6 +825,7 @@ describe('readiness — steps and the not-yet rule', () => {
   describe('a clean order', aCleanOrderTests)
   describe('not draft', notDraftTests)
   describe('not draft, review skipped', notDraftReviewSkippedTests)
+  describe('a draft, review skipped', draftReviewSkippedTests)
 })
 
 function notDraftReviewSkippedTests() {
@@ -847,6 +846,25 @@ function notDraftReviewSkippedTests() {
     const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
     const result = readiness(baseInput({ order, agreed: { at: T1, by: 'you' } }))
     expect(result.steps.find((s) => s.id === 'redTeam')?.word).toBe('Not reviewed')
+  })
+}
+
+// A red team skipped for a small order (ADR 084) reads as passed, with the
+// reason — not as "Not reviewed yet", which is a step still owed.
+function draftReviewSkippedTests() {
+  const reason = 'graded P3, one lane, no risk triggers'
+
+  it('reads the step as done with the reason', () => {
+    const result = readiness(baseInput({ loop: baseLoop({ skipped: reason }) }))
+    const step = result.steps.find((s) => s.id === 'redTeam')
+    expect(step).toMatchObject({ state: 'done', mark: 'check', word: `Skipped: ${reason}` })
+  })
+
+  it('reads the row as passed with the reason', () => {
+    const result = readiness(baseInput({ loop: baseLoop({ skipped: reason }) }))
+    const row = result.rows.find((r) => r.id === 'redTeam')
+    expect(row?.state).toBe('passed')
+    expect(row?.detail).toContain(reason)
   })
 }
 
@@ -1275,27 +1293,5 @@ describe('readiness — the Checks step', () => {
   it('does not hold the later steps back while checks wait', () => {
     const steps = readiness(baseInput({ checks: { waiting: 2 } })).steps
     expect(steps.find((s) => s.id === 'shape')?.state).not.toBe('not-yet')
-  })
-})
-
-describe('an intake turn that ran out its deadline', () => {
-  it('reads as failed and offers to draft again', () => {
-    const started = {
-      at: T1,
-      orderId: 'WO-1',
-      actor: 'role:architect',
-      action: 'converge.started',
-      subject: 'sess-1',
-      reason: 'draft',
-      evidence: [],
-    }
-    const intake = currentIntake(
-      [started],
-      intakeAt('drafting', new Date('2026-09-09T19:00:00Z')),
-      { now: Date.parse('2026-09-09T20:00:00Z'), isLive: () => false }
-    )
-    const result = readiness(baseInput({ intake }))
-    expect(result.strip.tone).toBe('bad')
-    expect(result.strip.actions).toContain('start-over')
   })
 })

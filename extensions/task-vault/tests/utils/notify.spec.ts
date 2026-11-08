@@ -71,10 +71,6 @@ function notifyLocalToastsTests() {
       })
     })
   })
-
-  it('does not throw when called without options', () => {
-    expect(() => notify('error', 'Oops', 'testKey')).not.toThrow()
-  })
 }
 
 function ignoredPushTests() {

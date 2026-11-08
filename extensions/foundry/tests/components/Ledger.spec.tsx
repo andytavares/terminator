@@ -374,25 +374,17 @@ function inForceTests() {
     await screen.findByText('Checks you accepted')
     expect(screen.getByText('no unit hardcodes a timeout')).toBeTruthy()
   })
-
-  it('offers a way to take one back out', async () => {
-    mount({ inForce: IN_FORCE })
-    await screen.findByText('Checks you accepted')
-    fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:rules.remove', {
-        ruleId: 'curator-hardcodes-the-timeout',
-      })
-    )
-  })
 }
 
 function removingTests() {
-  it('says it is gone and will not come back', async () => {
+  it('takes a check back out, and says it is gone and will not come back', async () => {
     mount({ inForce: IN_FORCE })
     await screen.findByText('Checks you accepted')
     fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
     await screen.findByText(/no longer in force/)
+    expect(invoke).toHaveBeenCalledWith('foundry:rules.remove', {
+      ruleId: 'curator-hardcodes-the-timeout',
+    })
   })
 
   it('reports a refusal rather than claiming the check was removed', async () => {

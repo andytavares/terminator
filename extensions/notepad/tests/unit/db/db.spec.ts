@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../../src/main/db/index'
-import { applyNotepadSchema, randomUUID } from '../../../src/db/db'
+import { applyNotepadSchema } from '../../../src/db/db'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 
 let db: ExtensionDB
@@ -11,17 +11,6 @@ beforeEach(() => {
 })
 
 describe('applyNotepadSchema', applyNotepadSchemaTests)
-
-describe('randomUUID', () => {
-  it('returns a valid UUID string', () => {
-    const id = randomUUID()
-    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
-  })
-
-  it('generates unique values', () => {
-    expect(randomUUID()).not.toBe(randomUUID())
-  })
-})
 
 function applyNotepadSchemaTests() {
   describe('tables', applyNotepadSchemaTablesTests)

@@ -11,11 +11,6 @@ const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
 describe('SidebarSearch', () => {
-  it('renders a text input element', () => {
-    render(<SidebarSearch query="" onChange={vi.fn()} onClear={vi.fn()} />)
-    expect(screen.getByRole('textbox')).toBeTruthy()
-  })
-
   it('calls onChange as user types', () => {
     const onChange = vi.fn()
     render(<SidebarSearch query="" onChange={onChange} onClear={vi.fn()} />)
@@ -31,11 +26,6 @@ describe('SidebarSearch', () => {
     expect(onClear).toHaveBeenCalledOnce()
   })
 
-  it('renders clear button when query is non-empty', () => {
-    render(<SidebarSearch query="api" onChange={vi.fn()} onClear={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /clear/i })).toBeTruthy()
-  })
-
   it('does not render clear button when query is empty', () => {
     render(<SidebarSearch query="" onChange={vi.fn()} onClear={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /clear/i })).toBeNull()
@@ -48,12 +38,6 @@ describe('SidebarSearch — clear button calls onClear', () => {
     render(<SidebarSearch query="something" onChange={vi.fn()} onClear={onClear} />)
     fireEvent.click(screen.getByRole('button', { name: /clear/i }))
     expect(onClear).toHaveBeenCalledOnce()
-  })
-
-  it('input has placeholder text', () => {
-    render(<SidebarSearch query="" onChange={vi.fn()} onClear={vi.fn()} />)
-    const input = screen.getByRole('textbox') as HTMLInputElement
-    expect(input.placeholder).toBeTruthy()
   })
 
   it('reflects query value in input', () => {

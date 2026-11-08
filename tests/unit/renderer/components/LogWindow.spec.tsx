@@ -23,18 +23,18 @@ describe('LogWindow', () => {
     expect(screen.getByText('No log entries yet.')).toBeTruthy()
   })
 
-  it('renders log entries with level and message', () => {
+  it.each([
+    ['info', 'INFO'],
+    ['warn', 'WARN'],
+    ['error', 'ERR'],
+    ['log', 'LOG'],
+  ] as const)('renders a %s entry with its message and the label %s', (level, label) => {
     useLogStore.setState({
-      entries: [
-        { id: 1, level: 'info', message: 'started up', timestamp: '12:00:00' },
-        { id: 2, level: 'error', message: 'something failed', timestamp: '12:00:01' },
-      ],
+      entries: [{ id: 1, level, message: 'started up', timestamp: '12:00:00' }],
     })
     render(<LogWindow onClose={vi.fn()} />)
     expect(screen.getByText('started up')).toBeTruthy()
-    expect(screen.getByText('something failed')).toBeTruthy()
-    expect(screen.getByText(/^INFO$/)).toBeTruthy()
-    expect(screen.getByText(/^ERR/)).toBeTruthy()
+    expect(screen.getByText(label)).toBeTruthy()
   })
 })
 
@@ -61,19 +61,5 @@ describe('LogWindow — empties the log when Clear is clicked', () => {
     render(<LogWindow onClose={onClose} />)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
-  })
-})
-
-describe('LogWindow — renders warn and log level labels', () => {
-  it('renders warn and log level labels', () => {
-    useLogStore.setState({
-      entries: [
-        { id: 1, level: 'warn', message: 'watch out', timestamp: '12:00:00' },
-        { id: 2, level: 'log', message: 'debug info', timestamp: '12:00:01' },
-      ],
-    })
-    render(<LogWindow onClose={vi.fn()} />)
-    expect(screen.getByText(/^WARN$/)).toBeTruthy()
-    expect(screen.getByText(/^LOG/)).toBeTruthy()
   })
 })

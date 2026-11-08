@@ -168,13 +168,6 @@ describe('Toast', () => {
     expect(screen.getByText('Published')).toBeTruthy()
   })
 
-  it('announces politely without stealing focus', () => {
-    const before = document.activeElement
-    render(<Toast message="Published" onDismiss={noop} />)
-    expect(screen.getByRole('status')).toBeTruthy()
-    expect(document.activeElement).toBe(before)
-  })
-
   it('carries its tone as data rather than as colour alone', () => {
     render(<Toast message="Could not reach the server" tone="error" onDismiss={noop} />)
     expect(screen.getByRole('status').getAttribute('data-tone')).toBe('error')
@@ -185,11 +178,6 @@ describe('Toast', () => {
     render(<Toast message="Published" onDismiss={onDismiss} />)
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(onDismiss).toHaveBeenCalledTimes(1)
-  })
-
-  it('renders nothing when the region is empty', () => {
-    const { container } = render(<ToastRegion toasts={[]} onDismiss={noop} />)
-    expect(container.querySelector('.tmui-toast')).toBeNull()
   })
 })
 

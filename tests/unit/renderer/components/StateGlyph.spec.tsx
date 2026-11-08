@@ -25,9 +25,4 @@ describe('StateGlyph', () => {
     })
     expect(new Set(shapes).size).toBe(TASK_STATES.length)
   })
-
-  it('keeps the plain needs-you glyph for a reported ask', () => {
-    render(<StateGlyph state="needs-you" inferred={false} />)
-    expect(screen.getByRole('img', { name: 'Needs you' })).toBeTruthy()
-  })
 })

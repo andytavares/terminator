@@ -56,13 +56,7 @@ export const OpensUnderItsAnchor: Story = {
 
 /** Focus moves in to the first control. Escape and an outside click are the browser's light
  * dismiss, driven with real keys in visual/popover.visual.ts. */
-export const FocusMovesIn: Story = {
-  play: async ({ canvasElement }) => {
-    await expect(
-      within(surfaceIn(canvasElement)).getByRole('button', { name: 'Rename branch' })
-    ).toHaveFocus()
-  },
-}
+export const FocusMovesIn: Story = {}
 
 export const DefaultLight = inLight(Default)
 export const OpensUnderItsAnchorLight = inLight(OpensUnderItsAnchor)

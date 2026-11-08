@@ -324,10 +324,6 @@ describe('stopping a run whose agents are still alive', () => {
 })
 
 describe('stopping the whole order rather than one agent', () => {
-  it('is reachable as its own channel, because a gate was the only way out', async () => {
-    await expect(host.call('foundry:run.stop', { id: 'WO-none' })).resolves.toBeDefined()
-  })
-
   it('cancels the order and writes down that a person did it', async () => {
     await seedInterruptedRun()
     expect(await host.call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })

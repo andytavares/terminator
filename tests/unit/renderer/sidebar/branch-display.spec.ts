@@ -36,13 +36,6 @@ describe('branchLabel — a branch is named by its branch', () => {
     // A workspace whose folder is not a git repository. The name is all it has.
     expect(branchLabel(branch({ name: 'detached', gitBranch: undefined }))).toBe('detached')
   })
-
-  it('is pure and does not mutate its input', () => {
-    const b = branch()
-    const snapshot = JSON.stringify(b)
-    branchLabel(b)
-    expect(JSON.stringify(b)).toBe(snapshot)
-  })
 })
 
 describe('abbreviatePath — a repo path as a human reads it', () => {

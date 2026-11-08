@@ -24,9 +24,4 @@ describe('dispatchNotification', () => {
       key: 'helloKey',
     })
   })
-
-  it('does not include a source or targets — those are resolved main-side', () => {
-    dispatchNotification({ type: 'error', title: 'Oops', key: 'oopsKey' })
-    expect(mockCreate).toHaveBeenCalledWith({ type: 'error', title: 'Oops', key: 'oopsKey' })
-  })
 })

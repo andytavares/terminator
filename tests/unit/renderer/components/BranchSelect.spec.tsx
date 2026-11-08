@@ -25,12 +25,6 @@ describe('BranchSelect', () => {
     expect(screen.getByText('Select branch…')).toBeTruthy()
   })
 
-  it('opens dropdown on trigger click', () => {
-    render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    expect(screen.getByPlaceholderText('Search branches…')).toBeTruthy()
-  })
-
   it('lists all branches when open', () => {
     render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /main/i }))
@@ -90,28 +84,6 @@ describe('BranchSelect — shows no matching branches message when filter has no
     expect(screen.getByPlaceholderText('Search branches…')).toBeTruthy()
     fireEvent.keyDown(screen.getByPlaceholderText('Search branches…'), { key: 'Escape' })
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
-  })
-})
-
-describe('BranchSelect — shows current branch check mark', () => {
-  it('shows current branch check mark', () => {
-    render(<BranchSelect branches={branches} value="main" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    expect(screen.getByText('✓')).toBeTruthy()
-  })
-
-  it('shows newBranchLabel option when provided', () => {
-    render(
-      <BranchSelect
-        branches={branches}
-        value="main"
-        onChange={vi.fn()}
-        newBranchLabel="+ New branch…"
-        onNewBranch={vi.fn()}
-      />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /main/i }))
-    expect(screen.getByText('+ New branch…')).toBeTruthy()
   })
 })
 

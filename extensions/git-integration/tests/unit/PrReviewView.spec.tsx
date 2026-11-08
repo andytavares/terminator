@@ -159,16 +159,6 @@ describe('PrReviewView', () => {
     expect(screen.getByTestId('review-diff-pane')).toBeTruthy()
   })
 
-  it('renders chapter file list when switched to guided mode', async () => {
-    const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
-    await renderView(
-      { chapters: [mockChapter, ch2] },
-      { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
-    )
-    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
-    expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-  })
-
   it('shows chapter nav for multi-chapter PRs in guided mode', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
     await renderView(
@@ -186,7 +176,7 @@ describe('PrReviewView — does not show chapter nav for single-chapter PRs', ()
     expect(screen.queryByTestId('chapter-nav')).toBeNull()
   })
 
-  it('shows submit panel when Submit button clicked', async () => {
+  it('opens the submit panel from Submit review and hides it on CloseSubmit', async () => {
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
     setupStore({ currentFilePath: 'src/foo.ts' })
     render(
@@ -194,15 +184,6 @@ describe('PrReviewView — does not show chapter nav for single-chapter PRs', ()
     )
     fireEvent.click(screen.getByRole('button', { name: /^Submit review/ }))
     expect(screen.getByTestId('submit-panel')).toBeTruthy()
-  })
-
-  it('hides submit panel when CloseSubmit clicked', async () => {
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts' })
-    render(
-      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
-    )
-    fireEvent.click(screen.getByRole('button', { name: /^Submit review/ }))
     fireEvent.click(screen.getByText('CloseSubmit'))
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
@@ -368,23 +349,7 @@ describe('PrReviewView — shows full-file-list by default, restores it after sw
   })
 })
 
-describe('PrReviewView — switches to guided mode from full mode', () => {
-  it('switches to guided mode from full mode', async () => {
-    const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/foo.ts', currentChapterId: 'ch-1' })
-    render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [mockChapter, ch2] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
-    )
-    fireEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
-    expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-  })
-
+describe('PrReviewView — refresh', () => {
   it('calls onRefresh when Refresh button is clicked', async () => {
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
     setupStore({ currentFilePath: 'src/foo.ts' })

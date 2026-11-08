@@ -53,12 +53,6 @@ function useExtensionToastStoreAddingRemovingTests() {
     useExtensionToastStore.getState().removeToast(id)
     expect(useExtensionToastStore.getState().toasts).toHaveLength(0)
   })
-
-  it('stores optional onClick handler', () => {
-    const onClick = vi.fn()
-    useExtensionToastStore.getState().addToast({ type: 'info', message: 'Click me', onClick })
-    expect(useExtensionToastStore.getState().toasts[0].onClick).toBe(onClick)
-  })
 }
 
 function useExtensionToastStoreDurationsTests() {

@@ -171,11 +171,6 @@ function exportNotesScopeTests() {
 }
 
 function exportNotesEdgeCasesTests() {
-  it('exports note with no tags', async () => {
-    const result = await exportNotes(db, { folder: exportDir, scope: 'all' })
-    expect((result as { data: { exported: number } }).data.exported).toBe(1)
-  })
-
   it('creates target folder when it does not exist', async () => {
     const newDir = path.join(exportDir, 'subdir')
     const result = await exportNotes(db, { folder: newDir, scope: 'all' })
@@ -382,8 +377,6 @@ function exportNotesIncludeDiagramsNotExportingDiagramsTests() {
 
 function registerExportIpcHandlersTests() {
   describe('picking a folder', registerExportIpcHandlersPickingFolderTests)
-  describe('running', registerExportIpcHandlersRunningTests)
-  describe('registration', registerExportIpcHandlersRegistrationTests)
 }
 
 function registerExportIpcHandlersPickingFolderTests() {
@@ -402,42 +395,6 @@ function registerExportIpcHandlersPickingFolderTests() {
     showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] })
     const cancelled = (await get('terminator.notepad:export.pickFolder')({})) as { data: unknown }
     expect(cancelled).toEqual({ data: null })
-    dispose()
-  })
-}
-
-function registerExportIpcHandlersRunningTests() {
-  it('dispatches export.run and import.run to their functions', async () => {
-    vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerExportIpcHandlers(mockApi, db)
-    const get = (ch: string) =>
-      vi.mocked(ipcMain.handle).mock.calls.find(([c]) => c === ch)![1] as (
-        e: unknown,
-        payload?: unknown
-      ) => Promise<unknown>
-
-    const exported = (await get('terminator.notepad:export.run')({}, {})) as { error?: string }
-    expect(exported).toHaveProperty('error')
-    const imported = (await get('terminator.notepad:import.run')({}, {})) as { error?: string }
-    expect(imported).toHaveProperty('error')
-    dispose()
-  })
-}
-
-function registerExportIpcHandlersRegistrationTests() {
-  it('returns a dispose function', () => {
-    const dispose = registerExportIpcHandlers(mockApi, db)
-    expect(typeof dispose).toBe('function')
-    dispose()
-  })
-
-  it('registers IPC channels on setup', () => {
-    vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerExportIpcHandlers(mockApi, db)
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:export.run',
-      expect.any(Function)
-    )
     dispose()
   })
 }

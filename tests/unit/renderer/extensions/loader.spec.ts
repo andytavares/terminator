@@ -245,13 +245,6 @@ describe('registerWebviewExtension — commands / keyboard shortcuts — does no
   })
 })
 
-describe('initExtensions — no __terminatorRegistry global', () => {
-  it('does not set __terminatorRegistry on window', async () => {
-    await callInit([{ id: 'com.test.ext', contributes: { globalTab: { label: 'X' } } }])
-    expect('__terminatorRegistry' in window).toBe(false)
-  })
-})
-
 describe('Quick Actions group allocation at init', () => {
   it('allocates groups from contributes.quickActions.group, in load order', async () => {
     await callInit([

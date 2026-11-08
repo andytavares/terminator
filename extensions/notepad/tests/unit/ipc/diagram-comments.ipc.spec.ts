@@ -5,11 +5,6 @@ vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
   app: { getPath: vi.fn(() => '/tmp') },
 }))
-import { ipcMain } from 'electron'
-
-import { apiOverIpcMain } from '../support/ipc-main-api'
-
-const mockApi = apiOverIpcMain()
 
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
@@ -19,7 +14,6 @@ import {
   listDiagramComments,
   resolveDiagramComment,
   deleteDiagramComment,
-  registerDiagramCommentsIpcHandlers,
 } from '../../../src/ipc/diagram-comments.ipc'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 
@@ -67,65 +61,8 @@ describe('deleteDiagramComment', () => {
   })
 })
 
-describe('registerDiagramCommentsIpcHandlers', () => {
-  it('dispatches each registered handler to its function', async () => {
-    vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerDiagramCommentsIpcHandlers(mockApi, db)
-    const get = (ch: string) =>
-      vi.mocked(ipcMain.handle).mock.calls.find(([c]) => c === ch)![1] as (
-        e: unknown,
-        payload?: unknown
-      ) => Promise<unknown>
-
-    // Invalid payloads still prove the dispatch reaches each function: every
-    // handler validates and answers with a structured VALIDATION_ERROR.
-    for (const ch of [
-      'terminator.notepad:diagram-comments.create',
-      'terminator.notepad:diagram-comments.list',
-      'terminator.notepad:diagram-comments.resolve',
-      'terminator.notepad:diagram-comments.delete',
-    ]) {
-      const result = (await get(ch)({}, {})) as { error?: string }
-      expect(result.error).toContain('VALIDATION_ERROR')
-    }
-    dispose()
-  })
-
-  it('registers and disposes without error', () => {
-    const dispose = registerDiagramCommentsIpcHandlers(mockApi, db)
-    expect(typeof dispose).toBe('function')
-    dispose()
-  })
-})
-
 function createDiagramCommentTests() {
-  describe('creating', createDiagramCommentCreatingTests)
   describe('unknown diagrams', createDiagramCommentUnknownDiagramsTests)
-}
-
-function createDiagramCommentCreatingTests() {
-  it('creates a root comment at given coordinates', async () => {
-    const result = await createDiagramComment(db, {
-      diagramId,
-      body: 'Check this element',
-      sceneX: 100,
-      sceneY: 200,
-    })
-    expect(result).toHaveProperty('data.id')
-    expect(result).toHaveProperty('data.createdAt')
-  })
-
-  it('creates a reply comment with parentId', async () => {
-    const root = await createDiagramComment(db, {
-      diagramId,
-      body: 'Root comment',
-      sceneX: 0,
-      sceneY: 0,
-    })
-    const parentId = (root as { data: { id: string } }).data.id
-    const reply = await createDiagramComment(db, { diagramId, parentId, body: 'Reply' })
-    expect(reply).toHaveProperty('data.id')
-  })
 }
 
 function createDiagramCommentUnknownDiagramsTests() {

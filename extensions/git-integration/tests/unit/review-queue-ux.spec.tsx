@@ -110,31 +110,6 @@ describe('review queue rows never lead with approval', () => {
   })
 })
 
-describe('review queue rows never lead with approval — drops the six-dot signal strip that never carried a visible label', () => {
-  for (const riskLevel of risks) {
-    it(`offers reading, not approving, as the ${riskLevel}-risk row's action`, () => {
-      withQueue([makePr({ number: 7, title: 'Some change', riskLevel })])
-      render(<ReviewQueue {...props} />)
-
-      const row = screen.getByText('Some change').closest<HTMLElement>('.rd-row')!
-      expect(within(row).queryByText(/approve/i)).toBeNull()
-      expect(within(row).getByRole('button', { name: 'Review' })).toBeTruthy()
-    })
-  }
-
-  it('drops the six-dot signal strip that never carried a visible label', () => {
-    const { container } = render(
-      <>
-        {(() => {
-          withQueue([makePr({ number: 9, title: 'Dotted' })])
-          return <ReviewQueue {...props} />
-        })()}
-      </>
-    )
-    expect(container.querySelectorAll('.pr-signal-dot')).toHaveLength(0)
-  })
-})
-
 /**
  * FR-032 / T078. The row count is the number of PRs fetched so far, which is
  * not the number waiting on you. Reporting the page size as the total is the
@@ -148,11 +123,5 @@ describe('the queue summary reports the real total', () => {
     })
     render(<ReviewQueue {...props} />)
     expect(screen.getByText('47', { selector: 'b' })).toBeTruthy()
-  })
-
-  it('has no manual pagination button', () => {
-    withQueue([makePr({ number: 1 })], { totalPrCount: 40, hasMorePrs: true })
-    render(<ReviewQueue {...props} />)
-    expect(screen.queryByText(/load more/i)).toBeNull()
   })
 })

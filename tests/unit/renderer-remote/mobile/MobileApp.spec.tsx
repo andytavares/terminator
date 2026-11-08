@@ -61,24 +61,7 @@ beforeEach(() => {
 })
 
 describe('MobileApp', () => {
-  it('renders MobileTerminalList by default', async () => {
-    mockListWorkspaces.mockResolvedValue([])
-    mockListTerminals.mockResolvedValue([])
-    const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
-    render(<MobileApp />)
-    await screen.findByText('open terminal')
-  })
-
-  it('switches to MobileTerminalView when onSelectTerminal is called', async () => {
-    mockListWorkspaces.mockResolvedValue([])
-    mockListTerminals.mockResolvedValue([])
-    const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
-    render(<MobileApp />)
-    fireEvent.click(await screen.findByText('open terminal'))
-    expect(screen.getByText('terminal:s1')).toBeTruthy()
-  })
-
-  it('returns to list view when onBack is called from MobileTerminalView', async () => {
+  it('switches to MobileTerminalView when a terminal is chosen, and back to the list on onBack', async () => {
     mockListWorkspaces.mockResolvedValue([])
     mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')

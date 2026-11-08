@@ -50,38 +50,24 @@ function notesStoreTests() {
 }
 
 function notesStoreNotesTests() {
-  it('starts with empty notes and no selection', () => {
-    const { notes, selectedNoteId } = useNotesStore.getState()
-    expect(notes).toEqual([])
-    expect(selectedNoteId).toBeNull()
-  })
-
-  it('setNotes replaces the list', () => {
-    useNotesStore.getState().setNotes([mockNote])
-    expect(useNotesStore.getState().notes).toHaveLength(1)
-    expect(useNotesStore.getState().notes[0].id).toBe('n1')
-  })
-
-  it('setNotes with empty array clears list', () => {
-    useNotesStore.getState().setNotes([mockNote])
-    useNotesStore.getState().setNotes([])
-    expect(useNotesStore.getState().notes).toHaveLength(0)
+  it.each([
+    { name: 'another note', next: [{ ...mockNote, id: 'n2', title: 'Other' }] },
+    { name: 'no notes', next: [] },
+  ])('setNotes replaces the list with $name', ({ next }) => {
+    useNotesStore.setState({ notes: [mockNote] })
+    useNotesStore.getState().setNotes(next)
+    expect(useNotesStore.getState().notes).toEqual(next)
   })
 }
 
 function notesStoreSelectionTests() {
-  it('setSelected sets the selected note id', () => {
-    useNotesStore.getState().setSelected('n1')
-    expect(useNotesStore.getState().selectedNoteId).toBe('n1')
-  })
-
   it('setSelected accepts null to deselect', () => {
     useNotesStore.getState().setSelected('n1')
     useNotesStore.getState().setSelected(null)
     expect(useNotesStore.getState().selectedNoteId).toBeNull()
   })
 
-  it('setSelected clears selectedDiagramId', () => {
+  it('setSelected selects the note and clears selectedDiagramId', () => {
     useNotesStore.getState().setSelectedDiagram('d1')
     useNotesStore.getState().setSelected('n1')
     expect(useNotesStore.getState().selectedDiagramId).toBeNull()
@@ -142,12 +128,7 @@ function notesStorePatchingTests() {
 }
 
 function notesStoreCachesTests() {
-  it('setBodyCache stores and returns body by note id', () => {
-    useNotesStore.getState().setBodyCache('n1', 'hello world')
-    expect(useNotesStore.getState().bodyCache['n1']).toBe('hello world')
-  })
-
-  it('setBodyCache is additive (does not clear other entries)', () => {
+  it('setBodyCache stores each body by note id without clearing the others', () => {
     useNotesStore.getState().setBodyCache('n1', 'body 1')
     useNotesStore.getState().setBodyCache('n2', 'body 2')
     expect(useNotesStore.getState().bodyCache['n1']).toBe('body 1')
@@ -157,10 +138,5 @@ function notesStoreCachesTests() {
   it('setDiagramCache stores scene JSON by diagram id', () => {
     useNotesStore.getState().setDiagramCache('d1', '{"elements":[]}')
     expect(useNotesStore.getState().diagramCache['d1']).toBe('{"elements":[]}')
-  })
-
-  it('bodyCache and diagramCache start empty', () => {
-    expect(useNotesStore.getState().bodyCache).toEqual({})
-    expect(useNotesStore.getState().diagramCache).toEqual({})
   })
 }

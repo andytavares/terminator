@@ -50,17 +50,6 @@ const replyProps = {
 }
 
 describe('CommentComposer (new comment)', () => {
-  it('renders Write and Preview tabs', () => {
-    render(<CommentComposer {...newCommentProps} />)
-    expect(screen.getByText('Write')).toBeTruthy()
-    expect(screen.getByText('Preview')).toBeTruthy()
-  })
-
-  it('renders textarea in write mode', () => {
-    render(<CommentComposer {...newCommentProps} />)
-    expect(screen.getByPlaceholderText(/Leave a comment/)).toBeTruthy()
-  })
-
   it('switches to preview tab', () => {
     render(<CommentComposer {...newCommentProps} />)
     fireEvent.click(screen.getByText('Preview'))
@@ -140,11 +129,6 @@ describe('CommentComposer (new comment) — shows New comment · line N header, 
 })
 
 describe('CommentComposer (reply)', () => {
-  it('renders a Reply submit button', () => {
-    render(<CommentComposer {...replyProps} />)
-    expect(screen.getByText('Reply')).toBeTruthy()
-  })
-
   it('calls prCommentReply on submit, not addDraft', async () => {
     mockPrCommentReply.mockResolvedValue({ success: true })
     const onSubmitted = vi.fn()

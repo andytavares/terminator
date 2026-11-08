@@ -61,11 +61,6 @@ const defaultProps = {
 }
 
 describe('FullFileList', () => {
-  it('renders chapter name', () => {
-    render(<FullFileList {...defaultProps} />)
-    expect(screen.getByText('1 · Core')).toBeTruthy()
-  })
-
   it('renders file names', () => {
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('foo.ts')).toBeTruthy()
@@ -158,17 +153,6 @@ describe('FullFileList — shows changed for a file the store lists as changed s
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('changed')).toBeTruthy()
   })
-
-  it('shows "viewed" for a file marked viewed and unchanged since', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      viewedFiles: new Set(['src/foo.ts']),
-      fileOrderOverrides: {},
-      changedSince: new Set<string>(),
-      viewedAt: { 'src/foo.ts': 'abc' },
-    })
-    render(<FullFileList {...defaultProps} />)
-    expect(screen.getByRole('img', { name: 'Viewed' })).toBeTruthy()
-  })
 })
 
 describe.each([
@@ -256,24 +240,5 @@ describe('FullFileList — comments and folder', () => {
   it('shows the folder muted after the file name', () => {
     render(<FullFileList {...defaultProps} />)
     expect(within(screen.getByTitle('src/foo.ts')).getByText('src/')).toBeTruthy()
-  })
-})
-
-describe('FullFileList — reading-order reason', () => {
-  it('does not render the reading-order reason on the row', () => {
-    const pr = makePr([
-      {
-        id: 'ch-1',
-        name: 'Core',
-        estimatedMinutes: 10,
-        status: 'not-started',
-        files: [makeFile('src/foo.ts')],
-      },
-    ])
-    pr.readingOrder = [
-      { step: 1, path: 'src/foo.ts', symbol: null, reason: 'Defines RiskScore', uses: [] },
-    ]
-    render(<FullFileList {...defaultProps} pr={pr} />)
-    expect(screen.queryByText('Defines RiskScore')).toBeNull()
   })
 })

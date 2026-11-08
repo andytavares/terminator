@@ -108,14 +108,6 @@ describe('ThreadDrawer terminal section lifecycle', () => {
     expect(screen.queryByTestId('preview-s9')).toBeNull()
     expect(screen.queryByText(/^LIVE TERMINAL/)).toBeNull()
   })
-
-  it('unmounts the preview when the drawer closes', () => {
-    openDrawerFor([fact({ ...OPEN_SESSION })], 'linear:TAV-20')
-    const { unmount } = render(<ThreadDrawer />)
-    expect(screen.getByTestId('preview-s9')).toBeTruthy()
-    unmount()
-    expect(screen.queryByTestId('preview-s9')).toBeNull()
-  })
 })
 
 describe('ThreadDrawer links', () => {

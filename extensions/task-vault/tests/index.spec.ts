@@ -76,28 +76,6 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('task-vault manifest quick action', () => {
-  it('declares a Task Vault group and a mnemonic on the capture command', () => {
-    const manifest = JSON.parse(readFileSync(join(__dirname, '../manifest.json'), 'utf-8')) as {
-      contributes: {
-        quickActions?: { group?: { mnemonic?: string; label?: string } }
-        commands?: { id: string; mnemonic?: string; label?: string }[]
-      }
-    }
-
-    expect(manifest.contributes.quickActions?.group).toEqual({
-      mnemonic: 'v',
-      label: 'Task Vault',
-    })
-
-    const command = manifest.contributes.commands?.find(
-      (c) => c.id === 'task-vault:capture-to-inbox'
-    )
-    expect(command?.mnemonic).toBe('c')
-    expect(command?.label).toBe('Capture to inbox')
-  })
-})
-
 describe(
   'task-vault activate() quick-actions command registration',
   taskVaultActivateQuickActionsTests
@@ -120,21 +98,23 @@ function taskVaultActivateQuickActionsTests() {
 }
 
 function taskVaultActivateQuickActionsRegisteringTests() {
-  it('registers the manifest command id with its label and mnemonic', async () => {
+  it('registers the capture command exactly as the manifest declares it, in the Task Vault group', async () => {
+    const manifest = JSON.parse(readFileSync(join(__dirname, '../manifest.json'), 'utf-8')) as {
+      contributes: {
+        quickActions: { group: { mnemonic: string; label: string } }
+        commands: { id: string }[]
+      }
+    }
+    const declared = manifest.contributes.commands.find(
+      (c) => c.id === 'task-vault:capture-to-inbox'
+    )
     const { api } = makeApi()
     const { activate } = await import('../src/index.ts')
 
     await activate(api)
 
-    const commandsRegister = vi.mocked(api.commands.register)
-    expect(commandsRegister).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'task-vault:capture-to-inbox',
-        label: 'Capture to inbox',
-        mnemonic: 'c',
-      }),
-      expect.any(Function)
-    )
+    expect(manifest.contributes.quickActions.group).toEqual({ mnemonic: 'v', label: 'Task Vault' })
+    expect(api.commands.register).toHaveBeenCalledWith(declared, expect.any(Function))
   })
 }
 

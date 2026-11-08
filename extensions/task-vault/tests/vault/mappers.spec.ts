@@ -74,15 +74,16 @@ function rowToTaskBasicFieldsTests() {
 }
 
 function rowToTaskBlockedColumnsTests() {
-  it('reads blocked_reason from promoted column', () => {
-    const task = rowToTask(baseTaskRow({ blocked_reason: 'waiting on PR' }))
-    expect(task.blockedReason).toBe('waiting on PR')
-  })
-
-  it('reads blocked_check_interval from promoted column', () => {
-    const task = rowToTask(baseTaskRow({ blocked_check_interval: '1d' }))
-    expect(task.blockedCheckInterval).toBe('1d')
-  })
+  it.each([
+    { column: 'blocked_reason', value: 'waiting on PR', field: 'blockedReason' },
+    { column: 'blocked_check_interval', value: '1d', field: 'blockedCheckInterval' },
+  ] as const)(
+    'reads $column from its promoted column when it is the only one set',
+    ({ column, value, field }) => {
+      const task = rowToTask(baseTaskRow({ [column]: value }))
+      expect(task[field]).toBe(value)
+    }
+  )
 }
 
 function rowToTaskRecurrenceColumnsTests() {

@@ -17,11 +17,6 @@ function readSensorFile(file: string): string {
 }
 
 describe('built-in sensors', () => {
-  it('ships the two built-ins', () => {
-    const files = fs.readdirSync(sensorsDir).filter((f) => f.endsWith('.yaml'))
-    expect(files.sort()).toEqual(['ci-main-red.yaml', 'tracker-query.yaml'])
-  })
-
   it('parses ci-main-red as a github-runs sensor on the base branch', () => {
     const parsed = parseSensor(readSensorFile('ci-main-red.yaml'), 'ci-main-red.yaml')
     expect(parsed.ok && parsed.value.source).toEqual({

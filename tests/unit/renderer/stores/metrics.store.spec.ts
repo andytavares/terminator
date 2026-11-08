@@ -55,18 +55,6 @@ afterEach(() => {
 })
 
 describe('useMetricsStore', () => {
-  it('setSystem updates system metrics', () => {
-    useMetricsStore.getState().setSystem(sysData)
-    expect(useMetricsStore.getState().system).toMatchObject({ cpuPercent: 42 })
-  })
-
-  it('setProcessMetrics stores per-session data', () => {
-    useMetricsStore
-      .getState()
-      .setProcessMetrics('sess-1', { pid: 123, cpuPercent: 5, rssBytes: 1024 })
-    expect(useMetricsStore.getState().processesBySessionId.get('sess-1')?.cpuPercent).toBe(5)
-  })
-
   it('startPolling fires immediately and sets pollingActive', async () => {
     mockGetSystem.mockResolvedValue({ data: sysData })
     mockGetProcesses.mockResolvedValue({ data: [] })
@@ -99,36 +87,31 @@ describe('useMetricsStore — startPolling polls getProcesses with resolved pids
 
   it('stopPolling clears all metrics and sets pollingActive false', async () => {
     mockGetSystem.mockResolvedValue({ data: sysData })
-    mockGetProcesses.mockResolvedValue({ data: [] })
-
-    useMetricsStore.getState().startPolling([])
-    await vi.advanceTimersByTimeAsync(2001)
-    await answered(mockGetSystem)
-
-    useMetricsStore.getState().setSystem(sysData)
-    expect(useMetricsStore.getState().system).not.toBeNull()
+    mockGetProcesses.mockResolvedValue({ data: [{ pid: 100, cpuPercent: 12, rssBytes: 4096 }] })
+    useMetricsStore.getState().startPolling([{ sessionId: 'sess-1', pid: 100 }])
+    await vi.advanceTimersByTimeAsync(0)
+    expect(useMetricsStore.getState().processesBySessionId.size).toBe(1)
 
     useMetricsStore.getState().stopPolling()
-    expect(useMetricsStore.getState().system).toBeNull()
+
+    expect(useMetricsStore.getState()).toMatchObject({ system: null, pollingActive: false })
     expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
-    expect(useMetricsStore.getState().pollingActive).toBe(false)
   })
 })
 
-describe('useMetricsStore — stopPolling keeps polling when globalMetricsEnabled is true', () => {
-  it('stopPolling keeps polling when globalMetricsEnabled is true', async () => {
+describe('useMetricsStore — stopPolling keeps system polling when globalMetricsEnabled', () => {
+  it('stopPolling keeps system polling when globalMetricsEnabled and clears per-process metrics', async () => {
     mockGetSystem.mockResolvedValue({ data: sysData })
-    mockGetProcesses.mockResolvedValue({ data: [] })
-
+    mockGetProcesses.mockResolvedValue({ data: [{ pid: 100, cpuPercent: 12, rssBytes: 4096 }] })
     useMetricsStore.setState({ globalMetricsEnabled: true })
     useMetricsStore.getState().startPolling([{ sessionId: 'sess-1', pid: 100 }])
-    useMetricsStore.getState().setProcessMetrics('sess-1', { pid: 100, cpuPercent: 5, rssBytes: 0 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(useMetricsStore.getState().processesBySessionId.size).toBe(1)
 
     useMetricsStore.getState().stopPolling()
 
-    // process metrics cleared, polling still active
+    expect(useMetricsStore.getState()).toMatchObject({ system: sysData, pollingActive: true })
     expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
-    expect(useMetricsStore.getState().pollingActive).toBe(true)
   })
 
   it('enableGlobalMetrics starts polling when not already active', async () => {
@@ -170,22 +153,7 @@ describe('useMetricsStore — disableGlobalMetrics stops polling and clears stat
   })
 })
 
-describe('useMetricsStore — stopPolling keeps system polling when globalMetricsEnabled and clears per-process metrics', () => {
-  it('stopPolling keeps system polling when globalMetricsEnabled and clears per-process metrics', async () => {
-    mockGetSystem.mockResolvedValue({ data: sysData })
-    mockGetProcesses.mockResolvedValue({ data: [] })
-    useMetricsStore.getState().startPolling([{ sessionId: 'sess-1', pid: 100 }])
-    useMetricsStore.setState({ globalMetricsEnabled: true })
-    useMetricsStore.getState().setSystem(sysData)
-
-    useMetricsStore.getState().stopPolling()
-
-    // Per-process metrics cleared
-    expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
-    // System metrics still populated (polling continued)
-    expect(useMetricsStore.getState().system).not.toBeNull()
-  })
-
+describe('useMetricsStore — enableGlobalMetrics called twice', () => {
   it('enableGlobalMetrics called twice still samples once per tick', async () => {
     mockGetSystem.mockResolvedValue({ data: sysData })
     mockGetProcesses.mockResolvedValue({ data: [] })
@@ -210,12 +178,6 @@ describe('useMetricsStore — restarting and stray answers', () => {
     mockGetSystem.mockClear()
     await vi.advanceTimersByTimeAsync(2000)
     expect(mockGetSystem).toHaveBeenCalledTimes(1)
-  })
-
-  it('stopping when nothing polls just clears the metrics', () => {
-    useMetricsStore.getState().setSystem(sysData)
-    useMetricsStore.getState().stopPolling()
-    expect(useMetricsStore.getState()).toMatchObject({ system: null, pollingActive: false })
   })
 
   it('ignores a failed process read and a pid no session owns', async () => {

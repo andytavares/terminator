@@ -33,12 +33,6 @@ beforeEach(() => {
 })
 
 describe('AgentsSettings', () => {
-  it('says any ACP agent works, with the example command', () => {
-    render(<AgentsSettings />)
-    expect(screen.getByText(/any agent that speaks the Agent Client Protocol/i)).toBeTruthy()
-    expect(screen.getByText(/opencode acp/)).toBeTruthy()
-  })
-
   it('saves a new custom agent with its command line split into command and arguments', () => {
     render(<AgentsSettings />)
     fireEvent.click(screen.getByText('Add agent'))

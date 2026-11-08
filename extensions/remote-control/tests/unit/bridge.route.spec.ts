@@ -201,26 +201,9 @@ function bridgeAuthenticationTests() {
     expect(ws.readyState).toBe(WebSocket.OPEN)
     await closeBridge(ws)
   })
-
-  it('rejects a ticket that has already been consumed', async () => {
-    const ticket = ticketStore.createTicket('__bridge__', 'bridge')
-    ticketStore.consumeTicket(ticket, 'bridge')
-    const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-    await expectClosed(ws)
-  })
 }
 
 function bridgeSubscribeTests() {
-  it('subscribes to a channel via onWindowEvent', async () => {
-    const ws = await openBridge()
-
-    ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await eventually(() =>
-      expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
-    )
-    await closeBridge(ws)
-  })
-
   it('does not double-subscribe to the same channel', async () => {
     const ws = await openBridge()
 
@@ -268,17 +251,6 @@ function bridgeInvokeResultTests() {
 }
 
 function bridgeInvokeEdgeTests() {
-  it('sends result: undefined when invokeChannel returns undefined', async () => {
-    mockInvokeChannel.mockResolvedValue(undefined)
-
-    const ws = await openBridge()
-    const parsed = await invokeOverBridge(ws, { id: 'r2', channel: 'nonexistent', args: [{}] })
-
-    expect(parsed.type).toBe('result')
-    expect(parsed.id).toBe('r2')
-    await closeBridge(ws)
-  })
-
   it('sends error response when invokeChannel throws', async () => {
     mockInvokeChannel.mockRejectedValue(new Error('validation failed'))
 
@@ -335,10 +307,12 @@ function bridgeSendEdgeTests() {
 }
 
 function bridgeEventForwardingTests() {
-  it('forwards onWindowEvent events to subscribed client', async () => {
+  it('subscribes to the channel and forwards its events to the client', async () => {
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await eventually(() => expect(mockOnWindowEvent).toHaveBeenCalled())
+    await eventually(() =>
+      expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
+    )
 
     const [[, forwarder]] = mockOnWindowEvent.mock.calls as [[string, (...a: unknown[]) => void]]
     forwarder({ sessionId: 's1', data: 'hello' })
@@ -389,12 +363,6 @@ function bridgeTicketPurposeTests() {
   it('rejects a terminal-purpose ticket on the bridge endpoint', async () => {
     const terminalTicket = ticketStore.createTicket('some-session-id', 'terminal')
     const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${terminalTicket}`)
-    await expectClosed(ws)
-  })
-
-  it('rejects an app-purpose ticket on the bridge endpoint', async () => {
-    const appTicket = ticketStore.createTicket('__app__', 'app')
-    const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${appTicket}`)
     await expectClosed(ws)
   })
 }

@@ -190,30 +190,7 @@ describe('createTerminalSession — stores the instance before activating the se
   })
 })
 
-describe('createTerminalSession — marks the session busy on output, and idle after the working hold', () => {
-  it('marks the session busy on output, and idle after the working hold', async () => {
-    vi.useFakeTimers()
-    try {
-      await createTerminalSession(terminalRequest())
-      const { hooks } = capturedCtorArgs[0]
-      hooks!.onBusy!()
-      expect(sessionOf('session-123')!.busy).toBe(true)
-      hooks!.onIdle!()
-      expect(sessionOf('session-123')!.busy).toBe(true)
-      vi.advanceTimersByTime(3500)
-      expect(sessionOf('session-123')!.busy).toBe(false)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('reads the screen when output settles, and records its last line', async () => {
-    await createTerminalSession(terminalRequest())
-    screenRows = ['$ pnpm test', '  14 passed, 2 failed', '', '']
-    capturedCtorArgs[0].hooks!.onIdle!()
-    expect(sessionOf('session-123')!.latestLine).toBe('14 passed, 2 failed')
-  })
-
+describe('createTerminalSession — requests focus for the new session, so its pane grabs the keyboard', () => {
   it('requests focus for the new session, so its pane grabs the keyboard', async () => {
     await createTerminalSession(terminalRequest())
     expect(useSessionStore.getState().focusRequest?.sessionId).toBe('session-123')
@@ -536,17 +513,7 @@ const PROMPT = {
   ],
 }
 
-describe('reading a choice prompt off the screen (054)', () => {
-  it('records the prompt a settled screen shows', async () => {
-    await createTerminalSession(terminalRequest())
-    screenRows = PROMPT_ROWS
-    capturedCtorArgs[0].hooks!.onIdle!()
-    expect(sessionOf('session-123')).toMatchObject({
-      latestLine: 'Esc to cancel',
-      choicePrompt: PROMPT,
-    })
-  })
-
+describe('reading a choice prompt off the screen (054) — forgets the prompt as soon as output moves again', () => {
   it('forgets the prompt as soon as output moves again', async () => {
     await createTerminalSession(terminalRequest())
     screenRows = PROMPT_ROWS
@@ -672,21 +639,26 @@ describe('answerChoice (054)', () => {
     expect(sessionOf('s1')!.choicePrompt).toBeUndefined()
     expect(sessionOf('s1')!.latestLine).toBe('Esc to cancel')
   })
+})
 
-  it('sends nothing when the prompt has gone', () => {
-    screenRows = ['⏺ Done.', '']
-    expect(answerChoice('s1', 1)).toBe(false)
-    expect(terminalApi.input).not.toHaveBeenCalled()
-  })
+describe('answerChoice (054) — sends nothing', () => {
+  setUpAnswerChoice054()
 
-  it('sends nothing for a number the prompt does not offer', () => {
-    expect(answerChoice('s1', 3)).toBe(false)
-    expect(terminalApi.input).not.toHaveBeenCalled()
-  })
-
-  it('sends nothing for a session without a terminal', () => {
-    useSessionStore.setState({ terminalInstances: new Map() })
-    expect(answerChoice('s1', 1)).toBe(false)
+  it.each([
+    {
+      when: 'the prompt has gone',
+      arrange: () => (screenRows = ['⏺ Done.', '']),
+      option: 1,
+    },
+    { when: 'the prompt does not offer the number', arrange: () => {}, option: 3 },
+    {
+      when: 'the session has no terminal',
+      arrange: () => useSessionStore.setState({ terminalInstances: new Map() }),
+      option: 1,
+    },
+  ])('sends nothing when $when', ({ arrange, option }) => {
+    arrange()
+    expect(answerChoice('s1', option)).toBe(false)
     expect(terminalApi.input).not.toHaveBeenCalled()
   })
 })

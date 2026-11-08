@@ -28,37 +28,15 @@ describe('registerLogHandlers()', () => {
     expect(mockWriteFromRenderer).toHaveBeenCalledWith('info', 'app', 'hello')
   })
 
-  it('ignores payload with missing level', () => {
+  it.each([
+    ['a missing level', { namespace: 'app', message: 'hello' }],
+    ['a missing namespace', { level: 'info', message: 'hello' }],
+    ['a non-string message', { level: 'info', namespace: 'app', message: 42 }],
+    ['a null payload', null],
+  ])('ignores %s', (_case, payload) => {
     registerLogHandlers()
     const handler = mockIpcOn.mock.calls[0][1]
-    handler({}, { namespace: 'app', message: 'hello' })
-    expect(mockWriteFromRenderer).not.toHaveBeenCalled()
-  })
-
-  it('ignores payload with missing namespace', () => {
-    registerLogHandlers()
-    const handler = mockIpcOn.mock.calls[0][1]
-    handler({}, { level: 'info', message: 'hello' })
-    expect(mockWriteFromRenderer).not.toHaveBeenCalled()
-  })
-})
-
-describe('registerLogHandlers() — malformed payloads', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('ignores payload with non-string message', () => {
-    registerLogHandlers()
-    const handler = mockIpcOn.mock.calls[0][1]
-    handler({}, { level: 'info', namespace: 'app', message: 42 })
-    expect(mockWriteFromRenderer).not.toHaveBeenCalled()
-  })
-
-  it('ignores null payload', () => {
-    registerLogHandlers()
-    const handler = mockIpcOn.mock.calls[0][1]
-    handler({}, null)
+    handler({}, payload)
     expect(mockWriteFromRenderer).not.toHaveBeenCalled()
   })
 })

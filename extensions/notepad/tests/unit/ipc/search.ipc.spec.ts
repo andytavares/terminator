@@ -1,9 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ipcMain } from 'electron'
-
-import { apiOverIpcMain } from '../support/ipc-main-api'
-
-const mockApi = apiOverIpcMain()
 import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({
@@ -13,7 +8,7 @@ vi.mock('electron', () => ({
 
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
-import { searchNotes, registerSearchIpcHandlers } from '../../../src/ipc/search.ipc'
+import { searchNotes } from '../../../src/ipc/search.ipc'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 
 let db: ExtensionDB
@@ -53,14 +48,6 @@ beforeEach(async () => {
   await applyNotepadSchema(db)
 })
 
-describe('registerSearchIpcHandlers', () => {
-  it('returns a dispose function', () => {
-    const dispose = registerSearchIpcHandlers(mockApi, db)
-    expect(typeof dispose).toBe('function')
-    dispose()
-  })
-})
-
 describe('searchNotes — basic text query (LIKE)', searchNotesBasicTextQueryLIKETests)
 describe('searchNotes — tag: filter', searchNotesTagFilterTests)
 
@@ -92,19 +79,6 @@ describe('searchNotes — empty query returns all', () => {
     const result = await searchNotes(db, { query: '' })
     const data = (result as { data: unknown[] }).data
     expect(data).toHaveLength(2)
-  })
-})
-
-describe('IPC handler registration', () => {
-  it('registerSearchIpcHandlers registers and disposes the channel', () => {
-    vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerSearchIpcHandlers(mockApi, db)
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:search.query',
-      expect.any(Function)
-    )
-    dispose()
-    expect(ipcMain.removeHandler).toHaveBeenCalledWith('terminator.notepad:search.query')
   })
 })
 
@@ -153,13 +127,6 @@ function searchNotesBasicTextQueryLIKENoMatchPartialTests() {
     expect(data.some((r) => r.id === 'n1')).toBe(true)
     expect(data.some((r) => r.id === 'n2')).toBe(false)
   })
-
-  it('search is case-insensitive', async () => {
-    await insertNote('n1', ['Hello World', 'Some content here'])
-    const result = await searchNotes(db, { query: 'HELLO' })
-    const data = (result as { data: { id: string }[] }).data
-    expect(data.some((r) => r.id === 'n1')).toBe(true)
-  })
 }
 
 function searchNotesTagFilterTests() {
@@ -206,15 +173,18 @@ function searchNotesTagFilterCombinedTextTests() {
 }
 
 function searchNotesBasicTextQueryCaseWildcardTests() {
-  it('folds the case of non-ASCII letters too', async () => {
-    await insertNote('n1', ['Über den Wolken', 'Die Freiheit wäre grenzenlos'])
-    await insertNote('n2', ['Café', 'CRÈME BRÛLÉE'])
+  it.each([
+    { query: 'HELLO', ids: ['n1'] },
+    { query: 'über', ids: ['n2'] },
+    { query: 'WÄRE', ids: ['n2'] },
+    { query: 'crème brûlée', ids: ['n3'] },
+  ])('matches $query regardless of case, non-ASCII letters too', async ({ query, ids }) => {
+    await insertNote('n1', ['Hello World', 'Some content here'])
+    await insertNote('n2', ['Über den Wolken', 'Die Freiheit wäre grenzenlos'])
+    await insertNote('n3', ['Café', 'CRÈME BRÛLÉE'])
 
-    const idsMatching = async (query: string) =>
-      ((await searchNotes(db, { query })) as { data: { id: string }[] }).data.map((r) => r.id)
-    expect(await idsMatching('über')).toEqual(['n1'])
-    expect(await idsMatching('WÄRE')).toEqual(['n1'])
-    expect(await idsMatching('crème brûlée')).toEqual(['n2'])
+    const result = await searchNotes(db, { query })
+    expect((result as { data: { id: string }[] }).data.map((r) => r.id)).toEqual(ids)
   })
 
   it('matches % and _ as the characters typed', async () => {

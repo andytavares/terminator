@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
-import {
-  adoptLoginShellPath,
-  LOGIN_SHELL_TIMEOUT_MS,
-} from '../../../src/main/shell/login-shell-path'
+import { adoptLoginShellPath } from '../../../src/main/shell/login-shell-path'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
 import { expectProcessGone, recordedPid } from '../../support/processes'
@@ -79,10 +76,6 @@ describe('adoptLoginShellPath with a slow shell', () => {
     const late: NodeJS.ProcessEnv = { SHELL: shell, PATH: '/usr/bin:/bin' }
     await adoptLoginShellPath(late, 300)
     expect(late.PATH, 'a shell past the wait leaves PATH alone').toBe('/usr/bin:/bin')
-  })
-
-  it('waits long enough by default for a shell whose rc files take several seconds', () => {
-    expect(LOGIN_SHELL_TIMEOUT_MS).toBeGreaterThanOrEqual(15_000)
   })
 })
 

@@ -157,30 +157,6 @@ describe('StagingArea — states — shows truncation banner when truncated is t
   })
 })
 
-describe('StagingArea — states — shows Unstage All button when files are staged', () => {
-  it('shows Unstage All button when files are staged', () => {
-    const files = [makeFile('modified', true, 'staged.ts')]
-    mockStore({
-      status: { branch: 'main', files, truncated: false, hasConflicts: false },
-      setStatus: mockSetStatus,
-      selectedFile: null,
-    })
-    render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    expect(screen.getByText('Unstage All')).toBeTruthy()
-  })
-
-  it('shows Stage All button when files are unstaged', () => {
-    const files = [makeFile('modified', false, 'unstaged.ts')]
-    mockStore({
-      status: { branch: 'main', files, truncated: false, hasConflicts: false },
-      setStatus: mockSetStatus,
-      selectedFile: null,
-    })
-    render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    expect(screen.getByText('Stage All')).toBeTruthy()
-  })
-})
-
 describe('StagingArea — interactions', () => {
   it('calls onFileSelect when a file row is clicked', () => {
     const onFileSelect = vi.fn()

@@ -237,13 +237,8 @@ describe('commitChanges — arguments', () => {
 })
 
 describe('commitChanges — the commit hash', () => {
-  it('resolves the commit hash parsed from stdout on success', async () => {
-    commitRuns(['[main a1b2c3d] feat: add x\n'])
-
-    await expect(commitChanges('/repo', 'feat: add x')).resolves.toEqual({ commitHash: 'a1b2c3d' })
-  })
-
   it.each([
+    ['main', '[main a1b2c3d] feat: add x'],
     ['feature/add-login', '[feature/add-login a1b2c3d] feat: add login'],
     ['release-1.2', '[release-1.2 a1b2c3d] chore: release'],
     ['user.name/fix_x', '[user.name/fix_x a1b2c3d] fix: x'],

@@ -212,13 +212,6 @@ function dateTimePickerTimeMode12hAMShortcutsHalvesTests() {
     expect(screen.getByText('4 hours')).toBeTruthy()
     expect(screen.getByText('End of day')).toBeTruthy()
   })
-
-  it('shows AM/PM toggle buttons', () => {
-    const { container } = render(<DateTimePicker mode="time" value="" onChange={vi.fn()} />)
-    act(() => clickTrigger(container))
-    expect(container.querySelector('.dtp__ampm-toggle')).toBeTruthy()
-    expect(container.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('AM')
-  })
 }
 
 function dateTimePickerTimeMode12hAMSlotsTests() {
@@ -302,19 +295,7 @@ function dateTimePickerTimeMode12hAMSelectionTests() {
 }
 
 function dateTimePickerDatetimeModeTests() {
-  describe('layout', dateTimePickerDatetimeModeLayoutTests)
   describe('updates', dateTimePickerDatetimeModeUpdatesTests)
-}
-
-function dateTimePickerDatetimeModeLayoutTests() {
-  it('shows both calendar and time panel with AM/PM toggle', () => {
-    const { container } = render(
-      <DateTimePicker mode="datetime" value="2026-06-13T14:00" onChange={vi.fn()} />
-    )
-    act(() => clickTrigger(container))
-    expect(screen.getByText('June 2026')).toBeTruthy()
-    expect(container.querySelector('.dtp__ampm-toggle')).toBeTruthy()
-  })
 }
 
 function dateTimePickerDatetimeModeUpdatesTests() {

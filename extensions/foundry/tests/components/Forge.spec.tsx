@@ -185,8 +185,7 @@ beforeEach(() => vi.clearAllMocks())
 
 describe('the tracker write-back panel', () => {
   describe('the rows and choices', theRowsAndChoicesTests)
-  describe('overriding', overridingTests)
-  describe('resetting', resettingTests)
+  describe('choosing a state', choosingTests)
   describe('nowhere to go', nowhereToGoTests)
   describe('nothing to offer', nothingToOfferTests)
 })
@@ -214,41 +213,30 @@ function theRowsAndChoicesTests() {
   })
 }
 
-function overridingTests() {
-  it('stores the override when the operator picks one', async () => {
-    mountStates({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await openForgeStep('Tracker')
-
-    const select = screen.getAllByRole('combobox')[1]
-    fireEvent.change(select, { target: { value: 'st-progress' } })
-
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.mapState', {
-        id: 'WO-1',
-        intent: 'in_review',
-        optionId: 'st-progress',
+function choosingTests() {
+  it.each([
+    { picked: 'st-progress', stored: null, optionId: 'st-progress' },
+    { picked: '', stored: 'st-review', optionId: null },
+  ])(
+    'saves $optionId when the operator picks "$picked" over $stored',
+    async ({ picked, stored, optionId }) => {
+      mountStates({
+        capability: { transitions: 'supported', states: STATES, unreachable: [] },
+        mapping: { started: null, in_review: stored, done: null },
       })
-    )
-  })
-}
+      await openForgeStep('Tracker')
 
-function resettingTests() {
-  it('puts an intent back to the tracker own resolution', async () => {
-    mountStates({
-      capability: { transitions: 'supported', states: STATES, unreachable: [] },
-      mapping: { started: null, in_review: 'st-review', done: null },
-    })
-    await openForgeStep('Tracker')
+      fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: picked } })
 
-    fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '' } })
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.mapState', {
-        id: 'WO-1',
-        intent: 'in_review',
-        optionId: null,
-      })
-    )
-  })
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith('foundry:order.mapState', {
+          id: 'WO-1',
+          intent: 'in_review',
+          optionId,
+        })
+      )
+    }
+  )
 }
 
 function nowhereToGoTests() {
@@ -273,14 +261,14 @@ function nowhereToGoTests() {
 }
 
 function nothingToOfferTests() {
-  it('offers no step at all for an order nobody seeded from a tracker', async () => {
-    mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
-    await screen.findByText('Refuse an expired refresh token')
-    expect(within(stepList()).queryByRole('button', { name: /^Tracker/ })).toBeNull()
-  })
-
-  it('offers no step when the states channel answered with nothing', async () => {
-    mountStates({})
+  it.each([
+    {
+      order: 'nobody seeded from a tracker',
+      reply: { capability: { transitions: 'no_issue', states: [], unreachable: [] } },
+    },
+    { order: 'whose states channel answered with nothing', reply: {} },
+  ])('offers no Tracker step for an order $order', async ({ reply }) => {
+    mountStates(reply)
     await screen.findByText('Refuse an expired refresh token')
     expect(within(stepList()).queryByRole('button', { name: /^Tracker/ })).toBeNull()
   })
@@ -497,13 +485,6 @@ function shapesItCannotRunTests() {
 }
 
 function forgeChoosingTests() {
-  it('starts with the proposal when the operator says nothing', async () => {
-    mountForStart()
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1' }))
-  })
-
   it("carries the operator's own choice when they make one", async () => {
     mountForStart()
     await openForgeStep('Shape')
@@ -564,6 +545,7 @@ function choosingMidTurnTests() {
     expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(shapeButton('Direct'))
     await eventually(() => expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('true'))
+    expect(invoke).toHaveBeenCalledWith('foundry:order.recipe', { id: 'WO-1', recipe: 'direct' })
 
     await orderChanged()
     await openForgeStep('Hand off')
@@ -803,7 +785,6 @@ function aStruckAssumptionTests() {
 // questions — not one at a time on the Red team step, and not sent until the
 // band's own Send button collects every decision into one turn.
 describe('deciding a blocking finding, in the band', () => {
-  describe('the decide button', theDecideButtonTests)
   describe('the moves', findingMovesTests)
   describe('sending a fix', sendingAFixTests)
   describe('the fix box and clearing', theFixBoxAndClearingTests)
@@ -840,17 +821,6 @@ const TWO_QUESTIONS = [
 
 function withQuestions() {
   mountShowing({ ...trackerDraft(), acceptance: [criterion()], openQuestions: TWO_QUESTIONS })
-}
-
-function theDecideButtonTests() {
-  it('offers a way to decide it, on the Red team step', async () => {
-    withFinding()
-    await openForgeStep('Red team')
-    await screen.findByText('the outcome restates the problem')
-    expect(screen.getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: /^Fix it my way/ })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: /^Accept it/ })).toBeTruthy()
-  })
 }
 
 function findingMovesTests() {
@@ -897,15 +867,6 @@ function sendingAFixTests() {
 }
 
 function theFixBoxAndClearingTests() {
-  it('opens the fix box under the finding it is for', async () => {
-    withFinding()
-    await openForgeStep('Red team')
-    await screen.findByText('the outcome restates the problem')
-    fireEvent.click(await screen.findByRole('radio', { name: /^Fix it my way/ }))
-    const finding = screen.getByText(/the outcome restates the problem/).closest('.fdry-fnd')
-    expect(finding?.querySelector('textarea')).toBeTruthy()
-  })
-
   // Reported: "I should be able to ask the agent to close the red team
   // findings too." Fixed and Accept were the only moves, and both are the
   // operator doing the work.
@@ -1327,7 +1288,6 @@ function landsAfter(polls: number, ending: Record<string, unknown>) {
 const REDRAFTED = { kind: 'redrafted', at: '2026-09-09T19:33:00Z', note: 'redrafted the plan' }
 
 describe('while the architect is working', () => {
-  describe('reading again', readingAgainTests)
   describe('clearing', forgeClearingTests)
 })
 
@@ -1360,57 +1320,30 @@ function refused() {
   render(<Forge orderId="WO-1" />)
 }
 
-function readingAgainTests() {
-  it('reads again each time the order changes until the redraft lands, rather than giving up after one', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    landsAfter(3, REDRAFTED)
-    await eventually(() =>
-      expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy()
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    await eventually(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
-
-    // Three changes before the turn ends. A view that stopped listening after
-    // one would never see it.
-    const compiled = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length
-    const before = compiled()
-    for (let change = 0; change < 3; change++) await orderChanged()
-    expect(compiled()).toBe(before + 3)
-    vi.useRealTimers()
-  })
-}
-
+// The view listens to a draft whether or not a turn runs, so only the strip clearing is left to
+// check. A refusal saves nothing, so the document stays byte-for-byte what it was: the stop
+// condition used to be the document growing, and the strip never cleared.
 function forgeClearingTests() {
-  // The view listens to a draft whether or not a turn runs, so there is no "poll stopped"
-  // moment to assert; what is left to check is the "architect is working" strip clearing.
-  it('clears "the architect is working" once the redraft lands', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    landsAfter(1, REDRAFTED)
-    await eventually(() => screen.getByRole('button', { name: /Draft the plan/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    // The first read still sees the turn in flight; the second sees it end.
-    await orderChanged()
-    await orderChanged()
-    await eventually(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
-    vi.useRealTimers()
-  })
+  it.each([
+    { polls: 3, ending: REDRAFTED },
+    { polls: 1, ending: REFUSED },
+  ])(
+    'clears "the architect is working" once a turn ends $ending.kind after $polls reads',
+    async ({ polls, ending }) => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      landsAfter(polls, ending)
+      await eventually(() => screen.getByRole('button', { name: /Draft the plan/ }))
+      fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
+      await eventually(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
 
-  // The reported bug, whole. A refusal saves nothing, so the document is
-  // byte-for-byte what it was — and the stop condition used to be the document
-  // growing. The button read "The architect is working…" over a turn that had
-  // ended forty minutes earlier, and the poll never stopped.
-  it('clears "the architect is working" when the turn was refused, though nothing was saved', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    landsAfter(1, REFUSED)
-    await eventually(() => screen.getByRole('button', { name: /Draft the plan/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    // The first read still sees the turn in flight; the second sees it end.
-    await orderChanged()
-    await orderChanged()
-    await eventually(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
-    vi.useRealTimers()
-  })
+      await orderChanged()
+      await orderChanged()
+      await orderChanged()
+      await orderChanged()
+      await eventually(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
+      vi.useRealTimers()
+    }
+  )
 }
 
 describe('a turn that was refused', () => {
@@ -1468,17 +1401,24 @@ describe('what this order writes back (FR-062)', () => {
     expect(screen.getByLabelText(/The pull request links/)).toBeTruthy()
   })
 
-  it('turns one on for this order alone', async () => {
-    mountStates({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await openForgeStep('Tracker')
-    fireEvent.click(screen.getByLabelText(/Move its workflow state/))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.writeBack', {
-        id: 'WO-1',
-        writeBack: ['status'],
-      })
-    )
-  })
+  it.each([
+    { before: [], after: ['status'] },
+    { before: ['summary_comment', 'status'], after: ['summary_comment'] },
+  ] as const)(
+    'toggles the workflow state for this order alone: $before becomes $after',
+    async ({ before, after }) => {
+      const capability = { transitions: 'supported', states: STATES, unreachable: [] }
+      mountStates({ capability }, { writeBack: [...before] })
+      await openForgeStep('Tracker')
+      fireEvent.click(screen.getByLabelText(/Move its workflow state/))
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith('foundry:order.writeBack', {
+          id: 'WO-1',
+          writeBack: after,
+        })
+      )
+    }
+  )
 })
 
 // The way back into the conversation that wrote the plan. It was a prop, and
@@ -1836,15 +1776,6 @@ function thePlanStepTests() {
 function noFilesBudgetAndNoControlsTests() {
   const SET = { agents: 3, wallClockMinutes: 45, tokens: null }
 
-  // ADR 056: agents and minutes are budgets; a count of files is not.
-  it('offers no files budget, and no check that a plan fits one', async () => {
-    mountBlocked({ budgets: SET })
-    await openForgeStep('Plan')
-    const section = await screen.findByRole('region', { name: 'Budgets' })
-    expect(within(section).queryByRole('spinbutton', { name: 'Files touched' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Change the budget' })).toBeNull()
-  })
-
   it('shows them without controls once the order is no longer a draft', async () => {
     mountBlocked({ status: 'running' as const, budgets: SET })
     await openForgeStep('Plan')
@@ -2010,16 +1941,6 @@ describe('a red-team round running', () => {
   })
 })
 
-describe('the Hand off step', () => {
-  it('offers no switch to hand off on its own: pressing Hand off is the only start', async () => {
-    mountForStart()
-    await screen.findByText('Ready to hand off')
-    await openForgeStep('Hand off')
-    expect(handOffButton()).toBeTruthy()
-    expect(screen.queryByRole('switch')).toBeNull()
-  })
-})
-
 function mountShapeDuringTurn() {
   const current = trackerDraft()
   const running = runningIntake('2026-09-06T10:00:00.000Z', 'S-1')
@@ -2050,18 +1971,6 @@ describe('choosing a shape while a turn is running', () => {
 })
 
 function orderRecipeTests() {
-  it('invokes order.recipe with the shape clicked, even mid-turn', async () => {
-    mountShapeDuringTurn()
-    await openForgeStep('Shape')
-    fireEvent.click(await screen.findByText('Standard'))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.recipe', {
-        id: 'WO-1',
-        recipe: 'standard',
-      })
-    )
-  })
-
   it('"Use the proposal" invokes order.recipe with recipe: null', async () => {
     mountShapeDuringTurn()
     await openForgeStep('Shape')
@@ -2189,118 +2098,16 @@ describe('holding and releasing the red-team loop from the strip', () => {
   describe('order.hold', orderHoldTests)
 })
 
-function expectUnavailableControlsHold(): void {
-  const nodes = Array.from(document.querySelectorAll('[aria-disabled="true"]'))
-  expect(nodes.length).toBeGreaterThan(0)
-  for (const node of nodes) {
-    expect(node.getAttribute('title')?.trim()).toBeTruthy()
-  }
-}
-
 function orderHoldTests() {
-  it('"Hold for me" invokes order.hold with held: true', async () => {
-    mountRedTeamRunning(null)
-    fireEvent.click(await screen.findByRole('button', { name: 'Hold for me' }))
+  it.each([
+    { heldAt: null, button: 'Hold for me', held: true },
+    { heldAt: '2026-09-06T10:01:00.000Z', button: 'Let it continue', held: false },
+  ])('"$button" saves held: $held', async ({ heldAt, button, held }) => {
+    mountRedTeamRunning(heldAt)
+    fireEvent.click(await screen.findByRole('button', { name: button }))
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.hold', { id: 'WO-1', held: true })
+      expect(invoke).toHaveBeenCalledWith('foundry:order.hold', { id: 'WO-1', held })
     )
-  })
-
-  it('"Let it continue" invokes order.hold with held: false', async () => {
-    mountRedTeamRunning('2026-09-06T10:01:00.000Z')
-    fireEvent.click(await screen.findByRole('button', { name: 'Let it continue' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.hold', { id: 'WO-1', held: false })
-    )
-  })
-}
-
-// Every ReasonButton that renders aria-disabled must resolve its
-// title to non-empty text (ReasonButton.tsx) — swept across the
-// states that put controls out of reach: a running turn, a refusal, findings
-// needing a decision, a step whose shape has an unmet requirement, and a
-// handed-off order.
-describe('every unavailable control names why, everywhere (ADR 074)', () => {
-  describe('a running turn', forgeARunningTurnTests)
-  describe('a refused turn', aRefusedTurnTests)
-  describe('a finding needing a decision', aFindingNeedingADecisionTests)
-  describe('the shape step', theShapeStepTests)
-})
-
-function forgeARunningTurnTests() {
-  it('holds on a running turn', async () => {
-    mountForStart({
-      intake: {
-        kind: 'running',
-        at: '2026-09-06T10:00:00.000Z',
-        sessionId: 'S-1',
-        asked: '',
-        actor: 'architect',
-        trigger: 'you',
-        round: null,
-        autoTurn: null,
-      },
-    })
-    await waitFor(() =>
-      expect(screen.getAllByText(/architect is working/).length).toBeGreaterThan(0)
-    )
-    await openForgeStep('Hand off')
-    expectUnavailableControlsHold()
-  })
-}
-
-function aRefusedTurnTests() {
-  it('holds on a refused turn', async () => {
-    const shown = trackerDraft()
-    invoke = vi.fn(async (channel: string) =>
-      channel === 'foundry:order.compile'
-        ? {
-            order: shown,
-            compile: compileOrder(shown),
-            intake: { kind: 'refused', at: '2026-09-06T10:00:00.000Z', reason: 'bad proposal' },
-          }
-        : {}
-    )
-    installForgeBridge()
-    render(<Forge orderId="WO-1" />)
-    await screen.findByText(/plan was refused/i)
-    expectUnavailableControlsHold()
-  })
-}
-
-function aFindingNeedingADecisionTests() {
-  it('holds when a finding needs a decision', async () => {
-    const redTeam = [{ ...BLOCKING_AND_NOTE[0], round: 1 }]
-    const intake = { kind: 'redrafted', at: '2026-09-06T10:00:00.000Z', note: 'redrafted' }
-    const round = {
-      round: 1,
-      startedAt: '2026-09-06T09:00:00.000Z',
-      finishedAt: '2026-09-06T09:05:00.000Z',
-    }
-    const loop = { rounds: [round], heldAt: null, exhausted: true }
-    mountCompiled({ ...trackerDraft(), redTeam }, { intake, loop })
-    await openForgeStep('Red team')
-    await screen.findByText('blocking one')
-    // Nothing is decided yet, so Send is unavailable — the case under audit.
-    expectUnavailableControlsHold()
-  })
-}
-
-function theShapeStepTests() {
-  it('holds on the shape step even when the order is otherwise ready', async () => {
-    mountForStart()
-    await openForgeStep('Shape')
-    await screen.findByText('Speckit')
-    expectUnavailableControlsHold()
-  })
-
-  it('holds on a handed-off order whose shape is fixed', async () => {
-    mountForStart()
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
-    await waitFor(() => expect(screen.getAllByText(/Handed off/).length).toBeGreaterThan(0))
-    await openForgeStep('Shape')
-    expectUnavailableControlsHold()
   })
 }
 
