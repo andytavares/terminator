@@ -1,0 +1,72 @@
+docs/adr/070-e2e-is-deterministic-and-selective.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+.github/workflows/ci.yml
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 17,22-24,44,48-50,65,105-106,133-134,159,173,175-179,181,237-238,271-273,276,301
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+docs/adr/129-ci-jobs-have-no-time-limit.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 15
+.husky/pre-commit
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 2
+docs/adr/107-production-only-unused-code-is-a-ci-gate.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+docs/adr/132-ci-finishes-in-five-minutes.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+docs/adr/151-ci-runs-everything-once-with-nothing-fancy.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 1-19
+docs/CONTRIBUTING.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 62,64,69,78,80,115,118,134,140,299
+docs/adr/071-ci-is-sharded-by-duration-and-warns-nothing.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+knip.jsonc
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 15,31,47,52-53,57-58,65-66
+docs/adr/133-paved-path-cleanup.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+scripts/workflow-lint.mjs
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 4-5,9,12-13,22,93-219,221-223
+tests/e2e/global-setup.ts
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 15
+README.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 185-209
+docs/adr/125-a-security-fix-skips-the-release-age-cooldown.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+docs/adr/139-the-pre-push-hook-trusts-foundry.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+scripts/check-single-copies.mjs
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 8-10
+tests/unit/scripts/workflow-lint.spec.ts
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3,8-9,26,48-92
+  s_7a27f124c1e8e3::t_ca48b0fc3d1c5a 93
+docs/adr/134-ci-releases-each-merge.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+docs/adr/136-a-real-order-runs-before-foundry-changes-ship.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+docs/ARCHITECTURE.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 979,982-984
+scripts/test-env.mjs
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 1-2
+scripts/typecheck.mjs
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 3
+docs/CONSTITUTION.md
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 2-26,302,412-414,427-431,435-437,467
+package.json
+  s_7a27f124c1e8e3::t_0454fdc8083a7b 24,32,36,52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e9a032780a5cccde36bd16d82b054efe61592f3a",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
