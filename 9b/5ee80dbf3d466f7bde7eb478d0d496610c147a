@@ -1,0 +1,106 @@
+extensions/git-integration/tests/unit/remote-access.spec.ts
+  s_7a27f124c1e8e3::t_6c8c3ccfdd3c1c 20-22,44-51
+  s_7a27f124c1e8e3::t_9b1d60a9bcbe7e 52
+extensions/git-integration/tests/unit/useResizePanel.spec.tsx
+  s_7a27f124c1e8e3::t_786b0634650b4f 114-115
+extensions/git-integration/tests/unit/ConflictResolver.spec.tsx
+  s_7a27f124c1e8e3::t_3d57ffdc46f9de 235-239,243,249-250
+extensions/git-integration/tests/unit/ChapterNav.spec.tsx
+  s_7a27f124c1e8e3::t_14f6680794fd80 88
+extensions/git-integration/tests/unit/renderer/App.spec.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 60-64,66-68,72
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_7a27f124c1e8e3::t_e4e6de92ed7b40 660,678
+  s_7a27f124c1e8e3::t_0aededc5e4aeb8 367-378,510-512,514-516,661-667,670-674,679-685,688-692,808-809,814-817
+  s_7a27f124c1e8e3::t_54948ca640847b 513,810-813
+extensions/git-integration/tests/unit/OverviewSummary.spec.tsx
+  s_7a27f124c1e8e3::t_3eccd3a7ea8ebb 83-84
+extensions/git-integration/tests/unit/dashboard-search.spec.ts
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 232-236,238-243,245
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 68,83-84,87,89
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_7a27f124c1e8e3::t_4c9f992f1c596c 278
+extensions/git-integration/tests/unit/risk-score.spec.ts
+  s_7a27f124c1e8e3::t_a6a9dfcb817b4f 85
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 514-519
+extensions/git-integration/tests/unit/ConflictHeader.spec.tsx
+  s_7a27f124c1e8e3::t_5d1b7f76d20090 86-87,100-104,148-152,158,166
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_7a27f124c1e8e3::t_cb698283f690a8 179,352
+extensions/git-integration/tests/unit/git-ipc-extra.spec.ts
+  s_7a27f124c1e8e3::t_b0e878ba2f3e29 209-210,213
+extensions/git-integration/tests/unit/pr-review-service.spec.ts
+  s_7a27f124c1e8e3::t_4b9e1ccb6ffd66 86,163-169
+extensions/git-integration/tests/unit/ReviewHeader.spec.tsx
+  s_7a27f124c1e8e3::t_f03605a1aa5de6 64-69
+extensions/git-integration/tests/unit/ResumeCard.spec.tsx
+  s_7a27f124c1e8e3::t_f03605a1aa5de6 207
+extensions/git-integration/tests/unit/PropertiesRail.spec.tsx
+  s_7a27f124c1e8e3::t_ece7a8fbadce63 19
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_7a27f124c1e8e3::t_c718543a1f252d 1332-1334
+  s_7a27f124c1e8e3::t_8c12e2d14dcdb6 1318,1321-1322,1325-1328,1331,1337,1339,1341-1342,1345-1349,1733
+extensions/git-integration/tests/unit/home-publisher.spec.ts
+  s_7a27f124c1e8e3::t_903c401b33d353 139-143
+extensions/git-integration/tests/unit/ReviewQueue.spec.tsx
+  s_7a27f124c1e8e3::t_c456813d23e55c 138,231-236
+extensions/git-integration/tests/unit/home-feed.spec.ts
+  s_7a27f124c1e8e3::t_5ce34a3c5edee1 43-48
+  s_7a27f124c1e8e3::t_cba264e3aca9ae 1
+extensions/git-integration/tests/unit/ManualEditor.spec.tsx
+  s_7a27f124c1e8e3::t_52b65706abb245 56-70
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_7a27f124c1e8e3::t_1a07a68b65ae3c 161-164,167
+  s_7a27f124c1e8e3::t_ccab9bc10f1254 304
+extensions/git-integration/tests/unit/github-api.spec.ts
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 39
+extensions/git-integration/tests/unit/PrReviewTab.close.spec.tsx
+  s_7a27f124c1e8e3::t_2aff70e62fe47d 69
+  s_7a27f124c1e8e3::t_4c9f992f1c596c 96
+extensions/git-integration/tests/unit/expand-gaps.spec.ts
+  s_7a27f124c1e8e3::t_829a9ad78d4d08 2
+extensions/git-integration/tests/unit/KeepBothModal.spec.tsx
+  s_7a27f124c1e8e3::t_fce174f3c5f068 2,89,92-94
+extensions/git-integration/tests/unit/conflict-reader.spec.ts
+  s_7a27f124c1e8e3::t_3eccd3a7ea8ebb 88-92,94,149,152,156
+extensions/git-integration/tests/unit/ViewMenu.spec.tsx
+  s_7a27f124c1e8e3::t_5a11ef37b2299f 51-64,83-96,98,109,122-126,128
+extensions/git-integration/tests/unit/ReviewInspector.spec.tsx
+  s_7a27f124c1e8e3::t_4a0ddccad58332 4,55,62-63,66,75-76,78,83-86,90,99-100,163,176
+  s_7a27f124c1e8e3::t_52b65706abb245 56-61
+  s_7a27f124c1e8e3::t_3ee9ba48f4ea89 77
+extensions/git-integration/tests/unit/git-service.spec.ts
+  s_7a27f124c1e8e3::t_b0e878ba2f3e29 241
+extensions/git-integration/tests/unit/InlineCommentThread.spec.tsx
+  s_7a27f124c1e8e3::t_2b71706012d678 72-77,150-155
+extensions/git-integration/tests/unit/chapter-builder.spec.ts
+  s_7a27f124c1e8e3::t_c0b69a0a3dfa63 36-44,77,79-80,110
+extensions/git-integration/tests/unit/merge-flow-api.spec.ts
+  s_7a27f124c1e8e3::t_d53c41e103c151 48
+extensions/git-integration/tests/unit/merge-flow-ipc.spec.ts
+  s_7a27f124c1e8e3::t_407c51add205d1 90,93,114,116,174-175,183,187-195
+extensions/git-integration/tests/unit/review-agent.spec.ts
+  s_7a27f124c1e8e3::t_abd5f92ec3c681 449-460,477-481
+extensions/git-integration/tests/unit/support/activate.ts
+  s_7a27f124c1e8e3::t_d798eacd1acf9e 38,44,70,78,91,132,143
+extensions/git-integration/tests/unit/workspace-enabled.spec.ts
+  s_7a27f124c1e8e3::t_df2141512e3d4b 56-59,62-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9b5ee80dbf3d466f7bde7eb478d0d496610c147a",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
