@@ -1,0 +1,19 @@
+tests/unit/renderer/agent/context-reaches-agent.spec.tsx
+  s_f53906548e22f9::t_461001dd5a4fe0 88,100-101,103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "878c199ba5a9b25f0560dbaedf09281f434b4024",
+  "prompts": {},
+  "sessions": {
+    "s_f53906548e22f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dff2918-ea06-4902-ae79-8fcf4b2e763c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
