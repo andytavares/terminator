@@ -337,7 +337,11 @@ class AcpAgentService implements AgentService {
     requestPermission: (params) => this.requestPermission(params),
     sessionUpdate: (params) => {
       const session = this.live(params.sessionId)
-      if (session) this.publishUpdate(session, params.update as AgentUpdate)
+      if (session) return this.publishUpdate(session, params.update as AgentUpdate)
+      logger.warn('agent update for no live session', {
+        sessionId: params.sessionId,
+        kind: params.update.sessionUpdate,
+      })
     },
   }
 
@@ -669,8 +673,11 @@ class AcpAgentService implements AgentService {
 
   private async send(session: Session, prompt: PromptRequest['prompt']): Promise<string> {
     session.sent += 1
+    logger.debug('agent prompt sent', { sessionId: session.id })
     try {
-      return (await session.link.agent.prompt({ sessionId: session.id, prompt })).stopReason
+      const { stopReason } = await session.link.agent.prompt({ sessionId: session.id, prompt })
+      logger.debug('agent prompt answered', { sessionId: session.id, stopReason })
+      return stopReason
     } finally {
       session.sent -= 1
     }
