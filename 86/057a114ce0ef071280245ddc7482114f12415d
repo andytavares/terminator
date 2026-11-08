@@ -1,0 +1,21 @@
+extensions/task-vault/tests/components/AreasView.spec.tsx
+  s_f53906548e22f9::t_0f789181fb7c67 312-318
+extensions/task-vault/tests/components/ProjectsBrowser.spec.tsx
+  s_f53906548e22f9::t_d60a93e99aea9e 8,83,205-220,444-457
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "86057a114ce0ef071280245ddc7482114f12415d",
+  "prompts": {},
+  "sessions": {
+    "s_f53906548e22f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dff2918-ea06-4902-ae79-8fcf4b2e763c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
