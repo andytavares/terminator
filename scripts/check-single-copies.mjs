@@ -5,7 +5,9 @@
 
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { packageName } from './check-release-age.mjs'
+
+/** The package a lockfile key installs: `node_modules/a/node_modules/@b/c` → `@b/c`. */
+const packageName = (key) => key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length)
 
 export const SINGLE_COPIES = [
   '@codemirror/state',

@@ -1,6 +1,6 @@
 # ADR 136: A real order runs before Foundry changes ship
 
-**Status**: Accepted
+**Status**: Superseded by ADR 151
 
 **Date**: 2026-10-29
 

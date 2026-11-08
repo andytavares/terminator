@@ -1,6 +1,6 @@
 # ADR 107: Code only tests reach is a CI gate
 
-**Status**: Accepted
+**Status**: Superseded by ADR 151 (one knip run)
 **Date**: 2026-10-13
 **Extends**: [ADR 104](104-unused-code-is-a-ci-gate.md)
 **Relates to**: Constitution Principle VI

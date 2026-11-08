@@ -59,42 +59,14 @@ The `release` job in `ci.yml` signs with the Developer ID Application certificat
 4. `base64 -i terminator-g2.p12 | gh secret set APPLE_CERTIFICATE`, then `gh secret set APPLE_CERTIFICATE_PASSWORD`, and delete the `.p12`.
 5. Run the `Test Notarization` workflow and confirm it passes.
 
-### Before you push
+### Before you commit
 
-```bash
-npm run ci:local        # Every check CI runs, at once as CI runs them; e2e last
-npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, ci.yml's three shards at once, two apps each
-```
-
-`npm run ci:local` runs what `.github/workflows/ci.yml` runs, where CI runs it. A local pass must predict a CI pass, so it tests what CI tests:
-
-- **The same commit.** It fetches `origin/main`, merges your `HEAD` with it in the persistent check worktree `.worktrees/.ci-local`, and runs there. It never tests your dirty working tree. It prints the `HEAD` and `origin/main` shas first. If the merge conflicts, it stops and says so.
-- **The same machine.** CI runs the app (E2E, Start, story screenshots) on macOS and every other job on `ubuntu-24.04-arm`. ci:local runs the macOS steps on this Mac. It runs the Ubuntu steps in a Docker container of Ubuntu 24.04 on arm64 with the `.nvmrc` Node (`scripts/ci-linux.Dockerfile`, `scripts/ci-linux.mjs`), so Docker must be running. The container works in a second worktree at the same merged commit, `.worktrees/.ci-local-linux`. The Linux jobs and the Mac jobs therefore never write into each other's files. The container's `node_modules` are Docker volumes of Linux installs.
-- **The same Node.** It refuses to start unless `node -v` is `v` plus the version in `.nvmrc`. It names both.
-- **The same install.** In the check worktree, on the Mac and in the container, it runs `npm ci` when the hash of `package-lock.json` differs from the hash recorded in `node_modules/.lock-hash` after the last install. Otherwise it keeps `node_modules`.
-- **The same checks.** `scripts/ci-plan.mjs` reads each job's own `run` steps from the workflow, so the two cannot drift. A GitHub expression or condition that it does not know stops it, and it names the job and step. It runs the jobs at once, as CI does. A job starts when the jobs it `needs` have passed. A failure lets the running jobs finish and skips the jobs that need the failed job. Each job's output prints as one block with its seconds. The e2e specs run last, alone, after every job has passed. Without a flag, the diff selects the specs. `--all` runs every test and sets `TEST_ALL=1` for the e2e step. Every step runs without the `GIT_` variables that a git hook sets, as CI does. It prints what it leaves to CI and why: the stability gate's repeats of changed specs run in CI only.
-
-`--prepare-only` does the Node check, the fetch, the merge and the install. Then it prints the shas and exits.
-
-On a pass, it records `<HEAD sha> <origin/main sha>` in your repository (`git rev-parse --git-path ci-local-passed`). The pre-push hook (`.husky/pre-push`) reads the record. It refuses to push a commit with no recorded pass and names `npm run ci:local`. When the hook lets a push through, it leaves a background process. That process waits up to two minutes for GitHub to have the commit, then sets the `local-check` commit status through `gh`. GitHub accepts a status only for a commit it has. The hook only checks the record. Git opens the connection to the remote before it runs the hook, and a hook that ran the whole suite left that connection idle until it dropped. So commit, run `npm run ci:local`, then push. A deleted ref passes. The hook does nothing where `CI` is set, because the release and story-baseline jobs push their own commits. It also does nothing for a push that Foundry makes (`git -c foundry.push=true push`). Foundry's final check ran on the order, and CI runs on the draft it opens ([ADR 139](adr/139-the-pre-push-hook-trusts-foundry.md)).
-
-To check whether local passes predicted CI, run `node scripts/ci-parity-report.mjs --since 2026-10-15`. It lists every failed CI job on a commit that had a `local-check` success (a parity break). It also lists every commit whose same job both failed and passed (a flip). It prints the counts and exits 1 when either count is not zero.
-
-### Prove a real order before you push Foundry changes
-
-```bash
-LINEAR_API_KEY=lin_api_… npm run canary    # One real order on this repository, from a Linear ticket to a draft pull request
-```
-
-`npm run canary` runs a real Foundry order with the real `claude`, `gh` and `git`, and the Linear API key in `LINEAR_API_KEY` (a development build cannot read the key that the installed app keeps in its keychain) ([ADR 136](adr/136-a-real-order-runs-before-foundry-changes-ship.md)). It never runs in CI. The pre-push hook refuses a push that changes `extensions/foundry/src/runtime/`, `src/main/agents/acp/`, `extensions/foundry/src/line/{integrate,worktree,commit}.ts`, `extensions/foundry/src/trackers/`, `extensions/foundry/recipes/`, or the locked version of `@agentclientprotocol/claude-agent-acp` or `@anthropic-ai/claude-code`, until a canary has passed on that commit. The list is `CANARY_PATHS` in `scripts/foundry-canary.mjs`. `--dry-run` prints the plan and changes nothing.
-
-It creates a Linear ticket (team `TAV`, label `canary`), a branch `canary/<order id>` and a draft pull request. When it ends, pass or fail, it closes the pull request and deletes both branches. It removes the order's worktrees and folder under `~/.foundry-canary/orders` (outside every repository), cancels the ticket and quits the app. It fails if anything is left or the app log gained an error. It runs in a fresh app profile, so the Terminator app can stay open.
+The pre-commit hook (`.husky/pre-commit`) runs `npx lint-staged` (Prettier and ESLint on the staged files) and then `npm run check`. That script runs every check CI runs, as the same npm scripts: `lint:deps`, `lint:unused`, `lint:duplicates`, `lint`, `lint:workflows`, `format:check`, `typecheck` and `npm test`. `npm run lint:workflows` fails if `.github/workflows/ci.yml` leaves one of them out, so the two cannot drift ([ADR 151](adr/151-ci-runs-everything-once-with-nothing-fancy.md)). E2E does not run before a commit: run `npm run test:e2e` yourself for a change it covers. CI runs it on every pull request.
 
 ### Run tests
 
 ```bash
-npm test                # The unit + integration specs your branch can reach (Vitest), with coverage
-npm test -- --all       # Every spec
+npm test                # Every unit + integration spec (Vitest)
 npm run test:watch      # Watch mode
 npm run test:e2e        # E2E — launches real Electron app (Playwright)
 npm run test:perf       # Wall-clock budgets (*.perf.spec.ts), one file at a time
@@ -103,9 +75,9 @@ npm run test:stories    # The design system's Storybook stories, run as tests
 npm run test:visual     # The design system's screenshot tests
 ```
 
-**Which tests run.** `npm test` runs what `scripts/test-select.mjs` selects for the commits on your branch since `origin/main` (not uncommitted work). CI runs the same command ([ADR 123](adr/123-tests-run-once-sealed-and-selected.md)). A push to main runs what its change reaches, compared with the commit that main was at before. A push that passes is released ([ADR 134](adr/134-ci-releases-each-merge.md)). Everything runs in these cases: `--all`, a pull request labelled `test: all`, the nightly sweep, and a change to a path that can change every result (`ALWAYS_ALL` in the script: test config and setup, `tests/support`, the lockfile, `package.json`, the e2e helpers). A source or data file that no spec imports and no map claims also runs everything. Read the choice with `node scripts/test-select.mjs`, which prints `mode`, `unit`, `e2e`, `base` and `reason`. A data file that the source reads with `fs`, which no import shows, goes in `RUNTIME_READS` in that script, with the specs that read it. Its unit test fails for a file that is listed nowhere. The suite runs once, in a fixed order, with no retry, repeat or shuffle, on macOS in CI as here. With a selection, coverage covers the changed files only.
+**Which tests run.** `npm test` runs every unit and integration spec, once, with no retry. CI runs the same suite with coverage on every pull request and every push to main. A push to main that passes is released ([ADR 134](adr/134-ci-releases-each-merge.md), [ADR 151](adr/151-ci-runs-everything-once-with-nothing-fancy.md)).
 
-**Temporary directories.** A spec makes a temporary directory with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, never with `mkdtempSync` in `os.tmpdir()`. `tests/setup.ts` removes every one after the spec file ends, passed or failed. An E2E spec uses `e2eTempDir(prefix)` from `tests/e2e/helpers.ts`. `tests/e2e/global-teardown.ts` removes it with the run's root. CI runs each unit shard through `node scripts/check-temp-leaks.mjs`. That script points `TMPDIR` at an empty directory (read by [`os.tmpdir()`](https://nodejs.org/api/os.html#ostmpdir), git, sh and mktemp) and fails if anything is left in it. Run it locally the same way: `node scripts/check-temp-leaks.mjs npx vitest run`. Specs that skipped this once left ~22,000 folders in `/tmp` in a day and filled the disk.
+**Temporary directories.** A spec makes a temporary directory with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, never with `mkdtempSync` in `os.tmpdir()`. `tests/setup.ts` removes every one after the spec file ends, passed or failed. An E2E spec uses `e2eTempDir(prefix)` from `tests/e2e/helpers.ts`. `tests/e2e/global-teardown.ts` removes it with the run's root. CI runs the suite through `node scripts/check-temp-leaks.mjs`. That script points `TMPDIR` at an empty directory (read by [`os.tmpdir()`](https://nodejs.org/api/os.html#ostmpdir), git, sh and mktemp) and fails if anything is left in it. Run it locally the same way: `node scripts/check-temp-leaks.mjs npx vitest run`. Specs that skipped this once left ~22,000 folders in `/tmp` in a day and filled the disk.
 
 Name a spec that asserts a wall-clock budget `*.perf.spec.ts`. `npm test` leaves it out, because beside every other spec in parallel it measures the load. `npm run test:perf` (`vitest.perf.config.ts`) runs it alone. CI's `Stories` job runs that command after the Storybook build.
 
@@ -116,8 +88,6 @@ Every other spec must also pass on a loaded machine, where a test can run ten ti
 **Every run is sealed and shuffled (ADR 123).** A unit spec sees the same environment on every machine. `tests/global-setup.ts` makes an empty `HOME` for the run. `tests/setup.ts` replaces the worker's `process.env` with `testEnvironment()` from `scripts/test-env.mjs` (UTC, `en_US.UTF-8`, git reading `tests/fixtures/git/gitconfig`, a short PATH). Your shell, `~/.gitconfig` and time zone never reach the spec. Files and the tests inside them run in a new random order each run, with one worker per core. Vitest prints the seed (`Running tests with seed "<n>"`). A failure that depends on order reproduces with `npx vitest run --sequence.seed=<n>`. Fix it so that the test does not need what ran before it, never by fixing the order. After every test, mocks are restored, stubbed env and globals are unstubbed, and fake timers are real again. Make a spy or stub in `beforeEach`, not `beforeAll`. In the node project, a connection to any host but localhost throws. A test that leaves an interval, a server, a socket, a watcher or a child process running fails and names the line that started it. A spec that makes the logger write must await `flushLogs()` (`src/main/logger.ts`) before its folder goes.
 
 Codecov gates coverage on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines that your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario that the running app can produce. Delete a branch that no real caller can reach; do not test it.
-
-To check whether a test depends on the machine's speed, run it with every core busy: `node scripts/under-load.mjs -- npx vitest run <spec>` (`--threads N` chooses how many). The load is threads of that one process, so it ends when the command ends. Never make load with background shell jobs (`yes > /dev/null &`). A non-interactive shell cannot kill them reliably, and ten such processes once ran for four hours, until the e2e check refused the machine as busy. That refusal now names the busiest processes.
 
 ### Measure performance
 
@@ -142,11 +112,10 @@ The suite runs in the background, so the machine stays usable while it runs. `la
 - Every flow passes alone (`npx playwright test tests/e2e/<file>:<line>`). The exception is a file that is `test.describe.serial` because a later flow reads what an earlier flow stored. Run such a file as a whole.
 - Before you send keys to a surface that you just opened, assert that it has focus.
 - An extension view is an iframe ([ADR 114](adr/114-extension-views-are-frames-in-the-window.md)), and three things follow. First, the browser routes a click by the last frame it drew. Click into a host dialog that opened over a view only after the dialog is drawn: `openSettingsSection` waits for that. Second, a key pressed while focus is in a view reaches the host only for ⌘P and ⌘,, which the frame shim forwards. For any other key, move focus first. Third, a theme or setting reaches a view as a message after the host has it, so poll the view for it. `launchApp()` emulates focus in every view, as Playwright does for the page, so focus and blur fire there even when the window is not the active application.
-- Launch the app through `launchApp()`. It isolates the profile. It runs the terminals on a fixture zsh config (`tests/e2e/fixtures/zdotdir`) whose `claude` is a stub, so no real agent runs. It turns off macOS window restore, whose crash prompt blocks startup. A launch that does not reach the sidebar in 25 s fails. The failure shows each window's state (its URL, whether it was still loading, whether its renderer crashed, or that main did not answer) and the app's own output. Close the app with `closeApp()`. It returns only after the app's process has exited (it kills the process after 5 s). Then it fails the spec if any process that the app started is still running 3 s later, and kills those processes and every process under them (`tests/e2e/leftover-processes.ts`). It finds them by the launch's marker in their environment and by the app's process tree, taken just before the close. This also covers the git and gh commands that the core runs with an environment of their own. Leaked processes add up on a CI runner until `fork` fails with `EAGAIN`, so a process that your feature starts must end when the app quits. CI prints the runner user's processes against its limit before and after each macOS E2E step, with the parent commands and a few full command lines of the commonest (`scripts/process-census.sh`).
+- Launch the app through `launchApp()`. It isolates the profile. It runs the terminals on a fixture zsh config (`tests/e2e/fixtures/zdotdir`) whose `claude` is a stub, so no real agent runs. It turns off macOS window restore, whose crash prompt blocks startup. A launch that does not reach the sidebar in 25 s fails. The failure shows each window's state (its URL, whether it was still loading, whether its renderer crashed, or that main did not answer) and the app's own output. Close the app with `closeApp()`. It returns only after the app's process has exited (it kills the process after 5 s). Then it fails the spec if any process that the app started is still running 3 s later, and kills those processes and every process under them (`tests/e2e/leftover-processes.ts`). It finds them by the launch's marker in their environment and by the app's process tree, taken just before the close. This also covers the git and gh commands that the core runs with an environment of their own. Leaked processes add up on a CI runner until `fork` fails with `EAGAIN`, so a process that your feature starts must end when the app quits.
 - Read what a terminal shows with `readTerminalRows(page)` from `tests/e2e/helpers.ts`, never from `.xterm-rows`. A visible terminal draws with WebGL into a canvas, and the DOM holds none of its text. `readTerminalRows` reads xterm's buffer through `window.terminatorE2E`, which the app sets up in `src/renderer/terminal/terminal-rows.ts`. It reads every open terminal, hidden ones too, one after another. When the row's terminal or its place on screen matters, read one pane with `readTerminalRowsIn(screen)`. Here `screen` is that pane's `.xterm-screen` (`visibleTerminalScreen(page)` for the first one on screen).
-- Add a new spec to `scripts/e2e-select.mjs`, under the extension it covers or in `CORE_SPECS`. The selector's unit test fails for a spec that is in neither.
 - **Live specs** (`tests/live/`, `npm run test:live`) start real agent options against the real Claude adapter and the operator's signed-in `claude`. They never run in CI. The Playwright live specs were deleted: `launchApp` seeds a stub agent and stub `claude`/`gh` first on PATH, so they could not reach a real agent.
-- CI runs only the specs that your diff selects, plus the smoke set, each once ([ADR 123](adr/123-tests-run-once-sealed-and-selected.md)). To see what your branch selects: `node scripts/test-select.mjs` (the `e2e` list).
+- CI runs every spec once, in three shards with Playwright's `--shard` ([ADR 151](adr/151-ci-runs-everything-once-with-nothing-fancy.md)).
 
 ### Build extensions
 
@@ -162,13 +131,13 @@ npm run build:extensions   # compile all extensions
 
 ```bash
 npm run lint       # ESLint (zero errors required)
-npm run lint:deps  # syncpack: exact versions, one per package
+npm run lint:deps  # syncpack: exact versions, one per package; no second copy of React or the editor state
 npm run lint:unused  # knip: no unused files, exports or dependencies
-npm run lint:unused:production  # knip --production: no code that only tests reach
 npm run lint:duplicates  # jscpd: no copy-pasted code
 npm run lint:workflows   # actionlint + shellcheck on .github/workflows, pinned versions
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
+npm run check      # Every check above, the format check and npm test: what the pre-commit hook runs
 ```
 
 The root `npx tsc --noEmit` checks nothing. Use `npm run typecheck`. It checks main, renderer, shared, the core's specs, both packages and every extension, each with its specs. The core's specs are in `tsconfig.test.json`: everything under `tests/unit`, `tests/integration` and `tests/e2e`. Playwright runs the e2e specs without checking their types, so this is the only check they get. Vitest and Playwright strip types without checking them. So every project whose `tsconfig.json` covers only its sources has a `tsconfig.test.json` beside it. That file extends the config and adds the project's tests. This applies to each extension and to the design system. For an extension, `scripts/typecheck.mjs` runs `tsconfig.json` and `tsconfig.test.json`, which adds `tests/`, Vitest's globals and Node 24's library. For the design system, the added tests are its Playwright screenshot suite, `visual/`. The extension SDK's `tsconfig.json` already includes its `tests/`. A new extension written in TypeScript adds both files and both projects to `typecheckProjects` in `scripts/typecheck.mjs`. That script runs every project at once, incrementally (`node_modules/.cache/typecheck`). Task Vault has a third file, `tsconfig.view.json`. It checks the view from `src/renderer/main.tsx` without the `Temporal` types that its backend has. The view also runs in the phone's browser, and iPhone Safari has no `Temporal` ([ADR 108](adr/108-temporal-in-extension-backends-not-in-views.md)). CI's Typecheck job runs `npm run typecheck`. Both `lint` and `typecheck` must pass with **0 errors** before you open a PR. Warnings are acceptable but must not accumulate.
@@ -188,14 +157,6 @@ Tests are functions too. Split a `describe` callback longer than 30 lines into d
 - Unused and unreachable: delete it, with any test that covers only it (Constitution VI).
 - Exported but used only in its own file: drop the `export`.
 - Reached in a way that knip cannot see (loaded by path at run time, a global declaration): add it to `knip.jsonc` with a comment that says how it is reached. Check that claim with `grep`.
-
-`npm run lint:unused:production` runs the same configuration in knip's [production mode](https://knip.dev/features/production-mode), which leaves out tests and stories. It must also report nothing ([ADR 107](adr/107-production-only-unused-code-is-a-ci-gate.md)). A finding there is code that only a test reaches:
-
-- Nothing in the app calls it: delete it with its tests.
-- It is what a spec expects, not what the app does (a table of shortcuts, a list of sanctioned operations): move it beside the spec.
-- It is a test seam (a clock setter, a reset): fake what the app reads instead (`vi.useFakeTimers`, `vi.resetModules`), and delete the seam.
-- The app runs it from inside its own file, and a spec tests it directly: drop the `export` and test it through its caller, or tag it `/** @internal */` ([knip](https://knip.dev/reference/jsdoc-tsdoc-tags#internal)).
-- It is a new production entry (an extension's `src/index.ts`, a file loaded by path): end its pattern in `knip.jsonc` with `!`.
 
 `npm run lint:workflows` runs actionlint 1.7.12 with shellcheck 0.11.0 over `.github/workflows`, the `run:` scripts included. `scripts/workflow-lint.mjs` downloads both once into `node_modules/.cache/workflow-lint` and checks the sha256 of each archive first. CI and this Mac therefore run the same binaries, whatever else is on `PATH`. To move to a new version, change its version, URL and checksum there together.
 
@@ -335,9 +296,7 @@ Per the constitution (Principle IV):
 
 Before you open a PR, verify:
 
-- [ ] `npm test` passes
-- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:unused:production`, `npm run lint:duplicates`, `npm run lint:workflows` and `npm run typecheck` report 0 errors
-- [ ] `npm run format:check` passes
+- [ ] `npm run check` passes (the pre-commit hook runs it)
 - [ ] `npm run build:extensions` succeeds with no compile errors
 - [ ] The PR adds no unused imports, unused variables, or dead code
 - [ ] The PR updates the documentation for every changed behavior (see the table above)

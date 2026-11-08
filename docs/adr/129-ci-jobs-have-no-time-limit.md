@@ -12,7 +12,7 @@ ADR 123 gave every job and many steps a `timeout-minutes` of 8 or less. A job th
 
 ## Decision
 
-1. **No workflow sets `timeout-minutes`**, on a job or a step. `tests/unit/scripts/ci-plan.spec.ts` fails if any file in `.github/workflows` sets it.
+1. **No workflow sets `timeout-minutes`**, on a job or a step. `npm run lint:workflows` (`scripts/workflow-lint.mjs`) fails if any file in `.github/workflows` sets it.
 2. **Eight minutes per step stays the goal.** A step that takes longer is a finding to fix (split a shard, re-record `timings.json`). It is not a reason to cancel the run.
 
 ## Alternatives considered

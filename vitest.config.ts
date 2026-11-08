@@ -39,14 +39,6 @@ export default defineConfig({
     // Vitest 5 clears mocks before each test by default; specs here register IPC handlers once
     // per file and read them back from the mock's calls.
     clearMocks: false,
-    // A flaky test found on main carries this tag while tests/quarantine.json holds its issue and
-    // expiry; required jobs run with --tagsFilter='!quarantine' (scripts/check-quarantine.mjs).
-    tags: [
-      {
-        name: 'quarantine',
-        description: 'Flaky on main; listed in tests/quarantine.json with its issue and expiry',
-      },
-    ],
     globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup.ts'],
     // Vitest turns every stylesheet into an empty string, `?raw` imports included.

@@ -1,6 +1,6 @@
 # ADR 134: CI releases each merge
 
-**Status**: Accepted
+**Status**: Accepted, amended by ADR 151 (every run tests everything)
 
 **Date**: 2026-10-29
 

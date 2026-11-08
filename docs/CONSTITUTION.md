@@ -1,4 +1,29 @@
 <!--
+SYNC IMPACT REPORT (9.0.0)
+==========================
+Version change: 8.0.0 → 9.0.0 (MAJOR: Principle XIV's CI rules removed and redefined, ADR 151)
+
+Modified principles:
+  - XIV: removed "Only the tests a change can reach" (test selection), the stability gate, the
+    nightly sweep, quarantine, the real-order Foundry canary, and the local CI simulation
+    (`npm run ci:local`, its pre-push hook and its local-check status). "CI and the local check
+    are the same check" becomes "Local checks and CI run the same npm scripts": the pre-commit
+    hook runs `npm run check` (every lint, `format:check`, `typecheck` and `npm test`), and
+    ci.yml runs each of those scripts, which `npm run lint:workflows` enforces. Every CI run
+    tests everything, once. CI runs on Ubuntu except the jobs that need a Mac.
+  - VI: the coverage gate text no longer names ci:local.
+  Kept: one run decides, random order, no test depends on another, signals never time, one
+  sealed environment, outside services never gate, enforced lint rules.
+  Approved by the maintainer on 2026-11-08: "Refactor ci entirely, make everything that can
+  run on Ubuntu images do that and simplify everything. Remove the burn in and flake detection
+  stuff, simplify everything, nothing fancy." The canary and the local CI simulation were
+  removed at the maintainer's instruction of the same day.
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (8.0.0)
 ==========================
 Version change: 7.0.1 → 8.0.0 (MAJOR: where complexity deviations are recorded is redefined)
@@ -274,8 +299,7 @@ a failing test exists that demands it.
 - Test coverage MUST be scoped to behavior, not implementation internals.
 - **Coverage gate: Codecov `codecov/patch`.** The pull request MUST have 80% coverage of the
   lines it adds or modifies, as Codecov measures it from the uploaded reports (ADR 095). It
-  is the one outside service that gates (Principle XIV). Vitest has no coverage threshold,
-  and `npm run ci:local` reports the check as not run.
+  is the one outside service that gates (Principle XIV). Vitest has no coverage threshold.
 - **Tests cover reachable behavior only.** A test MUST exercise a scenario the running
   application can produce and assert what a user or caller observes. These tests are defects:
   a test that only asserts a mock was called, restates a constant, tests a copy of production code, or
@@ -385,17 +409,9 @@ code has no value. It is a defect. ADR 123 records the reasoning.
   independent. Pinning the order (`sequence.shuffle: false`, `.sequential`,
   a fixed seed) is forbidden.
 - **One run decides.** A check's verdict is its first run. Never retry or rerun a failing test into a pass, in CI, locally, or in Foundry's final check. Fix it
-  at its cause, or delete it together with the behavior it claimed to cover. Repeats exist only
-  to find flaky tests, never to pass one. In CI, the stability gate runs every spec a change
-  adds or edits up to ten times, shuffled and under load, and any failure fails the check. The
-  nightly sweep runs the whole suite several times on one commit of `main` and opens an
-  issue for every test that disagrees with itself. ADR 124.
-- **Quarantine is short, small and visible.** You may quarantine a test that the sweep found flaky on `main`.
-  Tag it `quarantine` (Vitest) or `@quarantine` (Playwright) and list it in
-  `tests/quarantine.json` with its issue and an expiry at most 7 days away. It still runs,
-  in a job that does not gate. At most 5 tests are quarantined at once. A change cannot quarantine a test it added or
-  edited. An expired entry fails Lint until the test is fixed or
-  deleted. Skipping a test (`skip`, `fixme`, `todo`) is still forbidden.
+  at its cause, or delete it together with the behavior it claimed to cover. Nothing repeats a
+  test: every CI run runs every test once (ADR 151).
+- **No skipped test.** Skipping a test (`skip`, `fixme`, `todo`) is forbidden.
 - **Signals, never time.** A test waits only on a signal from the code under test: an
   awaited promise, an event, a locator assertion, or `eventually()`
   (`tests/support/eventually.ts`). It never sleeps and never waits a tick. A test MUST await the work it
@@ -408,20 +424,17 @@ code has no value. It is a defect. ADR 123 records the reasoning.
   the fixture git config, stubs first on `PATH`. Nothing of the developer's environment
   reaches a test. A spec connects only to loopback. A stub that has no answer fails. It
   never falls through to the real tool.
-- **CI and the local check are the same check.** CI runs on macOS, as the product does,
-  with the Node in `.nvmrc` and the commands `.github/workflows/ci.yml` lists.
-  `npm run ci:local` runs those same commands, except the stability gate's repeats, on the
-  commit merged with `origin/main`, never the working tree. The pre-push hook refuses a commit that has not passed it. A CI
-  failure after a local pass is a parity defect. Fix it like any other defect.
+- **Local checks and CI run the same npm scripts.** The pre-commit hook runs `npm run check`:
+  every lint script, `format:check`, `typecheck` and `npm test`. `.github/workflows/ci.yml` runs
+  each of those scripts with the Node in `.nvmrc`, and `npm run lint:workflows` fails if it
+  leaves one out. CI runs on Ubuntu, except the jobs that need a Mac: Start, E2E, the story
+  screenshots and the signed release. There is no local CI simulation. ADR 151.
 - **Outside services never gate.** An advisory database, the artifact store or a registry
   MUST NOT turn a change red that did not touch what they check. The one exception is
   Codecov's `codecov/patch`, which gates the lines a change adds or modifies (Principle VI).
-  `npm run ci:local` reports it as not run.
-- **Only the tests a change can reach.** `scripts/test-select.mjs` picks the unit,
-  integration and end-to-end tests a diff can reach, the same way in CI and locally. A path
-  it cannot place runs everything. A push to `main` runs what its change reaches, compared with
-  the commit `main` was at before. A push that passes them is released. The pull request
-  label `test: all`, `--all` locally and the nightly sweep run everything.
+- **Every run tests everything.** Every CI run, on a pull request and on a push to `main`, runs
+  the whole Vitest suite and the whole Playwright suite. A push to `main` that passes is
+  released (ADR 134, ADR 151).
 - **Enforced, not trusted.** `eslint.config.mjs` rejects sleeps, ticks, time limits and
   promises left unawaited in specs. These rules MUST NOT be disabled, suppressed or
   loosened.
@@ -451,4 +464,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions that affect this project.
 
-**Version**: 8.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-30
+**Version**: 9.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-11-08
