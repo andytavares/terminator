@@ -1,0 +1,82 @@
+extensions/foundry/tests/helpers/checkout-order.ts
+  s_7a27f124c1e8e3::t_d2f6683edf0553 2-3
+  s_7a27f124c1e8e3::t_8f6e64cdc2db8d 1,4-20
+extensions/foundry/tests/integration/line/integrate.spec.ts
+  s_7a27f124c1e8e3::t_1ca7d531b6f60d 1-24,32-87
+  s_7a27f124c1e8e3::t_e6b107214ae95d 25-31
+extensions/foundry/tests/integration/runtime/supervision-unavailable.spec.ts
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-93
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_7a27f124c1e8e3::t_60ad509a134e59 2,9,978-979
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_7a27f124c1e8e3::t_7c435341f0dc31 8
+extensions/foundry/tests/integration/line/executor-deps.spec.ts
+  s_7a27f124c1e8e3::t_e6b107214ae95d 26-31
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-25,32-802
+extensions/foundry/tests/integration/line/run-tail-ends.spec.ts
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-20,25-130
+  s_7a27f124c1e8e3::t_e6b107214ae95d 21-24
+extensions/foundry/tests/integration/line/execute-run.spec.ts
+  s_7a27f124c1e8e3::t_e6b107214ae95d 13-18,28-31
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-12,19-27,32-294
+extensions/foundry/tests/integration/runtime/supervised-runner.spec.ts
+  s_7a27f124c1e8e3::t_cdd645238d865a 1-269
+extensions/foundry/tests/integration/forge/forge-loop.spec.ts
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-31,36-335
+  s_7a27f124c1e8e3::t_e6b107214ae95d 32-35
+extensions/foundry/tests/helpers/command-script.ts
+  s_7a27f124c1e8e3::t_60ad509a134e59 1-6
+extensions/foundry/tests/integration/forge/intake-turn-ends.spec.ts
+  s_7a27f124c1e8e3::t_e6b107214ae95d 28-31
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-27,32-311
+extensions/foundry/tests/line/order-shape.spec.ts
+  s_7a27f124c1e8e3::t_7c435341f0dc31 2,167-269
+extensions/foundry/tests/storage-folder.spec.ts
+  s_7a27f124c1e8e3::t_67521ecc2d85fb 10
+extensions/foundry/tests/integration/line/worktree.spec.ts
+  s_7a27f124c1e8e3::t_d2f6683edf0553 9-10
+  s_7a27f124c1e8e3::t_c08bd0e48f705a 1-8,11-362
+extensions/foundry/tests/integration/forge/forge-loop-release.spec.ts
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-35,40-270
+  s_7a27f124c1e8e3::t_e6b107214ae95d 36-39
+extensions/foundry/tests/integration/line/baseline.spec.ts
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-109
+extensions/foundry/tests/forge/converge.spec.ts
+  s_7a27f124c1e8e3::t_ab19143367dc0a 359-380
+extensions/foundry/tests/integration/storage-folder.spec.ts
+  s_7a27f124c1e8e3::t_67521ecc2d85fb 1-44
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_7a27f124c1e8e3::t_79cc28b815c03f 70,150
+  s_7a27f124c1e8e3::t_786453b91b9e8f 151-164
+  s_7a27f124c1e8e3::t_146bc6c6a89964 165-167
+extensions/foundry/tests/integration/line/refinery-run.spec.ts
+  s_7a27f124c1e8e3::t_e6b107214ae95d 13-18,27-30
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-12,19-26,31-191
+extensions/foundry/tests/integration/line/scout-commands.spec.ts
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-141
+extensions/foundry/tests/integration/runtime/diff-metrics.spec.ts
+  s_7a27f124c1e8e3::t_635fe4924cd327 1-70
+extensions/foundry/tests/integration/forge/base-branch.spec.ts
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-67
+extensions/foundry/tests/integration/line/universal-repository.spec.ts
+  s_7a27f124c1e8e3::t_aceb74504eab74 1-8,15-24,29-213
+  s_7a27f124c1e8e3::t_e6b107214ae95d 9-14,25-28
+extensions/foundry/tests/line/worktree.spec.ts
+  s_7a27f124c1e8e3::t_609335e1268bf3 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f98653afb8e97ca8ef8b9b9fcadebde2c3a69d64",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,77 @@
+extensions/task-vault/tests/integration/ipc/inbox.ipc.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-155
+extensions/task-vault/tests/integration/ipc/vault-data.ipc.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-538
+extensions/task-vault/tests/integration/vault/db.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-127
+extensions/task-vault/tests/integration/vault/ensure-next-occurrence.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-304
+extensions/task-vault/tests/integration/ipc/vault-contexts.ipc.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-47
+extensions/remote-control/tests/integration/bridge.route.spec.ts
+  s_7a27f124c1e8e3::t_350ad8d077be5a 1-470
+extensions/git-integration/tests/integration/worktree.spec.ts
+  s_7a27f124c1e8e3::t_c9ef45e5c7143d 1-88
+extensions/git-integration/tests/integration/local-inventory.spec.ts
+  s_7a27f124c1e8e3::t_85299f13673da9 1-95
+extensions/task-vault/tests/integration/ipc/links.ipc.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-203
+extensions/task-vault/tests/integration/ipc/vault-areas.ipc.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-490
+extensions/task-vault/tests/components/CalendarDrawer.spec.tsx
+  s_7a27f124c1e8e3::t_cd703b0b1b54af 71,121-133,135-140
+  s_7a27f124c1e8e3::t_b035b57547be09 134
+  s_7a27f124c1e8e3::t_be2edd057b0a59 141-143
+extensions/task-vault/tests/components/TaskVaultView.spec.tsx
+  s_7a27f124c1e8e3::t_91fdbee9827bae 227-238
+extensions/task-vault/tests/integration/ipc/vault-handlers.ipc.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-953
+extensions/remote-control/tests/integration/terminal.routes.spec.ts
+  s_7a27f124c1e8e3::t_7f9d0dfc56cc41 1-328
+extensions/remote-control/tests/integration/remote-server.spec.ts
+  s_7a27f124c1e8e3::t_282ee7c18d5859 1-188
+extensions/task-vault/tests/integration/ipc/capture.ipc.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-130
+extensions/task-vault/tests/integration/ipc/projects.ipc.spec.ts
+  s_7a27f124c1e8e3::t_ad07698eb90a9e 1-272
+extensions/task-vault/tests/integration/vault/task-repository.spec.ts
+  s_7a27f124c1e8e3::t_350ad8d077be5a 1-141
+extensions/git-integration/tests/integration/git-service-hooks.spec.ts
+  s_7a27f124c1e8e3::t_7271e0d0bc543a 6-7
+extensions/git-integration/tests/integration/git-settings.spec.ts
+  s_7a27f124c1e8e3::t_0e4179d58cfcf1 7-9
+extensions/git-integration/tests/integration/merge-flow-atomic-write.spec.ts
+  s_7a27f124c1e8e3::t_06d323f813fda4 15
+extensions/git-integration/tests/integration/status-watch-roots.spec.ts
+  s_7a27f124c1e8e3::t_54139711f5fd12 5-6
+extensions/git-integration/tests/unit/worktree.spec.ts
+  s_7a27f124c1e8e3::t_e3b15c03051100 1-2
+extensions/task-vault/tests/integration/channel-schemas.spec.ts
+  s_7a27f124c1e8e3::t_84d29daf8656b4 3,11-12,16-17
+extensions/task-vault/tests/integration/home/publisher.spec.ts
+  s_7a27f124c1e8e3::t_d3b96ffae3dc09 3-5,7
+extensions/task-vault/tests/integration/index-reset.spec.ts
+  s_7a27f124c1e8e3::t_3e1a6c345bd0c0 3,6-8,15-16,19-21,68
+extensions/task-vault/tests/integration/ipc/admin.ipc.spec.ts
+  s_7a27f124c1e8e3::t_8e88f5c6c0a31f 3,5-6
+extensions/task-vault/tests/integration/notifications/task-scheduler.spec.ts
+  s_7a27f124c1e8e3::t_31c5a6f5121381 3-5,12,222
+extensions/task-vault/tests/integration/stale-threshold.spec.ts
+  s_7a27f124c1e8e3::t_d0817f804c57e1 7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "45cccbab6f0e63a406576798248812471825cff6",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

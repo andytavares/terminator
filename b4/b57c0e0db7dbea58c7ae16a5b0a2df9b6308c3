@@ -1,0 +1,24 @@
+extensions/foundry/tests/integration/forge/forge-loop.spec.ts
+  s_7a27f124c1e8e3::t_d483a2d5251b8f 7,337-348
+  s_7a27f124c1e8e3::t_bd3041ca152f6d 349-350
+extensions/foundry/tests/helpers/supervision-mocks.ts
+  s_7a27f124c1e8e3::t_c7a8c769a332e6 40-44
+extensions/foundry/tests/helpers/foundry-activation.ts
+  s_7a27f124c1e8e3::t_c7a8c769a332e6 33-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b4b57c0e0db7dbea58c7ae16a5b0a2df9b6308c3",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

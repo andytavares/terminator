@@ -1,0 +1,29 @@
+scripts/test-select.mjs
+  s_7a27f124c1e8e3::t_1ec66802af18e6 119-123
+extensions/foundry/tests/line/order-shape.spec.ts
+  s_7a27f124c1e8e3::t_b9248cc63cd9c4 206-208
+tests/integration/git-test-env.spec.ts
+  s_7a27f124c1e8e3::t_2ab34f3a96603d 47-49
+tests/integration/git/inherited-git-env.spec.ts
+  s_7a27f124c1e8e3::t_35b57ec61cea80 8-10
+tests/integration/scripts/build-extensions-inputs.spec.ts
+  s_7a27f124c1e8e3::t_f250d5778e1c59 5-7
+tests/integration/scripts/e2e-select.spec.ts
+  s_7a27f124c1e8e3::t_3ba7186a086cf4 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e8ff4864faa047ab4abb094efef7d09cc02267aa",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
