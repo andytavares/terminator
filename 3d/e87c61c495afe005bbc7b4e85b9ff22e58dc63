@@ -1,0 +1,72 @@
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+docs/adr/129-ci-jobs-have-no-time-limit.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 15
+.github/workflows/ci.yml
+  s_7a27f124c1e8e3::t_8a0ab383bff788 17,22-24,44,48-50,65,105-106,133-134,159,173,175-179,181,237-238,271-273,276,301
+docs/adr/133-paved-path-cleanup.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+docs/ARCHITECTURE.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 979,982-984
+docs/CONSTITUTION.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 2-26,302,412-414,427-431,435-437,467
+docs/CONTRIBUTING.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 62,64,69,78,80,115,118,134,140,299
+knip.jsonc
+  s_7a27f124c1e8e3::t_8a0ab383bff788 15,31,47,52-53,57-58,65-66
+scripts/check-single-copies.mjs
+  s_7a27f124c1e8e3::t_8a0ab383bff788 8-10
+docs/adr/070-e2e-is-deterministic-and-selective.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+docs/adr/071-ci-is-sharded-by-duration-and-warns-nothing.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+scripts/workflow-lint.mjs
+  s_7a27f124c1e8e3::t_8a0ab383bff788 4-5,9,12-13,22,93-219,221-223
+docs/adr/132-ci-finishes-in-five-minutes.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+docs/adr/136-a-real-order-runs-before-foundry-changes-ship.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+docs/adr/134-ci-releases-each-merge.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+docs/adr/125-a-security-fix-skips-the-release-age-cooldown.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+README.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 185-209
+scripts/test-env.mjs
+  s_7a27f124c1e8e3::t_8a0ab383bff788 1-2
+docs/adr/107-production-only-unused-code-is-a-ci-gate.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+scripts/typecheck.mjs
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+tests/e2e/global-setup.ts
+  s_7a27f124c1e8e3::t_8a0ab383bff788 15
+package.json
+  s_7a27f124c1e8e3::t_8a0ab383bff788 24,32,36,52
+tests/unit/scripts/workflow-lint.spec.ts
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3,8-9,26,48-92
+  s_7a27f124c1e8e3::t_204d70a7a01b3f 93
+docs/adr/139-the-pre-push-hook-trusts-foundry.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 3
+docs/adr/151-ci-runs-everything-once-with-nothing-fancy.md
+  s_7a27f124c1e8e3::t_8a0ab383bff788 1-19
+.husky/pre-commit
+  s_7a27f124c1e8e3::t_8a0ab383bff788 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3de87c61c495afe005bbc7b4e85b9ff22e58dc63",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
