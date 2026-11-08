@@ -1,0 +1,26 @@
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_7a27f124c1e8e3::t_d7c65949186ecc 49,74-84
+  s_7a27f124c1e8e3::t_b8db31ac0e5293 10,57
+  s_7a27f124c1e8e3::t_45194b0966fdfd 85-86
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_7a27f124c1e8e3::t_b8db31ac0e5293 19-22
+  s_7a27f124c1e8e3::t_d333e2f65e0e37 23-24
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_7a27f124c1e8e3::t_96d3542fb4c274 252-258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2cc9964929d120380d13916006c64d726c64b53a",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
