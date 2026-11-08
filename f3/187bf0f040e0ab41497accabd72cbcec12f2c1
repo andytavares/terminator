@@ -1,0 +1,39 @@
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_7a27f124c1e8e3::t_16b96e382ab102 901-903,912-914,920,922,926-932
+src/renderer/components/sidebar/FilterMenu.tsx
+  s_7a27f124c1e8e3::t_8e3ce53fac9c67 93-94
+src/renderer/components/AlertBadge.tsx
+  s_7a27f124c1e8e3::t_fb3b2e64a2d7ad 11
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_7a27f124c1e8e3::t_e644a46eefdbbf 80-81,84,123,131-134,148,150
+src/renderer/components/sidebar/useSidebarViews.ts
+  s_7a27f124c1e8e3::t_8e3ce53fac9c67 3,7,14,16
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_7a27f124c1e8e3::t_8e3ce53fac9c67 155
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_7a27f124c1e8e3::t_f62b49b4da8347 233,247
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_7a27f124c1e8e3::t_f62b49b4da8347 220-224,239,533-537,554-558,574-578,599-603
+tests/unit/renderer/components/sidebar/sidebar-menus.spec.tsx
+  s_7a27f124c1e8e3::t_8e3ce53fac9c67 47,51
+tests/unit/renderer/logger.spec.ts
+  s_7a27f124c1e8e3::t_76847af12cb276 76-77,79-80
+extensions/notepad/src/db/db.ts
+  s_7a27f124c1e8e3::t_d8f1a8c5364dc6 37,53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f3187bf0f040e0ab41497accabd72cbcec12f2c1",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
