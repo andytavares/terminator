@@ -1404,8 +1404,7 @@ stateDiagram-v2
   Ready --> HandedOff: automatic hand-off on
   Ready --> You: automatic hand-off off
   You --> HandedOff: press Hand off
-</pre
-    >
+</pre>
 
     <h3>Components and interfaces</h3>
     <p class="prose">
@@ -1423,8 +1422,7 @@ stateDiagram-v2
 | { kind: 'running'; at: string; sessionId: string; asked: string;
     actor: 'architect' | 'red team' | 'scout';
     trigger: 'you' | 'automatic';     // your ask, or a follow-up / loop fix
-    round: number | null }            // red-team loop round, when in the loop</pre
-    >
+    round: number | null }            // red-team loop round, when in the loop</pre>
     <p class="prose">
       <b><code>src/forge/readiness.ts</code></b> (new, pure). This is the one answer every Forge
       surface reads. It sits next to <code>standingOf</code>, which keeps answering the order list's
@@ -1454,8 +1452,7 @@ export interface Readiness {
 export function readiness(input: {
   order: WorkOrder; compile: CompileResult; intake: IntakeOutcome;
   autoHandOff: boolean; now: string
-}): Readiness</pre
-    >
+}): Readiness</pre>
     <p class="prose">
       A failing check is <code>being-fixed</code> when a machine turn is running or queued to close
       it. It is <code>failing</code> only when nothing will close it without you. That rule removes
@@ -2767,8 +2764,7 @@ npm run format
 npm run lint                       # 0 errors
 npm run typecheck:extensions       # the only typecheck that covers Foundry
 npx vitest run --coverage; echo "exit $?"   # must print exit 0, patch coverage ≥ 80%
-npx playwright test tests/e2e/foundry-forge.spec.ts; echo "exit $?"</pre
-    >
+npx playwright test tests/e2e/foundry-forge.spec.ts; echo "exit $?"</pre>
     <div class="prose">
       <p>
         The e2e addresses controls by role and accessible name. It covers four cases: a ledger

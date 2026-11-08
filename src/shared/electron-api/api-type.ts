@@ -22,14 +22,14 @@ type NamespaceOf<Path> = Path extends `${infer Namespace}.${string}` ? Namespace
 
 type BridgeOf<Spec extends { path: string }> = {
   [Namespace in NamespaceOf<Spec['path']>]: {
-    [Member in Spec as Member['path'] extends `${Namespace}.${infer Name}`
-      ? Name
-      : never]: MethodOf<Member>
+    [
+      Member in Spec as Member['path'] extends `${Namespace}.${infer Name}` ? Name : never
+    ]: MethodOf<Member>
   }
 } & {
-  [Member in Spec as Member['path'] extends `${string}.${string}`
-    ? never
-    : Member['path']]: MethodOf<Member>
+  [
+    Member in Spec as Member['path'] extends `${string}.${string}` ? never : Member['path']
+  ]: MethodOf<Member>
 }
 
 /** window.electronAPI in the app renderer, native and remote. */

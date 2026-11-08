@@ -51,8 +51,11 @@ export function searchWork(input: SearchInput): SearchHit[] {
       .map(sessionHit),
     ...tickets
       .filter((i) => !threadTickets.has(i.key) && matchesText([i.key, i.title], text))
-      .map(
-        (issue): SearchHit => ({ kind: 'ticket', issue, label: issue.title, detail: issue.key })
-      ),
+      .map((issue): SearchHit => ({
+        kind: 'ticket',
+        issue,
+        label: issue.title,
+        detail: issue.key,
+      })),
   ].slice(0, MAX_HITS)
 }

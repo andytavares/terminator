@@ -1,6 +1,6 @@
 # ADR 118: Dismissed means gone
 
-**Status**: Accepted, amended by [ADR 146](146-a-closed-session-leaves-home.md)
+**Status**: Accepted, amended by [ADR 146](146-a-closed-session-leaves-home.md) and [ADR 149](149-a-new-session-brings-a-dismissed-row-back.md)
 
 **Date**: 2026-10-19
 

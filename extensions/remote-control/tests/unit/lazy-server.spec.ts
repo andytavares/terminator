@@ -43,7 +43,10 @@ function fakeHostApi() {
 }
 
 const toggleRemote = (enabled: boolean) =>
-  dispatchChannel(specs.find((spec) => spec.channel === 'remote:toggle')!, { enabled })
+  dispatchChannel(
+    specs.find((spec) => spec.channel === 'remote:toggle')!,
+    { enabled }
+  )
 
 beforeAll(async () => {
   settings.set('terminator.remote-control.enabled', false)

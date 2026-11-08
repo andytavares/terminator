@@ -6,7 +6,12 @@ const threads = vi.hoisted(() => ({ all: [] as WorkThread[] }))
 const resumeSession = vi.hoisted(() => vi.fn())
 const latest = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/components/home/useWorkThreads', () => ({
-  useWorkThreads: () => ({ threads: [], groups: [], allThreads: threads.all }),
+  useWorkThreads: () => ({
+    threads: [],
+    groups: [],
+    allThreads: threads.all,
+    dismissedThreads: [],
+  }),
 }))
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({ resumeSession }))
 vi.mock('../../../../src/renderer/home/work-threads', async (importOriginal) => ({

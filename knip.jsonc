@@ -59,12 +59,12 @@
     "extensions/*": {
       "entry": ["src/index.ts!"],
       "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!"],
-      "vite": { "config": ["vite.renderer.config.ts"] },
+      "vite": { "config": ["vite.renderer.config.mts"] },
     },
     "extensions/git-integration": {
       "entry": ["src/index.ts!"],
       "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!"],
-      "vite": { "config": ["vite.renderer.config.ts"] },
+      "vite": { "config": ["vite.renderer.config.mts"] },
       // Loaded by path at run time: require.resolve of each grammar's .wasm,
       // src/review/symbols.ts:52.
       "ignoreDependencies": ["@vscode/tree-sitter-wasm"],
@@ -72,7 +72,7 @@
     "extensions/remote-control": {
       "entry": ["src/index.ts!"],
       "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!"],
-      "vite": { "config": ["vite.renderer.config.ts"] },
+      "vite": { "config": ["vite.renderer.config.mts"] },
       // The ngrok CLI the user installs; found with `which ngrok`,
       // src/server/ngrok-manager.ts:37.
       "ignoreBinaries": ["ngrok"],

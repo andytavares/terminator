@@ -5,8 +5,10 @@ import './extension-ui.css'
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 export type ButtonSize = 'sm' | 'md'
 
-export interface ButtonProps
-  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'> {
+export interface ButtonProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'className' | 'children'
+> {
   /** What the press means, not how loud it is. Two buttons side by side get one visual weight
    * between them: at most one is primary. */
   variant?: ButtonVariant

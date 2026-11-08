@@ -15,6 +15,7 @@ vi.mock('../../../../src/renderer/components/home/useWorkThreads', async () => {
       threads: state.threads,
       groups: work.groupThreads(state.threads as WorkThread[]),
       allThreads: state.threads,
+      dismissedThreads: [],
     }),
   }
 })

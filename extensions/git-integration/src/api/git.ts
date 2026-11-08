@@ -7,8 +7,7 @@ import type { RemoveItem, RemoveResult } from '../git/remove-local'
 import type { CleanupReport } from '../ipc/worktrees.ipc'
 
 export type CommitResult =
-  | { commitHash: string }
-  | { error: string; hookOutput?: string; isHookFailure?: boolean }
+  { commitHash: string } | { error: string; hookOutput?: string; isHookFailure?: boolean }
 
 const bridge = () => window.electronAPI.extensionBridge
 

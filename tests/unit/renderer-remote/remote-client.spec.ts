@@ -147,9 +147,8 @@ describe('listTerminals', () => {
 describe('assignTerminalWorkspace', () => {
   it('PATCH /api/terminals/:sessionId with workspaceId', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
-    const { assignTerminalWorkspace } = await import(
-      '../../../src/renderer-remote/api/remote-client'
-    )
+    const { assignTerminalWorkspace } =
+      await import('../../../src/renderer-remote/api/remote-client')
     await assignTerminalWorkspace('s1', 'w1')
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/terminals/s1',
@@ -161,9 +160,8 @@ describe('assignTerminalWorkspace', () => {
 
   it('PATCH /api/terminals/:sessionId with null to clear workspaceId', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
-    const { assignTerminalWorkspace } = await import(
-      '../../../src/renderer-remote/api/remote-client'
-    )
+    const { assignTerminalWorkspace } =
+      await import('../../../src/renderer-remote/api/remote-client')
     await assignTerminalWorkspace('s2', null)
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(opts.body as string)).toEqual({ workspaceId: null })
@@ -173,9 +171,8 @@ describe('assignTerminalWorkspace', () => {
 describe('assignTerminalWorkspace — throws when PATCH response is not ok', () => {
   it('throws when PATCH response is not ok', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
-    const { assignTerminalWorkspace } = await import(
-      '../../../src/renderer-remote/api/remote-client'
-    )
+    const { assignTerminalWorkspace } =
+      await import('../../../src/renderer-remote/api/remote-client')
     await expect(assignTerminalWorkspace('s-missing', 'w1')).rejects.toThrow('404')
   })
 })

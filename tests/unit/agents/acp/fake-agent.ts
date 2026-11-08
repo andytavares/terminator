@@ -1,22 +1,32 @@
 import {
-  AgentSideConnection,
-  ClientSideConnection,
+  agent,
+  methods,
   ndJsonStream,
-  type Agent,
-  type Client,
+  type AgentApp,
+  type AgentContext,
   type PromptRequest,
   type PromptResponse,
+  type RequestPermissionRequest,
+  type RequestPermissionResponse,
+  type SessionNotification,
   type SetSessionModeRequest,
   RequestError,
-} from '@agentclientprotocol/sdk'
+} from '@agentclientprotocol/sdk/unstable'
 import { availableAdapterModes } from '../../../support/acp-modes'
-import type { AgentLink } from '../../../../src/main/agents/acp/agent-service'
+import { connectClient } from '../../../../src/main/agents/acp/agent-connection'
+import type { AgentClient, AgentLink } from '../../../../src/main/agents/acp/agent-service'
+
+/** The calls the agent makes on the client. */
+interface ToClient {
+  sessionUpdate(params: SessionNotification): Promise<void>
+  requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse>
+}
 
 export interface FakeAgent {
   /** Every request the client made, in order. */
   calls: Array<{ method: string; params: unknown }>
   /** The agent's end of the connection: it sends updates and asks for permission. */
-  toClient: AgentSideConnection
+  toClient: ToClient
   killed: boolean
   /** Ends the process as if it had exited. */
   exit(code: number | null): void
@@ -80,35 +90,76 @@ async function extAnswer(fake: FakeAgent, method: string, params: Record<string,
   return method === '_session/steering' ? fake.onSteer(params) : {}
 }
 
-/** The agent's answers to the client's requests; each request is recorded first. */
-function agentHandlers(fake: FakeAgent, cancel: () => void): Agent {
-  const recorded = <P, R>(method: string, answer: (params: P) => R) => {
-    return (params: P): R => {
+type Recorder = <P, R>(method: string, answer: (params: P) => R) => (context: { params: P }) => R
+
+/** Wraps an answer so the request is recorded before it is answered. */
+function recorderFor(fake: FakeAgent): Recorder {
+  return (method, answer) =>
+    ({ params }) => {
       fake.calls.push({ method, params })
       return answer(params)
     }
-  }
+}
+
+/** The agent's answers to the session requests: open, load, mode and settings. */
+function withSessionHandlers(app: AgentApp, fake: FakeAgent, recorded: Recorder): AgentApp {
+  return app
+    .onRequest(
+      methods.agent.session.new,
+      recorded('newSession', async () => {
+        if (fake.failures.newSession) throw fake.failures.newSession
+        return { sessionId: SESSION_ID, configOptions: CONFIG_OPTIONS }
+      })
+    )
+    .onRequest(
+      methods.agent.session.load,
+      recorded('loadSession', async () => ({ configOptions: CONFIG_OPTIONS }))
+    )
+    .onRequest(
+      methods.agent.session.setMode,
+      recorded('setSessionMode', async ({ modeId }: SetSessionModeRequest) => {
+        if (fake.failures.setSessionMode) throw fake.failures.setSessionMode
+        // As the adapter answers over ACP: its plain Error becomes an internal error with details.
+        if (!availableAdapterModes().includes(modeId))
+          throw RequestError.internalError({
+            details: `Mode ${modeId} is not available in this session`,
+          })
+        return {}
+      })
+    )
+    .onRequest(
+      methods.agent.session.setConfigOption,
+      recorded('setSessionConfigOption', configOptionsAnswer)
+    )
+}
+
+/** The agent's answers to the client's requests; each request is recorded first. */
+function agentHandlers(fake: FakeAgent, cancel: () => void): AgentApp {
+  const recorded = recorderFor(fake)
+  const app = agent()
+    .onRequest(
+      methods.agent.initialize,
+      recorded('initialize', async () => initializeAnswer(fake.advertised))
+    )
+    .onRequest(methods.agent.authenticate, async () => ({}))
+    .onRequest(
+      methods.agent.session.prompt,
+      recorded('prompt', (params: PromptRequest) => fake.onPrompt(params))
+    )
+    .onNotification(
+      methods.agent.session.cancel,
+      recorded('cancel', async () => cancel())
+    )
+    .onRequest('*', ({ method, params }) =>
+      extAnswer(fake, method, params as Record<string, unknown>)
+    )
+  return withSessionHandlers(app, fake, recorded)
+}
+
+function toClientOf(client: AgentContext): ToClient {
   return {
-    initialize: recorded('initialize', async () => initializeAnswer(fake.advertised)),
-    authenticate: async () => ({}),
-    newSession: recorded('newSession', async () => {
-      if (fake.failures.newSession) throw fake.failures.newSession
-      return { sessionId: SESSION_ID, configOptions: CONFIG_OPTIONS }
-    }),
-    loadSession: recorded('loadSession', async () => ({ configOptions: CONFIG_OPTIONS })),
-    setSessionMode: recorded('setSessionMode', async ({ modeId }: SetSessionModeRequest) => {
-      if (fake.failures.setSessionMode) throw fake.failures.setSessionMode
-      // As the adapter answers over ACP: its plain Error becomes an internal error with details.
-      if (!availableAdapterModes().includes(modeId))
-        throw RequestError.internalError({
-          details: `Mode ${modeId} is not available in this session`,
-        })
-      return {}
-    }),
-    setSessionConfigOption: recorded('setSessionConfigOption', configOptionsAnswer),
-    prompt: recorded('prompt', (params: PromptRequest) => fake.onPrompt(params)),
-    cancel: recorded('cancel', async () => cancel()),
-    extMethod: (method, params) => extAnswer(fake, method, params),
+    sessionUpdate: (params) => client.notify(methods.client.session.update, params),
+    requestPermission: (params) => client.request(methods.client.session.requestPermission, params),
   }
 }
 
@@ -129,12 +180,12 @@ function newFake(
     disconnect: () => undefined,
     onPrompt: async () => ({ stopReason: 'end_turn' }),
     cancelled: new Promise((resolve) => (signalCancel = resolve)),
-    toClient: undefined as never, // Set below: the connection asks for its handlers at once.
+    toClient: undefined as never, // Set below, from the connection the fake's handlers serve.
   }
-  fake.toClient = new AgentSideConnection(
-    () => agentHandlers(fake, signalCancel),
+  const connection = agentHandlers(fake, signalCancel).connect(
     ndJsonStream(toClient.writable, toAgent.readable)
   )
+  fake.toClient = toClientOf(connection.client)
   const severable = new TransformStream<Uint8Array, Uint8Array>({
     start: (controller) => void (fake.disconnect = () => controller.terminate()),
   })
@@ -148,21 +199,21 @@ export function fakeConnector(
   failures: FakeAgent['failures'] = {},
   advertised: Advertised = { image: true, steering: true }
 ): {
-  connect(request: { agentId: string; client: Client }): Promise<AgentLink>
+  connect(request: { agentId: string; client: AgentClient }): Promise<AgentLink>
   agents: FakeAgent[]
   firstAgent: Promise<FakeAgent>
 } {
   const agents: FakeAgent[] = []
   let announce: (fake: FakeAgent) => void = () => undefined
   const firstAgent = new Promise<FakeAgent>((resolve) => (announce = resolve))
-  async function connect({ client }: { agentId: string; client: Client }): Promise<AgentLink> {
+  async function connect({ client }: { agentId: string; client: AgentClient }): Promise<AgentLink> {
     const { fake, agentStream } = newFake(failures, advertised)
     const exitListeners: Array<(code: number | null) => void> = []
     fake.exit = (code) => exitListeners.forEach((listener) => listener(code))
     agents.push(fake)
     announce(fake)
     return {
-      agent: new ClientSideConnection(() => client, agentStream),
+      agent: connectClient(client, agentStream),
       onExit: (listener) => void exitListeners.push(listener),
       kill: () => void (fake.killed = true),
       stderrTail: () => '',

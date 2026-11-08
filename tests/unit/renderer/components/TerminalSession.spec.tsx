@@ -138,9 +138,8 @@ beforeEach(async () => {
     return { observe: vi.fn(), disconnect: vi.fn() }
   })
   vi.stubGlobal('ResizeObserver', mockResizeObserver)
-  const { WebglContextBudget, MAX_WEBGL_CONTEXTS } = await import(
-    '../../../../src/renderer/terminal/webgl-contexts'
-  )
+  const { WebglContextBudget, MAX_WEBGL_CONTEXTS } =
+    await import('../../../../src/renderer/terminal/webgl-contexts')
   budgetHolder.current = new WebglContextBudget(MAX_WEBGL_CONTEXTS)
   mockPlatform = 'MacIntel'
   vi.clearAllMocks()

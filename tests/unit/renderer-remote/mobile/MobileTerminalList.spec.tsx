@@ -21,9 +21,8 @@ beforeEach(() => {
 })
 
 async function renderList(workspaces: Workspace[], terminals: TerminalSession[]) {
-  const { MobileTerminalList } = await import(
-    '../../../../src/renderer-remote/components/MobileTerminalList'
-  )
+  const { MobileTerminalList } =
+    await import('../../../../src/renderer-remote/components/MobileTerminalList')
   return render(
     <MobileTerminalList
       workspaces={workspaces}

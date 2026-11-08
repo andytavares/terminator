@@ -290,10 +290,7 @@ function useAskAnswers(setProblem: SetProblem, pollLive: () => Promise<void>) {
 
 /** Steering a live agent, and clearing or silencing what the feed says. */
 type SessionControl =
-  | 'foundry:run-redirect'
-  | 'foundry:run-interrupt'
-  | 'foundry:run-stop'
-  | 'foundry:run-terminal'
+  'foundry:run-redirect' | 'foundry:run-interrupt' | 'foundry:run-stop' | 'foundry:run-terminal'
 
 function useSessionControl(setProblem: SetProblem, pollLive: () => Promise<void>) {
   const control = useCallback(
@@ -954,7 +951,9 @@ function MergeOrder({ view }: { readonly view: FloorView }) {
     <section className="fdry-panel" style={{ marginBottom: 12 }}>
       <h3 className="fdry-panel-h">Merge order</h3>
       <ol className="fdry-merge">
-        {view.lanes?.map((row) => <MergeRow key={row.ord} row={row} />)}
+        {view.lanes?.map((row) => (
+          <MergeRow key={row.ord} row={row} />
+        ))}
       </ol>
     </section>
   )

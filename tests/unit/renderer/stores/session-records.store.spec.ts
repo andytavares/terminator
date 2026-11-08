@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { SessionRecordListing, SessionSnapshot } from '../../../../src/shared/types/index'
 
 let changed:
-  | ((payload: { sessionId: string; record: SessionRecordListing | null }) => void)
-  | null = null
+  ((payload: { sessionId: string; record: SessionRecordListing | null }) => void) | null = null
 
 const api = {
   list: vi.fn(),

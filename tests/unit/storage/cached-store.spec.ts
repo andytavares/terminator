@@ -29,7 +29,7 @@ vi.mock('electron-store', () => ({
   },
 }))
 
-interface Schema {
+type Schema = {
   names: string[]
   settings: { theme: string }
 }

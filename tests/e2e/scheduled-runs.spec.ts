@@ -69,6 +69,30 @@ async function theRunShowsUnderGlobal(): Promise<void> {
   )
 }
 
+/** In a narrow window, long cells wrap: the view never scrolls sideways. */
+async function theTableFitsANarrowWindow(): Promise<void> {
+  const resize = ([width, height]: number[]) =>
+    handle.app.evaluate(
+      ({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(size[0], size[1]),
+      [width, height]
+    )
+  const before = await handle.app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].getSize()
+  )
+  await resize([800, 600])
+  try {
+    const overflow = () =>
+      handle.page.locator('.scheduled').evaluate((view) => view.scrollWidth - view.clientWidth)
+    await expect.poll(overflow).toBeLessThanOrEqual(1)
+    await expect(runRow().getByRole('button', { name: `Actions for ${PROMPT}` })).toBeInViewport()
+    await expect(
+      handle.page.getByRole('button', { name: 'New scheduled run' }).first()
+    ).toBeInViewport({ ratio: 1 })
+  } finally {
+    await resize(before)
+  }
+}
+
 async function runNowStartsAnAgentInTheHomeFolder(): Promise<void> {
   const home = await handle.app.evaluate(() => process.env.HOME)
   await rowAction('Run now')
@@ -116,6 +140,10 @@ async function removeAsksThenEmptiesTheView(): Promise<void> {
 test('a global scheduled run is run, paused, edited and removed from Home', async () => {
   await test.step('Start work saves a global repeat', scheduleAGlobalRepeat)
   await test.step('Home → Scheduled lists it under Global', theRunShowsUnderGlobal)
+  await test.step(
+    'the table fits a narrow window with no sideways scroll',
+    theTableFitsANarrowWindow
+  )
   await test.step(
     'Run now starts an agent in the home folder in the background, and View opens it',
     runNowStartsAnAgentInTheHomeFolder

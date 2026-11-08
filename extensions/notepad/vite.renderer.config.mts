@@ -6,5 +6,5 @@ import { extensionViewConfig } from '@terminator/extension-sdk/vite'
 // chunk: Excalidraw is one 2,422 kB module, loaded only when a diagram opens. CI fails the build
 // on any chunk warning.
 export default defineConfig(
-  extensionViewConfig(__dirname, { plugins: [react()], chunkSizeWarningLimit: 2600 })
+  extensionViewConfig(import.meta.dirname, { plugins: [react()], chunkSizeWarningLimit: 2600 })
 )

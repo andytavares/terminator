@@ -31,9 +31,8 @@ async function startWatcher(): Promise<string> {
   records.onRecordChange((_id, record) => {
     if (record !== null) recorded.push(record)
   })
-  const { startAgentSessionWatcher } = await import(
-    '../../../src/main/agents/agent-session-watcher'
-  )
+  const { startAgentSessionWatcher } =
+    await import('../../../src/main/agents/agent-session-watcher')
   stop = startAgentSessionWatcher({ snapshotFor: (sessionId) => terminalSnapshot(sessionId) })
   return path.join(userData, 'agent-sessions')
 }

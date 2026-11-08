@@ -65,7 +65,7 @@ my-extension/
 │       ├── main.tsx         view entry: mountExtension(<App />)
 │       └── App.tsx          routes on the ?view= parameter
 ├── index.html               view document
-├── vite.renderer.config.ts  builds the view into dist/
+├── vite.renderer.config.mts  builds the view into dist/
 └── dist/index.html          the built view, named by manifest.renderer
 ```
 
@@ -128,10 +128,10 @@ const off = window.electronAPI.extensionBridge.on('my-tool:update', (data) => co
 
 `npm run build:extensions` (`scripts/build-extensions.cjs`) builds every directory under
 `extensions/`. esbuild bundles `src/index.ts` into the file that `manifest.main` names. When the
-extension has a `vite.renderer.config.ts`, the script runs that extension's `npm run build:renderer`
-(`vite build --config vite.renderer.config.ts`) into `dist/`. `npm run dev` and `npm run build`
+extension has a `vite.renderer.config.mts`, the script runs that extension's `npm run build:renderer`
+(`vite build --config vite.renderer.config.mts`) into `dist/`. `npm run dev` and `npm run build`
 run the script first. The guide's [Setting up a view](../../docs/EXTENSION-DEVELOPMENT.md#setting-up-a-view)
-has the `index.html` and `vite.renderer.config.ts` to start from.
+has the `index.html` and `vite.renderer.config.mts` to start from.
 
 Build an extension outside `extensions/` with its own scripts. Then install it from Settings →
 Extensions → **Install from Directory**. **Reload** there runs its backend again from disk and

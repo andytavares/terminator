@@ -18,7 +18,7 @@ interface ExtensionRecord extends Extension {
   rendererRelPath?: string
 }
 
-interface ExtensionStoreSchema {
+type ExtensionStoreSchema = {
   extensions: ExtensionRecord[]
 }
 

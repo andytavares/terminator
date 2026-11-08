@@ -11,6 +11,8 @@ export interface AgentTabRequest {
   resume?: string
   /** Sent as the `_meta` of `session/new`. */
   agentMeta?: Record<string, unknown>
+  /** The permission mode to start in; skipped when the agent does not offer it. */
+  mode?: string
 }
 
 /** Starts an agent as a tab of the project; null when the agent did not start. */

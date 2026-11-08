@@ -31,15 +31,15 @@ All four problems are in core renderer code. One change is in main (notification
 
 A throwaway Playwright probe ran against a fresh `npm run build` (exit 0). It opened one branch with three terminals. Two terminals ran `while true; do echo tick; sleep 0.4; done`. The probe sampled the surfaces every 250 ms for 10 s. Run the probe with `E2E_TOOLS=1 npx playwright test tests/e2e/tools/probe-research.spec.ts`. The probe was then removed from the tree.
 
-| Measurement                                               | Result                                                                               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Measurement                                               | Result                                                                              |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | Home Ledger row order changes in 40 samples               | **10**: `Terminal 2, Terminal 1, Terminal 3` ↔ `Terminal 1, Terminal 2, Terminal 3` |
 | Wall tile CSS `order` changes in 40 samples               | **8**: Terminal 1 and Terminal 2 swapping `order` 2 ↔ 3                             |
-| Focus after Enter on a Ledger row                         | `TEXTAREA.xterm-helper-textarea` ✓                                                   |
-| Focus after "Open Terminal 3" on a wall tile              | `TEXTAREA.xterm-helper-textarea` ✓                                                   |
-| Quick Actions → Sessions → Terminal 1, launched over Home | Home **still shown**, focus on `BODY` ✗                                              |
-| Sidebar terminal row click, different session             | `TEXTAREA.xterm-helper-textarea` ✓                                                   |
-| Sidebar terminal row click, the session already active    | focus on `DIV.terminal-row` ✗                                                        |
+| Focus after Enter on a Ledger row                         | `TEXTAREA.xterm-helper-textarea` ✓                                                  |
+| Focus after "Open Terminal 3" on a wall tile              | `TEXTAREA.xterm-helper-textarea` ✓                                                  |
+| Quick Actions → Sessions → Terminal 1, launched over Home | Home **still shown**, focus on `BODY` ✗                                             |
+| Sidebar terminal row click, different session             | `TEXTAREA.xterm-helper-textarea` ✓                                                  |
+| Sidebar terminal row click, the session already active    | focus on `DIV.terminal-row` ✗                                                       |
 
 The probe did not drive the notification path. The findings below about notifications come from the code.
 

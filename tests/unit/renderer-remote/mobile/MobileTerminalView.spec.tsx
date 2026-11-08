@@ -101,27 +101,24 @@ beforeEach(() => {
 
 describe('MobileTerminalView', () => {
   it('renders a container div for xterm', async () => {
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     const { container } = render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     // Should have a div that xterm mounts into
     expect(container.querySelector('.mobile-terminal-container')).toBeTruthy()
   })
 
   it('renders a back button', async () => {
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     expect(screen.getByRole('button', { name: /back/i })).toBeTruthy()
   })
 
   it('calls onBack when back button is clicked', async () => {
     const onBack = vi.fn()
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={onBack} />)
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
     expect(onBack).toHaveBeenCalledTimes(1)
@@ -136,9 +133,8 @@ describe('MobileTerminalView — shows reconnecting banner when status is reconn
       retry: vi.fn(),
       onOpenWsFailed: vi.fn(),
     })
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     expect(screen.getByText(/reconnecting/i)).toBeTruthy()
   })
@@ -150,9 +146,8 @@ describe('MobileTerminalView — shows reconnecting banner when status is reconn
       retry: vi.fn(),
       onOpenWsFailed: vi.fn(),
     })
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
   })
@@ -167,9 +162,8 @@ describe('MobileTerminalView — says why it was turned away', () => {
     async (status, text) => {
       const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
       vi.mocked(useReconnect).mockReturnValue({ status, retry: vi.fn(), onOpenWsFailed: vi.fn() })
-      const { MobileTerminalView } = await import(
-        '../../../../src/renderer-remote/components/MobileTerminalView'
-      )
+      const { MobileTerminalView } =
+        await import('../../../../src/renderer-remote/components/MobileTerminalView')
       render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
       expect(screen.getByRole('alert').textContent).toMatch(text)
       expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
@@ -185,9 +179,8 @@ describe('MobileTerminalView — renders MobileControlToolbar', () => {
       retry: vi.fn(),
       onOpenWsFailed: vi.fn(),
     })
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     expect(screen.getByText('ctrl-c')).toBeTruthy()
   })
@@ -201,9 +194,8 @@ describe('MobileTerminalView — sends key sequence to WebSocket when toolbar ke
       retry: vi.fn(),
       onOpenWsFailed: vi.fn(),
     })
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     // Flush microtasks so openWs async chain completes and wsRef.current is set
     await act(async () => {})
@@ -222,9 +214,8 @@ describe('MobileTerminalView — opens no socket and starts reconnecting when no
       retry: vi.fn(),
       onOpenWsFailed,
     })
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     await act(async () => {})
     expect(WsMockCtor).not.toHaveBeenCalled()
@@ -232,9 +223,8 @@ describe('MobileTerminalView — opens no socket and starts reconnecting when no
   })
 
   it('closes previous WebSocket when openWs is called a second time', async () => {
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     const { rerender } = render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     // Let first openWs complete so wsRef.current is set
     await act(async () => {})
@@ -249,9 +239,8 @@ describe('MobileTerminalView — writes incoming message data to terminal when a
   it('writes incoming message data to terminal when at bottom (no scrollToLine)', async () => {
     mockTermBuffer.baseY = 76 // 76 + 24 >= 100 → at bottom
     mockGetWsTicket.mockResolvedValue('ticket-abc')
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     await act(async () => {})
     expect(capturedMessageHandler).not.toBeNull()
@@ -264,9 +253,8 @@ describe('MobileTerminalView — writes incoming message data to terminal when a
     mockTermBuffer.baseY = 0 // 0 + 24 < 100 → not at bottom
     mockTermBuffer.length = 100
     mockGetWsTicket.mockResolvedValue('ticket-abc')
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s3" cwd="/tmp" onBack={vi.fn()} />)
     await act(async () => {})
     expect(capturedMessageHandler).not.toBeNull()
@@ -278,9 +266,8 @@ describe('MobileTerminalView — writes incoming message data to terminal when a
 
 describe('MobileTerminalView — forwards xterm onData keystrokes to WebSocket', () => {
   it('forwards xterm onData keystrokes to WebSocket', async () => {
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     await act(async () => {})
     expect(capturedOnDataHandler).not.toBeNull()
@@ -289,9 +276,8 @@ describe('MobileTerminalView — forwards xterm onData keystrokes to WebSocket',
   })
 
   it('does not send keystroke when WebSocket readyState is not OPEN', async () => {
-    const { MobileTerminalView } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalView'
-    )
+    const { MobileTerminalView } =
+      await import('../../../../src/renderer-remote/components/MobileTerminalView')
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     await act(async () => {})
     expect(capturedOnDataHandler).not.toBeNull()

@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+// electron-store 12 refuses to open outside Electron; the stores this spec reaches live in memory.
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
+
 // The facade and the stores have their own tests; here the question is only
 // whether the extension surface delegates to them, exposes nothing it should
 // not, and never hands out a credential.

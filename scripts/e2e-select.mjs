@@ -104,6 +104,7 @@ export const CORE_SPECS = [
   'desk.spec.ts',
   'extension-lifecycle.spec.ts',
   'home-tasks.spec.ts',
+  'inbox-sidebar.spec.ts',
   'issue-trackers.spec.ts',
   'live-preview-spacing.spec.ts',
   'mcp.spec.ts',
@@ -128,7 +129,7 @@ const SPEC_FILE_RE = /^tests\/e2e\/([^/]+\.spec\.ts)$/
 // anchored RegExp. No dependency on `path.matchesGlob`.
 function globToRegExp(glob) {
   let out = ''
-  for (let i = 0; i < glob.length; ) {
+  for (let i = 0; i < glob.length;) {
     const c = glob[i]
     if (c === '*' && glob[i + 1] === '*' && glob[i + 2] === '/') {
       out += '(?:.*/)?'

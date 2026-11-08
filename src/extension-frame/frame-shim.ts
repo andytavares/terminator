@@ -62,8 +62,7 @@ function createInvokeTable(post: (message: FrameRequest) => void) {
     },
     settle(
       reply: { id: string } & (
-        | { type: 'result'; result: unknown }
-        | { type: 'error'; error: string }
+        { type: 'result'; result: unknown } | { type: 'error'; error: string }
       )
     ): void {
       const waiter = pending.get(reply.id)

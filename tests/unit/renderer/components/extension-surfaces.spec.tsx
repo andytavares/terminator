@@ -225,9 +225,8 @@ describe('the extension API surface is unchanged', () => {
   // Asserted against inline literals so an accidental change to a published
   // contract fails here rather than in somebody else's extension.
   it('ExtensionContributes still declares exactly the known contribution types', async () => {
-    const { ExtensionContributesSchema } = await import(
-      '../../../../src/shared/schemas/extension.schema'
-    )
+    const { ExtensionContributesSchema } =
+      await import('../../../../src/shared/schemas/extension.schema')
     // The schema strips unknown keys, so parsing an over-full object returns
     // exactly the contribution types the contract recognises.
     const parsed = ExtensionContributesSchema.parse({

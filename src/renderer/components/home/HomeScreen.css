@@ -19,19 +19,25 @@
   container-type: size;
 }
 
+/* In a narrow window the header wraps onto more lines instead of running off the edge. */
 .hd {
   flex: none;
-  height: 50px;
+  min-height: 50px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 0 18px;
+  gap: 8px 10px;
+  padding: 7px 18px;
   border-bottom: 1px solid var(--tm-border);
 }
 .hd__title {
   margin: 0;
   font-size: var(--tm-font-size-lg);
   font-weight: 600;
+}
+.hd__date,
+.hd__start {
+  white-space: nowrap;
 }
 .hd__date {
   color: var(--tm-text-secondary);
@@ -44,7 +50,7 @@
   flex: 1;
 }
 .hd__search {
-  width: 330px;
+  width: min(330px, 100%);
 }
 .hd__start .tmui-kbd {
   background: transparent;

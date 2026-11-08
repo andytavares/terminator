@@ -31,16 +31,14 @@ beforeEach(() => {
 
 describe('extension-settings-store', () => {
   it('getExtensionSetting returns undefined for unknown key', async () => {
-    const { getExtensionSetting } = await import(
-      '../../../src/main/storage/extension-settings-store'
-    )
+    const { getExtensionSetting } =
+      await import('../../../src/main/storage/extension-settings-store')
     expect(getExtensionSetting('nonexistent.key')).toBeUndefined()
   })
 
   it('setExtensionSetting persists a value readable by getExtensionSetting', async () => {
-    const { getExtensionSetting, setExtensionSetting } = await import(
-      '../../../src/main/storage/extension-settings-store'
-    )
+    const { getExtensionSetting, setExtensionSetting } =
+      await import('../../../src/main/storage/extension-settings-store')
     setExtensionSetting('com.test.token', 'abc123')
     expect(getExtensionSetting('com.test.token')).toBe('abc123')
   })
@@ -48,9 +46,8 @@ describe('extension-settings-store', () => {
 
 describe('extension-settings-store — listing and overwriting', () => {
   it('getAllExtensionSettings returns all stored key-value pairs', async () => {
-    const { setExtensionSetting, getAllExtensionSettings } = await import(
-      '../../../src/main/storage/extension-settings-store'
-    )
+    const { setExtensionSetting, getAllExtensionSettings } =
+      await import('../../../src/main/storage/extension-settings-store')
     setExtensionSetting('com.test.a', 1)
     setExtensionSetting('com.test.b', true)
     const all = getAllExtensionSettings()
@@ -59,9 +56,8 @@ describe('extension-settings-store — listing and overwriting', () => {
   })
 
   it('setExtensionSetting overwrites existing value', async () => {
-    const { getExtensionSetting, setExtensionSetting } = await import(
-      '../../../src/main/storage/extension-settings-store'
-    )
+    const { getExtensionSetting, setExtensionSetting } =
+      await import('../../../src/main/storage/extension-settings-store')
     setExtensionSetting('com.test.key', 'first')
     setExtensionSetting('com.test.key', 'second')
     expect(getExtensionSetting('com.test.key')).toBe('second')
@@ -90,9 +86,8 @@ describe("extension-settings-store — a workspace's own values", () => {
   })
 
   it('"Use global default" (no value) removes the workspace value and keeps its others', async () => {
-    const { extensionSettingsSnapshot, setWorkspaceExtensionSetting } = await import(
-      '../../../src/main/storage/extension-settings-store'
-    )
+    const { extensionSettingsSnapshot, setWorkspaceExtensionSetting } =
+      await import('../../../src/main/storage/extension-settings-store')
     const enabled = { ...SIGN_OFF, key: 'terminator.git-integration.git.enabled' }
     setWorkspaceExtensionSetting('ws-reset', { ...SIGN_OFF, value: true })
     setWorkspaceExtensionSetting('ws-reset', { ...enabled, value: false })
@@ -106,12 +101,10 @@ describe("extension-settings-store — a workspace's own values", () => {
 
 describe("extension-settings-store — a workspace's own values beside its core overrides", () => {
   it("leaves the workspace's core overrides alone", async () => {
-    const { setWorkspaceExtensionSetting } = await import(
-      '../../../src/main/storage/extension-settings-store'
-    )
-    const { getWorkspaceSettings, updateWorkspaceSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { setWorkspaceExtensionSetting } =
+      await import('../../../src/main/storage/extension-settings-store')
+    const { getWorkspaceSettings, updateWorkspaceSettings } =
+      await import('../../../src/main/storage/settings-store')
     updateWorkspaceSettings('ws-core', { terminal: { defaultShell: '/bin/fish' } })
     setWorkspaceExtensionSetting('ws-core', { ...SIGN_OFF, value: true })
 

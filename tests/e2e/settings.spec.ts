@@ -101,6 +101,36 @@ async function escapeClosesSettings(): Promise<void> {
   await expect(settingsPanel(page)).toHaveCount(0)
 }
 
+async function workspaceExtensionPanelsStandApart(): Promise<void> {
+  const { page } = handle
+  await openSettingsSection(page, 'Workspace Settings')
+  const panels = content(page).locator('.extension-settings-panel')
+  await expect(panels.nth(1)).toBeVisible()
+  const layout = await panels.evaluateAll((elements) =>
+    elements.map((panel) => {
+      const style = getComputedStyle(panel)
+      const heading = document.createRange()
+      heading.selectNodeContents(panel.firstElementChild as HTMLElement)
+      const box = panel.getBoundingClientRect()
+      return {
+        top: box.top,
+        bottom: box.bottom,
+        borderTop: style.borderTopWidth,
+        headingInset: heading.getBoundingClientRect().left - box.left,
+      }
+    })
+  )
+  expect(
+    layout.map((panel) => panel.borderTop),
+    'each panel is a closed card'
+  ).not.toContain('0px')
+  expect(
+    Math.min(...layout.map((panel) => panel.headingInset)),
+    'the heading clears the card edge'
+  ).toBeGreaterThan(4)
+  expect(layout[1].top - layout[0].bottom, 'the cards do not touch').toBeGreaterThan(4)
+}
+
 async function workspaceShellOpensNewTerminals(): Promise<void> {
   const { page } = handle
   await openSettingsSection(page, 'Workspace Settings')
@@ -186,6 +216,10 @@ async function extensionsAndWorkspacesChange(): Promise<void> {
   await test.step(
     "a list setting is edited one item per line and stored as a list (Foundry's critical paths)",
     listSettingIsStoredAsList
+  )
+  await test.step(
+    "a workspace's extension settings are separate cards with padded headings",
+    workspaceExtensionPanelsStandApart
   )
   await test.step('Escape closes Settings', escapeClosesSettings)
   await test.step(

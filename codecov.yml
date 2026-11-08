@@ -36,6 +36,6 @@ ignore:
   - '**/*.test.tsx'
   - '**/__tests__/**'
   - '**/*.d.ts'
-  - 'extensions/*/vite.renderer.config.ts'
+  - 'extensions/*/vite.renderer.config.mts'
   - '.github/**'
   - '.claude/**'

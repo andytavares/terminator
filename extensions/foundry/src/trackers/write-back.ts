@@ -39,12 +39,7 @@ export interface IssuesPort {
 }
 
 type WriteBackEvent =
-  | 'agreed'
-  | 'amended'
-  | 'started'
-  | 'draft_opened'
-  | 'document_ready'
-  | 'merged'
+  'agreed' | 'amended' | 'started' | 'draft_opened' | 'document_ready' | 'merged'
 
 /** What each moment in an order's life means in the tracker's terms. @internal */
 export const INTENT_FOR_EVENT: Record<WriteBackEvent, TransitionIntent | null> = {

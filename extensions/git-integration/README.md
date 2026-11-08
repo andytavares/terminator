@@ -80,7 +80,7 @@ extensions/git-integration/
 ├── manifest.json        # id, main (src/index.js), renderer (dist/index.html), contributes
 ├── package.json         # its own dependencies and the build:renderer script
 ├── index.html           # view document
-├── vite.renderer.config.ts
+├── vite.renderer.config.mts
 ├── src/
 │   ├── index.ts         # backend: activate(api) / deactivate()
 │   ├── commands.ts      # Quick Actions commands

@@ -100,9 +100,8 @@ function keyEventFor(entry: ShortcutEntry) {
 async function renderShortcuts(onDirectShortcut: (actionId: string) => void) {
   // ⌘K clears the focused terminal, which reaches the main process.
   installElectronApi({ terminal: { input: vi.fn() } })
-  const { useKeyboardShortcuts } = await import(
-    '../../../../src/renderer/hooks/useKeyboardShortcuts'
-  )
+  const { useKeyboardShortcuts } =
+    await import('../../../../src/renderer/hooks/useKeyboardShortcuts')
   return renderHook(() =>
     useKeyboardShortcuts({
       onOpenSettings: vi.fn(),
