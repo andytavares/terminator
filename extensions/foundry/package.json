@@ -1,8 +1,8 @@
 {
   "name": "@terminator/extension-foundry",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "private": true,
-  "description": "Foundry \u2014 a software factory for Terminator",
+  "description": "Foundry — a software factory for Terminator",
   "scripts": {
     "build:renderer": "vite build --config vite.renderer.config.mts",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-foundry-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-foundry-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
