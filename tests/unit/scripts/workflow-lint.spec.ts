@@ -89,6 +89,11 @@ const BROKEN_POLICIES = [
     breaks: (copy: Workflows) => (copy.ci.on = { pull_request: { branches: ['main'] } }),
   },
   {
+    broken: 'git hooks installed on CI',
+    rule: /^CI installs no git hooks/,
+    breaks: (copy: Workflows) => delete copy.ci.env?.HUSKY,
+  },
+  {
     broken: 'a release workflow of its own',
     rule: /^No release\.yml/,
     breaks: (copy: Workflows) => copy.files.push('release.yml'),

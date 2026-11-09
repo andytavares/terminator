@@ -8,6 +8,9 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # No job installs the pre-commit hook: the release's version-bump commit would rerun every check
+  # (https://typicode.github.io/husky/how-to.html, "CI server and Docker").
+  HUSKY: 0
 
 # Every job reads the repository and nothing else, except the release, which asks for what it
 # writes (contents: write) itself.
