@@ -60,6 +60,8 @@ const ChapterSchema = z.object({
   files: z.array(PrChangedFileSchema),
   estimatedMinutes: z.number(),
   status: z.enum(['not-started', 'in-progress', 'complete']),
+  /** One line on what the chapter changes, e.g. "Changes markViewed and viewAll · 1 test file". */
+  summary: z.string().optional(),
 })
 
 // ─── Individual status check ──────────────────────────────────────────────────
