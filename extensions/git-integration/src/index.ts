@@ -210,12 +210,19 @@ const SETTINGS: Record<string, SettingDefinition> = {
 
 const disposables: Disposable[] = []
 
-/** Each workspace project's checkout, or its workspace folder. */
+/** Each workspace folder, then its projects' worktrees: the dashboard maps a repository to the
+ *  first checkout listed, so the main checkout wins over a worktree of the same origin. */
 function projectRootsOf(api: ExtensionAPI): () => string[] {
-  return () =>
-    api.workspace
-      .list()
-      .flatMap((w) => api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath))
+  return () => [
+    ...new Set(
+      api.workspace
+        .list()
+        .flatMap((w) => [
+          w.folderPath,
+          ...api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath),
+        ])
+    ),
+  ]
 }
 
 /** The roots a channel may run git or gh in: workspace folders, projects and the clone folder. */

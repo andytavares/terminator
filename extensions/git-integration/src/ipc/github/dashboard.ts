@@ -97,19 +97,25 @@ function parseGitRemoteUrl(url: string): { owner: string; name: string } | null 
   return { owner: match[1], name: match[2] }
 }
 
-/** owner/name -> project checkout, for each project whose origin is on GitHub. */
+/** The `owner/name` of the checkout's GitHub origin, or null for none. */
+async function githubRepoOf(root: string): Promise<string | null> {
+  try {
+    const parsed = parseGitRemoteUrl(await runGit(root, ['remote', 'get-url', 'origin']))
+    return parsed ? `${parsed.owner}/${parsed.name}` : null
+  } catch {
+    return null // no origin remote, or not a git repository
+  }
+}
+
+/** owner/name -> project checkout, for each project whose origin is on GitHub. When checkouts share
+ *  an origin, the first one listed wins, so the choice is the same on every refresh. */
 async function localRootsByRepo(listProjectRoots?: () => string[]): Promise<Map<string, string>> {
+  const roots = listProjectRoots?.() ?? []
+  const repos = await Promise.all(roots.map(githubRepoOf))
   const localRoots = new Map<string, string>()
-  await Promise.all(
-    (listProjectRoots?.() ?? []).map(async (root) => {
-      try {
-        const parsed = parseGitRemoteUrl(await runGit(root, ['remote', 'get-url', 'origin']))
-        if (parsed) localRoots.set(`${parsed.owner}/${parsed.name}`, root)
-      } catch {
-        // no origin remote / not a git repo — skip
-      }
-    })
-  )
+  repos.forEach((repo, i) => {
+    if (repo && !localRoots.has(repo)) localRoots.set(repo, roots[i])
+  })
   return localRoots
 }
 
