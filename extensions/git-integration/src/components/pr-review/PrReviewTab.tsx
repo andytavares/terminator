@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
-import { Button } from '@terminator/extension-ui'
+import { ExternalLink, Loader2 } from 'lucide-react'
+import { Button, EmptyState, type DialogAction } from '@terminator/extension-ui'
 import { githubAPI } from '../../api/github'
 import { usePrReviewStore, sessionKey, legacySessionKey } from '../../stores/pr-review.store'
 import { useReviewUiStore } from '../../stores/review-ui.store'
@@ -19,6 +19,7 @@ import {
 import { ReviewSessionSchema } from '../../schemas/pr-review.schema'
 import type { ReviewQueuePR, PrReviewDetail } from '../../schemas/pr-review.schema'
 import { choose } from '../text'
+import { NO_REPOSITORY, pullRequestUrl, type OpenStatus } from '../../review/open-status'
 import './pr-review.css'
 
 type ReviewStore = ReturnType<typeof usePrReviewStore.getState>
@@ -187,8 +188,18 @@ function useQueue(repoRoot: string | null) {
   return { loadQueue, handleRefreshQueue }
 }
 
-/** The view state of the tab: the open PR's overview flag, its queue row, banner info and merge flow. */
-function useTabView() {
+/** A pop-out opened for a PR starts on its opening screen; with no repository, that has failed. */
+function initialOpenStatus(isPopoutWindow: boolean, repoRoot: string | null): OpenStatus {
+  const target = isPopoutWindow ? popoutPrFromUrl() : null
+  if (!target) return null
+  if (!repoRoot) return { prNumber: target.prNumber, state: 'failed', message: NO_REPOSITORY }
+  return { prNumber: target.prNumber, state: 'opening' }
+}
+
+/** The view state of the tab: the open PR's overview flag, its queue row, banner info, merge flow
+ *  and where opening a PR stands. */
+function useTabView(initialOpen: () => OpenStatus) {
+  const [openStatus, setOpenStatus] = useState<OpenStatus>(initialOpen)
   const [showOverview, setShowOverview] = useState(false)
   const [activeQueuePr, setActiveQueuePr] = useState<ReviewQueuePR | null>(null)
   const [mergeFlowWorktree, setMergeFlowWorktree] = useState<string | null>(null)
@@ -202,6 +213,8 @@ function useTabView() {
     setMergeFlowWorktree,
     sinceInfo,
     setSinceInfo,
+    openStatus,
+    setOpenStatus,
   }
 }
 
@@ -263,13 +276,21 @@ function closePr(ctx: TabContext, loadQueue: ReturnType<typeof useLoadPrQueue>):
   void loadQueue({ search: undefined })
 }
 
-/** A pop-out window opened with a PR number in its URL opens that PR. */
-function usePopoutAutoOpen(ctx: TabContext | null, isPopoutWindow: boolean) {
-  useEffect(() => {
-    if (!isPopoutWindow || !ctx) return
-    const target = popoutPrFromUrl()
-    if (!target) return
-    const { repoRoot, store, view, loaders } = ctx
+/** Shows the PR as opening until `load` resolves, then clears that or says why it failed. A later
+ *  open of another PR owns the status, so this one leaves it alone. */
+async function trackOpen(view: TabView, prNumber: number, load: () => Promise<string | null>) {
+  view.setOpenStatus({ prNumber, state: 'opening' })
+  const message = await load()
+  const next: OpenStatus = message === null ? null : { prNumber, state: 'failed', message }
+  view.setOpenStatus((current) => (current?.prNumber === prNumber ? next : current))
+}
+
+type PopoutTarget = NonNullable<ReturnType<typeof popoutPrFromUrl>>
+
+/** Opens the PR a pop-out window was opened for. */
+function openPopoutPr(ctx: TabContext, target: PopoutTarget) {
+  const { repoRoot, store, view, loaders } = ctx
+  return trackOpen(view, target.prNumber, () =>
     loaders.loadPrDetail(target.prNumber, async (detail) => {
       view.setSinceInfo(await loadAndReconcileSession({ repoRoot, detail }, store))
       useReviewUiStore.getState().resetForPr()
@@ -277,6 +298,15 @@ function usePopoutAutoOpen(ctx: TabContext | null, isPopoutWindow: boolean) {
       view.setShowOverview(target.showOverview)
       loaders.fetchFileMetrics(detail)
     })
+  )
+}
+
+/** A pop-out window opened with a PR number in its URL opens that PR. */
+function usePopoutAutoOpen(ctx: TabContext | null, isPopoutWindow: boolean) {
+  useEffect(() => {
+    if (!isPopoutWindow || !ctx) return
+    const target = popoutPrFromUrl()
+    if (target) void openPopoutPr(ctx, target)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 }
@@ -285,7 +315,7 @@ function usePrReviewTab(repoRoot: string | null) {
   const store = usePrReviewStore()
   const isPopoutWindow = new URLSearchParams(window.location.search).get('view') === 'pr-review'
   const isPoppedOut = usePoppedOut(isPopoutWindow, store.activePr)
-  const view = useTabView()
+  const view = useTabView(() => initialOpenStatus(isPopoutWindow, repoRoot))
   const { loadQueue, handleRefreshQueue } = useQueue(repoRoot)
   const loaders = usePrLoaders(repoRoot)
   const ctx: TabContext | null = repoRoot ? { repoRoot, store, view, loaders } : null
@@ -321,7 +351,9 @@ function tabHandlers(t: PrReviewTabState, ctx: TabContext) {
   return {
     handleOpenPr: async (pr: ReviewQueuePR) => {
       view.setActiveQueuePr(pr)
-      await loaders.loadPrDetail(pr.number, (detail) => showOpenedPr(ctx, pr, detail))
+      await trackOpen(view, pr.number, () =>
+        loaders.loadPrDetail(pr.number, (detail) => showOpenedPr(ctx, pr, detail))
+      )
     },
     handleClosePr,
     handleApproved: () => {
@@ -415,6 +447,7 @@ function QueueScreen(props: { t: PrReviewTabState; h: TabHandlers; repoRoot: str
       )}
       <ReviewQueue
         repoRoot={props.repoRoot}
+        openStatus={t.view.openStatus}
         onOpenPr={h.handleOpenPr}
         onRefresh={t.handleRefreshQueue}
         onDismissPr={t.handleDismissPr}
@@ -434,8 +467,60 @@ function ProjectTab({ t, ctx }: { t: PrReviewTabState; ctx: TabContext }) {
   return <QueueScreen t={t} h={h} repoRoot={ctx.repoRoot} />
 }
 
+/** The status of the PR this pop-out was opened for, while no PR is open. */
+function popoutOpenStatus(t: PrReviewTabState): NonNullable<OpenStatus> | null {
+  const { openStatus } = t.view
+  if (!t.isPopoutWindow || !openStatus || t.store.activePr) return null
+  return choose(popoutPrFromUrl()?.prNumber === openStatus.prNumber, openStatus, null)
+}
+
+function PopoutOpening({ prNumber }: { prNumber: number }) {
+  return (
+    <div className="pr-open-screen" role="status" aria-busy="true">
+      <Loader2 aria-hidden="true" className="pr-open-spinner" />
+      <h3>Opening pull request #{prNumber}</h3>
+      <p>Loading files, checks and chapters</p>
+    </div>
+  )
+}
+
+/** Retry when a repository is known, and Open on GitHub when its address is. */
+function recoveryActions(t: PrReviewTabState, prNumber: number): DialogAction[] {
+  const { ctx } = t
+  const target = popoutPrFromUrl()
+  const url = pullRequestUrl(ctx?.repoRoot ?? null, prNumber)
+  const actions: DialogAction[] = []
+  if (ctx && target) {
+    actions.push({ label: 'Retry', tone: 'primary', onSelect: () => openPopoutPr(ctx, target) })
+  }
+  if (url) {
+    const open = () => void window.electronAPI.shell.openExternal(url).catch(() => {})
+    actions.push({ label: 'Open on GitHub', onSelect: open })
+  }
+  return actions
+}
+
+function PopoutOpenScreen({ t, status }: { t: PrReviewTabState; status: NonNullable<OpenStatus> }) {
+  if (status.state === 'opening') return <PopoutOpening prNumber={status.prNumber} />
+  const showAll: DialogAction = {
+    label: 'Show all pull requests',
+    onSelect: () => t.view.setOpenStatus(null),
+  }
+  return (
+    <div className="pr-open-screen">
+      <EmptyState
+        heading={`Could not open pull request #${status.prNumber}`}
+        description={status.message}
+        actions={[showAll, ...recoveryActions(t, status.prNumber)]}
+      />
+    </div>
+  )
+}
+
 export function PrReviewTab({ repoRoot }: Props) {
   const t = usePrReviewTab(repoRoot)
+  const popoutStatus = popoutOpenStatus(t)
+  if (popoutStatus) return <PopoutOpenScreen t={t} status={popoutStatus} />
   if (!t.ctx) {
     return (
       <div className="pr-review-empty">

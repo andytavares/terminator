@@ -1,4 +1,5 @@
 import React, { type JSX } from 'react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@terminator/extension-ui'
 import { plural } from '@terminator/extension-sdk'
 
@@ -66,8 +67,9 @@ interface PrRowProps {
     estimatedMinutes: number
   }
   meta: (MetaPart | null | false)[]
-  /** The row's own action, which opens the pull request like the row does. */
-  action: { label: string; primary: boolean; always: boolean }
+  /** The row's own action, which opens the pull request like the row does. While `busy`, the
+   *  pull request is opening: the row and its action do nothing. */
+  action: { label: string; primary: boolean; always: boolean; busy?: boolean }
   onOpen: () => void
   testId?: string
   /** Actions after the row's own. */
@@ -75,18 +77,18 @@ interface PrRowProps {
 }
 
 /** One pull request in a list: number and title, what needs attention, size, actions. */
-export function PrRow({ pr, meta, action, onOpen, testId, children }: PrRowProps): JSX.Element {
+export function PrRow({ pr, meta, action, testId, children, ...props }: PrRowProps): JSX.Element {
+  const onOpen = action.busy ? () => {} : props.onOpen
   return (
     <div
       className="rd-row rd-row--clickable"
       role="group"
       aria-label={`#${pr.number} ${pr.title}`}
+      aria-busy={action.busy}
       tabIndex={0}
       data-testid={testId}
       onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onOpen()
-      }}
+      onKeyDown={(e) => e.key === 'Enter' && onOpen()}
     >
       <span className="rd-ti">
         <span className="rd-t1">
@@ -113,6 +115,8 @@ function RowAction({ action, onOpen }: Pick<PrRowProps, 'action' | 'onOpen'>): J
       size="sm"
       variant={action.primary ? 'primary' : 'secondary'}
       className={action.always ? 'rd-row-action rd-always' : 'rd-row-action'}
+      icon={action.busy ? Loader2 : undefined}
+      disabled={action.busy}
       onClick={(e) => {
         e.stopPropagation()
         onOpen()

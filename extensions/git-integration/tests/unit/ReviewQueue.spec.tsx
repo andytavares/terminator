@@ -6,6 +6,7 @@ import { ReviewQueue } from '../../src/components/pr-review/ReviewQueue'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { ReviewQueuePR } from '../../src/schemas/pr-review.schema'
+import type { OpenStatus } from '../../src/review/open-status'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
@@ -391,5 +392,61 @@ describe('ReviewQueue (continued) — one list, two lines per row — colours ad
     renderMany([makePr({ mergeStateStatus: 'dirty' })])
     expect(within(screen.getByTestId('pr-meta')).getByText('Conflicts')).toBeTruthy()
     expect(screen.getByRole('group', { name: /^#\d+ / }).innerHTML).not.toContain('<svg')
+  })
+})
+
+/** The queue with PRs 7 and 8, PR 7 in `openStatus`. */
+function renderWithOpenStatus(openStatus: OpenStatus, repoRoot = '/repo') {
+  vi.mocked(usePrReviewStore).mockReturnValue({
+    ...defaultStoreState,
+    prQueue: [makePr({ number: 7, title: 'Opening one' }), makePr({ number: 8, title: 'Other' })],
+  })
+  const onOpenPr = vi.fn()
+  render(
+    <ReviewQueue
+      {...defaultProps}
+      repoRoot={repoRoot}
+      openStatus={openStatus}
+      onOpenPr={onOpenPr}
+    />
+  )
+  return onOpenPr
+}
+
+describe('ReviewQueue — a pull request that is opening', () => {
+  it('shows its row as busy, with its action disabled and reading Opening…', () => {
+    renderWithOpenStatus({ prNumber: 7, state: 'opening' })
+    const row = screen.getByRole('group', { name: '#7 Opening one' })
+    expect(row.getAttribute('aria-busy')).toBe('true')
+    expect(within(row).getByRole('button', { name: 'Opening…' })).toHaveProperty('disabled', true)
+  })
+
+  it('does not open it again when its row is clicked', async () => {
+    const onOpenPr = renderWithOpenStatus({ prNumber: 7, state: 'opening' })
+    await userEvent.setup().click(screen.getByText('Opening one'))
+    expect(onOpenPr).not.toHaveBeenCalled()
+  })
+
+  it('leaves the other rows clickable', async () => {
+    const onOpenPr = renderWithOpenStatus({ prNumber: 7, state: 'opening' })
+    const other = screen.getByRole('group', { name: '#8 Other' })
+    await userEvent.setup().click(within(other).getByRole('button', { name: 'Review' }))
+    expect(onOpenPr).toHaveBeenCalledWith(expect.objectContaining({ number: 8 }))
+  })
+})
+
+describe('ReviewQueue — a pull request that did not open', () => {
+  it('opens it on GitHub from a gh:owner/name repository', async () => {
+    const openExternal = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('electronAPI', { shell: { openExternal } })
+    renderWithOpenStatus({ prNumber: 7, state: 'failed', message: 'HTTP 502' }, 'gh:acme/app')
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open on GitHub' }))
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/acme/app/pull/7')
+  })
+
+  it('offers no GitHub link for a local checkout, whose address it does not know', () => {
+    renderWithOpenStatus({ prNumber: 7, state: 'failed', message: 'HTTP 502' })
+    expect(screen.getByRole('alert').textContent).toContain('Could not open #7.')
+    expect(screen.queryByRole('button', { name: 'Open on GitHub' })).toBeNull()
   })
 })

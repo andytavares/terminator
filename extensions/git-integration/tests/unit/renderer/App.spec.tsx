@@ -62,8 +62,20 @@ describe('git-integration renderer App', () => {
 })
 
 describe('git-integration renderer App — live repoRoot', () => {
-  it('updates repoRoot when workspace:changed fires', async () => {
-    setSearch({ view: 'project', repoRoot: '/initial/repo' })
+  it('keeps the repoRoot its URL names when workspace:changed fires', async () => {
+    setSearch({ view: 'pr-review', repoRoot: '/review/repo', prNumber: '3' })
+    render(<App />)
+    const handler = await expectSubscribedToWorkspaceChanges()
+    act(() => {
+      handler({ repoRoot: '/other/repo' })
+    })
+    expect((await screen.findByTestId('pr-review-tab')).getAttribute('data-repo-root')).toBe(
+      '/review/repo'
+    )
+  })
+
+  it('follows workspace:changed when its URL names no repoRoot', async () => {
+    setSearch({ view: 'project', repoRoot: '' })
     render(<App />)
     const handler = await expectSubscribedToWorkspaceChanges()
     act(() => {

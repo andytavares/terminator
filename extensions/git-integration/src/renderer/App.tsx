@@ -33,17 +33,26 @@ export function App(): React.JSX.Element {
   )
 }
 
-function ViewForPage(): React.JSX.Element {
-  const view = getSearchParam('view')
-  const [repoRoot, setRepoRoot] = useState<string | null>(getSearchParam('repoRoot') || null)
+/** The repository its URL names, for the view's life. A view opened without one follows the
+ *  workspace; the main window reloads its frame with a new URL when its repository changes. */
+function useRepoRoot(): string | null {
+  const [urlRepoRoot] = useState(() => getSearchParam('repoRoot') || null)
+  const [workspaceRepoRoot, setWorkspaceRepoRoot] = useState<string | null>(null)
 
   useEffect(() => {
     const off = window.electronAPI.extensionBridge.on('workspace:changed', (data: unknown) => {
       const d = data as { repoRoot?: string | null }
-      setRepoRoot(d.repoRoot ?? null)
+      setWorkspaceRepoRoot(d.repoRoot ?? null)
     })
     return off
   }, [])
+
+  return urlRepoRoot ?? workspaceRepoRoot
+}
+
+function ViewForPage(): React.JSX.Element {
+  const view = getSearchParam('view')
+  const repoRoot = useRepoRoot()
 
   if (view === 'reviews') {
     return <ReviewDashboard />

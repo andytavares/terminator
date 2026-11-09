@@ -12,6 +12,7 @@ import {
   signalDots,
 } from '../review/pr-signals'
 import { mergeSessionStatuses, parsePrList } from './queue-sessions'
+import { NO_REPOSITORY } from '../review/open-status'
 
 // ─── Queue loading ────────────────────────────────────────────────────────────
 
@@ -145,31 +146,66 @@ export function useLoadPrQueue(repoRoot: string | null) {
 
 // ─── PR detail loading ────────────────────────────────────────────────────────
 
+const UNREADABLE_DETAIL = 'GitHub sent pull request data this view cannot read'
+
+interface DetailRequest {
+  repoRoot: string
+  prNumber: number
+  setRateLimitState: Store['setRateLimitState']
+}
+
+/** "14:30": the local time a rate limit lifts at. */
+function clockTime(epochMs: number): string {
+  return new Date(epochMs).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+}
+
+/** The message for a channel error. A rate limit also starts the wait the queue shows. */
+function detailErrorMessage(reply: { error: string; resetAt?: number }, request: DetailRequest) {
+  if (reply.error !== 'RATE_LIMITED') return reply.error
+  const resetAt = reply.resetAt ?? Date.now() + 60_000
+  request.setRateLimitState({ resetAt })
+  return `GitHub limited requests until ${clockTime(resetAt)}`
+}
+
+/** Loads and parses the detail, then hands it to `onSuccess`: null when that ran, else the reason. */
+async function openDetail(
+  request: DetailRequest,
+  onSuccess: (detail: PrReviewDetail) => Promise<void>
+): Promise<string | null> {
+  const result = await githubAPI.prReviewDetail(request.repoRoot, request.prNumber)
+  if ('error' in result) return detailErrorMessage(result, request)
+  const parsed = PrReviewDetailSchema.safeParse(result.pr)
+  if (!parsed.success) {
+    console.error('PR detail schema validation failed', parsed.error.issues)
+    return UNREADABLE_DETAIL
+  }
+  await onSuccess(parsed.data)
+  return null
+}
+
+/** Loads a pull request's detail. Resolves to null when it opened, else a message for people. */
 export function useLoadPrDetail(repoRoot: string | null) {
   const { setRateLimitState } = usePrReviewStore()
 
   return useCallback(
-    async (prNumber: number, onSuccess: (detail: PrReviewDetail) => Promise<void>) => {
-      if (!repoRoot) return
+    async (
+      prNumber: number,
+      onSuccess: (detail: PrReviewDetail) => Promise<void>
+    ): Promise<string | null> => {
+      if (!repoRoot) return NO_REPOSITORY
+      let message: string | null
       try {
-        const result = await githubAPI.prReviewDetail(repoRoot, prNumber)
-        if ('error' in result) {
-          if ((result as { error: string }).error === 'RATE_LIMITED') {
-            setRateLimitState({
-              resetAt: (result as { resetAt?: number }).resetAt ?? Date.now() + 60_000,
-            })
-          }
-          return
-        }
-        const parsed = PrReviewDetailSchema.safeParse((result as { pr: unknown }).pr)
-        if (parsed.success) {
-          await onSuccess(parsed.data)
-        } else {
-          console.error('PR detail schema validation failed', parsed.error.issues)
-        }
+        message = await openDetail({ repoRoot, prNumber, setRateLimitState }, onSuccess)
       } catch (e) {
-        console.error('Failed to load PR detail', e)
+        message = e instanceof Error && e.message ? e.message : String(e)
       }
+      if (message !== null)
+        console.error('Could not open pull request', { repoRoot, prNumber, message })
+      return message
     },
     [repoRoot, setRateLimitState]
   )

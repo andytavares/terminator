@@ -49,6 +49,8 @@ export interface StubPullRequest {
   branchUpdates: number
   /** Names of the checks that fail on the latest commit; the dashboard shows them. */
   failedChecks: string[]
+  /** True while GitHub answers this pull request's file list with a 502, which fails its review. */
+  failFiles: boolean
 }
 
 export interface NewStubPullRequest {
@@ -204,6 +206,7 @@ export function addPullRequest(context: StubContext, input: NewStubPullRequest):
     viewedPaths: [],
     branchUpdates: 0,
     failedChecks: [],
+    failFiles: false,
   }
   context.pullRequests.push(pr)
   return pr
@@ -425,8 +428,11 @@ function restResponse(context: StubContext, request: ApiRequest): unknown {
 const pr = (context: StubContext, match: RegExpMatchArray) =>
   findPullRequest(context, Number(match[1]))
 
-const prFiles = (context: StubContext, match: RegExpMatchArray) =>
-  pullRequestFiles(context, pr(context, match))
+function prFiles(context: StubContext, match: RegExpMatchArray) {
+  const pullRequest = pr(context, match)
+  if (pullRequest.failFiles) throw new GhFailure(502, 'Bad Gateway')
+  return pullRequestFiles(context, pullRequest)
+}
 
 /** PUT .../merge: GitHub refuses a stale `sha` (gh's --match-head-commit) and a closed pull request. */
 function squashMergePullRequest(
