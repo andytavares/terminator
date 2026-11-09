@@ -359,7 +359,7 @@ function actionHandlers(r: ReviewState) {
   const { store, view, props } = r
   return {
     markViewed: () => markOpenFileViewed(r),
-    setViewed: (viewed: boolean) => setOpenFileViewed(r, viewed),
+    toggleOpenFileViewed: (viewed: boolean) => setOpenFileViewed(r, viewed),
     finishChapter: () => finishChapter(r),
     pause: () => {
       store.setPaused(headOf(r), new Date().toISOString())
@@ -608,7 +608,7 @@ function CentrePane({ r, h }: { r: ReviewState; h: Handlers }) {
         isLastChapter={position.activeChapterIndex === r.displayPr.chapters.length - 1}
         position={positionText(r)}
         isViewed={!!openPath && r.store.viewedFiles.has(openPath)}
-        onToggleViewed={h.setViewed}
+        onToggleViewed={h.toggleOpenFileViewed}
         onPrevFile={h.prevFile}
         onMarkViewed={h.markViewed}
         onFinishChapter={h.finishChapter}
