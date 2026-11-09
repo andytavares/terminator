@@ -46,13 +46,15 @@ type Tone = 'ok' | 'wait' | 'quiet' | 'bad'
 
 interface CellProps {
   tone: Tone
+  /** The reviewer must act. Defaults to a bad or waiting tone; Reviews waits on others, not me. */
+  attention?: boolean
   icon: LucideIcon
   label: string
   detail: string
   children?: React.ReactNode
 }
 
-function CellBody({ tone, icon: Icon, label, detail }: Omit<CellProps, 'children'>) {
+function CellBody({ tone, icon: Icon, label, detail }: Omit<CellProps, 'children' | 'attention'>) {
   return (
     <>
       <Icon aria-hidden className="rs-icon" data-tone={tone} data-testid="readiness-icon" />
@@ -64,11 +66,18 @@ function CellBody({ tone, icon: Icon, label, detail }: Omit<CellProps, 'children
 
 function Cell(props: CellProps) {
   return (
-    <div className={`rs-cell rs-cell--${props.tone}`}>
+    <div
+      className={`rs-cell rs-cell--${props.tone}`}
+      data-attention={props.attention ?? needsAttention(props.tone)}
+    >
       <CellBody {...props} />
       {props.children && <span className="rs-end">{props.children}</span>}
     </div>
   )
+}
+
+function needsAttention(tone: Tone): boolean {
+  return tone === 'bad' || tone === 'wait'
 }
 
 const CHECK_TONE: Record<CheckState, { tone: Tone; icon: LucideIcon }> = {
@@ -80,16 +89,24 @@ const CHECK_TONE: Record<CheckState, { tone: Tone; icon: LucideIcon }> = {
 }
 
 function ChecksCell({ pr }: { pr: PrReviewDetail }) {
-  const [open, setOpen] = useState(false)
   const checks = pr.statusChecks ?? []
   if (checks.length === 0) {
     return <Cell tone="quiet" icon={CircleDashed} label="Checks" detail="No checks" />
   }
+  return <ReportedChecksCell checks={checks} />
+}
+
+/** The checks summary, which opens the checks grouped failures-first. */
+function ReportedChecksCell({ checks }: { checks: NonNullable<PrReviewDetail['statusChecks']> }) {
+  const [open, setOpen] = useState(false)
   const counts = countChecks(checks)
   const { tone, icon } = CHECK_TONE[summaryStatus(counts)]
   const detail = detailedLabel(counts)
   return (
-    <div className={`rs-cell rs-cell--${tone} rs-cell--anchor`}>
+    <div
+      className={`rs-cell rs-cell--${tone} rs-cell--anchor`}
+      data-attention={needsAttention(tone)}
+    >
       <button
         type="button"
         className="rs-cell-button"
@@ -123,7 +140,7 @@ function reviewsSummary(pr: PrReviewDetail): { tone: Tone; detail: string } {
 function ReviewsCell({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
   const { tone, detail } = reviewsSummary(pr)
   return (
-    <Cell tone={tone} icon={Users} label="Reviews" detail={detail}>
+    <Cell tone={tone} attention={youAreRequested} icon={Users} label="Reviews" detail={detail}>
       {youAreRequested && (
         <span className="rs-chip" title="You have been requested to review this PR">
           <Eye aria-hidden />

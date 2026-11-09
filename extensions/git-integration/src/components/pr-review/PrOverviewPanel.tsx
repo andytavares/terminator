@@ -336,7 +336,7 @@ function ReviewActions({ props, actions, label }: HeaderProps) {
   return (
     <>
       {props.pr.isDraft && (
-        <Button onClick={actions.handleMarkReady} disabled={actions.markReady.busy}>
+        <Button variant="ghost" onClick={actions.handleMarkReady} disabled={actions.markReady.busy}>
           {choose(actions.markReady.busy, 'Marking ready…', 'Mark as ready')}
         </Button>
       )}

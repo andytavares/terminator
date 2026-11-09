@@ -6,7 +6,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PropertiesRail } from '../../src/components/pr-review/PropertiesRail'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
-import { buildPr } from './overview-fixtures'
+import { baseInsights, buildPr } from './overview-fixtures'
 
 const rail = () => within(screen.getByRole('complementary', { name: 'Pull request details' }))
 
@@ -106,7 +106,10 @@ describe('PropertiesRail — flat icons', () => {
   afterEach(() => removeStylesheet())
 
   it("draws every signal icon in its row's text colour, a neutral one at 60%", () => {
-    render(<PropertiesRail pr={buildPr()} />)
+    const unchanged = { ...baseInsights.complexity, branchDelta: 0, functions: [] }
+    render(
+      <PropertiesRail pr={buildPr({ insights: { ...baseInsights, complexity: unchanged } })} />
+    )
     const rows = screen
       .getAllByRole('listitem')
       .filter((row) => row.classList.contains('pr-rail-signal'))

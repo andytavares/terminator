@@ -19,7 +19,7 @@
   margin: 0 0 10px;
   text-transform: none;
   letter-spacing: 0;
-  font-size: var(--tm-font-size-md);
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   color: var(--tm-text-primary);
 }
@@ -41,7 +41,8 @@
   padding: 6px 8px;
   margin: 0 -8px;
   border-radius: 6px;
-  font-size: var(--tm-font-size-sm);
+  font-size: var(--tm-font-size-md);
+  color: var(--tm-text-primary);
 }
 
 .pr-rail-signal-icon {
@@ -52,13 +53,27 @@
 }
 
 .pr-rail-signal-label {
-  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-faint);
+}
+
+/* A signal off its calm default is semibold in its colour; calm values stay plain. */
+.pr-rail-signal--warning .pr-rail-signal-value,
+.pr-rail-signal--danger .pr-rail-signal-value {
+  font-weight: 600;
+}
+.pr-rail-signal--warning .pr-rail-signal-value {
+  color: var(--tm-warning);
+}
+.pr-rail-signal--danger .pr-rail-signal-value {
+  color: var(--tm-danger);
 }
 
 .pr-rail-signal-value small {
   display: block;
   margin-top: 1px;
   font-size: var(--tm-font-size-sm);
+  font-weight: 400;
   color: var(--tm-text-muted);
 }
 
@@ -78,12 +93,14 @@
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 10px;
   margin: 0;
-  font-size: var(--tm-font-size-sm);
+  font-size: var(--tm-font-size-md);
+  color: var(--tm-text-primary);
   align-items: baseline;
 }
 
 .pr-rail-details dt {
-  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-faint);
 }
 
 .pr-rail-details dd {

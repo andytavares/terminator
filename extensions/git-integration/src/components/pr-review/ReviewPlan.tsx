@@ -74,6 +74,23 @@ function RowAccessibleText({ chapter, labelId, descriptionId }: AccessibleTextPr
   )
 }
 
+/** The chapter's name and file names, with its summary line under them when it has one. */
+function ChapterName({ chapter }: { chapter: Chapter }) {
+  return (
+    <span className="review-plan__name">
+      <span className="review-plan__title">
+        {chapter.name}
+        <small>{fileNamesOf(chapter)}</small>
+      </span>
+      {chapter.summary && (
+        <span className="review-plan__summary" data-testid="chapter-summary">
+          {chapter.summary}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function PlanRow({ chapter, number, largest, onStartAt }: RowProps) {
   // Named by a hidden label, not aria-label: the icon-tooltip installer shows any aria-label
   // that the visible text lacks, which put a tooltip under every row.
@@ -89,10 +106,7 @@ function PlanRow({ chapter, number, largest, onStartAt }: RowProps) {
     >
       <RowAccessibleText chapter={chapter} labelId={labelId} descriptionId={descriptionId} />
       <span className="review-plan__number">{number}</span>
-      <span className="review-plan__name">
-        {chapter.name}
-        <small>{fileNamesOf(chapter)}</small>
-      </span>
+      <ChapterName chapter={chapter} />
       <ChapterFacts chapter={chapter} />
       <span className="review-plan__change">
         <ChangeBar chapter={chapter} largest={largest} />

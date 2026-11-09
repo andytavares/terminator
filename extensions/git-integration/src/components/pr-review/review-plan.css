@@ -6,7 +6,7 @@
 }
 .review-plan__heading h2 {
   margin: 0;
-  font-size: var(--tm-font-size-md);
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
 }
 .review-plan__heading span {
@@ -24,8 +24,8 @@
   align-items: center;
   gap: var(--tm-space-3);
   width: 100%;
-  height: 40px;
-  padding: 0 14px;
+  min-height: 40px;
+  padding: var(--tm-space-2) 14px;
   border: 0;
   border-top: 1px solid var(--tm-border);
   background: transparent;
@@ -48,14 +48,29 @@
   color: var(--tm-text-muted);
 }
 .review-plan__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.review-plan__title,
+.review-plan__summary {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.review-plan__name small {
+.review-plan__title {
+  font-weight: 600;
+}
+.review-plan__title small {
   margin-left: var(--tm-space-2);
   font-size: var(--tm-font-size-sm);
-  color: var(--tm-text-muted);
+  font-weight: 400;
+  color: var(--tm-text-faint);
+}
+.review-plan__summary {
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-secondary);
 }
 .review-plan__risk {
   display: inline-flex;
@@ -77,14 +92,18 @@
 .review-plan__risk--medium {
   color: var(--tm-warning);
 }
+/* Low risk is plain muted text: only medium and high carry a coloured dot. */
 .review-plan__risk--low {
   color: var(--tm-text-muted);
   font-weight: 400;
 }
+.review-plan__risk--low::before {
+  display: none;
+}
 .review-plan__files,
 .review-plan__minutes {
   font-size: var(--tm-font-size-sm);
-  color: var(--tm-text-secondary);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
 .review-plan__minutes {
