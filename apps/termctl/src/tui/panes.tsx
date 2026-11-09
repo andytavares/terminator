@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink'
 import type { Command } from '../command-names.js'
 import { columns, commandWords } from '../help.js'
-import { table, type Row } from '../output.js'
+import { rowsTable, type Row } from '../output.js'
 import { formFields, matchingCommands } from './form.js'
 import { LISTS, type Snapshot } from './lists.js'
 import { rowWindow, visibleRows, type Mode, type Outcome, type View } from './view.js'
@@ -41,7 +41,7 @@ export function RowsPane({
 }: PaneProps & { refreshed: string; height: number }) {
   const rows = visibleRows(view, snapshot)
   const [heading = '', ...lines] =
-    rows.length > 0 ? table(rows).trimEnd().split('\n') : ['No rows.']
+    rows.length > 0 ? rowsTable(rows).trimEnd().split('\n') : ['No rows.']
   return (
     <Box
       flexDirection="column"

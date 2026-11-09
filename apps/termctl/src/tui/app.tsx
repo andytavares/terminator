@@ -73,7 +73,15 @@ function useSnapshot(client: ToolClient, clock: TuiClock) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [now, setNow] = useState(clock.now())
   useEffect(() => {
-    const refresh = () => void loadSnapshot(client, clock.now).then(setSnapshot)
+    // A refresh slower than REFRESH_MS is not overlapped, so an older result never lands last.
+    let loading = false
+    const refresh = () => {
+      if (loading) return
+      loading = true
+      void loadSnapshot(client, clock.now)
+        .then(setSnapshot)
+        .finally(() => (loading = false))
+    }
     refresh()
     const stopRefresh = clock.every(REFRESH_MS, refresh)
     const stopTick = clock.every(TICK_MS, () => setNow(clock.now()))

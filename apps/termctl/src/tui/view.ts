@@ -56,8 +56,10 @@ const BROWSE: Browse = { kind: 'browse' }
 /** The view after a key. */
 export function viewAfterKey(view: View, press: Keypress, context: KeyContext): View {
   // Ink hands keys that arrive in one chunk, such as a paste, over as one input, tabs and returns included.
-  if (press.input.length > 1) {
-    return [...press.input].reduce(
+  // Characters, not UTF-16 units: an emoji is one key.
+  const characters = [...press.input]
+  if (characters.length > 1) {
+    return characters.reduce(
       (current, input) => viewAfterKey(current, keypressOf(input, press.key), context),
       view
     )

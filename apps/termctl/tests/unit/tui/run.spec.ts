@@ -220,6 +220,42 @@ describe('runTui: destructive commands', () => {
   })
 })
 
+/** fakeClient, except that list_tasks waits for `release` once `held` is set. `started` counts
+ * the list_tasks calls as they begin. */
+function holdingClient(results: Record<string, unknown>) {
+  const gate = { held: false, started: 0, release: () => {} }
+  const client = fakeClient(results)
+  const callTool: ToolClient['callTool'] = async (params) => {
+    if (params.name === 'list_tasks') gate.started += 1
+    if (params.name === 'list_tasks' && gate.held) {
+      await new Promise<void>((resolve) => (gate.release = resolve))
+    }
+    return client.callTool(params)
+  }
+  return { gate, client: { ...client, callTool } }
+}
+
+describe('runTui: a slow refresh', () => {
+  it('starts no new refresh while the last one is still loading', async () => {
+    const results = listResults()
+    const { gate, client } = holdingClient(results)
+    const { lastFrame, press, fire, exit } = start(client)
+    await eventually(() => expect(lastFrame()).toMatch(/Tasks\s+2/))
+    gate.held = true
+    fire(2000)
+    fire(2000)
+    await eventually(() => expect(gate.started).toBe(2))
+    results.list_tasks = { data: [...TASKS, { id: 't3', title: 'Docs' }] }
+    gate.held = false
+    gate.release()
+    await eventually(() => expect(lastFrame()).toMatch(/Tasks\s+3/))
+    fire(2000)
+    await eventually(() => expect(gate.started).toBe(3))
+    press('q')
+    await exit
+  })
+})
+
 describe('runTui: refresh and quit', () => {
   it('reloads the lists when the refresh timer fires, and shows how long ago', async () => {
     const results = listResults()

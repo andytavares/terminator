@@ -7,7 +7,7 @@ export function formatResult(text: string, options: { json: boolean }): string {
   const value = parsedOrUndefined(text)
   if (value === undefined) return `${text}\n`
   const rows = unwrapped(value)
-  if (isRowList(rows)) return table(rows)
+  if (isRowList(rows)) return rowsTable(rows)
   return `${JSON.stringify(value, null, 2)}\n`
 }
 
@@ -41,7 +41,7 @@ function isScalar(value: unknown): boolean {
   return value === null || typeof value !== 'object'
 }
 
-export function table(rows: Row[]): string {
+export function rowsTable(rows: Row[]): string {
   const columns = [
     ...new Set(rows.flatMap((row) => Object.keys(row).filter((key) => isScalar(row[key])))),
   ]

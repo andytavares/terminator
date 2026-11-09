@@ -61,7 +61,12 @@
     "apps/termctl": {
       // The command's entry, bundled by scripts/build-termctl.mjs.
       "entry": ["src/bin.ts"],
-      "ignoreDependencies": ["@terminator/core-shared", "@terminator/test-support"],
+      // Its integration specs start core-main's MCP server by relative path.
+      "ignoreDependencies": [
+        "@terminator/core-main",
+        "@terminator/core-shared",
+        "@terminator/test-support",
+      ],
     },
     "packages/extension-ui": {
       "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}"],

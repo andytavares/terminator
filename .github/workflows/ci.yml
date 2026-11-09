@@ -207,14 +207,17 @@ jobs:
         if: steps.select.outputs.specs != ''
         run: npx playwright install --with-deps chromium
 
+      # The display is larger than the 1280×800 window every spec lays out (tests/e2e/helpers.ts).
+      # Chromium's sandbox needs a setuid helper or user namespaces the runner does not grant.
       - name: Run E2E suite
         if: steps.select.outputs.specs != ''
         env:
           SPECS: ${{ steps.select.outputs.specs }}
+          E2E_ELECTRON_ARGS: --no-sandbox
         run: |
           # SPECS is a list of paths; word splitting passes one argument per spec.
           # shellcheck disable=SC2086
-          xvfb-run -a npx playwright test $SPECS --grep-invert @mac --shard=${{ matrix.shard }}/3 --workers=2 --reporter=dot --pass-with-no-tests
+          xvfb-run -a --server-args='-screen 0 1920x1080x24' npx playwright test $SPECS --grep-invert @mac --shard=${{ matrix.shard }}/3 --workers=2 --reporter=dot --pass-with-no-tests
 
       - name: Upload failure traces
         if: failure()

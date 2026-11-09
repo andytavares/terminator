@@ -12,10 +12,9 @@
 // each bundled extension enabled alone beside the probe, and with all of them.
 // The probe also reports process.memoryUsage() from inside the host.
 //
-// --scenario=working-session measures a session in use, on macOS: 4 terminal tabs that have
-// printed output (the last one on screen, or the Overview with --view=overview), 1 agent tab
-// on the e2e stub agent, 2 MCP relays held open, every extension on. It then samples for 60 s
-// the physical footprint (`footprint -p`) and the mean CPU (`ps` CPU time) of every process.
+// --scenario=working-session (macOS): 4 terminals, 1 stub agent tab, 2 MCP relays, every extension
+// on, the last terminal on screen (--view=overview: the Overview); then 60 s of each process's
+// physical footprint (`footprint -p`) and CPU time.
 import { _electron as electron } from 'playwright'
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'

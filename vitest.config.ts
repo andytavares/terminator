@@ -143,6 +143,8 @@ export default defineConfig({
         'packages/core-*/src/**/*.ts',
         'packages/core-*/src/**/*.tsx',
         'packages/core-renderer/extension-frame/**/*.ts',
+        'apps/*/src/**/*.ts',
+        'apps/*/src/**/*.tsx',
         'extensions/*/src/**/*.ts',
         'extensions/*/src/**/*.tsx',
         'packages/extension-ui/src/**/*.ts',
