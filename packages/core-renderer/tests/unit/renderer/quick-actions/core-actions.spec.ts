@@ -19,6 +19,7 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
     canGoBack: true,
     canGoForward: true,
     hasClosedTab: true,
+    canReportBug: true,
     ...coreActionHandlers(),
     ...overrides,
   }
@@ -65,6 +66,7 @@ function coreActionHandlers() {
     onToggleSidebarMode: vi.fn(),
     onOpenSettings: vi.fn(),
     onToggleLog: vi.fn(),
+    onReportBug: vi.fn(),
   }
 }
 
@@ -322,6 +324,7 @@ const DESTRUCTIVE_BY_ID: Record<string, boolean> = {
   'core.toggle-sidebar-inbox': false,
   'core.open-settings': false,
   'core.toggle-log': false,
+  'core.report-bug': false,
   'session:s1': false,
   'core.switch-workspace-ws-1': false,
 }
@@ -332,5 +335,24 @@ describe('buildCoreActions — destructive marks', () => {
       buildCoreActions(makeDeps()).map((a) => [a.id, a.destructive === true])
     )
     expect(marks).toEqual(DESTRUCTIVE_BY_ID)
+  })
+})
+
+describe('buildCoreActions — report a bug', () => {
+  it('opens a bug report from the top group, showing its menu shortcut', async () => {
+    const deps = makeDeps()
+    const action = buildCoreActions(deps).find((a) => a.id === 'core.report-bug')!
+
+    expect(action).toMatchObject({ label: 'Report a bug', group: 'top', shortcut: '⌘⇧B' })
+    await action.run()
+    expect(deps.onReportBug).toHaveBeenCalled()
+  })
+
+  it('is unavailable, and says so, where bug reports do not exist', () => {
+    const action = buildCoreActions(makeDeps({ canReportBug: false })).find(
+      (a) => a.id === 'core.report-bug'
+    )!
+
+    expect(action.disabledReason).toBe('Report bugs from the desktop app')
   })
 })

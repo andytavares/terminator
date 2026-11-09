@@ -19,6 +19,7 @@ import { revealSession } from '../terminal/navigate-to-session'
 import { useTaskSwitcher } from '../components/task-switcher/task-switcher.store'
 import { dockBack, toggleBreakout } from '../terminal/breakout'
 import { switchLane } from '../terminal/switch-lane'
+import { openBugReport } from '../stores/bug-report.store'
 
 // What the main process tells the window: menu accelerators, notifications,
 // and what extensions ask the shell to do.
@@ -72,6 +73,9 @@ function subscribeShellMenu(events: MenuEvents | undefined, handlers: MenuHandle
     events?.onMenuOpenAbout?.(handlers.openAbout),
     events?.onMenuToggleSidebar?.(countedShortcut('core.toggle-sidebar', handlers.toggleSidebar)),
     events?.onMenuCloseTab?.(closeTabOf),
+    window.electronAPI.bugReport?.onMenuReportBug(
+      countedShortcut('core.report-bug', () => openBugReport())
+    ),
   ]
 }
 

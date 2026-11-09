@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event'
 import type { QueuedToast as Toast } from '@terminator/extension-ui'
 import { useToastStore } from '../../../../src/stores/toast.store'
 import { ToastContainer } from '../../../../src/components/ToastContainer'
+import { useBugReportStore } from '../../../../src/stores/bug-report.store'
+import { installElectronApi } from '../../../../../test-support/src/electron-api'
 
 function withToasts(toasts: Array<Omit<Toast, 'duration'>>): void {
   useToastStore.setState({ toasts: toasts.map((toast) => ({ ...toast, duration: 3500 })) })
@@ -69,5 +71,33 @@ describe('ToastContainer — leaves expiry to the store', () => {
       vi.advanceTimersByTime(60_000)
     })
     expect(screen.getByText('Saved')).toBeTruthy()
+  })
+})
+
+describe('ToastContainer — report an error', () => {
+  it('offers to report an error, starting the report with what the toast said', async () => {
+    const user = userEvent.setup()
+    installElectronApi({ bugReport: {} })
+    useBugReportStore.setState(useBugReportStore.getInitialState())
+    withToasts([{ id: '9', type: 'error', message: 'Push failed' }])
+    render(<ToastContainer />)
+
+    await user.click(screen.getByRole('button', { name: 'Report' }))
+
+    expect(useBugReportStore.getState()).toMatchObject({
+      isOpen: true,
+      prefill: 'The app said: Push failed\n\n',
+    })
+  })
+
+  it('offers no report for an info toast, or where bug reports do not exist', () => {
+    installElectronApi({})
+    withToasts([
+      { id: '1', type: 'info', message: 'Copied' },
+      { id: '2', type: 'error', message: 'Push failed' },
+    ])
+    render(<ToastContainer />)
+
+    expect(screen.queryByRole('button', { name: 'Report' })).toBeNull()
   })
 })
