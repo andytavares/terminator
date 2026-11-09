@@ -26,7 +26,12 @@ vi.mock('../../src/hooks/usePrReview', async (importActual) => ({
 }))
 
 vi.mock('../../src/components/pr-review/PrOverviewPanel', () => ({
-  PrOverviewPanel: ({ pr }: { pr: { number: number } }) => <h2>Overview of #{pr.number}</h2>,
+  PrOverviewPanel: ({ pr, onClose }: { pr: { number: number }; onClose: () => void }) => (
+    <>
+      <h2>Overview of #{pr.number}</h2>
+      <button onClick={onClose}>Close review</button>
+    </>
+  ),
 }))
 
 vi.mock('../../src/components/pr-review/PrReviewView', () => ({
@@ -144,5 +149,53 @@ describe('a pop-out window whose pull request did not open', () => {
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: 'Show all pull requests' }))
     expect(screen.getByLabelText('Search pull requests')).toBeTruthy()
+  })
+})
+
+/** A promise and the function that settles it, for replies a test answers in its own order. */
+function deferred() {
+  let settle: (value: unknown) => void = () => {}
+  const promise = new Promise((resolve) => (settle = resolve))
+  return { promise, settle }
+}
+
+describe('a pull request that fails while another one opened', () => {
+  it('leaves no stale failure under its row once the opened one closes', async () => {
+    usePrReviewStore.setState({
+      prQueue: [3, 8].map((n) => ({ ...reviewQueuePr(n), sessionStatus: 'not-started' })),
+    })
+    const [reply3, reply8] = [deferred(), deferred()]
+    vi.mocked(githubAPI.prReviewDetail).mockImplementation(
+      (_root, n) => (n === 3 ? reply3.promise : reply8.promise) as never
+    )
+    const user = userEvent.setup()
+    render(<PrReviewTab repoRoot="/repo" />)
+    await user.click(
+      within(screen.getByRole('group', { name: '#3 PR 3' })).getByRole('button', { name: 'Review' })
+    )
+    await user.click(
+      within(screen.getByRole('group', { name: '#8 PR 8' })).getByRole('button', { name: 'Review' })
+    )
+    reply3.settle({ pr: detailOf3 })
+    await user.click(await screen.findByRole('button', { name: 'Close review' }))
+    reply8.settle({ error: 'gh: HTTP 502 Bad Gateway' })
+    await screen.findByRole('group', { name: '#8 PR 8' })
+    await expect.poll(() => vi.mocked(console.error).mock.calls.length).toBeGreaterThan(0)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('a pop-out window after Show all pull requests', () => {
+  it('opens its pull request again from the list with the row state, not the full screen', async () => {
+    usePrReviewStore.setState({ prQueue: [{ ...reviewQueuePr(3), sessionStatus: 'not-started' }] })
+    renderPopout('/repo', Promise.resolve({ error: 'gh: HTTP 502 Bad Gateway' }))
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Show all pull requests' }))
+    vi.mocked(githubAPI.prReviewDetail).mockReturnValue(new Promise(() => {}) as never)
+    await user.click(
+      within(screen.getByRole('group', { name: '#3 PR 3' })).getByRole('button', { name: 'Review' })
+    )
+    expect(await screen.findByRole('button', { name: 'Opening…' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Opening pull request #3' })).toBeNull()
   })
 })

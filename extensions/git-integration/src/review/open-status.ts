@@ -1,8 +1,11 @@
 /** Where opening a pull request stands: loading its detail, or failed with a message for people. */
 export type OpenStatus =
-  | { prNumber: number; state: 'opening' }
-  | { prNumber: number; state: 'failed'; message: string }
+  | { prNumber: number; state: 'opening'; where: OpenWhere }
+  | { prNumber: number; state: 'failed'; message: string; where: OpenWhere }
   | null
+
+/** Where the status shows: the pop-out's full-window screen, or the pull request's queue row. */
+export type OpenWhere = 'window' | 'row'
 
 export const NO_REPOSITORY = 'No repository given'
 

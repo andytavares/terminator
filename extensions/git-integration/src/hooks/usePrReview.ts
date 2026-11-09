@@ -204,7 +204,12 @@ export function useLoadPrDetail(repoRoot: string | null) {
         message = e instanceof Error && e.message ? e.message : String(e)
       }
       if (message !== null)
-        console.error('Could not open pull request', { repoRoot, prNumber, message })
+        console.error('Could not open pull request', {
+          channel: 'github:pr-review-detail',
+          repoRoot,
+          prNumber,
+          message,
+        })
       return message
     },
     [repoRoot, setRateLimitState]

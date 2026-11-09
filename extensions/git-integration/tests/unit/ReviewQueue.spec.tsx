@@ -415,20 +415,20 @@ function renderWithOpenStatus(openStatus: OpenStatus, repoRoot = '/repo') {
 
 describe('ReviewQueue — a pull request that is opening', () => {
   it('shows its row as busy, with its action disabled and reading Opening…', () => {
-    renderWithOpenStatus({ prNumber: 7, state: 'opening' })
+    renderWithOpenStatus({ prNumber: 7, state: 'opening', where: 'row' })
     const row = screen.getByRole('group', { name: '#7 Opening one' })
     expect(row.getAttribute('aria-busy')).toBe('true')
     expect(within(row).getByRole('button', { name: 'Opening…' })).toHaveProperty('disabled', true)
   })
 
   it('does not open it again when its row is clicked', async () => {
-    const onOpenPr = renderWithOpenStatus({ prNumber: 7, state: 'opening' })
+    const onOpenPr = renderWithOpenStatus({ prNumber: 7, state: 'opening', where: 'row' })
     await userEvent.setup().click(screen.getByText('Opening one'))
     expect(onOpenPr).not.toHaveBeenCalled()
   })
 
   it('leaves the other rows clickable', async () => {
-    const onOpenPr = renderWithOpenStatus({ prNumber: 7, state: 'opening' })
+    const onOpenPr = renderWithOpenStatus({ prNumber: 7, state: 'opening', where: 'row' })
     const other = screen.getByRole('group', { name: '#8 Other' })
     await userEvent.setup().click(within(other).getByRole('button', { name: 'Review' }))
     expect(onOpenPr).toHaveBeenCalledWith(expect.objectContaining({ number: 8 }))
@@ -439,13 +439,16 @@ describe('ReviewQueue — a pull request that did not open', () => {
   it('opens it on GitHub from a gh:owner/name repository', async () => {
     const openExternal = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('electronAPI', { shell: { openExternal } })
-    renderWithOpenStatus({ prNumber: 7, state: 'failed', message: 'HTTP 502' }, 'gh:acme/app')
+    renderWithOpenStatus(
+      { prNumber: 7, state: 'failed', message: 'HTTP 502', where: 'row' },
+      'gh:acme/app'
+    )
     await userEvent.setup().click(screen.getByRole('button', { name: 'Open on GitHub' }))
     expect(openExternal).toHaveBeenCalledWith('https://github.com/acme/app/pull/7')
   })
 
   it('offers no GitHub link for a local checkout, whose address it does not know', () => {
-    renderWithOpenStatus({ prNumber: 7, state: 'failed', message: 'HTTP 502' })
+    renderWithOpenStatus({ prNumber: 7, state: 'failed', message: 'HTTP 502', where: 'row' })
     expect(screen.getByRole('alert').textContent).toContain('Could not open #7.')
     expect(screen.queryByRole('button', { name: 'Open on GitHub' })).toBeNull()
   })

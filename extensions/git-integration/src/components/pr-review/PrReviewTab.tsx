@@ -19,7 +19,12 @@ import {
 import { ReviewSessionSchema } from '../../schemas/pr-review.schema'
 import type { ReviewQueuePR, PrReviewDetail } from '../../schemas/pr-review.schema'
 import { choose } from '../text'
-import { NO_REPOSITORY, pullRequestUrl, type OpenStatus } from '../../review/open-status'
+import {
+  NO_REPOSITORY,
+  pullRequestUrl,
+  type OpenStatus,
+  type OpenWhere,
+} from '../../review/open-status'
 import './pr-review.css'
 
 type ReviewStore = ReturnType<typeof usePrReviewStore.getState>
@@ -192,8 +197,9 @@ function useQueue(repoRoot: string | null) {
 function initialOpenStatus(isPopoutWindow: boolean, repoRoot: string | null): OpenStatus {
   const target = isPopoutWindow ? popoutPrFromUrl() : null
   if (!target) return null
-  if (!repoRoot) return { prNumber: target.prNumber, state: 'failed', message: NO_REPOSITORY }
-  return { prNumber: target.prNumber, state: 'opening' }
+  const { prNumber } = target
+  if (!repoRoot) return { prNumber, state: 'failed', message: NO_REPOSITORY, where: 'window' }
+  return { prNumber, state: 'opening', where: 'window' }
 }
 
 /** The view state of the tab: the open PR's overview flag, its queue row, banner info, merge flow
@@ -271,18 +277,24 @@ function closePr(ctx: TabContext, loadQueue: ReturnType<typeof useLoadPrQueue>):
   view.setActiveQueuePr(null)
   store.setActivePr(null)
   view.setSinceInfo(null)
+  view.setOpenStatus(null)
   store.reset()
   useReviewUiStore.getState().resetForPr()
   void loadQueue({ search: undefined })
 }
 
-/** Shows the PR as opening until `load` resolves, then clears that or says why it failed. A later
- *  open of another PR owns the status, so this one leaves it alone. */
-async function trackOpen(view: TabView, prNumber: number, load: () => Promise<string | null>) {
-  view.setOpenStatus({ prNumber, state: 'opening' })
+/** Shows the PR as opening until `load` resolves, then clears that or says why it failed. A PR
+ *  that opened clears any status; a failure is kept only while no later open owns the status. */
+async function trackOpen(
+  view: TabView,
+  target: { prNumber: number; where: OpenWhere },
+  load: () => Promise<string | null>
+) {
+  view.setOpenStatus({ ...target, state: 'opening' })
   const message = await load()
-  const next: OpenStatus = message === null ? null : { prNumber, state: 'failed', message }
-  view.setOpenStatus((current) => (current?.prNumber === prNumber ? next : current))
+  if (message === null) return view.setOpenStatus(null)
+  const failed: OpenStatus = { ...target, state: 'failed', message }
+  view.setOpenStatus((current) => (current?.prNumber === target.prNumber ? failed : current))
 }
 
 type PopoutTarget = NonNullable<ReturnType<typeof popoutPrFromUrl>>
@@ -290,7 +302,7 @@ type PopoutTarget = NonNullable<ReturnType<typeof popoutPrFromUrl>>
 /** Opens the PR a pop-out window was opened for. */
 function openPopoutPr(ctx: TabContext, target: PopoutTarget) {
   const { repoRoot, store, view, loaders } = ctx
-  return trackOpen(view, target.prNumber, () =>
+  return trackOpen(view, { prNumber: target.prNumber, where: 'window' }, () =>
     loaders.loadPrDetail(target.prNumber, async (detail) => {
       view.setSinceInfo(await loadAndReconcileSession({ repoRoot, detail }, store))
       useReviewUiStore.getState().resetForPr()
@@ -351,7 +363,7 @@ function tabHandlers(t: PrReviewTabState, ctx: TabContext) {
   return {
     handleOpenPr: async (pr: ReviewQueuePR) => {
       view.setActiveQueuePr(pr)
-      await trackOpen(view, pr.number, () =>
+      await trackOpen(view, { prNumber: pr.number, where: 'row' }, () =>
         loaders.loadPrDetail(pr.number, (detail) => showOpenedPr(ctx, pr, detail))
       )
     },
@@ -471,7 +483,7 @@ function ProjectTab({ t, ctx }: { t: PrReviewTabState; ctx: TabContext }) {
 function popoutOpenStatus(t: PrReviewTabState): NonNullable<OpenStatus> | null {
   const { openStatus } = t.view
   if (!t.isPopoutWindow || !openStatus || t.store.activePr) return null
-  return choose(popoutPrFromUrl()?.prNumber === openStatus.prNumber, openStatus, null)
+  return choose(openStatus.where === 'window', openStatus, null)
 }
 
 function PopoutOpening({ prNumber }: { prNumber: number }) {
