@@ -406,7 +406,7 @@
 }
 /* Level 2: the chapter's name. */
 .chapter-nav-name {
-  font-size: 14px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   color: var(--tm-text-primary);
 }

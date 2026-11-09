@@ -25,7 +25,7 @@
   display: flex;
   min-width: 0;
   font-family: var(--tm-font-mono);
-  font-size: 16px;
+  font-size: var(--tm-font-size-lg);
   white-space: nowrap;
 }
 

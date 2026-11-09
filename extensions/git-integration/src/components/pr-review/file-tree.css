@@ -23,7 +23,7 @@
 }
 /* Styled like the chapter outline's headers (ChapterNav): level 2. */
 .file-tree-chapter-header b {
-  font-size: 14px;
+  font-size: var(--tm-font-size-lg);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
