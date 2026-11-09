@@ -8,11 +8,13 @@ import {
   type UploadedReport,
 } from '../../../core-shared/src/bug-report'
 import { readBase64 } from '../../../core-shared/src/read-base64'
+import { bugReportDetails, bugReportStatus, submitBugReport } from '../api/remote-client'
 
 // Report a bug from the phone (ADR 156). The desktop posts it through its own gh; without gh, the
 // phone opens the filled-in GitHub form, where the photos and videos are attached by hand.
 
 const ORIGIN = 'Phone remote'
+const FACTS_SOURCE = { status: bugReportStatus, details: bugReportDetails }
 /** Five files of up to 10 MB stay well inside the remote bridge's message limit. */
 const MAX_FILES = 5
 
@@ -25,7 +27,7 @@ type Phase =
 /** Whether the desktop's gh can post, and the app details the report would carry. */
 function useFacts(): ReportFacts {
   const [facts, setFacts] = useState<ReportFacts>({ status: null, details: null })
-  useEffect(() => void loadReportFacts(window.electronAPI.bugReport).then(setFacts), [])
+  useEffect(() => void loadReportFacts(FACTS_SOURCE).then(setFacts), [])
   return facts
 }
 
@@ -61,7 +63,7 @@ async function post(form: Form, setPhase: (phase: Phase) => void): Promise<void>
     form.files.map(async (file) => ({ name: file.name, data: await readBase64(file) }))
   )
   const report: UploadedReport = { ...form.report, uploads }
-  const result = await window.electronAPI.bugReport.submitUploaded(report)
+  const result = await submitBugReport(report)
   setPhase(result.ok ? { name: 'posted', ...result } : { name: 'failed', message: result.message })
 }
 

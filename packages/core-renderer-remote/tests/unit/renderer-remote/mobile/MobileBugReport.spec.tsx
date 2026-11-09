@@ -2,16 +2,22 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ElectronAPI } from '../../../../../core-shared/src/electron-api/api-type'
-import { installElectronApi } from '../../../../../test-support/src/electron-api'
+import type * as RemoteClient from '../../../../src/api/remote-client'
 import { MobileBugReport } from '../../../../src/components/MobileBugReport'
 
-const status = vi.fn<ElectronAPI['bugReport']['status']>()
-const details = vi.fn<ElectronAPI['bugReport']['details']>()
-const submitUploaded = vi.fn<ElectronAPI['bugReport']['submitUploaded']>()
+const status = vi.fn<typeof RemoteClient.bugReportStatus>()
+const details = vi.fn<typeof RemoteClient.bugReportDetails>()
+const submitUploaded = vi.fn<typeof RemoteClient.submitBugReport>()
+
+// The desktop is reached over the remote server's HTTP routes; that is the boundary.
+vi.mock('../../../../src/api/remote-client', () => ({
+  bugReportStatus: () => status(),
+  bugReportDetails: () => details(),
+  submitBugReport: (report: Parameters<typeof RemoteClient.submitBugReport>[0]) =>
+    submitUploaded(report),
+}))
 
 beforeEach(() => {
-  installElectronApi({ bugReport: { status, details, submitUploaded } })
   status.mockResolvedValue({ ready: true, login: 'octocat' })
   details.mockResolvedValue({ details: 'Terminator 0.1.198 · macOS 15.6 (arm64)' })
 })

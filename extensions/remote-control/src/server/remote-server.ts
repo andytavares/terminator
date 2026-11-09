@@ -7,6 +7,7 @@ import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '@termina
 import { registerHealthRoute } from './routes/health.route.js'
 import { registerTerminalRoutes } from './routes/terminal.routes.js'
 import { registerWorkspaceRoutes } from './routes/workspace.routes.js'
+import { registerBugReportRoutes } from './routes/bug-report.routes.js'
 import { registerAuthMiddleware } from './auth.middleware.js'
 import { registerLoginRoute } from './routes/login.route.js'
 import { AuthRateLimiter } from './auth-rate-limiter.js'
@@ -237,11 +238,7 @@ async function sendMobilePage(
   const { reply } = exchange
   if (!admitToSurface(parts, 'mobile', exchange)) return reply.redirect('/')
   try {
-    // The bridge gives the phone window.electronAPI, which its bug report posts through.
-    const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8').replace(
-      /<head[^>]*>/i,
-      (m) => `${m}\n    ${SHIM_TAG}`
-    )
+    const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
     return reply.type('text/html').send(html)
   } catch {
     return reply.status(503).send('Mobile renderer not built. Run: npm run build:remote')
@@ -302,6 +299,7 @@ async function registerApi(parts: RemoteServerParts): Promise<ServerConnections>
     listWorkspaces: deps.listWorkspaces,
     listProjects: deps.listProjects,
   })
+  await registerBugReportRoutes(fastify, { invokeChannel: deps.invokeChannel })
   const terminalCleanup = await registerTerminalRoutes(fastify, {
     ptyManager: options.ptyManager,
     ticketStore,
