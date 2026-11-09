@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { pressOutside } from '../../../../tests/support/modal'
+import { pressOutside } from '../../../../packages/test-support/src/modal'
 
 const mockInvoke = vi.fn()
 const mockRecord = vi.fn()

@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRoleRegistry, ResumeForbiddenError } from '../../src/line/roles.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // The single most important invariant in the whole design lives here: a
 // verifier may not resume a conversation. The builder's justification is in

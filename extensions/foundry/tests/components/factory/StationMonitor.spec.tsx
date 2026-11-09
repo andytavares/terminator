@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { StationMonitor } from '../../../src/components/factory/StationMonitor.js'
 import type { MonitorStatus } from '../../../src/components/factory/StationMonitor.js'
 import type { TranscriptLine } from '../../../src/runtime/transcript-excerpt.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 // jsdom has no canvas: the case's 2D context is a fake, and what this spec
 // asserts is the screen, the chin and the keys — the case's own drawing is

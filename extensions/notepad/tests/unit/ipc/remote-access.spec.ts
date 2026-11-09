@@ -9,7 +9,7 @@ import { registerExportIpcHandlers } from '../../../src/ipc/export.ipc.js'
 import { registerFoldersIpcHandlers } from '../../../src/ipc/folders.ipc.js'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from '../../../src/ipc/notes.ipc.js'
 import { registerSearchIpcHandlers } from '../../../src/ipc/search.ipc.js'
-import { remoteAccessByChannel } from '../../../../../tests/support/extension-channels'
+import { remoteAccessByChannel } from '../../../../../packages/test-support/src/extension-channels'
 
 const REGISTRARS = [
   registerCommentsIpcHandlers,

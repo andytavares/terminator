@@ -4,6 +4,7 @@
   "description": "Extension-first AI-focused terminal emulator",
   "main": "out/main/index.js",
   "type": "module",
+  "packageManager": "npm@11.19.0",
   "workspaces": [
     "extensions/*",
     "packages/*"
@@ -28,13 +29,13 @@
     "pretest:e2e": "install-electron",
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage --reporter=verbose --reporter=junit \"--outputFile.junit=test-report.junit.xml\"",
-    "lint": "node scripts/lint.mjs",
+    "lint": "NODE_OPTIONS=--max-old-space-size=4096 turbo run lint lint:root --concurrency=3 --output-logs=errors-only",
     "lint:deps": "syncpack lint && node scripts/check-single-copies.mjs",
     "lint:unused": "knip",
     "lint:duplicates": "jscpd",
     "lint:workflows": "node scripts/workflow-lint.mjs",
     "check": "npm run lint:deps && npm run lint:unused && npm run lint:duplicates && npm run lint && npm run lint:workflows && npm run format:check && npm run typecheck && npm test",
-    "typecheck": "node scripts/typecheck.mjs",
+    "typecheck": "turbo run typecheck typecheck:specs --concurrency=4 --output-logs=errors-only",
     "format": "prettier --write .",
     "format:check": "prettier --check --cache --cache-location node_modules/.cache/prettier/format-check .",
     "create-extension": "node scripts/create-extension.cjs",
@@ -44,7 +45,9 @@
     "build-storybook": "npm run build-storybook -w @terminator/extension-ui",
     "test:stories": "npm run test:stories -w @terminator/extension-ui",
     "test:visual": "npm run test:visual -w @terminator/extension-ui",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "lint:root": "eslint . --ignore-pattern 'packages/**' --ignore-pattern 'extensions/**'",
+    "typecheck:specs": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/typecheck/tsconfig.test.tsbuildinfo -p tsconfig.test.json"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -115,6 +118,7 @@
     "playwright": "1.64.1",
     "prettier": "3.9.10",
     "syncpack": "15.3.3",
+    "turbo": "2.11.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",
     "vite": "8.3.5",

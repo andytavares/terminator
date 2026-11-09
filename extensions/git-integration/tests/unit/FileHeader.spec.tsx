@@ -7,7 +7,7 @@ import {
   type FileHeaderProps,
 } from '../../src/components/pr-review/diff-pane/FileHeader'
 import type { PrChangedFile } from '../../src/schemas/pr-review.schema'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 const { stubViewMenu } = vi.hoisted(() => ({ stubViewMenu: () => null }))
 vi.mock('../../src/components/pr-review/ViewMenu', () => ({ ViewMenu: stubViewMenu }))

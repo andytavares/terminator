@@ -3,7 +3,7 @@
   // way the root tsconfig.test.json does the core's. Vitest strips types and
   // tsconfig.json includes src/ only, so this is the only check the specs get.
   // It starts from tsconfig.json and adds Vitest's globals (vitest.config.ts
-  // sets `globals: true`). The sources and the root tests/support helpers the
+  // sets `globals: true`). The sources and the root packages/test-support/src helpers the
   // specs import are checked through those imports.
   "extends": "./tsconfig.json",
   "compilerOptions": {

@@ -13,7 +13,7 @@ import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Standing } from '../../src/order/standing.js'
 import type { Gate } from '../../src/gates/rules.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // What `run.observe` has to hand a surface before that surface can say what to
 // do next. Before this it returned the graph and nothing else, so the Floor

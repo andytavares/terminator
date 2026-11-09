@@ -1,11 +1,11 @@
 import { vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { wrapDb } from '../../../../src/main/db/index'
+import { wrapDb } from '../../../../packages/core-main/src/db/index'
 import { dispatchChannel } from '@terminator/extension-sdk'
 import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { applyTaskVaultSchema } from '../../src/vault/db'
 import { insertTask, type NewTaskRow } from '../../src/vault/task-repository'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 /** A real in-memory SQLite database with the task-vault schema applied. */
 export async function createVaultDb(): Promise<ExtensionDB> {

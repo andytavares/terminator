@@ -4,7 +4,7 @@ import { useAgentRuns } from '../../src/hooks/useAgentRuns'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 const mockList = vi.fn()
 const mockOnEvent = vi.fn()

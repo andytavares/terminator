@@ -10,7 +10,7 @@ import { registerAdminIpcHandlers } from '../../src/ipc/admin.ipc.js'
 import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc.js'
 import { registerProjectsIpcHandlers } from '../../src/ipc/projects.ipc.js'
 import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc.js'
-import { remoteAccessByChannel } from '../../../../tests/support/extension-channels'
+import { remoteAccessByChannel } from '../../../../packages/test-support/src/extension-channels'
 
 const REGISTRARS = [
   registerAdminIpcHandlers,

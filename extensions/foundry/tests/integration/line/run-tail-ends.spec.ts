@@ -16,7 +16,7 @@ import { createOrderStore } from '../../../src/order/store.js'
 import { orderStoreAt } from '../../../src/state/live-index.js'
 import type { WorkOrder } from '../../../src/order/schema.js'
 import { theRunner } from '../../helpers/supervision-mocks.js'
-import { eventually } from '../../../../../tests/support/eventually'
+import { eventually } from '../../../../../packages/test-support/src/eventually'
 
 vi.mock(
   '../../../src/runtime/supervised-runner.js',

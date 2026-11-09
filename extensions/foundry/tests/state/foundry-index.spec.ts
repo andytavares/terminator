@@ -4,7 +4,7 @@ import type { FoundryChange, IndexSource } from '../../src/state/foundry-index.j
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { emptyRunGraph } from '../helpers/run-nodes.js'
 
 function listedOrder(id: string, createdAt: string): WorkOrder {

@@ -5,7 +5,7 @@ import { seedOrder, houseDocsIn, newOrderId, pathsNamedIn } from '../../src/forg
 import { applyProposal, parseProposal } from '../../src/order/proposal.js'
 import { branchFor } from '../../src/line/worktree.js'
 import type { SeedDeps } from '../../src/forge/intake-source.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // Scout runs before the operator is asked anything (FR-002). By the time a
 // question could be put to them, the repository has already been read, the

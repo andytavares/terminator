@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdirSync, rmSync, utimesSync } from 'fs'
 import { join } from 'path'
 import { ensureReviewWorktree } from '../../src/review/worktree.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 interface GitCall {
   cmd: string

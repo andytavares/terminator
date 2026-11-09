@@ -12,7 +12,7 @@ import {
 import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schema.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // Converging an order.
 //

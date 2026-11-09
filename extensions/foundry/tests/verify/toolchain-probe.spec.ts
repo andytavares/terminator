@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { probeToolchain } from '../../src/verify/toolchain-probe.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // The probe is what makes "works in any repository, with nothing installed"
 // true rather than a claim. It reads manifests and never executes them: FR-070

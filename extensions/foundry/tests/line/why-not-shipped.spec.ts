@@ -6,7 +6,7 @@ import { resolveRecipe } from '../../src/recipe/resolve.js'
 import { resolveSources } from '../../src/workspace-root.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 import type { RunOutcome } from '../../src/line/executor.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 // The one sentence the ledger gets when a finished run opens nothing: the
 // first thing that actually stopped it.

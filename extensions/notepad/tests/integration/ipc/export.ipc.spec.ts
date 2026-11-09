@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../../tests/support/fakes'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
 
 const showOpenDialog = vi.fn()
 
@@ -28,7 +28,7 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp') },
 }))
 
-import { wrapDb } from '../../../../../src/main/db/index'
+import { wrapDb } from '../../../../../packages/core-main/src/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
 import {
   toSlug,

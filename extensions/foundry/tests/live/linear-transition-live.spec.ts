@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createLinearProvider } from '../../../../src/main/integrations/providers/linear.provider'
+import { createLinearProvider } from '../../../../packages/core-main/src/integrations/providers/linear.provider'
 import type {
   StoredCredential,
   TrackerStateOption,
-} from '../../../../src/main/integrations/providers/provider'
-import { requiredLiveEnv } from '../../../../tests/support/live-env'
+} from '../../../../packages/core-main/src/integrations/providers/provider'
+import { requiredLiveEnv } from '../../../../packages/test-support/src/live-env'
 
 // ADR-041, against the real Linear API.
 //

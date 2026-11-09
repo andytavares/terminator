@@ -4,7 +4,7 @@ import { render, screen, cleanup, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installVaultBridge, eventually } from './helpers/bridge'
 import { DatabaseAdmin } from '../../src/components/DatabaseAdmin'
-import { pressOutside } from '../../../../tests/support/modal'
+import { pressOutside } from '../../../../packages/test-support/src/modal'
 
 let bridge: ReturnType<typeof installVaultBridge>
 

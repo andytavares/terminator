@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import { mkdirSync, rmSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 vi.mock('electron-store', () => ({
   default: class {

@@ -1,0 +1,238 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+// ── fs mock ────────────────────────────────────────────────────────────────
+const mockWrite = vi.fn((data: string, cb?: (err: Error | null) => void) => {
+  cb?.(null)
+  return true
+})
+
+const mockStream = {
+  write: mockWrite,
+  on: vi.fn(),
+}
+
+let mockExistsSync = vi.fn((..._args: unknown[]) => false)
+let mockStatSyncSize = 0
+const mockStatSync = vi.fn((..._args: unknown[]) => ({ size: mockStatSyncSize }))
+const mockRenameSync = vi.fn()
+const mockCreateWriteStream = vi.fn((..._args: unknown[]) => mockStream)
+
+vi.mock('fs', () => ({
+  createWriteStream: (...args: unknown[]) => mockCreateWriteStream(...args),
+  existsSync: (...args: unknown[]) => mockExistsSync(...args),
+  statSync: (...args: unknown[]) => mockStatSync(...args),
+  renameSync: (...args: unknown[]) => mockRenameSync(...args),
+}))
+
+// ── electron mock ─────────────────────────────────────────────────────────
+vi.mock('electron', () => ({
+  app: {
+    getPath: vi.fn(() => '/tmp/testlogs'),
+    getVersion: vi.fn(() => '0.1.0'),
+  },
+}))
+
+/** The lines written to the log stream, without their leading timestamp. */
+function linesWritten(): string[] {
+  return mockWrite.mock.calls.map(([line]) => line.slice(line.indexOf(' ') + 1))
+}
+
+function useFreshLogger(): void {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    mockExistsSync = vi.fn(() => false)
+    mockStatSyncSize = 0
+  })
+
+  afterEach(() => {
+    // restore NODE_ENV
+    delete process.env.NODE_ENV
+  })
+}
+
+describe('logger: where it writes', () => {
+  useFreshLogger()
+
+  it('writes into the app logs folder', async () => {
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('ns').info('x')
+    expect(mockCreateWriteStream).toHaveBeenCalledWith('/tmp/testlogs/terminator.log', {
+      flags: 'a',
+    })
+  })
+})
+
+describe('logger (packages/core-main/src/logger.ts)', () => {
+  useFreshLogger()
+
+  it.each([
+    ['debug', 'DEBUG [myns] hello\n'],
+    ['info', 'INFO  [myns] hello\n'],
+    ['warn', 'WARN  [myns] hello\n'],
+    ['error', 'ERROR [myns] hello\n'],
+  ] as const)('%s writes one line with its level and namespace', async (level, line) => {
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('myns')[level]('hello')
+    expect(linesWritten()).toEqual([line])
+  })
+})
+
+describe('logger — meta formatting', () => {
+  useFreshLogger()
+
+  it('formats extra meta arguments as space-separated string', async () => {
+    const { makeLogger } = await import('../../src/logger')
+    const log = makeLogger('meta-ns')
+    log.info('prefix', { key: 'val' }, 42)
+    const written = mockStream.write.mock.calls[0][0] as string
+    expect(written).toMatch(/\{"key":"val"\}/)
+    expect(written).toMatch(/42/)
+  })
+
+  it('formats non-object meta as String()', async () => {
+    const { makeLogger } = await import('../../src/logger')
+    const log = makeLogger('meta-ns2')
+    log.warn('msg', 'extra-string')
+    const written = mockStream.write.mock.calls[0][0] as string
+    expect(written).toMatch(/extra-string/)
+  })
+})
+
+describe('logger — renderer lines', () => {
+  useFreshLogger()
+
+  it('writeFromRenderer writes the correct level to stream', async () => {
+    const { writeFromRenderer } = await import('../../src/logger')
+    writeFromRenderer('error', 'renderer', 'Something broke')
+    const written = mockStream.write.mock.calls[0][0] as string
+    expect(written).toMatch(/ERROR/)
+    expect(written).toMatch(/\[renderer\]/)
+    expect(written).toMatch(/Something broke/)
+  })
+})
+
+describe('logger — rotation', () => {
+  useFreshLogger()
+
+  it('rotates log file when it exceeds 5 MB', async () => {
+    mockExistsSync = vi.fn(() => true)
+    mockStatSyncSize = 6 * 1024 * 1024 // 6 MB > 5 MB threshold
+
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('rotate-test').info('trigger rotation')
+
+    expect(mockRenameSync).toHaveBeenCalledOnce()
+    const [from, to] = mockRenameSync.mock.calls[0] as [string, string]
+    expect(from).toContain('terminator.log')
+    expect(to).toContain('terminator.old.log')
+  })
+
+  it('does not rotate when log file does not exist', async () => {
+    mockExistsSync = vi.fn(() => false)
+
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('no-rotate').info('ping')
+
+    expect(mockRenameSync).not.toHaveBeenCalled()
+  })
+})
+
+describe('logger — rotation fallbacks', () => {
+  useFreshLogger()
+
+  it('does not rotate when log file is under 5 MB', async () => {
+    mockExistsSync = vi.fn(() => true)
+    mockStatSyncSize = 1024 // tiny
+
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('small-log').info('ping')
+
+    expect(mockRenameSync).not.toHaveBeenCalled()
+  })
+
+  it('still writes the line when the size of the old log cannot be read', async () => {
+    mockExistsSync = vi.fn(() => true)
+    mockStatSync.mockImplementationOnce(() => {
+      throw new Error('EACCES')
+    })
+
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('stat-err').info('ping')
+    expect(mockRenameSync).not.toHaveBeenCalled()
+    expect(mockStream.write).toHaveBeenCalledWith(expect.stringContaining('[stat-err] ping'))
+  })
+})
+
+describe('logger — write failures and development mirroring', () => {
+  useFreshLogger()
+
+  it('swallows stream.write errors without crashing', async () => {
+    mockStream.write.mockImplementationOnce(() => {
+      throw new Error('disk full')
+    })
+
+    const { makeLogger } = await import('../../src/logger')
+    expect(() => makeLogger('write-err').info('ping')).not.toThrow()
+  })
+
+  // ── dev mode stdout / stderr mirroring ────────────────────────────────
+
+  it('mirrors non-error logs to stdout in development mode', async () => {
+    process.env.NODE_ENV = 'development'
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('dev-ns').info('dev message')
+
+    expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('dev message'))
+    writeSpy.mockRestore()
+  })
+
+  it('mirrors error logs to stderr in development mode', async () => {
+    process.env.NODE_ENV = 'development'
+    const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('dev-err').error('dev error')
+
+    expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('dev error'))
+    writeSpy.mockRestore()
+  })
+})
+
+describe('logger — no mirroring outside development', () => {
+  useFreshLogger()
+
+  it('does NOT mirror to stdout/stderr outside development mode', async () => {
+    process.env.NODE_ENV = 'production'
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const { makeLogger } = await import('../../src/logger')
+    makeLogger('prod-ns').info('prod message')
+
+    expect(stdoutSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+    stdoutSpy.mockRestore()
+    stderrSpy.mockRestore()
+  })
+})
+
+describe('logger — the top-level export', () => {
+  useFreshLogger()
+
+  it('writes every level under the "main" namespace', async () => {
+    const { logger } = await import('../../src/logger')
+    logger.debug('a')
+    logger.info('b')
+    logger.warn('c')
+    logger.error('d')
+    expect(linesWritten()).toEqual([
+      'DEBUG [main] a\n',
+      'INFO  [main] b\n',
+      'WARN  [main] c\n',
+      'ERROR [main] d\n',
+    ])
+  })
+})

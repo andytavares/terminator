@@ -1,0 +1,648 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook, waitFor } from '@testing-library/react'
+import { useWorkspaceStore } from '../../../../src/stores/workspace.store'
+import { useSessionStore } from '../../../../src/stores/session.store'
+import { useSettingsStore } from '../../../../src/stores/settings.store'
+import { useExtensionRegistry } from '../../../../src/extensions/registry'
+import { useNavigationStore } from '../../../../src/stores/navigation.store'
+import { useKeyboardShortcuts } from '../../../../src/hooks/useKeyboardShortcuts'
+import { useStartWorkStore } from '../../../../src/components/home/start-work'
+import type { useTerminalSession } from '../../../../src/hooks/useTerminalSession'
+import {
+  projectFixture,
+  resetStore,
+  terminalSessionOf,
+  workspaceFixture,
+} from '../../../../../test-support/src/renderer-stores'
+import { revealSession } from '../../../../src/terminal/navigate-to-session'
+import { installElectronApi } from '../../../../../test-support/src/electron-api'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../../core-shared/src/schemas/settings.schema'
+import {
+  SCRATCH_PROJECT_ID,
+  type TerminalSession,
+} from '../../../../../core-shared/src/types/index'
+import type { ElectronAPI } from '../../../../../core-shared/src/electron-api/api-type'
+import { sessionState, workspaceState } from '../../../../../test-support/src/store-state'
+
+type TerminalSessionApi = ReturnType<typeof useTerminalSession>
+
+// The hook builds an xterm for each terminal it opens, which jsdom cannot run;
+// what is asserted is the terminal it asks for.
+const terminals = vi.hoisted(() => ({
+  createSession: vi.fn(),
+  splitSession: vi.fn(),
+}))
+vi.mock('../../../../src/hooks/useTerminalSession', () => ({
+  useTerminalSession: (): TerminalSessionApi => terminals,
+}))
+
+const createSession = vi.mocked<TerminalSessionApi['createSession']>(terminals.createSession)
+const splitSession = vi.mocked<TerminalSessionApi['splitSession']>(terminals.splitSession)
+const input = vi.fn<ElectronAPI['terminal']['input']>()
+const createNotification = vi.fn<ElectronAPI['notifications']['create']>(async () => ({
+  id: 'n1',
+}))
+
+const workspace1 = workspaceFixture({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1' })
+const workspace2 = workspaceFixture({ id: 'ws-2', name: 'WS 2', folderPath: '/ws2' })
+
+function setup(
+  overrides: { activeProjectId?: string | null; workspaces?: (typeof workspace1)[] } = {}
+) {
+  resetStore(useWorkspaceStore, {
+    workspaces: overrides.workspaces ?? [workspace1, workspace2],
+    activeWorkspaceId: 'ws-1',
+    activeProjectId: overrides.activeProjectId ?? null,
+  })
+}
+
+/** Sessions of one project, as tabs in that order, with `active` shown. */
+function withTabs(projectId: string, ids: string[], active: string): void {
+  const all = new Map(sessionState().sessions)
+  for (const id of ids) all.set(id, terminalSessionOf({ id, projectId }))
+  useSessionStore.setState({ sessions: all })
+  sessionState().setActiveSessionForProject(projectId, active)
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  // The app ships for macOS: Cmd is the command key. A test of another platform says so.
+  vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+  createSession.mockResolvedValue('session-id')
+  splitSession.mockResolvedValue(undefined)
+  resetStore(useSessionStore)
+  resetStore(useExtensionRegistry)
+  resetStore(useSettingsStore, {
+    globalSettings: {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      terminal: { ...DEFAULT_GLOBAL_SETTINGS.terminal, scrollbackLimit: 5000 },
+    },
+  })
+  setup()
+  installElectronApi({
+    project: { list: async () => ({ projects: [] }) },
+    terminal: { input, close: async () => ({ success: true }) },
+    notifications: { create: createNotification },
+  })
+})
+
+function pressKey(
+  key: string,
+  options: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean } = {}
+) {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, ...options })
+  window.dispatchEvent(event)
+  return event
+}
+
+describe('useKeyboardShortcuts', () => {
+  it('calls onOpenSettings when Cmd+, is pressed', () => {
+    const onOpenSettings = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onOpenSettings }))
+    pressKey(',', { metaKey: true })
+    expect(onOpenSettings).toHaveBeenCalled()
+  })
+
+  it('calls onToggleLog when Cmd+Shift+L is pressed', () => {
+    const onToggleLog = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleLog }))
+    pressKey('l', { metaKey: true, shiftKey: true })
+    expect(onToggleLog).toHaveBeenCalled()
+  })
+
+  it('switches to workspace by number when Cmd+2 is pressed, expanding only it', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('2', { metaKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2')
+    expect(workspaceState().expandedWorkspaceIds).toEqual(new Set(['ws-2']))
+  })
+
+  it('does nothing for out-of-range workspace index', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('9', { metaKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-1')
+  })
+})
+
+describe('useKeyboardShortcuts — Ctrl+1–9 are the lane keys on a Mac', () => {
+  it('leaves Ctrl+2 alone on a Mac: it switches lanes there, not workspaces', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('2', { ctrlKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-1')
+    pressKey('2', { metaKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2')
+  })
+
+  it('switches workspace on Ctrl+2 where Ctrl is the command key', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('2', { ctrlKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2')
+  })
+})
+
+describe('useKeyboardShortcuts — cycles to next workspace on Cmd+=, expanding only it', () => {
+  it('cycles to next workspace on Cmd+=, expanding only it', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('=', { metaKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2')
+    expect(workspaceState().expandedWorkspaceIds).toEqual(new Set(['ws-2']))
+  })
+
+  it('cycles to previous workspace on Cmd+-', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('-', { metaKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2') // wraps around
+  })
+
+  it('cycleWorkspace does nothing when workspaces list is empty', () => {
+    resetStore(useWorkspaceStore)
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('=', { metaKey: true })
+    expect(workspaceState().activeWorkspaceId).toBeNull()
+  })
+})
+
+describe('useKeyboardShortcuts — cycles to next workspace on Cmd+=, expanding only it — creates new session on Cmd+T when project is active', () => {
+  it('creates new session on Cmd+T when project is active', () => {
+    setup({ activeProjectId: 'proj-1' })
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('t', { metaKey: true })
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      type: 'human',
+      title: 'Terminal',
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
+  })
+})
+
+describe('useKeyboardShortcuts — does not create session on Cmd+T when no active project', () => {
+  it('does not create session on Cmd+T when no active project', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('t', { metaKey: true })
+    expect(createSession).not.toHaveBeenCalled()
+  })
+
+  it('calls onOpenCommandPalette when Cmd+P is pressed', () => {
+    const onOpenCommandPalette = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onOpenCommandPalette }))
+    pressKey('p', { metaKey: true })
+    expect(onOpenCommandPalette).toHaveBeenCalled()
+  })
+
+  it('sends clear escape to active terminal on Cmd+K when project and session active', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['session-1'], 'session-1')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('k', { metaKey: true })
+    expect(input).toHaveBeenCalledWith('session-1', '\x0c')
+  })
+
+  it('does nothing on Cmd+K when no active project', () => {
+    withTabs('proj-1', ['session-1'], 'session-1')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('k', { metaKey: true })
+    expect(input).not.toHaveBeenCalled()
+  })
+})
+
+describe('useKeyboardShortcuts — cycles tabs on Cmd+ArrowRight when sessions exist', () => {
+  it('cycles tabs on Cmd+ArrowRight when sessions exist', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['s1', 's2'], 's1')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('ArrowRight', { metaKey: true })
+    expect(sessionState().getActiveSessionForProject('proj-1')).toBe('s2')
+  })
+
+  it('cycles tabs on Cmd+ArrowLeft when sessions exist', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['s1', 's2'], 's2')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('ArrowLeft', { metaKey: true })
+    expect(sessionState().getActiveSessionForProject('proj-1')).toBe('s1')
+  })
+
+  it('calls onToggleOverview when Cmd+Shift+E is pressed', () => {
+    const onToggleOverview = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleOverview }))
+    pressKey('e', { metaKey: true, shiftKey: true })
+    expect(onToggleOverview).toHaveBeenCalled()
+  })
+
+  // Cmd+Shift+I belongs to the "Open Extension DevTools" menu accelerator, which Electron
+  // consumes before the renderer sees it — the hook must not also claim it.
+  it('does not call onToggleOverview when Cmd+Shift+I is pressed', () => {
+    const onToggleOverview = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleOverview }))
+    pressKey('i', { metaKey: true, shiftKey: true })
+    expect(onToggleOverview).not.toHaveBeenCalled()
+  })
+})
+
+describe('useKeyboardShortcuts — calls onNewScratch when Cmd+Shift+T is pressed', () => {
+  it('calls onNewScratch when Cmd+Shift+T is pressed', () => {
+    const onNewScratch = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onNewScratch }))
+    pressKey('t', { metaKey: true, shiftKey: true })
+    expect(onNewScratch).toHaveBeenCalled()
+  })
+
+  it('reports a split that fails on Cmd+D', async () => {
+    splitSession.mockRejectedValueOnce(new Error('split failed'))
+    setup({ activeProjectId: 'proj-1' })
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('d', { metaKey: true })
+    await waitFor(() =>
+      expect(createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'splitPaneFailed', message: 'split failed' })
+      )
+    )
+  })
+
+  it('removes keydown listener on unmount', () => {
+    const onOpenSettings = vi.fn()
+    const { unmount } = renderHook(() => useKeyboardShortcuts({ onOpenSettings }))
+    unmount()
+    pressKey(',', { metaKey: true })
+    expect(onOpenSettings).not.toHaveBeenCalled()
+  })
+})
+
+function registeredAccelerator(accelerator: string) {
+  const action = vi.fn()
+  useExtensionRegistry.getState().registerKeyboardShortcut({ accelerator, action })
+  return action
+}
+
+function pressIn(field: HTMLElement, key: string, metaKey = false): void {
+  document.body.appendChild(field)
+  field.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, metaKey }))
+  field.remove()
+}
+
+describe('useKeyboardShortcuts — extension shortcuts', () => {
+  it('calls extension shortcut action when accelerator matches', () => {
+    const action = registeredAccelerator('CmdOrCtrl+Shift+K')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('k', { metaKey: true, shiftKey: true })
+    expect(action).toHaveBeenCalled()
+  })
+
+  it('suppresses bare-key extension shortcut when pressed inside an input', () => {
+    const action = registeredAccelerator('1')
+    renderHook(() => useKeyboardShortcuts())
+    pressIn(document.createElement('input'), '1')
+    expect(action).not.toHaveBeenCalled()
+  })
+
+  it('fires bare-key extension shortcut when pressed outside an input', () => {
+    const action = registeredAccelerator('1')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('1')
+    expect(action).toHaveBeenCalled()
+  })
+
+  it('fires modifier+key extension shortcut even when pressed inside an input', () => {
+    const action = registeredAccelerator('CmdOrCtrl+1')
+    renderHook(() => useKeyboardShortcuts())
+    pressIn(document.createElement('input'), '1', true)
+    expect(action).toHaveBeenCalled()
+  })
+})
+
+describe('useKeyboardShortcuts — Cmd+D splits vertically when activeProjectId is set', () => {
+  it('Cmd+D splits vertically when activeProjectId is set', () => {
+    setup({ activeProjectId: 'proj-1' })
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('d', { metaKey: true })
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', {
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
+  })
+
+  it('Cmd+D does nothing when no activeProjectId', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('d', { metaKey: true })
+    expect(splitSession).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+Shift+D splits horizontally when activeProjectId is set', () => {
+    setup({ activeProjectId: 'proj-1' })
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('d', { metaKey: true, shiftKey: true })
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', {
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
+  })
+})
+
+describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split mode', () => {
+  it('Cmd+W closes focused split pane when in split mode', async () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['ses-root', 'ses-focused'], 'ses-root')
+    sessionState().activateSplit('proj-1', {
+      targetId: 'ses-root',
+      newId: 'ses-focused',
+      direction: 'vertical',
+    })
+    sessionState().setFocusedSession('proj-1', 'ses-focused')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('w', { metaKey: true })
+    expect(JSON.stringify(sessionState().getPaneLayout('proj-1'))).not.toContain('ses-focused')
+    await waitFor(() => expect(sessionState().sessions.has('ses-focused')).toBe(false))
+    expect(sessionState().sessions.has('ses-root')).toBe(true)
+  })
+
+  it('Cmd+W closes active tab when not in split mode', async () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['ses-other', 'ses-active'], 'ses-active')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('w', { metaKey: true })
+    await waitFor(() => expect(sessionState().sessions.has('ses-active')).toBe(false))
+    expect(sessionState().sessions.has('ses-other')).toBe(true)
+  })
+})
+
+describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split mode — Cmd+W does nothing when no activeProjectId', () => {
+  it('Cmd+W does nothing when no activeProjectId', () => {
+    withTabs('proj-1', ['ses-active'], 'ses-active')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('w', { metaKey: true })
+    expect(sessionState().sessions.has('ses-active')).toBe(true)
+  })
+})
+
+const scratch = { scratchProjectId: SCRATCH_PROJECT_ID }
+
+describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides activeProjectId', () => {
+  it('Cmd+K clears scratch session when scratchProjectId is set and activeProjectId is null', () => {
+    withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('k', { metaKey: true })
+    expect(input).toHaveBeenCalledWith('scratch-ses-1', '\x0c')
+  })
+
+  it('Cmd+T creates scratch session when scratchProjectId is set and activeProjectId is null', () => {
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('t', { metaKey: true })
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: 'Terminal',
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
+  })
+
+  it('Cmd+D splits the scratch terminal when that is what is on screen', () => {
+    // Scratch is an ordinary project here, as for Cmd+T and Cmd+W; doing nothing silently
+    // read as the feature having been removed.
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('d', { metaKey: true })
+    expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'vertical', {
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
+  })
+})
+
+describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides activeProjectId — Cmd+Shift+D splits the scratch terminal horizontally', () => {
+  it('Cmd+Shift+D splits the scratch terminal horizontally', () => {
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('d', { metaKey: true, shiftKey: true })
+    expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'horizontal', {
+      cwd: '/ws1',
+      scrollbackLimit: 5000,
+    })
+  })
+})
+
+describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides activeProjectId — Cmd+W closes scratch tab when scratchProjectId is set', () => {
+  it('Cmd+W closes scratch tab when scratchProjectId is set', async () => {
+    withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('w', { metaKey: true })
+    await waitFor(() => expect(sessionState().sessions.has('scratch-ses-1')).toBe(false))
+  })
+
+  it('Cmd+ArrowRight cycles scratch tabs when scratchProjectId is set', () => {
+    withTabs(SCRATCH_PROJECT_ID, ['ss1', 'ss2'], 'ss1')
+    renderHook(() => useKeyboardShortcuts(scratch))
+    pressKey('ArrowRight', { metaKey: true })
+    expect(sessionState().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('ss2')
+  })
+
+  it('Cmd+T calls onNewTab when provided instead of creating a session directly', () => {
+    const onNewTab = vi.fn()
+    setup({ activeProjectId: 'proj-1' })
+    renderHook(() => useKeyboardShortcuts({ scratchProjectId: null, onNewTab }))
+    pressKey('t', { metaKey: true })
+    expect(onNewTab).toHaveBeenCalled()
+    expect(createSession).not.toHaveBeenCalled()
+  })
+})
+
+const mkSession = (id: string, projectId: string, patch: Partial<TerminalSession> = {}) =>
+  terminalSessionOf({ id, projectId, type: 'agent', ...patch })
+
+function seedSessionsWithActive(...list: TerminalSession[]): void {
+  useSessionStore.setState({ sessions: new Map(list.map((s) => [s.id, s])) })
+  useSessionStore.setState({
+    projectViews: new Map([['p1', { terminalCounter: 0, activeSessionId: 'a' }]]),
+  })
+}
+
+/** The hooks every "session navigation shortcuts (FR-032)" describe registers. */
+function setUpSessionNavigationShortcutsFR(): void {
+  beforeEach(() => {
+    setup({ activeProjectId: 'p1' })
+    seedSessionsWithActive(
+      mkSession('a', 'p1', { lastAttendedAt: 300 }),
+      mkSession('b', 'p2', { lastAttendedAt: 200 }),
+      mkSession('c', 'p3', { lastAttendedAt: 100, bellCount: 1 })
+    )
+  })
+}
+
+describe('session navigation shortcuts (FR-032)', () => {
+  setUpSessionNavigationShortcutsFR()
+
+  it('Cmd+] moves to the next most-recently-attended session, across projects', () => {
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey(']', { metaKey: true })
+    expect(sessionState().getActiveSessionForProject('p2')).toBe('b')
+  })
+
+  it('Cmd+[ moves the other way and wraps around', () => {
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('[', { metaKey: true })
+    expect(sessionState().getActiveSessionForProject('p3')).toBe('c')
+  })
+
+  it('keeps activeProjectId in step so the project tab bar does not lose its footing', () => {
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey(']', { metaKey: true })
+    expect(workspaceState().activeProjectId).toBe('p2')
+  })
+
+  it('does nothing when there is only one session to cycle', () => {
+    seedSessionsWithActive(mkSession('a', 'p1', { lastAttendedAt: 1 }))
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey(']', { metaKey: true })
+    expect(workspaceState().activeProjectId).toBe('p1')
+    expect(sessionState().focusRequest).toBeNull()
+  })
+})
+
+describe('session navigation shortcuts (FR-032) — Cmd+Shift+A jumps to a session waiting on you', () => {
+  setUpSessionNavigationShortcutsFR()
+
+  it('Cmd+Shift+A jumps to a session waiting on you', () => {
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('a', { metaKey: true, shiftKey: true })
+    expect(sessionState().getActiveSessionForProject('p3')).toBe('c')
+    expect(workspaceState().activeProjectId).toBe('p3')
+  })
+
+  it('Cmd+Shift+A does nothing when no session is waiting', () => {
+    seedSessionsWithActive(mkSession('a', 'p1'))
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('a', { metaKey: true, shiftKey: true })
+    expect(workspaceState().activeProjectId).toBe('p1')
+    expect(sessionState().focusRequest).toBeNull()
+  })
+
+  it('Cmd+I opens the note editor', () => {
+    const onEditSessionNote = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onEditSessionNote }))
+    pressKey('i', { metaKey: true })
+    expect(onEditSessionNote).toHaveBeenCalledOnce()
+  })
+
+  it('never binds Escape — it belongs to the terminal (FR-033)', () => {
+    renderHook(() => useKeyboardShortcuts({ onEditSessionNote: vi.fn() }))
+    const event = pressKey('Escape', { metaKey: true })
+    expect(event.defaultPrevented).toBe(false)
+  })
+})
+
+describe('session navigation shortcuts (FR-032) — leaves the new bindings alone while typing in a text field', () => {
+  setUpSessionNavigationShortcutsFR()
+
+  it('leaves the new bindings alone while typing in a text field', () => {
+    renderHook(() => useKeyboardShortcuts({}))
+    const field = document.createElement('input')
+    document.body.appendChild(field)
+    field.focus()
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: ']', metaKey: true, bubbles: true }))
+    expect(workspaceState().activeProjectId).toBe('p1')
+    field.remove()
+  })
+})
+
+describe('useKeyboardShortcuts — Cmd+K on Home', () => {
+  it('leaves Cmd+K to the search field while Home is the active tab', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['session-1'], 'session-1')
+    useExtensionRegistry.setState({ activeGlobalTabId: 'core.home' })
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('k', { metaKey: true })
+    expect(input).not.toHaveBeenCalled()
+  })
+})
+
+describe('back, forward and reopen closed tab', () => {
+  beforeEach(() => resetStore(useNavigationStore))
+
+  it('Cmd+Option+Left goes back and does not also switch to the previous tab', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['s1', 's2'], 's2')
+    renderHook(() => useKeyboardShortcuts())
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+    pressKey('ArrowLeft', { metaKey: true, altKey: true })
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    expect(sessionState().getActiveSessionForProject('proj-1')).toBe('s2')
+  })
+
+  it('Cmd+Option+Right goes forward again', () => {
+    renderHook(() => useKeyboardShortcuts())
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+    pressKey('ArrowLeft', { metaKey: true, altKey: true })
+    pressKey('ArrowRight', { metaKey: true, altKey: true })
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
+  })
+
+  it('the mouse back button goes back and the forward button goes forward', () => {
+    renderHook(() => useKeyboardShortcuts())
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 3 }))
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 4 }))
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
+  })
+})
+
+describe('back and forward between Overview and a terminal', () => {
+  beforeEach(() => resetStore(useNavigationStore))
+
+  it('Cmd+Option+Left returns from a terminal to Overview, and Cmd+Option+Right to the terminal', () => {
+    setup({ activeProjectId: 'feature-a' })
+    useWorkspaceStore.setState({
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [projectFixture({ id: 'feature-a', workspaceId: 'ws-1' })]],
+      ]),
+    })
+    withTabs('feature-a', ['s1'], 's1')
+    renderHook(() => useKeyboardShortcuts())
+    useExtensionRegistry.getState().setActiveGlobalTab('core.overview')
+    revealSession('s1')
+
+    pressKey('ArrowLeft', { metaKey: true, altKey: true })
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.overview')
+
+    pressKey('ArrowRight', { metaKey: true, altKey: true })
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    expect(workspaceState().activeProjectId).toBe('feature-a')
+    expect(sessionState().getActiveSessionForProject('feature-a')).toBe('s1')
+  })
+})
+
+describe('reopen closed tab', () => {
+  beforeEach(() => resetStore(useNavigationStore))
+
+  it('Cmd+Option+T reopens the last closed terminal in its folder; Cmd+T is not it', () => {
+    setup({ activeProjectId: 'proj-1' })
+    useNavigationStore
+      .getState()
+      .rememberClosed({ projectId: 'proj-1', cwd: '/work/api', title: 'Terminal 2' })
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('t', { metaKey: true, altKey: true })
+    expect(createSession).toHaveBeenCalledTimes(1)
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'proj-1', cwd: '/work/api', title: 'Terminal 2' })
+    )
+    expect(useNavigationStore.getState().closedTabs).toHaveLength(0)
+  })
+
+  it('Cmd+Option+T does nothing when no tab was closed', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('t', { metaKey: true, altKey: true })
+    expect(createSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('useKeyboardShortcuts — Start work', () => {
+  it('opens Start work on Cmd+N', () => {
+    useStartWorkStore.getState().closeLauncher()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('n', { metaKey: true })
+    expect(useStartWorkStore.getState().open).toBe(true)
+    useStartWorkStore.getState().closeLauncher()
+  })
+})

@@ -7,7 +7,7 @@ import { createOrderStore } from '../../../src/order/store.js'
 import { draftOrder } from '../../../src/order/draft.js'
 import type { WorkOrder } from '../../../src/order/schema.js'
 import { makeVerdict } from '../../../src/verify/verdict.js'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
 
 // Shipping writes through the real order store, so the ledger file an entry lands in is
 // asserted, not only the arguments `record` received (docs/ARCHITECTURE.md, "The ledger").

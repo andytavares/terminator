@@ -9,7 +9,7 @@ import * as path from 'node:path'
 import { fakeHost, realGit, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
-import { makeTempDir } from '../../support/temp-dir'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 
 const SCRIPT = join(__dirname, '../../../scripts/check-temp-leaks.mjs')
 

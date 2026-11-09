@@ -48,7 +48,7 @@ async function theReviewHeaderMenuIsAboveTheFileToolbar(): Promise<void> {
         </div>
       </div>
       <div class="pr-review-panels">
-        <main class="pr-review-panel pr-review-panel--centre"><div class="rs-fh">src/main/session/session-store.ts</div></main>
+        <main class="pr-review-panel pr-review-panel--centre"><div class="rs-fh">packages/core-main/src/session/session-store.ts</div></main>
       </div>
     </div>`)
   try {

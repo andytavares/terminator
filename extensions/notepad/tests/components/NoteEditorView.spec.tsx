@@ -9,7 +9,7 @@ import {
   setEditorHoverAnchor,
   type SelectionAnchor,
 } from '../../src/editor/NoteEditor'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // NoteEditor around a real CodeMirror view: what it reports to its owner, the code languages it
 // loads, and the comment highlights it draws.

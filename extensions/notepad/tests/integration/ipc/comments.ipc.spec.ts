@@ -6,7 +6,7 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp') },
 }))
 
-import { wrapDb } from '../../../../../src/main/db/index'
+import { wrapDb } from '../../../../../packages/core-main/src/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
 import {
   listComments,

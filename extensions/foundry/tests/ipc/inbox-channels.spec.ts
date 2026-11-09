@@ -10,7 +10,7 @@ import type { Gate } from '../../src/gates/rules.js'
 import type { Autonomy } from '../../src/gates/autonomy.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // One queue, always sorted, every row attributable to a rule. "Nothing needs
 // you" only means something if nothing can reach this list without a rule

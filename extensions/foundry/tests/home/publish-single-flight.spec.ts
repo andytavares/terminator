@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fakeHost } from '../helpers/foundry-host.js'
 import { startFoundryHomePublisher } from '../../src/home/publish.js'
 import { readLiveStandings } from '../../src/ipc/standing.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 vi.mock('../../src/ipc/standing.js', () => ({ readLiveStandings: vi.fn() }))
 const feedCounter = vi.hoisted(() => ({ built: 0 }))

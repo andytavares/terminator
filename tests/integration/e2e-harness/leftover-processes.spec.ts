@@ -8,8 +8,8 @@ import {
   launchMarker,
   type ProcessRow,
 } from '../../e2e/leftover-processes'
-import { makeTempDir } from '../../support/temp-dir'
-import { eventually } from '../../support/eventually'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
+import { eventually } from '../../../packages/test-support/src/eventually'
 
 // Each link starts the next and waits on it, a new one every 50 ms, like the gh
 // stub that ran itself (macOS run 38380127678): the links that appear after the

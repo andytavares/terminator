@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { wrapDb } from '../../../../src/main/db/index'
+import { wrapDb } from '../../../../packages/core-main/src/db/index'
 import { dispatchChannel } from '@terminator/extension-sdk'
 import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { disposableSpy } from '../support/disposable'
 import { applyTaskVaultSchema } from '../../src/vault/db'
 

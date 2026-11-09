@@ -8,8 +8,8 @@ import type {
   ShellExecOptions,
 } from '@terminator/extension-sdk'
 import { activate, deactivate } from '../../../src/index.ts'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 interface RegisteredChannel {
   spec: ChannelSpec

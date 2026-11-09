@@ -9,7 +9,7 @@ import { idleRunSeams } from '../../extensions/foundry/tests/ipc/run-deps.js'
 import { createRunChannels } from '../../extensions/foundry/src/ipc/run-channels.js'
 import { probeToolchain } from '../../extensions/foundry/src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../extensions/foundry/src/order/schema.js'
-import { makeTempDir } from '../support/temp-dir'
+import { makeTempDir } from '../../packages/test-support/src/temp-dir'
 
 // The portability claim, exercised against a repository that is not this one.
 //

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createMuteStore } from '../../../src/runtime/feed/mutes.js'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
 
 // Which runs are allowed to interrupt you. A mute you have to set again after
 // every restart is one you stop bothering with, and then notifications get

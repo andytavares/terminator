@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { GitFullView } from '../../src/components/GitFullView'
 import { useGitStore } from '../../src/stores/git.store'
-import { installElectronApi } from '../../../../tests/support/electron-api'
+import { installElectronApi } from '../../../../packages/test-support/src/electron-api'
 
 // A workspace that switched "Enable Git Integration" off gets GIT_DISABLED
 // from git:status; the Git view says so instead of loading for ever.

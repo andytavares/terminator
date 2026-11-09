@@ -8,7 +8,7 @@
  * 10 s or the test's 5 s, and on a busy machine (four vitest processes on four
  * cores) it took longer than either.
  */
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 import { activate } from '../../src/index.ts'
 import { runtime } from '../../src/runtime/runtime-state.ts'
 import { settleBackground } from '../../src/background.ts'

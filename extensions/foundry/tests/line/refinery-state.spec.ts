@@ -9,7 +9,7 @@ import {
 } from '../../src/line/refinery-state.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 let root: string
 

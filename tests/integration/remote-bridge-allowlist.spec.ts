@@ -6,7 +6,7 @@ import { once } from 'node:events'
 import { WebSocket } from 'ws'
 import { registerBridgeRoute } from '../../extensions/remote-control/src/server/routes/bridge.route'
 import { WsTicketStore } from '../../extensions/remote-control/src/server/ws-ticket-store'
-import { REMOTE_ACCESSIBLE_CHANNELS } from '../../src/main/remote/remote-accessible-channels'
+import { REMOTE_ACCESSIBLE_CHANNELS } from '../../packages/core-main/src/remote/remote-accessible-channels'
 
 // Integration test for the regression that took down the browser `/app/` surface:
 // the bridge default-deny enforcement shipped, but the allowlist was empty, so every
@@ -14,7 +14,7 @@ import { REMOTE_ACCESSIBLE_CHANNELS } from '../../src/main/remote/remote-accessi
 // (isRemoteAccessible is the exact one-liner api.ts uses) and a registry of real
 // handlers, then drives a real WebSocket bridge client end-to-end: an allowlisted
 // channel's handler runs and returns its result. The refusal of a channel off the
-// list is in tests/unit/extensions/api-v1.2.0.spec.ts and bridge.route.spec.ts.
+// list is in packages/core-main/tests/unit/extensions/api-v1.2.0.spec.ts and bridge.route.spec.ts.
 
 async function waitForMessage(ws: WebSocket): Promise<Record<string, unknown>> {
   const [data] = await once(ws, 'message')

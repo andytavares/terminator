@@ -3,7 +3,7 @@ import { spawnSync } from 'child_process'
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { runInNewContext } from 'vm'
-import { makeTempDir } from '../../support/temp-dir'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 
 const SCRIPT = join(process.cwd(), 'scripts', 'create-extension.cjs')
 

@@ -16,7 +16,7 @@ import type { Standing } from '../../src/order/standing.js'
 import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { CompileResult } from '../../src/order/compile.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 import type { CheckDecisions } from '../../src/forge/readiness.js'
 

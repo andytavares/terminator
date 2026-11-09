@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp'), getAppPath: vi.fn(() => '/tmp') },
 }))
 
-import { wrapDb } from '../../../../../src/main/db/index'
+import { wrapDb } from '../../../../../packages/core-main/src/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
 import {
   createNote,
@@ -31,7 +31,7 @@ import {
   NOTES_CHANGED_CHANNEL,
 } from '../../../src/ipc/notes.ipc'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 let db: ExtensionDB
 

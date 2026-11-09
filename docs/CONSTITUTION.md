@@ -1,4 +1,17 @@
 <!--
+SYNC IMPACT REPORT (10.0.1)
+===========================
+Version change: 10.0.0 → 10.0.1 (PATCH: paths corrected; no rule changed)
+
+Modified principles:
+  - XIV: the core moved into workspace packages (packages/core-*, packages/test-support), so the
+    paths of the tier guard, eventually(), the hang bounds and the integration test folders follow.
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (10.0.0)
 ===========================
 Version change: 9.0.0 → 10.0.0 (MAJOR: Principles XIII and XIV redefined by the test audit, ADR 150)
@@ -421,7 +434,7 @@ code has no value. It is a defect. ADR 123 records the reasoning.
 
 - **Each check in the lowest tier that proves it.** A unit test is one behaviour in one process
   with no I/O: it opens no socket, loopback included, starts no process, watches no file and opens
-  no database, and `tests/setup.ts` refuses each. An integration test (`tests/integration`,
+  no database, and `packages/test-support/setup.ts` refuses each. An integration test (`tests/integration`, `packages/*/tests/integration`,
   `extensions/*/tests/integration`) reaches one boundary the code owns, through a private instance
   it makes, and only on this machine. An end-to-end test is one user journey (ADR 115, ADR 150).
 - **No test depends on another.** `vitest.config.ts` resets every mock, calls and implementation
@@ -442,10 +455,10 @@ code has no value. It is a defect. ADR 123 records the reasoning.
   fails and says which.
 - **Signals, never time.** A test waits only on a signal from the code under test: an
   awaited promise, an event, a locator assertion, or `eventually()`
-  (`tests/support/eventually.ts`). It never sleeps and never waits a tick. A test MUST await the work it
+  (`packages/test-support/src/eventually.ts`). It never sleeps and never waits a tick. A test MUST await the work it
   starts. Stopping (`dispose`, `stop`, `close`, `deactivate`) returns a
   promise that settles when the work it started has ended. The only time limits are the
-  hang bounds in `tests/support/bounds.ts` and `playwright.config.ts`, far above any real
+  hang bounds in `packages/test-support/src/bounds.ts` and `playwright.config.ts`, far above any real
   duration. A spec MUST NOT set its own.
 - **One sealed environment.** Every test process runs in the environment
   `scripts/test-env.mjs` builds: fixed time zone and locale, a fresh `HOME` and `TMPDIR`,
@@ -493,4 +506,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions that affect this project.
 
-**Version**: 10.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-11-08
+**Version**: 10.0.1 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-11-08

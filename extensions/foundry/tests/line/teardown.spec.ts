@@ -6,7 +6,7 @@ import { orderDir } from '../../src/data-root.js'
 import { checkoutPath, createdBranchMarker } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // The one path whose removal the file system refuses, as a read-only volume
 // does (EROFS). Root removes a file in a 0o500 directory, so chmod cannot.

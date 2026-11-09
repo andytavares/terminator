@@ -9,7 +9,7 @@ vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
 vi.mock('../../src/components/DateTimePicker', () => import('./helpers/input-stubs'))
 
 import { notify } from '../../src/utils/notify'
-import { pressOutside } from '../../../../tests/support/modal'
+import { pressOutside } from '../../../../packages/test-support/src/modal'
 
 let bridge: ReturnType<typeof installVaultBridge>
 

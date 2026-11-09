@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { hashPassword } from '../../src/server/password-hash'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // The server and fastify cost the host 25 MB (docs/research/perf/2026-10-12-extension-host.md),
 // so they load when Remote Control is turned on, not on activation. Vitest runs a vi.mock

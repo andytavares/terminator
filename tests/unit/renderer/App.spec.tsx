@@ -1,61 +1,68 @@
-import { fact } from './sidebar/fixtures/facts'
-import type { SessionFacts } from '../../../src/renderer/sidebar/session-facts'
+import { fact } from '../../../packages/core-renderer/tests/unit/renderer/sidebar/fixtures/facts'
+import type { SessionFacts } from '../../../packages/core-renderer/src/sidebar/session-facts'
 import React, { type ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
-import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
-import { useSessionStore } from '../../../src/renderer/stores/session.store'
-import { isBrokenOut, useBreakoutStore } from '../../../src/renderer/stores/breakout.store'
-import { useToastStore } from '../../../src/renderer/stores/toast.store'
-import { useExtensionCommandsStore } from '../../../src/renderer/stores/extension-commands.store'
-import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
-import { useTerminalOpenErrorStore } from '../../../src/renderer/stores/terminal-open-error.store'
-import { useIntegrationsStore } from '../../../src/renderer/stores/integrations.store'
-import { App } from '../../../src/renderer/App'
-import { installLogInterceptor } from '../../../src/renderer/logger'
-import { useLogStore } from '../../../src/renderer/stores/log.store'
-import { useNotificationStore } from '../../../src/renderer/stores/notification.store'
-import type { QuickAction } from '../../../src/renderer/quick-actions/types'
-import type { QuickActionsProps } from '../../../src/renderer/components/QuickActions'
-import type { useTerminalSession } from '../../../src/renderer/hooks/useTerminalSession'
-import type { useKeyboardShortcuts } from '../../../src/renderer/hooks/useKeyboardShortcuts'
-import type { UnifiedSidebar } from '../../../src/renderer/components/sidebar/UnifiedSidebar'
-import type { TerminalInstance } from '../../../src/renderer/components/terminal/TerminalSession'
+import { useWorkspaceStore } from '../../../packages/core-renderer/src/stores/workspace.store'
+import { useSettingsStore } from '../../../packages/core-renderer/src/stores/settings.store'
+import { useSessionStore } from '../../../packages/core-renderer/src/stores/session.store'
+import {
+  isBrokenOut,
+  useBreakoutStore,
+} from '../../../packages/core-renderer/src/stores/breakout.store'
+import { useToastStore } from '../../../packages/core-renderer/src/stores/toast.store'
+import { useExtensionCommandsStore } from '../../../packages/core-renderer/src/stores/extension-commands.store'
+import { useExtensionRegistry } from '../../../packages/core-renderer/src/extensions/registry'
+import { useTerminalOpenErrorStore } from '../../../packages/core-renderer/src/stores/terminal-open-error.store'
+import { useIntegrationsStore } from '../../../packages/core-renderer/src/stores/integrations.store'
+import { App } from '../../../packages/core-renderer/src/App'
+import { installLogInterceptor } from '../../../packages/core-renderer/src/logger'
+import { useLogStore } from '../../../packages/core-renderer/src/stores/log.store'
+import { useNotificationStore } from '../../../packages/core-renderer/src/stores/notification.store'
+import type { QuickAction } from '../../../packages/core-renderer/src/quick-actions/types'
+import type { QuickActionsProps } from '../../../packages/core-renderer/src/components/QuickActions'
+import type { useTerminalSession } from '../../../packages/core-renderer/src/hooks/useTerminalSession'
+import type { useKeyboardShortcuts } from '../../../packages/core-renderer/src/hooks/useKeyboardShortcuts'
+import type { UnifiedSidebar } from '../../../packages/core-renderer/src/components/sidebar/UnifiedSidebar'
+import type { TerminalInstance } from '../../../packages/core-renderer/src/components/terminal/TerminalSession'
 import {
   SCRATCH_PROJECT_ID,
   type GlobalSettings,
   type Project,
   type TerminalSession,
   type Workspace,
-} from '../../../src/shared/types/index'
-import type { ElectronAPI } from '../../../src/shared/electron-api/api-type'
+} from '../../../packages/core-shared/src/types/index'
+import type { ElectronAPI } from '../../../packages/core-shared/src/electron-api/api-type'
 import {
   projectFixture,
   resetStore,
   terminalSessionOf,
   workspaceFixture,
-} from '../../support/renderer-stores'
-import { bridgeEvents, installElectronApi, pushedEvent } from '../../support/electron-api'
-import { partialFake } from '../../support/fakes'
+} from '../../../packages/test-support/src/renderer-stores'
+import {
+  bridgeEvents,
+  installElectronApi,
+  pushedEvent,
+} from '../../../packages/test-support/src/electron-api'
+import { partialFake } from '../../../packages/test-support/src/fakes'
 
 // Settings are answered by the main process's own settings store, kept in memory.
 vi.mock('electron-store', async () =>
-  (await import('../../support/stores')).inMemoryElectronStore()
+  (await import('../../../packages/test-support/src/stores')).inMemoryElectronStore()
 )
 
 // The children are stand-ins: what is under test is the shell that wires them.
-vi.mock('../../../src/renderer/extensions/loader', () => ({}))
+vi.mock('../../../packages/core-renderer/src/extensions/loader', () => ({}))
 const facts = vi.hoisted(() => ({
   sessionFacts: [] as Array<Pick<SessionFacts, 'sessionId' | 'workItem'> & Partial<SessionFacts>>,
 }))
-vi.mock('../../../src/renderer/components/session/useSessionFacts', () => ({
+vi.mock('../../../packages/core-renderer/src/components/session/useSessionFacts', () => ({
   useSessionFacts: () => facts.sessionFacts,
   useIssue: () => null,
   useIssueTitles: () => new Map(),
 }))
-vi.mock('../../../src/renderer/components/session/SessionLinkDialog', () => ({
+vi.mock('../../../packages/core-renderer/src/components/session/SessionLinkDialog', () => ({
   SessionLinkDialog: ({
     facts,
     onClose,
@@ -72,7 +79,7 @@ vi.mock('../../../src/renderer/components/session/SessionLinkDialog', () => ({
 
 type ShortcutOptions = NonNullable<Parameters<typeof useKeyboardShortcuts>[0]>
 const shortcuts = vi.hoisted(() => ({ callbacks: {} as ShortcutOptions }))
-vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
+vi.mock('../../../packages/core-renderer/src/hooks/useKeyboardShortcuts', () => ({
   useKeyboardShortcuts: (options: ShortcutOptions = {}) => {
     shortcuts.callbacks = options
   },
@@ -82,14 +89,14 @@ vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
 // is the terminal asked for.
 type TerminalSessionApi = ReturnType<typeof useTerminalSession>
 const terminals = vi.hoisted(() => ({ createSession: vi.fn(), splitSession: vi.fn() }))
-vi.mock('../../../src/renderer/hooks/useTerminalSession', () => ({
+vi.mock('../../../packages/core-renderer/src/hooks/useTerminalSession', () => ({
   useTerminalSession: (): TerminalSessionApi => terminals,
 }))
 const createSession = vi.mocked<TerminalSessionApi['createSession']>(terminals.createSession)
 const splitSession = vi.mocked<TerminalSessionApi['splitSession']>(terminals.splitSession)
 
 const palette = vi.hoisted(() => ({ props: null as QuickActionsProps | null }))
-vi.mock('../../../src/renderer/components/QuickActions', () => ({
+vi.mock('../../../packages/core-renderer/src/components/QuickActions', () => ({
   QuickActions: (props: QuickActionsProps) => {
     palette.props = props
     return (
@@ -102,7 +109,7 @@ vi.mock('../../../src/renderer/components/QuickActions', () => ({
 
 type SidebarProps = ComponentProps<typeof UnifiedSidebar>
 const sidebar = vi.hoisted(() => ({ props: null as SidebarProps | null }))
-vi.mock('../../../src/renderer/components/sidebar/UnifiedSidebar', () => ({
+vi.mock('../../../packages/core-renderer/src/components/sidebar/UnifiedSidebar', () => ({
   UnifiedSidebar: (props: SidebarProps) => {
     sidebar.props = props
     return (
@@ -113,14 +120,14 @@ vi.mock('../../../src/renderer/components/sidebar/UnifiedSidebar', () => ({
     )
   },
 }))
-vi.mock('../../../src/renderer/components/AboutDialog', () => ({
+vi.mock('../../../packages/core-renderer/src/components/AboutDialog', () => ({
   AboutDialog: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="about-dialog">
       <button onClick={onClose}>Close About</button>
     </div>
   ),
 }))
-vi.mock('../../../src/renderer/components/NameTerminalDialog', () => ({
+vi.mock('../../../packages/core-renderer/src/components/NameTerminalDialog', () => ({
   NameTerminalDialog: ({
     defaultName,
     onConfirm,
@@ -137,7 +144,7 @@ vi.mock('../../../src/renderer/components/NameTerminalDialog', () => ({
     </div>
   ),
 }))
-vi.mock('../../../src/renderer/components/terminal/TerminalPane', () => ({
+vi.mock('../../../packages/core-renderer/src/components/terminal/TerminalPane', () => ({
   TerminalPane: ({ projectId }: { projectId: string }) => (
     <div data-testid="terminal-pane">{projectId}</div>
   ),
@@ -146,7 +153,7 @@ const tabBar = vi.hoisted(() => ({
   editNoteSessionId: null as string | null,
   onScratchDeactivate: undefined as (() => void) | undefined,
 }))
-vi.mock('../../../src/renderer/components/terminal/TabBar', () => ({
+vi.mock('../../../packages/core-renderer/src/components/terminal/TabBar', () => ({
   TabStateIcon: () => null,
   TabBar: ({
     editNoteSessionId,
@@ -163,36 +170,36 @@ vi.mock('../../../src/renderer/components/terminal/TabBar', () => ({
     return <div data-testid="tab-bar" />
   },
 }))
-vi.mock('../../../src/renderer/components/settings/SettingsPanel', () => ({
+vi.mock('../../../packages/core-renderer/src/components/settings/SettingsPanel', () => ({
   SettingsPanel: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="settings-panel">
       <button onClick={onClose}>Close Settings</button>
     </div>
   ),
 }))
-vi.mock('../../../src/renderer/components/home/HomeScreen', () => ({
+vi.mock('../../../packages/core-renderer/src/components/home/HomeScreen', () => ({
   HomeScreen: () => <div data-testid="home-screen" />,
 }))
-vi.mock('../../../src/renderer/components/overview/OverviewScreen', () => ({
+vi.mock('../../../packages/core-renderer/src/components/overview/OverviewScreen', () => ({
   OverviewScreen: () => <div data-testid="overview-screen" />,
 }))
-vi.mock('../../../src/renderer/components/ToastContainer', () => ({
+vi.mock('../../../packages/core-renderer/src/components/ToastContainer', () => ({
   ToastContainer: () => <div data-testid="toast-container" />,
 }))
-vi.mock('../../../src/renderer/components/LogWindow', () => ({
+vi.mock('../../../packages/core-renderer/src/components/LogWindow', () => ({
   LogWindow: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="log-window">
       <button onClick={onClose}>Close Log</button>
     </div>
   ),
 }))
-vi.mock('../../../src/renderer/components/ErrorBoundary', () => ({
+vi.mock('../../../packages/core-renderer/src/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 // ── The main process ─────────────────────────────────────────────────────────
 
-type MainSettings = typeof import('../../../src/main/storage/settings-store')
+type MainSettings = typeof import('../../../packages/core-main/src/storage/settings-store')
 let mainSettings: MainSettings
 
 /** Settings as saved: the defaults, with `patch` written over them by main's own merge. */
@@ -391,7 +398,7 @@ function paletteAction(id: string): QuickAction | undefined {
 beforeEach(async () => {
   vi.clearAllMocks()
   vi.resetModules()
-  mainSettings = await import('../../../src/main/storage/settings-store')
+  mainSettings = await import('../../../packages/core-main/src/storage/settings-store')
   shortcuts.callbacks = {}
   palette.props = null
   sidebar.props = null
@@ -412,8 +419,8 @@ beforeEach(async () => {
 // from the module cache, so a surface mounts within its own test.
 beforeAll(async () => {
   await Promise.all([
-    import('../../../src/renderer/components/settings/SettingsPanel'),
-    import('../../../src/renderer/components/overview/OverviewScreen'),
+    import('../../../packages/core-renderer/src/components/settings/SettingsPanel'),
+    import('../../../packages/core-renderer/src/components/overview/OverviewScreen'),
   ])
 })
 

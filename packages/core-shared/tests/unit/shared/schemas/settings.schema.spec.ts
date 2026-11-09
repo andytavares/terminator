@@ -1,0 +1,176 @@
+import { describe, it, expect, vi } from 'vitest'
+import {
+  GlobalSettingsSchema,
+  WorkspaceSettingsSchema,
+  DEFAULT_GLOBAL_SETTINGS,
+} from '../../../../src/schemas/settings.schema'
+import { defaultGlobalSettings } from '../../../../src/settings-defaults'
+
+const base = defaultGlobalSettings('/bin/zsh')
+
+describe('GlobalSettingsSchema — ui.hideSidebarOnHome', () => {
+  it('is on when the settings have never set it', () => {
+    expect(
+      GlobalSettingsSchema.parse({ ...base, ui: { hasSeenWelcome: true } }).ui.hideSidebarOnHome
+    ).toBe(true)
+  })
+
+  it('is on in the shipped defaults', () => {
+    expect(defaultGlobalSettings('/bin/zsh').ui.hideSidebarOnHome).toBe(true)
+  })
+
+  it('keeps an explicit off', () => {
+    const parsed = GlobalSettingsSchema.parse({
+      ...base,
+      ui: { hasSeenWelcome: true, hideSidebarOnHome: false },
+    })
+    expect(parsed.ui.hideSidebarOnHome).toBe(false)
+  })
+})
+
+describe('GlobalSettingsSchema — ui.homeLayout', () => {
+  it('is Tasks when the settings have never set it', () => {
+    expect(
+      GlobalSettingsSchema.parse({ ...base, ui: { hasSeenWelcome: true } }).ui.homeLayout
+    ).toBe('tasks')
+  })
+
+  it('is Tasks in the shipped defaults', () => {
+    expect(defaultGlobalSettings('/bin/zsh').ui.homeLayout).toBe('tasks')
+  })
+
+  it('keeps Classic and rejects a layout that does not exist', () => {
+    const ui = { hasSeenWelcome: true }
+    expect(
+      GlobalSettingsSchema.parse({ ...base, ui: { ...ui, homeLayout: 'classic' } }).ui.homeLayout
+    ).toBe('classic')
+    expect(
+      GlobalSettingsSchema.safeParse({ ...base, ui: { ...ui, homeLayout: 'board' } }).success
+    ).toBe(false)
+  })
+})
+
+describe('GlobalSettingsSchema — ui.showUsageTab', () => {
+  it('is on when the settings have never set it', () => {
+    expect(
+      GlobalSettingsSchema.parse({ ...base, ui: { hasSeenWelcome: true } }).ui.showUsageTab
+    ).toBe(true)
+  })
+
+  it('keeps an explicit off', () => {
+    const parsed = GlobalSettingsSchema.parse({
+      ...base,
+      ui: { hasSeenWelcome: true, showUsageTab: false },
+    })
+    expect(parsed.ui.showUsageTab).toBe(false)
+  })
+})
+
+// The defaults a settings file written before a field existed is read with. Only these are
+// pinned: a stored file depends on each one.
+
+const validGlobal = {
+  appearance: { theme: 'dark' as const },
+  terminal: { scrollbackLimit: 10000, defaultShell: '/bin/zsh' },
+  git: { worktreeBaseDir: '' },
+  ui: { hasSeenWelcome: false },
+}
+
+const validWorkspace = {
+  workspaceId: '550e8400-e29b-41d4-a716-446655440000',
+  overrides: {},
+  extensions: {},
+}
+
+describe('GlobalSettingsSchema defaults for fields an older file lacks', () => {
+  it('fills the ui section', () => {
+    const { ui: _ui, ...withoutUi } = validGlobal
+    expect(GlobalSettingsSchema.parse(withoutUi).ui).toEqual({
+      hasSeenWelcome: false,
+      editor: '',
+      hideSidebarOnHome: true,
+      showUsageTab: true,
+      homeLayout: 'tasks',
+      sidebarMode: 'tree',
+    })
+  })
+
+  it('fills the editor with empty, which means detect', () => {
+    const parsed = GlobalSettingsSchema.parse({ ...validGlobal, ui: { hasSeenWelcome: true } })
+    expect(parsed.ui.editor).toBe('')
+  })
+
+  it('fills the notification targets', () => {
+    expect(GlobalSettingsSchema.parse(validGlobal).notifications).toEqual({
+      defaultTargets: ['system', 'center', 'toast'],
+      overrides: {},
+    })
+  })
+})
+
+describe('GlobalSettingsSchema defaults for the sidebar and quick actions', () => {
+  it('fills the sidebar stale threshold with two hours, in the parsed and the shipped settings', () => {
+    const parsed = GlobalSettingsSchema.parse({ ...DEFAULT_GLOBAL_SETTINGS, sidebar: undefined })
+    expect(parsed.sidebar.staleAfterMs).toBe(7_200_000)
+    expect(DEFAULT_GLOBAL_SETTINGS.sidebar.staleAfterMs).toBe(7_200_000)
+  })
+
+  it('fills the quick actions with empty lists, in the parsed and the shipped settings', () => {
+    const empty = { pins: [], usage: [], directUse: [], custom: [] }
+    expect(GlobalSettingsSchema.parse(validGlobal).quickActions).toEqual(empty)
+    expect(DEFAULT_GLOBAL_SETTINGS.quickActions).toEqual(empty)
+  })
+})
+
+/** The shell the settings ship with when `SHELL` is `shell`, or unset when `undefined`. */
+async function shippedShell(shell: string | undefined): Promise<string> {
+  const original = process.env.SHELL
+  if (shell === undefined) delete process.env.SHELL
+  else process.env.SHELL = shell
+  vi.resetModules()
+  try {
+    const module = await import('../../../../src/schemas/settings.schema')
+    return module.DEFAULT_GLOBAL_SETTINGS.terminal.defaultShell
+  } finally {
+    process.env.SHELL = original
+  }
+}
+
+describe('DEFAULT_GLOBAL_SETTINGS shell', () => {
+  it('uses process.env.SHELL when set', async () => {
+    expect(await shippedShell('/bin/fish')).toBe('/bin/fish')
+  })
+
+  it('falls back to /bin/zsh when SHELL is not set', async () => {
+    expect(await shippedShell(undefined)).toBe('/bin/zsh')
+  })
+})
+
+describe('WorkspaceSettingsSchema defaults', () => {
+  it('fills overrides and extensions with empty objects', () => {
+    const parsed = WorkspaceSettingsSchema.parse({ workspaceId: validWorkspace.workspaceId })
+    expect(parsed.overrides).toEqual({})
+    expect(parsed.extensions).toEqual({})
+  })
+})
+
+describe('GlobalSettingsSchema — sessions.deleteClosedAfterHours', () => {
+  const withHours = (deleteClosedAfterHours: number) =>
+    GlobalSettingsSchema.safeParse({ ...validGlobal, sessions: { deleteClosedAfterHours } })
+
+  it('fills 24 hours, in the parsed and the shipped settings', () => {
+    expect(GlobalSettingsSchema.parse(validGlobal).sessions.deleteClosedAfterHours).toBe(24)
+    expect(DEFAULT_GLOBAL_SETTINGS.sessions.deleteClosedAfterHours).toBe(24)
+  })
+
+  it('accepts one hour and thirty days', () => {
+    expect(withHours(1).success).toBe(true)
+    expect(withHours(720).success).toBe(true)
+  })
+
+  it('refuses zero, more than thirty days, and part of an hour', () => {
+    expect(withHours(0).success).toBe(false)
+    expect(withHours(721).success).toBe(false)
+    expect(withHours(1.5).success).toBe(false)
+  })
+})

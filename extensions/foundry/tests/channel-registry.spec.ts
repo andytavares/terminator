@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import { makeTempDir } from '../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 import { integrateDepsFor } from '../src/line/ship-deps.js'
 import { ledgerActions } from './helpers/order-ledger'
 

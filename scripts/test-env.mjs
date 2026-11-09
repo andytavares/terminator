@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** The global git config a test's git reads, in place of the developer's ~/.gitconfig. */
-export const GIT_CONFIG_FIXTURE = join(REPO_ROOT, 'tests/fixtures/git/gitconfig')
+export const GIT_CONFIG_FIXTURE = join(REPO_ROOT, 'packages/test-support/fixtures/git/gitconfig')
 
 const SYSTEM_PATH = ['/usr/bin', '/bin', '/usr/sbin', '/sbin']
 

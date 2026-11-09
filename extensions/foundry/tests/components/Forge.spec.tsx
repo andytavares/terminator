@@ -8,7 +8,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { openForgeStep } from '../helpers/forge-steps.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // The mapping panel (FR-060): which of the tracker's own states each moment
 // means. Presented rather than assumed, because "In Review" is a decision

@@ -2,9 +2,12 @@
   "name": "@terminator/extension-foundry",
   "version": "0.1.14",
   "private": true,
-  "description": "Foundry — a software factory for Terminator",
+  "description": "Foundry \u2014 a software factory for Terminator",
   "scripts": {
-    "build:renderer": "vite build --config vite.renderer.config.mts"
+    "build:renderer": "vite build --config vite.renderer.config.mts",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-foundry-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-foundry-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run extensions/foundry/"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.5",
@@ -15,5 +18,8 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@terminator/test-support": "1.0.0"
   }
 }

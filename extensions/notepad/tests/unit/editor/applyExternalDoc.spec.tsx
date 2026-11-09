@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { NoteEditor, applyExternalDoc } from '../../../src/editor/NoteEditor'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 // A stand-in for EditorView that keeps real EditorState semantics (doc,
 // selection, transaction application) without needing a DOM.

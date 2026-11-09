@@ -71,21 +71,21 @@ function pureLayer({ files, ignores = [], allowed, also }) {
   }
 }
 
-/** `src/renderer/sidebar/` and the Desk's `src/renderer/home/` decide what is shown from their
+/** `packages/core-renderer/src/sidebar/` and the Desk's `packages/core-renderer/src/home/` decide what is shown from their
  * arguments alone (ADR-027, Constitution XI). */
 function pureLayers() {
   return [
     pureLayer({
-      files: ['src/renderer/sidebar/*.ts'],
+      files: ['packages/core-renderer/src/sidebar/*.ts'],
       // The shared type module holds frozen identifiers beside the types; the stored-JSON
       // helper holds no React, store or clock.
-      allowed: '\\.\\./\\.\\./shared/types/index$|\\.\\./home/local-storage$',
-      also: '../../shared/types/index or ../home/local-storage',
+      allowed: '\\.\\./\\.\\./\\.\\./core-shared/src/types/index$|\\.\\./home/local-storage$',
+      also: '../../../core-shared/src/types/index or ../home/local-storage',
     }),
     pureLayer({
-      files: ['src/renderer/home/*.ts'],
+      files: ['packages/core-renderer/src/home/*.ts'],
       // The Desk's stores hold what the operator did, so they may use zustand and the clock.
-      ignores: ['src/renderer/home/{dismissals,focus-store,local-storage}.ts'],
+      ignores: ['packages/core-renderer/src/home/{dismissals,focus-store,local-storage}.ts'],
       allowed: '\\.\\./sidebar/|@terminator/extension-sdk/plain$',
       also: 'the sidebar layer (../sidebar/) or @terminator/extension-sdk/plain',
     }),
@@ -93,7 +93,7 @@ function pureLayers() {
 }
 
 const SLEEP_MESSAGE =
-  'Tests never sleep or wait a tick (ADR 123). Wait on the condition you assert next: a locator assertion, expect.poll, eventually() from tests/support/eventually.ts, fake timers, or the promise the code under test returns.'
+  'Tests never sleep or wait a tick (ADR 123). Wait on the condition you assert next: a locator assertion, expect.poll, eventually() from packages/test-support/src/eventually.ts, fake timers, or the promise the code under test returns.'
 
 const TIMEOUT_MESSAGE =
   'No per-test or per-wait time limit (ADR 123). One bound exists only to catch a hang: vitest.config.ts and playwright.config.ts set it far above any real duration. Wait on a signal instead.'
@@ -126,7 +126,15 @@ const TIMEOUT_OVERRIDES = [
 
 // Spec and e2e files, with type information: a promise that is not awaited is work that
 // outlives its test.
-const TEST_FILES = ['**/*.spec.ts', '**/*.spec.tsx', 'tests/**/*.ts', 'tests/**/*.tsx']
+const TEST_FILES = [
+  '**/*.spec.ts',
+  '**/*.spec.tsx',
+  'tests/**/*.ts',
+  'tests/**/*.tsx',
+  'packages/*/tests/**/*.ts',
+  'packages/*/tests/**/*.tsx',
+  'packages/test-support/**/*.ts',
+]
 
 const EXTENSIONS = readdirSync(join(import.meta.dirname, 'extensions'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -136,8 +144,24 @@ const EXTENSIONS = readdirSync(join(import.meta.dirname, 'extensions'), { withFi
 // builds each project in turn until one holds the file, so every program was in memory at once
 // (4.8 GB, and CI's 7 GB runner swapped for eight minutes).
 const TEST_PROJECTS = [
-  { files: ['tests/**/*.ts', 'tests/**/*.tsx'], project: './tsconfig.test.json' },
-  { files: ['src/**/*.spec.ts', 'src/**/*.spec.tsx'], project: './tsconfig.main.json' },
+  {
+    files: [
+      'tests/**/*.ts',
+      'tests/**/*.tsx',
+      'packages/extension-ui/tests/**/*.ts',
+      'packages/extension-ui/tests/**/*.tsx',
+      'packages/test-support/**/*.ts',
+    ],
+    project: './tsconfig.test.json',
+  },
+  ...['core-main', 'core-renderer', 'core-renderer-remote', 'core-shared'].map((name) => ({
+    files: [`packages/${name}/tests/**/*.ts`, `packages/${name}/tests/**/*.tsx`],
+    project: `./packages/${name}/tsconfig.test.json`,
+  })),
+  {
+    files: ['packages/core-main/src/**/*.spec.ts', 'packages/core-shared/src/**/*.spec.ts'],
+    project: './packages/core-main/tsconfig.json',
+  },
   {
     files: ['packages/extension-sdk/**/*.spec.ts', 'packages/extension-sdk/**/*.spec.tsx'],
     project: './packages/extension-sdk/tsconfig.json',
@@ -197,8 +221,11 @@ export default defineConfig([
     // ADR 096: core invoke channels register through the schema table, where a
     // zod schema is required. Only the table and the extension API call
     // handleChannel.
-    files: ['src/main/**/*.ts'],
-    ignores: ['src/main/ipc/invoke-table.ts', 'src/main/extensions/api.ts'],
+    files: ['packages/core-main/src/**/*.ts'],
+    ignores: [
+      'packages/core-main/src/ipc/invoke-table.ts',
+      'packages/core-main/src/extensions/api.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -234,14 +261,15 @@ export default defineConfig([
       'tests/**/*.{ts,tsx}',
       'extensions/*/tests/**/*.{ts,tsx}',
       'packages/*/tests/**/*.{ts,tsx}',
+      'packages/test-support/**/*.ts',
     ],
     // The places a wait's bound is set (ADR 123), and the leak guard, which reads Node's own
     // schedule: a closed handle's destroy hook is emitted on the check phase after its close
     // callback, so a fixed count of loop turns is exact there, not a race.
     ignores: [
-      'tests/support/eventually.ts',
-      'tests/support/hang-bound.ts',
-      'tests/support/leak-guard.ts',
+      'packages/test-support/src/eventually.ts',
+      'packages/test-support/src/hang-bound.ts',
+      'packages/test-support/src/leak-guard.ts',
     ],
     rules: {
       'no-restricted-syntax': [
@@ -396,7 +424,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/renderer/**/*.{ts,tsx}'],
+    files: ['packages/core-renderer/src/**/*.{ts,tsx}'],
     ignores: ['**/*.spec.ts', '**/*.spec.tsx'],
     rules: {
       'no-restricted-imports': [
@@ -416,7 +444,7 @@ export default defineConfig([
   },
   ...pureLayers(),
   {
-    files: ['src/renderer/components/**/*.tsx'],
+    files: ['packages/core-renderer/src/components/**/*.tsx'],
     rules: {
       'no-restricted-syntax': [
         'error',

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readTranscriptTail } from '../../src/runtime/transcript-excerpt.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // Reading a run's own record. The schema is not a published contract, so the
 // question every case below asks is the same: does a line it did not expect

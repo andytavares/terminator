@@ -21,7 +21,7 @@ import { ledgerActions, untilLedgerHas } from '../helpers/order-ledger.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { executingOrders } from '../../src/line/run-control.js'
 import { settleBackground } from '../../src/background.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 

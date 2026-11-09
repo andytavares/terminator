@@ -26,7 +26,7 @@ import type { Verdict } from '../../src/verify/verdict.js'
 import type { CiOutcome } from '../../src/line/ship-tail.js'
 import type { LadderOutcome } from '../../src/verify/ladder.js'
 import type { Check } from '../../src/line/ci.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // Work ends in a draft pull request without anyone asking for one, and the
 // decision the operator is offered is whether to mark it ready — never whether

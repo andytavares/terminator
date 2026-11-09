@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { runPicturesStep } from '../../src/line/pictures.js'
 import type { PicturesRecord } from '../../src/line/pictures.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // The step's purpose is the images it leaves, so exit 0 alone is not a pass: a
 // command that took no pictures measured nothing.

@@ -14,9 +14,9 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/main/index.ts'),
+          index: resolve(__dirname, 'packages/core-main/src/index.ts'),
           // The extension host, a utilityProcess main starts (ADR 094).
-          'extension-host': resolve(__dirname, 'src/main/extensions/host/entry.ts'),
+          'extension-host': resolve(__dirname, 'packages/core-main/src/extensions/host/entry.ts'),
         },
       },
     },
@@ -26,7 +26,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/main/preload.ts'),
+          index: resolve(__dirname, 'packages/core-main/src/preload.ts'),
         },
         output: {
           format: 'cjs',
@@ -36,6 +36,8 @@ export default defineConfig({
     },
   },
   renderer: {
+    // electron-vite's default renderer root is src/renderer; the renderer lives in its own package.
+    root: resolve(__dirname, 'packages/core-renderer/src'),
     plugins: [react()],
     resolve: {
       // Mermaid's ELK layout is one 1,477 kB chunk, past the budget below, for diagrams
@@ -43,7 +45,10 @@ export default defineConfig({
       alias: [
         {
           find: /^\.\/elk-[A-Z0-9]+\.mjs$/,
-          replacement: resolve(__dirname, 'src/renderer/components/agent/no-elk-layout.ts'),
+          replacement: resolve(
+            __dirname,
+            'packages/core-renderer/src/components/agent/no-elk-layout.ts'
+          ),
         },
       ],
     },
@@ -60,7 +65,7 @@ export default defineConfig({
       chunkSizeWarningLimit: 970,
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/renderer/index.html'),
+          index: resolve(__dirname, 'packages/core-renderer/src/index.html'),
         },
       },
     },

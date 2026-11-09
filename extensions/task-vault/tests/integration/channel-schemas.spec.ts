@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { wrapDb } from '../../../../src/main/db/index'
+import { wrapDb } from '../../../../packages/core-main/src/db/index'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({
@@ -14,7 +14,7 @@ vi.mock('../../src/notifications/task-scheduler.js', async (importOriginal) => (
 }))
 
 import { activate, deactivate } from '../../src/index.ts'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 const disposable = { dispose: () => {} }
 

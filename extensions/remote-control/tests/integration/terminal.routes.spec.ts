@@ -9,7 +9,7 @@ import { WsSubscriberManager } from '../../src/server/ws-subscriber-manager'
 import { ConnectedDeviceRegistry } from '../../src/server/connected-devices'
 import { HEARTBEAT_INTERVAL_MS } from '../../src/server/heartbeat'
 import { createFakePtyManager, type FakePtyManager } from '../unit/helpers/fake-pty-manager'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 let ptyManager: FakePtyManager
 let ticketStore: WsTicketStore

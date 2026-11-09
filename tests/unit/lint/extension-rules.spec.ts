@@ -75,7 +75,7 @@ describe('extension import boundary — allowed', () => {
   })
 
   it('does not apply to core source', async () => {
-    expect(await rejected('../../../packages/x', 'src/main/a/b.ts')).toBe(false)
+    expect(await rejected('../../../packages/x', 'packages/core-main/src/a/b.ts')).toBe(false)
   })
 })
 
@@ -143,7 +143,7 @@ describe('extension vocabulary rule', () => {
   it('does not police core source, which has its own rule', async () => {
     const msgs = await syntaxMessagesFor(
       'const A = () => <p>saved to vault</p>',
-      'src/renderer/components/X.tsx'
+      'packages/core-renderer/src/components/X.tsx'
     )
     expect(msgs).toHaveLength(0)
   })
@@ -179,7 +179,7 @@ describe('icon sizing rule', () => {
   it('does not police core source', async () => {
     const msgs = await syntaxMessagesFor(
       'const A = () => <Check size={14} />',
-      'src/renderer/components/X.tsx'
+      'packages/core-renderer/src/components/X.tsx'
     )
     expect(msgs.join(' ')).not.toMatch(/Constitution XII/)
   })

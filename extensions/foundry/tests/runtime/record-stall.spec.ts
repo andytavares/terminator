@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { recordStall } from '../../src/runtime/supervision-runtime.ts'
 import { orderDir } from '../../src/data-root.ts'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 const firing = {
   sessionId: 'loose-1',

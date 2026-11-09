@@ -15,7 +15,7 @@ import {
   migrateLineListSettings,
 } from '../../src/state/settings.js'
 import { DEFAULT_ASK_MODEL } from '../../src/forge/converge.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 // What the operator wrote in the settings page, as each reader hands it on.
 

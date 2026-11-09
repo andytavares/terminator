@@ -2,13 +2,13 @@
   "files": [],
   "references": [
     {
-      "path": "./tsconfig.main.json"
+      "path": "./packages/core-main"
     },
     {
-      "path": "./tsconfig.renderer.json"
+      "path": "./packages/core-renderer"
     },
     {
-      "path": "./tsconfig.shared.json"
+      "path": "./packages/core-shared"
     },
     {
       "path": "./packages/extension-ui"

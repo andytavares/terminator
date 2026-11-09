@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { rmSync } from 'fs'
 import { join } from 'path'
 import { createFeedLog } from '../../../src/runtime/feed/feed-log.js'
-import { makeTempDir } from '../../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../../packages/test-support/src/temp-dir'
 
 let dir: string
 beforeEach(() => (dir = makeTempDir('feed-')))

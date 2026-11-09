@@ -1,0 +1,169 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+const mockFetch = vi.fn()
+global.fetch = mockFetch
+
+// jsdom provides localStorage — reset between tests
+beforeEach(() => {
+  localStorage.clear()
+  mockFetch.mockReset()
+})
+
+afterEach(() => {
+  vi.resetModules()
+})
+
+describe('forgetLegacyToken', () => {
+  it('removes the password an older version stored in localStorage', async () => {
+    const { forgetLegacyToken } = await import('../../../src/api/remote-client')
+    localStorage.setItem('remote_token', 'old-password')
+    forgetLegacyToken()
+    expect(localStorage.getItem('remote_token')).toBeNull()
+  })
+})
+
+describe('createTerminal', () => {
+  it('POST /api/terminals with cwd and tabTitle, returns sessionId', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ sessionId: 's1' }),
+    })
+    const { createTerminal } = await import('../../../src/api/remote-client')
+    const result = await createTerminal({ cwd: '/tmp', tabTitle: 'Test' })
+    expect(result.sessionId).toBe('s1')
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/terminals',
+      expect.objectContaining({ method: 'POST' })
+    )
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toEqual({
+      cwd: '/tmp',
+      type: 'human',
+      tabTitle: 'Test',
+    })
+  })
+
+  it('throws when response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 })
+    const { createTerminal } = await import('../../../src/api/remote-client')
+    await expect(createTerminal({ cwd: '/tmp' })).rejects.toThrow('createTerminal failed')
+  })
+})
+
+describe('resizeTerminal', () => {
+  it('POST /api/terminals/:sessionId/resize with cols and rows', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true })
+    const { resizeTerminal } = await import('../../../src/api/remote-client')
+    await resizeTerminal('s1', 120, 40)
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/terminals/s1/resize',
+      expect.objectContaining({ method: 'POST' })
+    )
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toEqual({ cols: 120, rows: 40 })
+  })
+})
+
+describe('getWsTicket', () => {
+  it('returns ticket string on success', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ticket: 'ticket-abc' }),
+    })
+    const { getWsTicket } = await import('../../../src/api/remote-client')
+    const ticket = await getWsTicket('s1')
+    expect(ticket).toBe('ticket-abc')
+  })
+
+  it('throws when response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    const { getWsTicket } = await import('../../../src/api/remote-client')
+    await expect(getWsTicket('s1')).rejects.toThrow('getWsTicket failed')
+  })
+})
+
+describe('listWorkspaces', () => {
+  it('GET /api/workspaces returns workspace array', async () => {
+    const workspaces = [
+      { id: 'w1', name: 'My Workspace', folderPath: '/tmp', color: 'blue', tags: [] },
+    ]
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => workspaces })
+    const { listWorkspaces } = await import('../../../src/api/remote-client')
+    const result = await listWorkspaces()
+    expect(result).toEqual(workspaces)
+  })
+
+  it('throws when response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    const { listWorkspaces } = await import('../../../src/api/remote-client')
+    await expect(listWorkspaces()).rejects.toThrow('listWorkspaces failed')
+  })
+})
+
+describe('listTerminals', () => {
+  it('GET /api/terminals returns terminal session array', async () => {
+    const terminals = [{ sessionId: 's1', cwd: '/tmp', createdAt: '2026-06-19T10:00:00.000Z' }]
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => terminals })
+    const { listTerminals } = await import('../../../src/api/remote-client')
+    const result = await listTerminals()
+    expect(result).toEqual(terminals)
+    expect(mockFetch).toHaveBeenCalledWith('/api/terminals', expect.anything())
+  })
+
+  it('throws when response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    const { listTerminals } = await import('../../../src/api/remote-client')
+    await expect(listTerminals()).rejects.toThrow('listTerminals failed')
+  })
+})
+
+describe('assignTerminalWorkspace', () => {
+  it('PATCH /api/terminals/:sessionId with workspaceId', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+    const { assignTerminalWorkspace } = await import('../../../src/api/remote-client')
+    await assignTerminalWorkspace('s1', 'w1')
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/terminals/s1',
+      expect.objectContaining({ method: 'PATCH' })
+    )
+    const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(opts.body as string)).toEqual({ workspaceId: 'w1' })
+  })
+
+  it('PATCH /api/terminals/:sessionId with null to clear workspaceId', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+    const { assignTerminalWorkspace } = await import('../../../src/api/remote-client')
+    await assignTerminalWorkspace('s2', null)
+    const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(opts.body as string)).toEqual({ workspaceId: null })
+  })
+})
+
+describe('assignTerminalWorkspace — throws when PATCH response is not ok', () => {
+  it('throws when PATCH response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+    const { assignTerminalWorkspace } = await import('../../../src/api/remote-client')
+    await expect(assignTerminalWorkspace('s-missing', 'w1')).rejects.toThrow('404')
+  })
+})
+
+describe('credentials', () => {
+  it('sends the session cookie and no Authorization header', async () => {
+    const { listWorkspaces } = await import('../../../src/api/remote-client')
+    localStorage.setItem('remote_token', 'old-password')
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [] })
+    await listWorkspaces()
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(options.credentials).toBe('same-origin')
+    expect(new Headers(options.headers).has('Authorization')).toBe(false)
+  })
+
+  it('sends the user back to the login page on 401', async () => {
+    const replace = vi.fn()
+    vi.stubGlobal('location', { ...window.location, replace })
+    const { listWorkspaces } = await import('../../../src/api/remote-client')
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    await expect(listWorkspaces()).rejects.toThrow('401')
+    expect(replace).toHaveBeenCalledWith('/')
+  })
+})

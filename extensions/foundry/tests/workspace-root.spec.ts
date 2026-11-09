@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { resolveFoundryDataRoot } from '../src/workspace-root.js'
-import { partialFake } from '../../../tests/support/fakes'
+import { partialFake } from '../../../packages/test-support/src/fakes'
 
 // Every case names its own folders: the resolver memoises on the setting and
 // the workspace, so two cases sharing both would read each other's answer.

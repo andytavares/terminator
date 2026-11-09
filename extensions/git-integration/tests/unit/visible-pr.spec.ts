@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { visiblePr } from '../../src/review/visible-pr'
 import type { PrChangedFile, PrReviewDetail } from '../../src/schemas/pr-review.schema'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 function file(path: string, level: 'low' | 'high'): PrChangedFile {
   return partialFake<PrChangedFile>({

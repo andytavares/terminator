@@ -9,7 +9,7 @@ When you update the extension scaffold template (`generateIndex`), enforce these
 1. **IPC handlers** belong in the backend entry (`src/index.js`). Register them with `api.ipc.registerHandler({ channel: '${id}:channel', schema, invalid, run })`: a `ChannelSpec` with a zod `schema`. The core has accepted only this form since SDK 3.0 (ADR 096). Put zod in the extension's own `package.json`.
 2. **Renderer calls to own channels** go through `window.electronAPI.extensionBridge.invoke('${id}:channel', payload)`. Never use a named method on `window.electronAPI`.
 3. **Never add new namespaces to `window.electronAPI`**. The preload is core-only. Extensions use `extensionBridge`.
-4. **Never modify core files**: `src/main/preload.ts`, `src/extension-frame/frame-shim.ts`, `src/shared/electron-api/manifest.ts`, `src/main/ipc/*.ts`.
+4. **Never modify core files**: `packages/core-main/src/preload.ts`, `packages/core-renderer/extension-frame/frame-shim.ts`, `packages/core-shared/src/electron-api/manifest.ts`, `packages/core-main/src/ipc/*.ts`.
 5. **Put NPM dependencies in the extension's own `package.json`**, not the root.
 6. **Never import from other extensions, or from core source**. Import only `@terminator/extension-sdk`, `@terminator/extension-ui` and the extension's own npm packages (`npm run lint` enforces it). Extensions cannot reach each other: SDK 6.0.0 removed `extensionDependencies` and `api.extensions.get` (ADR 133).
 

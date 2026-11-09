@@ -6,7 +6,7 @@ import { vendingDecorX, wallDecorX, whiteboardX } from '../../../src/factory/art
 import { layoutHall, TILE_PX } from '../../../src/factory/layout.js'
 import type { HallMap, HallProp } from '../../../src/factory/layout.js'
 import type { RunGraph } from '../../../src/line/run-graph.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 const FIXTURES = path.join(__dirname, '..', 'fixtures')
 const WALL_KINDS = ['shelves', 'racks', 'statuswall', 'lockers']

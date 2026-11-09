@@ -7,7 +7,7 @@ import { RichContent } from '../../src/components/pr-review/RichContent'
 const mockOpenExternal = vi.fn()
 
 // The sanitising, link and HTML behaviour belongs to the design system's
-// Markdown and is specified in tests/unit/packages/extension-ui/markdown.spec.tsx;
+// Markdown and is specified in packages/extension-ui/tests/unit/markdown.spec.tsx;
 // this file covers what the review UI adds to it.
 beforeEach(() => {
   mockOpenExternal.mockResolvedValue({ ok: true })

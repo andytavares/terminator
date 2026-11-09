@@ -9,15 +9,14 @@
 import * as fs from 'node:fs'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
-import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt, writeGraph } from '../../src/state/live-index.js'
 import { checkoutPath } from '../../src/line/worktree.js'
-import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import { writeObservedFiles } from '../../src/line/observed-files.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { runningOrder } from '../helpers/order-parts.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
@@ -38,17 +37,18 @@ afterAll(async () => {
   await deactivate()
 })
 
-/** A records location with two in-flight orders, each with a checkout on disk. */
+/** A records location with two in-flight orders, each with a checkout on disk. Written through the
+ * running Foundry's index: its refinery tick can read the location between two hand-written records. */
 async function seedTwoRunningOrders(): Promise<void> {
   dataDir = makeTempDir('fdry-read-path-')
-  const store = createOrderStore(dataDir)
+  const store = orderStoreAt(dataDir)
   for (const [id, agreedAt] of [
     ['WO-1', '2026-09-06T10:01:00.000Z'],
     ['WO-2', '2026-09-06T10:02:00.000Z'],
   ] as const) {
     const order = runningOrder(id, ['src/a.ts'], { recipe: 'direct', agreedAt })
     await store.save(order)
-    await writeRunGraph(
+    await writeGraph(
       dataDir,
       partialFake<RunGraph>({
         orderId: id,

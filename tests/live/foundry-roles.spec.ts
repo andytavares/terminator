@@ -2,25 +2,31 @@ import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createAgentLog } from '../../src/main/agents/acp/agent-log'
-import { createConnector } from '../../src/main/agents/acp/agent-connection'
-import { createAgentService, type AgentService } from '../../src/main/agents/acp/agent-service'
+import { createAgentLog } from '../../packages/core-main/src/agents/acp/agent-log'
+import { createConnector } from '../../packages/core-main/src/agents/acp/agent-connection'
+import {
+  createAgentService,
+  type AgentService,
+} from '../../packages/core-main/src/agents/acp/agent-service'
 import { proposalJsonSchema } from '../../extensions/foundry/src/order/proposal'
 import { roleSettings, type RoleFacts } from '../../extensions/foundry/src/runtime/role-settings'
 import {
   agentStartInput,
   type StartSupervisedRunOptions,
 } from '../../extensions/foundry/src/runtime/supervised-runner'
-import { makeTempDir, removeTempDirs } from '../support/temp-dir'
+import { makeTempDir, removeTempDirs } from '../../packages/test-support/src/temp-dir'
 
 // Each role's real start options against the real adapter and the signed-in `claude`, closed before
 // any prompt, so it costs no model tokens. Run with `npm run test:live`.
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
-vi.mock('../../src/main/logger', () => ({
+vi.mock('../../packages/core-main/src/logger', () => ({
   makeLogger: () => ({ error: console.error, warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }))
-vi.mock('../../src/main/agents/ask-watcher', () => ({ raiseAsk: vi.fn(), clearAsk: vi.fn() }))
+vi.mock('../../packages/core-main/src/agents/ask-watcher', () => ({
+  raiseAsk: vi.fn(),
+  clearAsk: vi.fn(),
+}))
 
 const NOTHING_ELSE = {
   autonomy: 'standard',

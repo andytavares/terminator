@@ -7,8 +7,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
 import { startSensorTick, stopSensorTick } from '../../src/sensors/sensor-tick.js'
 import { createSignalStore } from '../../src/sensors/store.js'
-import { eventually } from '../../../../tests/support/eventually'
-import { partialFake } from '../../../../tests/support/fakes'
+import { eventually } from '../../../../packages/test-support/src/eventually'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import type { ActivationContext } from '../../src/ipc/register.js'
 
 afterEach(async () => {

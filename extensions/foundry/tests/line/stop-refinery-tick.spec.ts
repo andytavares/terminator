@@ -11,8 +11,8 @@ import { agreedLineOrder } from '../helpers/line-run.js'
 import { startRefineryTick, stopRefineryTick } from '../../src/line/refinery-run.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { orderDir } from '../../src/data-root.js'
-import { eventually } from '../../../../tests/support/eventually'
-import { partialFake } from '../../../../tests/support/fakes'
+import { eventually } from '../../../../packages/test-support/src/eventually'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import type { ActivationContext } from '../../src/ipc/register.js'
 
 afterEach(async () => {

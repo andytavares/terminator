@@ -1,7 +1,7 @@
 /** Reading an order's ledger the way the store reads it, for specs that wait on or assert it. */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 import { createOrderStore } from '../../src/order/store.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 

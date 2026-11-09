@@ -12,7 +12,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 import { execSucceeded, fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { orderStoreAt } from '../../src/state/live-index.js'

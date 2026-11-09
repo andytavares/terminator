@@ -6,7 +6,7 @@ import { signText } from '../../../src/factory/layout.js'
 import type { RunNode } from '../../../src/line/run-graph.js'
 import { parseRecipe } from '../../../src/recipe/parse.js'
 import { createRecordingPaint } from './paint-fake.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 const RECIPES = path.join(__dirname, '..', '..', '..', 'recipes')
 

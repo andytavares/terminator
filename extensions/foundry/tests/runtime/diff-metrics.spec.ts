@@ -7,7 +7,7 @@ import {
   parseChangedFiles,
   readChangedFiles,
 } from '../../src/runtime/diff-metrics.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 // The diff summary drives two decisions: whether a finished session enters the
 // review queue at all (FR-045), and the >300-line P1 trigger (FR-048).

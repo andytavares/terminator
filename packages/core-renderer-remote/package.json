@@ -1,0 +1,18 @@
+{
+  "name": "@terminator/core-renderer-remote",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The browser and mobile renderer that Remote Control serves",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-renderer-remote-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run packages/core-renderer-remote/"
+  },
+  "dependencies": {
+    "@terminator/core-shared": "1.0.0"
+  },
+  "devDependencies": {
+    "@terminator/test-support": "1.0.0"
+  }
+}

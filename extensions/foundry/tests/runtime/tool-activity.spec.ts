@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { AgentUpdate, AgentsAPI } from '@terminator/extension-sdk'
 import { trackToolActivity } from '../../src/runtime/tool-activity.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 function trackedSession() {
   let send: (update: AgentUpdate) => void = () => undefined

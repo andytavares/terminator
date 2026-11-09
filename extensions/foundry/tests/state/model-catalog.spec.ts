@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { MODEL_ALIASES, modelCatalog } from '../../src/state/model-catalog.js'
 import type { AgentConfigOption, AgentsAPI } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 const modelOption = (options: AgentConfigOption['options']): AgentConfigOption => ({
   id: 'model',

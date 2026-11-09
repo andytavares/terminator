@@ -83,8 +83,8 @@ inside the shell.
   rest, give an element inside it `tabIndex={-1}`.
 
 In a unit test, the DOM supplies only `showModal()`, `close()` and the `cancel`
-event after Escape (`tests/support/native-dialog.ts`). `pressOutside` from
-`tests/support/modal.ts` presses the backdrop. The stories and
+event after Escape (`packages/test-support/src/native-dialog.ts`). `pressOutside` from
+`packages/test-support/src/modal.ts` presses the backdrop. The stories and
 `visual/modal-keys.visual.ts` assert focus and the inert page. `visual/modal-keys.visual.ts` presses real
 keys against the built Storybook.
 

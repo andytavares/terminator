@@ -11,7 +11,10 @@ const eslint = new ESLint({
   overrideConfigFile: path.join(repoRoot, 'eslint.config.mjs'),
 })
 // The first lint of each kind of file also loads the parser and the rules it runs.
-for (const file of ['src/renderer/warm-up.ts', 'src/renderer/WarmUp.tsx']) {
+for (const file of [
+  'packages/core-renderer/src/warm-up.ts',
+  'packages/core-renderer/src/WarmUp.tsx',
+]) {
   await eslint.lintText('export const a = 1\n', { filePath: path.join(repoRoot, file) })
 }
 
@@ -34,15 +37,15 @@ const branchy = `export function branchy(n: number): number {\n${Array.from(
 ).join('')}  return -1\n}\n`
 
 const COVERED = [
-  'src/renderer/components/Example.tsx',
-  'src/renderer-remote/example.ts',
+  'packages/core-renderer/src/components/Example.tsx',
+  'packages/core-renderer-remote/src/example.ts',
   'packages/extension-sdk/src/example.ts',
   'packages/extension-ui/src/Example.tsx',
   'packages/extension-ui/stories/Example.stories.tsx',
   // Specs are linted with type information, so each is a spec a test project includes.
-  'tests/unit/renderer/App.render-count.spec.tsx',
-  'tests/unit/renderer-remote/App.spec.tsx',
-  'tests/unit/ConfirmDialog.spec.tsx',
+  'packages/core-renderer/tests/unit/renderer/App.render-count.spec.tsx',
+  'packages/core-renderer-remote/tests/unit/renderer-remote/App.spec.tsx',
+  'packages/core-renderer/tests/unit/ConfirmDialog.spec.tsx',
   'tests/integration/foundry-portability.spec.ts',
   'tests/unit/lint/size-limits.spec.ts',
   'scripts/perf/example.mts',

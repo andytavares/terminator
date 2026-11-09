@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
 import { hashPassword } from '../../src/server/password-hash'
-import { isPending, unfinishedWork } from '../../../../tests/support/pending'
+import { isPending, unfinishedWork } from '../../../../packages/test-support/src/pending'
 
 import { createRemoteServer } from '../../src/server/remote-server'
 import { WsTicketStore } from '../../src/server/ws-ticket-store'
 import { WsSubscriberManager } from '../../src/server/ws-subscriber-manager'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { createFakePtyManager, type FakePtyManager } from './helpers/fake-pty-manager'
 
 const PASSWORD = 'correct-password'

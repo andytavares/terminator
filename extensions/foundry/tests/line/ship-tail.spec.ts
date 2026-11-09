@@ -12,7 +12,7 @@ import type { CiVerdict, Check } from '../../src/line/ci.js'
 import type { Feedback, NodeState, RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { CiState } from '../../src/line/ci-state.js'
 import type { Recipe } from '../../src/recipe/parse.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 function check(over: Partial<Check> = {}): Check {
   return { name: 'build', bucket: 'pass', link: 'https://x/1', workflow: 'ci', ...over }

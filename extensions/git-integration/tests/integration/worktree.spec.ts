@@ -6,7 +6,7 @@ import { join } from 'path'
 import { ensureReviewWorktree } from '../../src/review/worktree.js'
 import { bindRealShell } from '../unit/support/shell'
 import { GIT_FREE_ENV } from '../unit/support/git-repo'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 const git = (cwd: string, args: string[], input?: string) =>
   execFileSync('git', args, { cwd, env: GIT_FREE_ENV, input, encoding: 'utf-8' }).trim()

@@ -10,9 +10,6 @@
     ".": {
       "entry": [
         "scripts/**/*.{cjs,mjs,mts,js}",
-        // The global declaration of window.electronAPI: tsconfig.renderer.json's
-        // `include` reaches it, no import does.
-        "src/renderer/electron-api.d.ts",
         // Bundled by esbuild from a string: git-integration-contrast.spec.ts:139.
         "tests/e2e/git-integration-contrast.entry.tsx",
         // electron-builder reads its config file by name
@@ -20,8 +17,6 @@
         "electron-builder.cjs",
         // Run by path as the e2e profiles' agent: tests/e2e/helpers.ts (STUB_AGENT).
         "tests/e2e/fixtures/acp-stub-agent.mjs",
-        // Reached only through electron.vite.config.ts's alias for mermaid's ELK chunk.
-        "src/renderer/components/agent/no-elk-layout.ts",
       ],
       // Tools the e2e stubs call on the runner's PATH: openssl makes the stub
       // servers' throwaway CA (tracker-stub.ts, jira-stub.ts) and jq shapes the
@@ -34,22 +29,52 @@
       // bridge route against the core's allowlist, so it imports the server
       // packages that extensions/remote-control/package.json declares.
       // The Claude agent's process runs the adapter by path, resolved with createRequire:
-      // src/main/agents/acp/agent-registry.ts.
+      // packages/core-main/src/agents/acp/agent-registry.ts.
       "ignoreDependencies": [
         "fastify",
         "@fastify/websocket",
         "@agentclientprotocol/claude-agent-acp",
       ],
     },
+    // The core packages import each other, and every workspace's specs import packages/test-support,
+    // by relative path. Each declares those packages so Turborepo's package graph knows which
+    // packages a change reaches.
+    "packages/core-main": {
+      // electron.vite.config.ts's main inputs: the app and the extension host, a utilityProcess.
+      "entry": ["src/index.ts", "src/extensions/host/entry.ts"],
+      "ignoreDependencies": ["@terminator/core-shared", "@terminator/test-support"],
+    },
+    "packages/core-renderer": {
+      "entry": [
+        // Reached only through electron.vite.config.ts's alias for mermaid's ELK chunk.
+        "src/components/agent/no-elk-layout.ts",
+        // vite.config.remote.ts's frameShim input.
+        "extension-frame/frame-shim.ts",
+      ],
+      "ignoreDependencies": ["@terminator/core-shared", "@terminator/test-support"],
+    },
+    "packages/core-renderer-remote": {
+      // The scripts of index.html and mobile.html, built by vite.config.remote.ts.
+      "entry": ["src/main.tsx", "src/mobile.main.tsx"],
+      "ignoreDependencies": ["@terminator/core-shared", "@terminator/test-support"],
+    },
     "packages/extension-ui": {
       "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}"],
       "playwright": { "config": ["playwright.visual.config.ts"] },
       "vitest": { "config": ["vitest.stories.config.ts"] },
+      "ignoreDependencies": ["@terminator/test-support"],
+    },
+    "packages/extension-sdk": {
+      "ignoreDependencies": ["@terminator/test-support"],
+    },
+    "packages/core-shared": {
+      "ignoreDependencies": ["@terminator/test-support"],
     },
     "extensions/*": {
       "entry": ["src/index.ts"],
       "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}"],
       "vite": { "config": ["vite.renderer.config.mts"] },
+      "ignoreDependencies": ["@terminator/test-support"],
     },
     "extensions/git-integration": {
       "entry": ["src/index.ts"],
@@ -57,7 +82,7 @@
       "vite": { "config": ["vite.renderer.config.mts"] },
       // Loaded by path at run time: require.resolve of each grammar's .wasm,
       // src/review/symbols.ts:52.
-      "ignoreDependencies": ["@vscode/tree-sitter-wasm"],
+      "ignoreDependencies": ["@vscode/tree-sitter-wasm", "@terminator/test-support"],
     },
     "extensions/remote-control": {
       "entry": ["src/index.ts"],
@@ -66,6 +91,7 @@
       // The ngrok CLI the user installs; found with `which ngrok`,
       // src/server/ngrok-manager.ts:37.
       "ignoreBinaries": ["ngrok"],
+      "ignoreDependencies": ["@terminator/test-support"],
     },
   },
 }

@@ -12,7 +12,7 @@ import { createOrderStore } from '../../../src/order/store.js'
 import { orderStoreAt } from '../../../src/state/live-index.js'
 
 import { readyDraft } from '../../helpers/forge-turns.js'
-import { eventually } from '../../../../../tests/support/eventually'
+import { eventually } from '../../../../../packages/test-support/src/eventually'
 vi.mock('../../../src/runtime/supervised-runner.js', () => ({
   createSupervisedRunner: () => {
     throw new Error('the runner could not be created')

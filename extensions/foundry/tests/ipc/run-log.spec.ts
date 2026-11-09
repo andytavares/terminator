@@ -9,7 +9,7 @@ import { orderStoreAt, writeGraph } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import type { RunLogLine } from '../../src/ipc/run-log.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))

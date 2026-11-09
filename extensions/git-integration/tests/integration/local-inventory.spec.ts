@@ -6,7 +6,7 @@ import {
   type InventoryShell,
   type WorktreeEntry,
 } from '../../src/git/local-inventory'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 /** A worktree without a `.git` file: nothing to read. */
 const readFileOrNull = async () => null

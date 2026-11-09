@@ -1,7 +1,7 @@
 {
   "name": "@terminator/extension-ui",
   "version": "1.0.0",
-  "description": "The shared UI floor for Terminator: one dialog, one confirmation, one toast, one empty state, one layer scale — used by the core app and every extension.",
+  "description": "The shared UI floor for Terminator: one dialog, one confirmation, one toast, one empty state, one layer scale \u2014 used by the core app and every extension.",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -26,7 +26,10 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test:stories": "vitest run --config vitest.stories.config.ts",
-    "test:visual": "playwright test --config playwright.visual.config.ts"
+    "test:visual": "playwright test --config playwright.visual.config.ts",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-extension-ui-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-extension-ui-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run packages/extension-ui/"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",
@@ -46,6 +49,7 @@
     "@playwright/test": "1.64.1",
     "@storybook/addon-vitest": "10.6.3",
     "@storybook/react-vite": "10.6.3",
+    "@terminator/test-support": "1.0.0",
     "@vitest/browser-playwright": "5.0.5",
     "playwright": "1.64.1",
     "storybook": "10.6.3"

@@ -1,0 +1,18 @@
+{
+  "name": "@terminator/core-shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Types, schemas and helpers the main process and the renderers share",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-shared-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-shared-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "cd ../.. && vitest run packages/core-shared/"
+  },
+  "dependencies": {
+    "@terminator/extension-sdk": "6.3.0"
+  },
+  "devDependencies": {
+    "@terminator/test-support": "1.0.0"
+  }
+}

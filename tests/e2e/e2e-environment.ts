@@ -27,9 +27,9 @@ export function sealedAppEnvironment(
     ...testEnvironment({ ...directories, stubs: [STUB_BIN_DIR] }, inherited),
     // Pins terminal.defaultShell's SHELL fallback to zsh so ZDOTDIR applies on a bash runner too.
     ZDOTDIR: STUB_ZDOTDIR,
-    // Hidden windows that keep drawing, no Dock icon (src/main/background-mode.ts).
+    // Hidden windows that keep drawing, no Dock icon (packages/core-main/src/background-mode.ts).
     TERMINATOR_RUN_IN_BACKGROUND: '1',
-    // The main process announces readiness (src/main/e2e-readiness.ts).
+    // The main process announces readiness (packages/core-main/src/e2e-readiness.ts).
     TERMINATOR_E2E: '1',
   }
 }

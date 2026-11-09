@@ -11,7 +11,7 @@ import type {
   DraftComment,
 } from '../../src/schemas/pr-review.schema'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 const chapterNamed = (id: string, name: string) => partialFake<Chapter>({ id, name })
 

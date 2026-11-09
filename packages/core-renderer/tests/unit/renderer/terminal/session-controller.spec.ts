@@ -1,0 +1,686 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+const { mockDispatchNotification } = vi.hoisted(() => ({ mockDispatchNotification: vi.fn() }))
+vi.mock('../../../../src/lib/notifications', () => ({
+  dispatchNotification: mockDispatchNotification,
+}))
+
+// Capture constructor args + hooks so tests can drive bell/busy/idle events.
+let screenRows: string[] = []
+let screenCursor = 99
+let capturedCtorArgs: Array<{
+  sessionId: string
+  scrollbackLimit: number
+  hooks?: {
+    onBell?: () => void
+    onBusy?: () => void
+    onInput?: (data: string) => void
+    onIdle?: () => void
+    onDispose?: () => void
+  }
+}> = []
+vi.mock('../../../../src/components/terminal/TerminalSession', () => ({
+  TerminalInstance: class MockTerminalInstance {
+    constructor(
+      sessionId: string,
+      scrollbackLimit: number,
+      hooks?: {
+        onBell?: () => void
+        onBusy?: () => void
+        onInput?: (data: string) => void
+        onIdle?: () => void
+        onDispose?: () => void
+      }
+    ) {
+      capturedCtorArgs.push({ sessionId, scrollbackLimit, hooks })
+    }
+    readVisibleRows(): string[] {
+      return screenRows
+    }
+    cursorRow(): number {
+      return screenCursor
+    }
+  },
+}))
+
+import { useSessionStore, type NewSessionRequest } from '../../../../src/stores/session.store'
+import { useWorkspaceStore } from '../../../../src/stores/workspace.store'
+import { leafIds } from '../../../../src/utils/pane-tree'
+import { terminalSessionOf } from '../../../../../test-support/src/renderer-stores'
+import type { TerminalSession } from '../../../../../core-shared/src/types/index'
+import {
+  adoptTerminalSession,
+  createTerminalSession,
+  splitTerminalSession,
+  answerChoice,
+} from '../../../../src/terminal/session-controller'
+
+// The main process's side of the terminal calls. The session store is the
+// real one: what the controller does shows up as the state it leaves there.
+const terminalApi = {
+  create: vi.fn<Window['electronAPI']['terminal']['create']>(),
+  input: vi.fn<Window['electronAPI']['terminal']['input']>(),
+}
+
+const sessionOf = (id: string): TerminalSession | undefined =>
+  useSessionStore.getState().sessions.get(id)
+const activeIn = (projectId: string): string | null =>
+  useSessionStore.getState().getActiveSessionForProject(projectId)
+/** Puts a session in the store as if it had been open a while. */
+const storeSession = (id: string, patch: Partial<TerminalSession> = {}): void =>
+  useSessionStore.setState((s) => ({
+    sessions: new Map(s.sessions).set(id, terminalSessionOf({ id, projectId: 'proj-1', ...patch })),
+  }))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  // A node-project spec: the controller and the store only reach window.electronAPI.
+  vi.stubGlobal('window', { electronAPI: { terminal: terminalApi } })
+  capturedCtorArgs = []
+  screenRows = []
+  screenCursor = 99
+  terminalApi.create.mockResolvedValue({ sessionId: 'session-123' })
+  useSessionStore.setState(useSessionStore.getInitialState(), true)
+  useWorkspaceStore.setState({ activeProjectId: 'other-project' })
+  // The activity throttle reads the wall clock; each spec sets it.
+  vi.useFakeTimers({ toFake: ['Date'], now: 0 })
+})
+
+afterEach(() => {
+  // Every terminal a spec opened is disposed, as closing its tab does, so none outlives it.
+  for (const { hooks } of capturedCtorArgs) hooks?.onDispose?.()
+  vi.useRealTimers()
+})
+
+/** A terminal in proj-1, with whatever a spec changes. */
+function terminalRequest(overrides: Partial<NewSessionRequest> = {}): NewSessionRequest {
+  return {
+    projectId: 'proj-1',
+    type: 'human',
+    title: 'T',
+    cwd: '/repo',
+    scrollbackLimit: 5000,
+    ...overrides,
+  }
+}
+
+describe('createTerminalSession', () => {
+  it('records the session with the given args and returns the id', async () => {
+    const id = await createTerminalSession(
+      terminalRequest({ title: 'My Tab', parentSessionId: 'parent-1' })
+    )
+    expect(id).toBe('session-123')
+    expect(sessionOf('session-123')).toMatchObject({
+      projectId: 'proj-1',
+      type: 'human',
+      tabTitle: 'My Tab',
+      scrollbackLimit: 5000,
+      parentSessionId: 'parent-1',
+    })
+    expect(terminalApi.create).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/repo' }))
+  })
+
+  it('carries the line a resuming terminal opens with', async () => {
+    await createTerminalSession(
+      terminalRequest({ title: 'My Tab', initialCommand: 'claude --resume abc' })
+    )
+    expect(terminalApi.create).toHaveBeenCalledWith(
+      expect.objectContaining({ initialCommand: 'claude --resume abc' })
+    )
+  })
+})
+
+describe('createTerminalSession — reports a terminal that could not start, and opens no tab', () => {
+  // A branch whose worktree was removed outside the app: the main process
+  // refuses the spawn, and the operator gets the folder's name rather than a
+  // tab that opens and instantly dies with nothing in it.
+  it('reports a terminal that could not start, and opens no tab', async () => {
+    terminalApi.create.mockResolvedValueOnce({
+      error: 'CWD_MISSING',
+      message: 'That folder no longer exists: /repo/.worktrees/removed',
+    })
+
+    await expect(createTerminalSession(terminalRequest({ cwd: '/gone' }))).rejects.toThrow(
+      '/repo/.worktrees/removed'
+    )
+
+    expect(mockDispatchNotification).toHaveBeenCalledWith({
+      type: 'error',
+      title: 'Could not open a terminal',
+      message: 'That folder no longer exists: /repo/.worktrees/removed',
+      key: 'terminalStartFailed',
+    })
+    expect(useSessionStore.getState().sessions.size).toBe(0)
+    expect(useSessionStore.getState().terminalInstances.size).toBe(0)
+    expect(activeIn('proj-1')).toBeNull()
+  })
+})
+
+describe('createTerminalSession — stores the instance before activating the session', () => {
+  it('stores the instance before activating the session', async () => {
+    const seen: string[] = []
+    const stop = useSessionStore.subscribe((state) => {
+      if (state.terminalInstances.has('session-123') && !seen.includes('instance'))
+        seen.push('instance')
+      if (
+        state.projectViews.get('proj-1')?.activeSessionId === 'session-123' &&
+        !seen.includes('activate')
+      )
+        seen.push('activate')
+    })
+    await createTerminalSession(terminalRequest())
+    stop()
+    expect(seen).toEqual(['instance', 'activate'])
+  })
+
+  it('constructs the instance with the session id and the scrollback asked for', async () => {
+    await createTerminalSession(terminalRequest({ scrollbackLimit: 7777 }))
+    expect(capturedCtorArgs).toHaveLength(1)
+    expect(capturedCtorArgs[0]).toMatchObject({ sessionId: 'session-123', scrollbackLimit: 7777 })
+  })
+})
+
+describe('createTerminalSession — requests focus for the new session, so its pane grabs the keyboard', () => {
+  it('requests focus for the new session, so its pane grabs the keyboard', async () => {
+    await createTerminalSession(terminalRequest())
+    expect(useSessionStore.getState().focusRequest?.sessionId).toBe('session-123')
+  })
+})
+
+async function createAndGetBell(): Promise<() => void> {
+  await createTerminalSession(terminalRequest({ title: 'My Tab' }))
+  return capturedCtorArgs[0].hooks!.onBell!
+}
+
+describe('bell handling', () => {
+  it('counts and notifies when the session is not the active session', async () => {
+    const bell = await createAndGetBell()
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'some-other-session')
+    bell()
+    expect(sessionOf('session-123')!.bellCount).toBe(1)
+    expect(mockDispatchNotification).toHaveBeenCalledWith({
+      type: 'info',
+      title: 'Terminator',
+      message: 'My Tab needs attention',
+      key: 'terminalBell',
+      sessionId: 'session-123',
+    })
+  })
+
+  it('counts when the session is active but its project is not the active project', async () => {
+    const bell = await createAndGetBell()
+    useWorkspaceStore.setState({ activeProjectId: 'different-project' })
+    bell()
+    expect(activeIn('proj-1')).toBe('session-123')
+    expect(sessionOf('session-123')!.bellCount).toBe(1)
+  })
+
+  it('does nothing when the session is active in the active project', async () => {
+    const bell = await createAndGetBell()
+    useWorkspaceStore.setState({ activeProjectId: 'proj-1' })
+    bell()
+    expect(sessionOf('session-123')!.bellCount).toBeUndefined()
+    expect(mockDispatchNotification).not.toHaveBeenCalled()
+  })
+})
+
+describe('bell handling — does not crash when the session is missing from the store', () => {
+  it('does not crash when the session is missing from the store', async () => {
+    const bell = await createAndGetBell()
+    useSessionStore.setState({ sessions: new Map() })
+    expect(() => bell()).not.toThrow()
+    expect(useSessionStore.getState().sessions.size).toBe(0)
+    expect(mockDispatchNotification).not.toHaveBeenCalled()
+  })
+})
+
+const layoutOf = (projectId: string) => useSessionStore.getState().getPaneLayout(projectId)
+
+describe('splitTerminalSession', () => {
+  it('does nothing when there is no focused or active session', async () => {
+    await splitTerminalSession('proj-1', 'horizontal', { cwd: '/repo', scrollbackLimit: 5000 })
+    expect(terminalApi.create).not.toHaveBeenCalled()
+    expect(layoutOf('proj-1')).toBeNull()
+  })
+
+  it('creates a session pinned to the focused session and splits the pane', async () => {
+    storeSession('focused-1')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'focused-1')
+    await splitTerminalSession('proj-1', 'vertical', { cwd: '/repo', scrollbackLimit: 5000 })
+    expect(sessionOf('session-123')).toMatchObject({
+      projectId: 'proj-1',
+      parentSessionId: 'focused-1',
+    })
+    expect(useSessionStore.getState().getTerminalInstance('session-123')).toBeDefined()
+    expect(layoutOf('proj-1')).toMatchObject({ type: 'split', direction: 'vertical' })
+    expect(leafIds(layoutOf('proj-1')!)).toEqual(['focused-1', 'session-123'])
+    expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('session-123')
+  })
+})
+
+describe('splitTerminalSession — splits the focused pane of the split on screen, not the active tab', () => {
+  it('splits the focused pane of the split on screen, not the active tab', async () => {
+    storeSession('root-1')
+    storeSession('pane-1', { parentSessionId: 'root-1' })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'root-1')
+    useSessionStore
+      .getState()
+      .activateSplit('proj-1', { targetId: 'root-1', newId: 'pane-1', direction: 'vertical' })
+    await splitTerminalSession('proj-1', 'horizontal', { cwd: '/repo', scrollbackLimit: 5000 })
+    expect(sessionOf('session-123')!.parentSessionId).toBe('root-1')
+    expect(leafIds(layoutOf('proj-1')!)).toEqual(['root-1', 'pane-1', 'session-123'])
+  })
+})
+
+describe('splitTerminalSession — pins to the focused session root when the focused session is itself a split child', () => {
+  it('pins to the focused session root when the focused session is itself a split child', async () => {
+    storeSession('child-1', { parentSessionId: 'root-1' })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'child-1')
+    await splitTerminalSession('proj-1', 'horizontal', { cwd: '/repo', scrollbackLimit: 5000 })
+    expect(sessionOf('session-123')!.parentSessionId).toBe('root-1')
+  })
+
+  it('falls back to the active session when nothing is focused', async () => {
+    storeSession('active-9')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'active-9')
+    await splitTerminalSession('proj-1', 'horizontal', { cwd: '/repo', scrollbackLimit: 5000 })
+    expect(layoutOf('proj-1')).toMatchObject({ type: 'split', direction: 'horizontal' })
+    expect(leafIds(layoutOf('proj-1')!)).toEqual(['active-9', 'session-123'])
+  })
+
+  it('wires the same bell handling into split instances', async () => {
+    storeSession('focused-1')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'focused-1')
+    await splitTerminalSession('proj-1', 'horizontal', { cwd: '/repo', scrollbackLimit: 5000 })
+    useSessionStore.getState().renameSession('session-123', 'Split Tab')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'focused-1')
+    capturedCtorArgs[0].hooks!.onBell!()
+    expect(sessionOf('session-123')!.bellCount).toBe(1)
+    expect(mockDispatchNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Split Tab needs attention' })
+    )
+  })
+})
+
+// A supervised agent's terminal is spawned in main; without an xterm instance its store
+// record never mounts, and the project opens empty.
+const adopted = {
+  sessionId: 'terminal-1',
+  projectId: 'proj-1',
+  tabTitle: 'feat/x',
+  scrollbackLimit: 5000,
+}
+
+describe('adoptTerminalSession', () => {
+  it('records the session', () => {
+    adoptTerminalSession(adopted)
+    expect(sessionOf('terminal-1')).toMatchObject({
+      projectId: 'proj-1',
+      tabTitle: 'feat/x',
+      scrollbackLimit: 5000,
+      type: 'agent',
+    })
+  })
+
+  it('builds the xterm instance, without which no pane ever mounts', () => {
+    adoptTerminalSession(adopted)
+    expect(capturedCtorArgs).toEqual([
+      expect.objectContaining({ sessionId: 'terminal-1', scrollbackLimit: 5000 }),
+    ])
+    expect(useSessionStore.getState().getTerminalInstance('terminal-1')).toBeDefined()
+  })
+
+  it('shows it when the project has nothing selected', () => {
+    adoptTerminalSession(adopted)
+    expect(activeIn('proj-1')).toBe('terminal-1')
+  })
+
+  it('does not steal focus from the terminal being read', () => {
+    // A supervised run starting in the background used to yank the operator
+    // away from whatever they had open in that project.
+    storeSession('the-one-being-read')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'the-one-being-read')
+    adoptTerminalSession(adopted)
+    expect(activeIn('proj-1')).toBe('the-one-being-read')
+  })
+})
+
+describe('adoptTerminalSession — an agent tab', () => {
+  it('stores an agent tab as one and builds no xterm for it', () => {
+    adoptTerminalSession({ ...adopted, surface: 'agent' })
+    expect(sessionOf('terminal-1')).toMatchObject({ surface: 'agent' })
+    expect(capturedCtorArgs).toEqual([])
+    expect(useSessionStore.getState().getTerminalInstance('terminal-1')).toBeUndefined()
+    expect(activeIn('proj-1')).toBe('terminal-1')
+  })
+})
+
+describe('adoptTerminalSession — does nothing for a session it already has, so a repeat is not a second tab', () => {
+  it('does nothing for a session it already has, so a repeat is not a second tab', () => {
+    storeSession('terminal-1', { tabTitle: 'feat/x', type: 'human' })
+    adoptTerminalSession(adopted)
+    expect(sessionOf('terminal-1')!.type).toBe('human')
+    expect(capturedCtorArgs).toEqual([])
+  })
+
+  it('wires bell, busy and idle exactly as a terminal the operator opened', () => {
+    vi.useFakeTimers()
+    try {
+      adoptTerminalSession(adopted)
+      capturedCtorArgs[0].hooks?.onBusy?.()
+      capturedCtorArgs[0].hooks?.onIdle?.()
+      expect(sessionOf('terminal-1')!.busy).toBe(true)
+      vi.advanceTimersByTime(3500)
+      expect(sessionOf('terminal-1')!.busy).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// onBusy fires on every PTY output chunk. Without a throttle a chatty agent
+// would write to the store — and re-render the sidebar — per chunk.
+async function busyHookFor(sessionId: string) {
+  terminalApi.create.mockResolvedValue({ sessionId })
+  await createTerminalSession(terminalRequest({ type: 'agent', title: 'A' }))
+  const hooks = capturedCtorArgs.at(-1)!.hooks!
+  return hooks.onBusy!
+}
+
+/** Counts the store writes that move a session's activity stamp. */
+function countStamps(): { of: (id: string) => number[] } {
+  const stamps = new Map<string, number[]>()
+  useSessionStore.subscribe((state, previous) => {
+    for (const [id, session] of state.sessions) {
+      const before = previous.sessions.get(id)?.lastActivityAt
+      if (before !== session.lastActivityAt)
+        stamps.set(id, [...(stamps.get(id) ?? []), session.lastActivityAt])
+    }
+  })
+  return { of: (id) => stamps.get(id) ?? [] }
+}
+
+describe('activity stamping throttle (FR-002)', () => {
+  it('writes once for a burst of output inside one second', async () => {
+    const onBusy = await busyHookFor('s1')
+    const stamps = countStamps()
+    vi.setSystemTime(1_000)
+    for (let i = 0; i < 100; i++) onBusy()
+    expect(stamps.of('s1')).toEqual([1_000])
+  })
+
+  it('writes again once the clock passes one second', async () => {
+    const onBusy = await busyHookFor('s1')
+    const stamps = countStamps()
+    vi.setSystemTime(1_000)
+    onBusy()
+    vi.setSystemTime(2_001)
+    onBusy()
+    expect(stamps.of('s1')).toEqual([1_000, 2_001])
+  })
+
+  it('writes again exactly at the one-second boundary — "at most once per second" allows it', async () => {
+    const onBusy = await busyHookFor('s1')
+    const stamps = countStamps()
+    vi.setSystemTime(1_000)
+    onBusy()
+    vi.setSystemTime(2_000)
+    onBusy()
+    expect(stamps.of('s1')).toEqual([1_000, 2_000])
+  })
+})
+
+describe('activity stamping throttle (FR-002) — suppresses a write one millisecond short of the boundary', () => {
+  it('suppresses a write one millisecond short of the boundary', async () => {
+    const onBusy = await busyHookFor('s1')
+    const stamps = countStamps()
+    vi.setSystemTime(1_000)
+    onBusy()
+    vi.setSystemTime(1_999)
+    onBusy()
+    expect(stamps.of('s1')).toEqual([1_000])
+  })
+
+  it('throttles each session independently', async () => {
+    const first = await busyHookFor('s1')
+    const second = await busyHookFor('s2')
+    const stamps = countStamps()
+    vi.setSystemTime(5_000)
+    first()
+    second()
+    expect(stamps.of('s1')).toEqual([5_000])
+    expect(stamps.of('s2')).toEqual([5_000])
+  })
+})
+
+describe('activity stamping throttle (FR-002) — a disposed terminal', () => {
+  it('forgets a terminal once it is disposed, so one reopened on its session stamps at once', async () => {
+    const first = await busyHookFor('s1')
+    vi.setSystemTime(1_000)
+    first()
+    capturedCtorArgs.at(-1)!.hooks!.onDispose!()
+    const reopened = await busyHookFor('s1')
+    const stamps = countStamps()
+    vi.setSystemTime(1_500)
+    reopened()
+    expect(stamps.of('s1')).toEqual([1_500])
+  })
+})
+
+describe('activity stamping throttle (FR-002) — still marks the session busy on every chunk — only the stamp is throttled', () => {
+  it('still marks the session busy on every chunk — only the stamp is throttled', async () => {
+    vi.setSystemTime(1_000)
+    const onBusy = await busyHookFor('s1')
+    onBusy()
+    useSessionStore.getState().setSessionIdle('s1')
+    onBusy()
+    expect(sessionOf('s1')!.busy).toBe(true)
+  })
+
+  it('stamps activity when the session goes idle so the last byte counts', async () => {
+    vi.setSystemTime(9_000)
+    terminalApi.create.mockResolvedValue({ sessionId: 's1' })
+    await createTerminalSession(terminalRequest({ type: 'agent', title: 'A' }))
+    const hooks = capturedCtorArgs.at(-1)!.hooks!
+    hooks.onIdle!()
+    expect(sessionOf('s1')!.lastActivityAt).toBe(9_000)
+  })
+})
+
+const PROMPT_ROWS = [
+  '⏺ Write(a.txt)',
+  ' Do you want to create a.txt?',
+  ' ❯ 1. Yes',
+  '   2. No',
+  ' Esc to cancel',
+  '',
+]
+const PROMPT = {
+  question: 'Do you want to create a.txt?',
+  options: [
+    { number: 1, label: 'Yes' },
+    { number: 2, label: 'No' },
+  ],
+}
+
+describe('reading a choice prompt off the screen (054) — forgets the prompt as soon as output moves again', () => {
+  it('forgets the prompt as soon as output moves again', async () => {
+    await createTerminalSession(terminalRequest())
+    screenRows = PROMPT_ROWS
+    capturedCtorArgs[0].hooks!.onIdle!()
+    screenRows = ['⏺ Wrote 1 line to a.txt', '']
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(sessionOf('session-123')!.latestLine).toBe('⏺ Wrote 1 line to a.txt')
+    expect(sessionOf('session-123')!.choicePrompt).toBeUndefined()
+  })
+})
+
+describe('reading a choice prompt off the screen (054) — refreshes the latest line of a session that never settles, once a second', () => {
+  it('refreshes the latest line of a session that never settles, once a second', async () => {
+    await createTerminalSession(terminalRequest())
+    screenRows = ['17:02:21 14 passed', '']
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(sessionOf('session-123')!.latestLine).toBe('17:02:21 14 passed')
+    screenRows = ['17:02:22 15 passed', '']
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(sessionOf('session-123')!.latestLine).toBe('17:02:21 14 passed')
+    vi.setSystemTime(1000)
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(sessionOf('session-123')!.latestLine).toBe('17:02:22 15 passed')
+  })
+
+  it('reads the latest line from above the cursor', async () => {
+    await createTerminalSession(terminalRequest())
+    screenRows = ['$ pnpm test', '14 passed, 2 failed', 'me@host $ ', '']
+    screenCursor = 2
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(sessionOf('session-123')!.latestLine).toBe('14 passed, 2 failed')
+  })
+})
+
+async function busySession(): Promise<NonNullable<(typeof capturedCtorArgs)[0]['hooks']>> {
+  await createTerminalSession(terminalRequest())
+  const hooks = capturedCtorArgs[0].hooks!
+  hooks.onBusy!()
+  return hooks
+}
+
+/** The hooks every "working hold before idle (058)" describe registers. */
+function setUpWorkingHoldBeforeIdle(): void {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+}
+
+describe('working hold before idle (058)', () => {
+  setUpWorkingHoldBeforeIdle()
+
+  it('reads the screen at settle but stays busy until the hold elapses', async () => {
+    const hooks = await busySession()
+    screenRows = ['$ pnpm test', '  14 passed, 2 failed', '', '']
+    hooks.onIdle!()
+    expect(sessionOf('session-123')!.latestLine).toBe('14 passed, 2 failed')
+    expect(sessionOf('session-123')!.busy).toBe(true)
+    vi.advanceTimersByTime(3499)
+    expect(sessionOf('session-123')!.busy).toBe(true)
+    vi.advanceTimersByTime(1)
+    expect(sessionOf('session-123')!.busy).toBe(false)
+  })
+
+  it('a choice prompt on screen is reported immediately at settle, before the hold', async () => {
+    const hooks = await busySession()
+    screenRows = PROMPT_ROWS
+    hooks.onIdle!()
+    expect(sessionOf('session-123')).toMatchObject({
+      latestLine: 'Esc to cancel',
+      choicePrompt: PROMPT,
+      busy: true,
+    })
+  })
+})
+
+describe('working hold before idle (058) — a busy event inside the hold cancels the pending idle', () => {
+  setUpWorkingHoldBeforeIdle()
+
+  it('a busy event inside the hold cancels the pending idle', async () => {
+    const hooks = await busySession()
+    hooks.onIdle!()
+    vi.advanceTimersByTime(2000)
+    hooks.onBusy!()
+    vi.advanceTimersByTime(3500)
+    expect(sessionOf('session-123')!.busy).toBe(true)
+  })
+
+  it('disposing the instance clears its pending idle timer', async () => {
+    const hooks = await busySession()
+    hooks.onIdle!()
+    hooks.onDispose!()
+    vi.advanceTimersByTime(3500)
+    expect(sessionOf('session-123')!.busy).toBe(true)
+  })
+})
+
+/** The hooks every "answerChoice (054)" describe registers. */
+function setUpAnswerChoice054(): void {
+  beforeEach(async () => {
+    terminalApi.create.mockResolvedValue({ sessionId: 's1' })
+    await createTerminalSession(terminalRequest({ projectId: 'p', title: 'claude' }))
+    screenRows = PROMPT_ROWS
+    capturedCtorArgs[0].hooks!.onIdle!()
+  })
+}
+
+describe('answerChoice (054)', () => {
+  setUpAnswerChoice054()
+
+  it('types the option number when the prompt is still on screen', () => {
+    expect(answerChoice('s1', 2)).toBe(true)
+    expect(terminalApi.input).toHaveBeenCalledWith('s1', '2')
+  })
+
+  it('sends nothing and drops the buttons when the prompt has changed', () => {
+    screenRows = PROMPT_ROWS.map((r) => r.replace('2. No', '2. No, and tell Claude why'))
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(terminalApi.input).not.toHaveBeenCalled()
+    expect(sessionOf('s1')!.choicePrompt).toBeUndefined()
+    expect(sessionOf('s1')!.latestLine).toBe('Esc to cancel')
+  })
+})
+
+describe('answerChoice (054) — sends nothing', () => {
+  setUpAnswerChoice054()
+
+  it.each([
+    {
+      when: 'the prompt has gone',
+      arrange: () => (screenRows = ['⏺ Done.', '']),
+      option: 1,
+    },
+    { when: 'the prompt does not offer the number', arrange: () => {}, option: 3 },
+    {
+      when: 'the session has no terminal',
+      arrange: () => useSessionStore.setState({ terminalInstances: new Map() }),
+      option: 1,
+    },
+  ])('sends nothing when $when', ({ arrange, option }) => {
+    arrange()
+    expect(answerChoice('s1', option)).toBe(false)
+    expect(terminalApi.input).not.toHaveBeenCalled()
+  })
+})
+
+describe('answerChoice — an agent tab', () => {
+  setUpAnswerChoice054()
+
+  it('never reads or answers the screen of an agent tab', () => {
+    useSessionStore.setState((s) => ({
+      sessions: new Map(s.sessions).set('s1', { ...sessionOf('s1')!, surface: 'agent' }),
+    }))
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(terminalApi.input).not.toHaveBeenCalled()
+  })
+})
+
+describe('createTerminalSession — typing answers a guessed ask', () => {
+  it('clears the bell and the screen choice on a keystroke, but not on a focus report', async () => {
+    await createTerminalSession(terminalRequest())
+    const { hooks } = capturedCtorArgs[0]
+    const choicePrompt = { question: 'Go?', options: [{ number: 1, label: 'Yes' }] }
+    const raise = () =>
+      useSessionStore.setState({
+        sessions: new Map([
+          ['session-123', { ...sessionOf('session-123')!, bellCount: 1, choicePrompt }],
+        ]),
+      })
+    raise()
+    hooks!.onInput!('\x1b[I')
+    expect(sessionOf('session-123')!.bellCount).toBe(1)
+    hooks!.onInput!('y')
+    expect(sessionOf('session-123')!.bellCount).toBeUndefined()
+    expect(sessionOf('session-123')!.choicePrompt).toBeUndefined()
+  })
+})

@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { dispatchChannel } from '@terminator/extension-sdk'
 import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { wrapDb } from '../../../../src/main/db/index'
-import { partialFake } from '../../../../tests/support/fakes'
+import { wrapDb } from '../../../../packages/core-main/src/db/index'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { activate, deactivate } from '../../src/index'
 
 // Notepad's "Re-initialise database" setting: its button runs

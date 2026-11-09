@@ -13,7 +13,7 @@ import { collectableWrites, readRungOutput } from '../../src/line/rung-output.js
 import { roleSettings } from '../../src/runtime/role-settings.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 import { writeFileWithDirs } from '../helpers/files.js'
 
 // The whole chain, with the real role files and the real policy.

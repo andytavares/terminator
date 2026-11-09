@@ -10,13 +10,13 @@ import {
   startCommand,
   startupProblems,
 } from '../../../scripts/smoke-start.mjs'
-import { makeTempDir } from '../../support/temp-dir'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 import { userInfo } from 'node:os'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
 const IDS = ['terminator.notepad', 'terminator.task-vault']
 
-// Lines as src/main/logger.ts writes them.
+// Lines as packages/core-main/src/logger.ts writes them.
 const READY = '2026-10-12T14:00:00.000Z INFO  [main] App ready {"version":"0.1.144"}'
 const activated = (id: string) =>
   `2026-10-12T14:00:01.000Z INFO  [extension-host] Extension ${id} activated`

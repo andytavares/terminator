@@ -13,7 +13,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { ledgerActions } from '../helpers/order-ledger.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 

@@ -12,7 +12,7 @@ import { freshFoundryStorage, idleHome } from '../helpers/foundry-host.js'
 const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { activate, deactivate } from '../../src/index.ts'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
@@ -105,7 +105,7 @@ function paletteApi(): ExtensionAPI {
   })
 }
 
-// Each test activates Foundry afresh: the fake clock only lasts one test (tests/setup.ts), and the
+// Each test activates Foundry afresh: the fake clock only lasts one test (packages/test-support/setup.ts), and the
 // palette's refresh timer is made at activation.
 beforeEach(async () => {
   registered.clear()

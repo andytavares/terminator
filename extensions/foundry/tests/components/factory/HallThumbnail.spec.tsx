@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import { HallThumbnail } from '../../../src/components/factory/HallThumbnail.js'
 import type { RunGraph } from '../../../src/line/run-graph.js'
-import { partialFake } from '../../../../../tests/support/fakes'
+import { partialFake } from '../../../../../packages/test-support/src/fakes'
 
 // The Factory's front door shows a picture, not just text — one still frame
 // of the order's own hall, fetched once it is actually on screen.

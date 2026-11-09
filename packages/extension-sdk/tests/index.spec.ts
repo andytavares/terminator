@@ -9,7 +9,7 @@ import {
   type ChannelSpec,
   type ExtensionAPI,
 } from '@terminator/extension-sdk'
-import { partialFake } from '../../../tests/support/fakes'
+import { partialFake } from '../../test-support/src/fakes'
 
 describe('plural', () => {
   it('keeps the word for one and adds an s for any other count', () => {

@@ -9,8 +9,8 @@ import { parseRecipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { testCriterion } from '../helpers/order-parts.js'
 import { idleExecutorSeams } from './idle-executor-seams.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { eventually } from '../../../../tests/support/eventually'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 // The scheduler starts a node the moment a slot frees, not when the whole wave ends.
 

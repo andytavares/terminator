@@ -220,7 +220,7 @@ Every member of the Extension API now crosses a process boundary. Extension back
   - notification `onClick`
   - command `args`
   - `window.focusSelf`
-- `src/main/extensions/api.ts` implements the declaration. The compiler checks that the two agree.
+- `packages/core-main/src/extensions/api.ts` implements the declaration. The compiler checks that the two agree.
 - The package is source-only TypeScript, like `@terminator/extension-ui`. It has `react`, `react-dom` and `zod` as peer dependencies.
 
 ### Added

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { hallSigns, joinedWords } from '../../src/factory/signs.js'
 import type { HallMap } from '../../src/factory/layout.js'
 import type { BeltTile } from '../../src/factory/belts.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 const tile = (kind: 'split' | 'merge', x: number, y: number): BeltTile => ({
   x,

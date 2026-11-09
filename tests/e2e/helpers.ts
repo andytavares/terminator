@@ -12,9 +12,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sealedAppEnvironment } from './e2e-environment'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
-import { orOnHang } from '../support/hang-bound'
-import { E2E_LAUNCH_HANG_MS, WAIT_BOUND_MS } from '../support/bounds'
-import { createLaunchSteps, type LaunchSteps } from '../support/launch-steps'
+import { orOnHang } from '../../packages/test-support/src/hang-bound'
+import { E2E_LAUNCH_HANG_MS, WAIT_BOUND_MS } from '../../packages/test-support/src/bounds'
+import { createLaunchSteps, type LaunchSteps } from '../../packages/test-support/src/launch-steps'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
@@ -279,7 +279,7 @@ export async function launchApp(
   }
 }
 
-/** Resolves once the main process announces `kind` for `subject` (src/main/e2e-readiness.ts):
+/** Resolves once the main process announces `kind` for `subject` (packages/core-main/src/e2e-readiness.ts):
  * a window's id for `drawn` and `focused`, `<extension id>:<view>` for `ready`. */
 function untilAnnounced(
   app: ElectronApplication,
@@ -319,7 +319,7 @@ async function windowStates(app: ElectronApplication): Promise<string> {
 }
 
 // How long a graceful quit gets before a force-kill: only a hang bound. Quitting stops the
-// extensions, commands and PTYs (src/main/index.ts, before-quit), which took over 5 s on a loaded
+// extensions, commands and PTYs (packages/core-main/src/index.ts, before-quit), which took over 5 s on a loaded
 // CI runner; a SIGKILL then left Electron helpers running past the leftover check (run 42458181074).
 const GRACEFUL_CLOSE_MS = WAIT_BOUND_MS
 // SIGKILL cannot be caught, so the process is gone almost at once; a second is

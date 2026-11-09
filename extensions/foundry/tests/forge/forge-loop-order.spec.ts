@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import type { ArchitectTurn } from '../../src/forge/intake-turn.js'
-import { eventually } from '../../../../tests/support/eventually'
+import { eventually } from '../../../../packages/test-support/src/eventually'
 
 const ledger = vi.hoisted(() => ({
   entries: [] as { action: string }[],

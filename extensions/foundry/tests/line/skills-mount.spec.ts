@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { mountSkills } from '../../src/line/skills-mount.js'
 import type { ResolvedSkill } from '../../src/recipe/resolve.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { makeTempDir } from '../../../../packages/test-support/src/temp-dir'
 
 let root: string
 let mountDir: string

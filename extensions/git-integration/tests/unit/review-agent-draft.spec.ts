@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { dispatchChannel, type AgentsAPI } from '@terminator/extension-sdk'
 import { registerReviewAgentHandlers, type ReviewAgentDeps } from '../../src/ipc/review-agent.ipc'
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 import { bindShellToAnswers } from './support/shell'
 
 vi.mock('electron-store', () => ({ default: class {} }))

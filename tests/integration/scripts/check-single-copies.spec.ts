@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { makeTempDir } from '../../support/temp-dir'
+import { makeTempDir } from '../../../packages/test-support/src/temp-dir'
 
 const script = join(__dirname, '../../../scripts/check-single-copies.mjs')
 

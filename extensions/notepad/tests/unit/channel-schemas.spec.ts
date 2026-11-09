@@ -8,7 +8,7 @@ vi.mock('../../src/db/db', async (importOriginal) => ({
 }))
 
 import { activate } from '../../src/index.ts'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 const disposable = { dispose: () => {} }
 

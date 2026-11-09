@@ -18,7 +18,7 @@
 - [ ] `npm run lint` passes
 - [ ] `npm run test` passes (coverage ≥ 80%)
 - [ ] `npm run build:extensions` succeeds
-- [ ] New IPC channels added to `extensions/foundry/IPC-CHANNELS.md` (Foundry) and `src/shared/electron-api/manifest.ts`
+- [ ] New IPC channels added to `extensions/foundry/IPC-CHANNELS.md` (Foundry) and `packages/core-shared/src/electron-api/manifest.ts`
 - [ ] README / docs updated if user-facing behavior changed
 - [ ] No `console.log` left in production paths
 

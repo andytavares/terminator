@@ -4,7 +4,7 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { autonomyFor, letAutoModeDecide, lighterRedTeam } from '../../src/state/settings.js'
 import { integrateDepsFor } from '../../src/line/ship-deps.js'
 import { noteUntrackedDataRoot } from '../../src/workspace-root.js'
-import { partialFake } from '../../../../tests/support/fakes'
+import { partialFake } from '../../../../packages/test-support/src/fakes'
 
 // Each Foundry setting the operator changes, read where the Line, the Forge or
 // activation reads it, with the value the operator chose rather than the default.

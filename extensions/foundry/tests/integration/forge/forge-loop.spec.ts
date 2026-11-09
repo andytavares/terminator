@@ -28,7 +28,7 @@ import {
 } from '../../helpers/forge-turns.js'
 import { ledgerActions, untilLedgerHas } from '../../helpers/order-ledger.js'
 import { theRunner } from '../../helpers/supervision-mocks.js'
-import { eventually } from '../../../../../tests/support/eventually'
+import { eventually } from '../../../../../packages/test-support/src/eventually'
 
 vi.mock(
   '../../../src/runtime/supervised-runner.js',

@@ -22,7 +22,7 @@ import { writeObservedFiles } from '../../../src/line/observed-files.js'
 import { checkoutPath } from '../../../src/line/worktree.js'
 import { theRunner } from '../../helpers/supervision-mocks.js'
 import { ledgerActions } from '../../helpers/order-ledger.js'
-import { eventually } from '../../../../../tests/support/eventually'
+import { eventually } from '../../../../../packages/test-support/src/eventually'
 
 vi.mock(
   '../../../src/runtime/supervised-runner.js',
@@ -91,7 +91,7 @@ async function mergeFirst(): Promise<void> {
   merged.add(pullOf('WO-1'))
 }
 
-// Each test activates Foundry afresh: the fake clock only lasts one test (tests/setup.ts), and the
+// Each test activates Foundry afresh: the fake clock only lasts one test (packages/test-support/setup.ts), and the
 // interval the minute ticks run on is made at activation.
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-refinery-order')
