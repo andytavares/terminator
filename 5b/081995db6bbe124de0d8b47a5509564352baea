@@ -1,0 +1,124 @@
+apps/termctl/package.json
+  s_75776fa1f8e041::t_9c5976e809592a 1-17
+  s_75776fa1f8e041::t_1cc349184f7dc4 18-23
+apps/termctl/src/bin.ts
+  s_75776fa1f8e041::t_af6c75828ca3cc 1-33
+apps/termctl/src/cli.ts
+  s_75776fa1f8e041::t_a26a9db25f3ecb 1-184
+apps/termctl/src/command-names.ts
+  s_75776fa1f8e041::t_52d6c905075d73 1-59
+apps/termctl/src/confirm.ts
+  s_75776fa1f8e041::t_1791617a44f6f9 1-28
+apps/termctl/src/connect.ts
+  s_75776fa1f8e041::t_6c2a01bfd1a6e6 1-26
+apps/termctl/src/exit-codes.ts
+  s_75776fa1f8e041::t_b0e8849ea73ec1 1-9
+apps/termctl/src/flags.ts
+  s_75776fa1f8e041::t_1f321f92787e77 1-113
+apps/termctl/src/help.ts
+  s_75776fa1f8e041::t_1b74f2baa35fbb 1-70
+apps/termctl/src/output.ts
+  s_75776fa1f8e041::t_17be540891c636 1-63
+apps/termctl/src/socket-location.ts
+  s_75776fa1f8e041::t_cbe363e3f3e8b1 1-17
+apps/termctl/src/socket-transport.ts
+  s_75776fa1f8e041::t_582f09373c7398 1-56
+apps/termctl/src/tui/app.tsx
+  s_75776fa1f8e041::t_c2012609f4d508 1-96
+apps/termctl/src/tui/form.ts
+  s_75776fa1f8e041::t_e289bff3745c4d 1-36
+apps/termctl/src/tui/lists.ts
+  s_75776fa1f8e041::t_440a8ae2bb9a20 1-59
+apps/termctl/src/tui/panes.tsx
+  s_75776fa1f8e041::t_8c37bd18c93131 1-168
+apps/termctl/src/tui/run.tsx
+  s_75776fa1f8e041::t_ffbce5c28f4f81 1-45
+apps/termctl/src/tui/view.ts
+  s_75776fa1f8e041::t_406142fa3f9f2d 1-202
+apps/termctl/tests/fixtures/app-tools.json
+  s_75776fa1f8e041::t_6255b6338f7ada 1-2783
+apps/termctl/tests/integration/bundle.spec.ts
+  s_75776fa1f8e041::t_fde0355b444702 1-53
+apps/termctl/tests/integration/cli.spec.ts
+  s_75776fa1f8e041::t_6b6af2c78e6784 1-122
+apps/termctl/tests/integration/tui.spec.ts
+  s_75776fa1f8e041::t_45ebce05b9f308 1-72
+apps/termctl/tests/unit/cli.spec.ts
+  s_75776fa1f8e041::t_624cd6f3d0bf29 1-153
+apps/termctl/tests/unit/command-names.spec.ts
+  s_75776fa1f8e041::t_32dd94ed9536b9 1-44
+apps/termctl/tests/unit/confirm.spec.ts
+  s_75776fa1f8e041::t_2aa9f58005438f 1-30
+apps/termctl/tests/unit/flags.spec.ts
+  s_75776fa1f8e041::t_6641e5614302d0 1-97
+apps/termctl/tests/unit/help.spec.ts
+  s_75776fa1f8e041::t_b2dd6319d5a93b 1-38
+apps/termctl/tests/unit/output.spec.ts
+  s_75776fa1f8e041::t_67281f0d3ccfea 1-40
+apps/termctl/tests/unit/socket-location.spec.ts
+  s_75776fa1f8e041::t_22a4adb19ca022 1-23
+apps/termctl/tests/unit/tui/row-window.spec.ts
+  s_75776fa1f8e041::t_995fd74348fb09 1-20
+apps/termctl/tests/unit/tui/run.spec.ts
+  s_75776fa1f8e041::t_b87f701d00a060 1-244
+apps/termctl/tsconfig.json
+  s_75776fa1f8e041::t_200123d57e8939 1-14
+apps/termctl/tsconfig.test.json
+  s_75776fa1f8e041::t_85204814aff679 1-6
+docs/user-guide/USER-GUIDE.md
+  s_75776fa1f8e041::t_72e9960a65efa5 29-30,266,284-293
+docs/user-guide/termctl.md
+  s_75776fa1f8e041::t_e2f419134ef7f8 1-72
+electron-builder.cjs
+  s_75776fa1f8e041::t_12e7afbf42fdeb 45-46
+knip.jsonc
+  s_75776fa1f8e041::t_0fad0182583b4f 25,61-65
+packages/core-main/src/index.ts
+  s_75776fa1f8e041::t_dab16ce2a43492 61,67-68,465,473-483
+packages/core-main/src/integrations/termctl-command.ts
+  s_75776fa1f8e041::t_cc9a3744525682 1-111
+packages/core-main/src/ipc/claude-code.ipc.ts
+  s_75776fa1f8e041::t_cfc8296ecf318b 2
+packages/core-main/src/ipc/invoke-table.ts
+  s_75776fa1f8e041::t_cdae15a66bd930 3-9,97-114
+packages/core-main/src/ipc/termctl.ipc.ts
+  s_75776fa1f8e041::t_13f15dc1cbdca3 1-29
+packages/core-main/tests/integration/integrations/termctl-command.spec.ts
+  s_75776fa1f8e041::t_8f1d064ebf53f2 1-100
+packages/core-main/tests/unit/integrations/termctl-command.spec.ts
+  s_75776fa1f8e041::t_f4e1350b76da45 1-29
+packages/core-main/tests/unit/ipc/termctl.ipc.spec.ts
+  s_75776fa1f8e041::t_fe98d9314b877d 1-52
+packages/core-main/tests/unit/mcp/socket-path.spec.ts
+  s_75776fa1f8e041::t_af65fdf4a96bdd 2
+packages/core-renderer/src/components/settings/IntegrationsSettings.tsx
+  s_75776fa1f8e041::t_c0c9ba4b78db8d 3,7-10,314-391,414
+packages/core-renderer/tests/unit/renderer/components/IntegrationsSettings.spec.tsx
+  s_75776fa1f8e041::t_e087b0439c425a 9-12,28-33,60-61,384-449
+packages/core-shared/src/electron-api/manifest.ts
+  s_75776fa1f8e041::t_3580fc60f65296 198-202,1951-1977
+scripts/build-termctl.mjs
+  s_75776fa1f8e041::t_9164ccea9c395a 1-34
+tests/e2e/mcp.spec.ts
+  s_75776fa1f8e041::t_826e673a35165a 9
+tests/unit/config/termctl-resource.spec.ts
+  s_75776fa1f8e041::t_160a8194695d40 1-17
+docs/adr/155-termctl-is-an-mcp-client-shipped-in-the-app.md
+  s_75776fa1f8e041::t_dc109cf5647fe9 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5b081995db6bbe124de0d8b47a5509564352baea",
+  "prompts": {},
+  "sessions": {
+    "s_75776fa1f8e041": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0e6f6173-e406-4b5a-8671-7386b692887c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
