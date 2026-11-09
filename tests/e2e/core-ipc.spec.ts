@@ -220,8 +220,12 @@ async function theViewReachesTheApp(): Promise<void> {
   )
 }
 
-test('an extension view reads the workspace, acts on its repository and ends its terminals', async () => {
-  await theViewReadsTheWorkspace()
-  await theViewActsOnTheRepository()
-  await theViewReachesTheApp()
-})
+test(
+  'an extension view reads the workspace, acts on its repository and ends its terminals',
+  { tag: '@mac' },
+  async () => {
+    await theViewReadsTheWorkspace()
+    await theViewActsOnTheRepository()
+    await theViewReachesTheApp()
+  }
+)

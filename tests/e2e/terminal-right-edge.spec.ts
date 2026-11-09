@@ -206,6 +206,6 @@ const RIGHT_EDGE_STEPS: Steps = [
   ],
 ]
 
-test("a branch's terminal draws up to its right edge and no further", async () => {
+test("a branch's terminal draws up to its right edge and no further", { tag: '@mac' }, async () => {
   for (const [title, body] of RIGHT_EDGE_STEPS) await test.step(title, body)
 })

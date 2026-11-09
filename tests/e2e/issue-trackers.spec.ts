@@ -49,6 +49,9 @@ function linearState(): LinearState {
 test.beforeAll(async () => {
   repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-trackers-repo-'))
   git(repo, 'init', '--quiet', '-b', BRANCH)
+  // Git guesses an identity from the host on macOS only; a Linux runner has none to guess.
+  git(repo, 'config', 'user.email', 'e2e@example.com')
+  git(repo, 'config', 'user.name', 'E2E')
   git(repo, 'commit', '--quiet', '--allow-empty', '-m', 'root')
   stub = await startTrackerStub(linearState())
   handle = await launchApp(undefined, stub.env)

@@ -239,8 +239,12 @@ async function aPromptSurvivesARestart(): Promise<void> {
   )
 }
 
-test('settings change the theme, a workspace, an extension and the terminal, and survive a restart', async () => {
-  await theLookChanges()
-  await extensionsAndWorkspacesChange()
-  await aPromptSurvivesARestart()
-})
+test(
+  'settings change the theme, a workspace, an extension and the terminal, and survive a restart',
+  { tag: '@mac' },
+  async () => {
+    await theLookChanges()
+    await extensionsAndWorkspacesChange()
+    await aPromptSurvivesARestart()
+  }
+)
