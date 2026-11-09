@@ -307,7 +307,8 @@ button.mobile-list__terminal {
 .mobile-report__field textarea {
   width: 100%;
   font: inherit;
-  font-size: 16px;
+  /* iOS Safari zooms into a focused field under 16px. */
+  font-size: var(--tm-font-size-xl);
   color: var(--tm-text-primary);
 }
 

@@ -23,26 +23,36 @@ beforeEach(() => {
 })
 
 async function describeBug(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  await user.type(screen.getByLabelText('Title'), 'Tile frozen')
-  await user.type(screen.getByLabelText('What happened, and what you expected'), 'Stayed grey.')
+  await user.click(screen.getByLabelText('Title'))
+  await user.paste('Tile frozen')
+  await user.click(screen.getByLabelText('What happened, and what you expected'))
+  await user.paste('Stayed grey.')
 }
 
 describe('MobileBugReport, desktop gh signed in', () => {
-  it('warns that the report is public and posts it with the phone’s files', async () => {
-    const user = userEvent.setup()
+  it('warns that the report becomes a public issue', async () => {
+    render(<MobileBugReport onBack={vi.fn()} />)
+
+    expect(await screen.findByText('Posting as @octocat')).toBeTruthy()
+    expect(screen.getByText(/becomes a public issue/)).toBeTruthy()
+  })
+
+  it('posts the report with the phone’s files and shows the new issue', async () => {
+    const user = userEvent.setup({ delay: null })
     submitUploaded.mockResolvedValue({
       ok: true,
       number: 7,
       url: 'https://github.com/o/r/issues/7',
     })
     render(<MobileBugReport onBack={vi.fn()} />)
-    expect(screen.getByText(/becomes a public issue/)).toBeTruthy()
-    expect(await screen.findByText('Posting as @octocat')).toBeTruthy()
-
+    await screen.findByText('Posting as @octocat')
     await describeBug(user)
     await user.upload(screen.getByLabelText('Photos or videos'), new File(['png'], 'IMG_1.png'))
+
     await user.click(screen.getByRole('button', { name: 'Post issue' }))
 
+    // Posting encodes the files first, so wait for the result before checking the request.
+    expect(await screen.findByText('Issue #7 posted')).toBeTruthy()
     expect(submitUploaded).toHaveBeenCalledWith({
       title: 'Tile frozen',
       description: 'Stayed grey.',
@@ -50,7 +60,6 @@ describe('MobileBugReport, desktop gh signed in', () => {
       includeDetails: true,
       uploads: [{ name: 'IMG_1.png', data: btoa('png') }],
     })
-    expect(await screen.findByText('Issue #7 posted')).toBeTruthy()
   })
 })
 
