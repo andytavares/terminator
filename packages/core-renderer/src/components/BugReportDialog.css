@@ -143,12 +143,6 @@
   gap: var(--tm-space-2);
 }
 
-.bug-report__add button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tm-space-1);
-}
-
 .bug-report__details {
   display: flex;
   gap: var(--tm-space-2);

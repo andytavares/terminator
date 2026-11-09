@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type JSX } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Camera, Globe, Paperclip, Video, X } from 'lucide-react'
-import { Checkbox, Dialog, type DialogAction } from '@terminator/extension-ui'
+import { Button, Checkbox, Dialog, type DialogAction } from '@terminator/extension-ui'
 import {
   loadReportFacts,
   type ReportAttachment,
@@ -141,6 +141,24 @@ function AttachmentTile({ file, onRemove }: { file: ReportAttachment; onRemove: 
 
 type AddingFiles = ReturnType<typeof useAddingFiles>
 
+function AddButtons({ adding }: { adding: AddingFiles }) {
+  return (
+    <div className="bug-report__add">
+      <Button
+        size="sm"
+        icon={Camera}
+        onClick={() => void adding.capture()}
+        disabled={adding.capturing}
+      >
+        Capture window
+      </Button>
+      <Button size="sm" icon={Paperclip} onClick={() => void adding.pick()}>
+        Add files
+      </Button>
+    </div>
+  )
+}
+
 function Attachments({ form, adding }: { form: ReportForm; adding: AddingFiles }) {
   const problems = [adding.problem, ...form.attachments.map((a) => a.problem)].filter(Boolean)
   return (
@@ -158,14 +176,7 @@ function Attachments({ form, adding }: { form: ReportForm; adding: AddingFiles }
           {problem}
         </p>
       ))}
-      <div className="bug-report__add">
-        <button type="button" onClick={() => void adding.capture()} disabled={adding.capturing}>
-          <Camera aria-hidden="true" /> Capture window
-        </button>
-        <button type="button" onClick={() => void adding.pick()}>
-          <Paperclip aria-hidden="true" /> Add files
-        </button>
-      </div>
+      <AddButtons adding={adding} />
     </fieldset>
   )
 }
