@@ -101,7 +101,7 @@ const MAC_RUNNER_LIMIT = 5
 /**
  * @typedef {{ name?: string, run?: string, uses?: string, with?: Record<string, unknown> }} Step
  * @typedef {{ 'runs-on'?: string, if?: string, needs?: string | string[], strategy?: Record<string, any>, steps?: Step[] }} Job
- * @typedef {{ on?: { pull_request?: { branches?: string[] } | null }, jobs: Record<string, Job> }} Workflow
+ * @typedef {{ on?: { pull_request?: { branches?: string[] } | null }, env?: Record<string, unknown>, jobs: Record<string, Job> }} Workflow
  */
 
 /** The workflows the policies read: each parsed, each file's text, and the file names. */
@@ -227,6 +227,12 @@ const POLICIES = [
   [
     'ci.yml runs on a pull request into any branch, so a stacked pull request is checked too',
     ({ ci }) => ci.on?.pull_request !== undefined && !ci.on.pull_request?.branches,
+  ],
+  [
+    // npm ci's `prepare` installs the pre-commit hook, which would rerun every check, on a smaller
+    // runner, inside the release's version-bump commit (https://typicode.github.io/husky/how-to.html).
+    'CI installs no git hooks: ci.yml sets HUSKY to 0 for every job',
+    ({ ci }) => String(ci.env?.HUSKY) === '0',
   ],
   [
     'No release.yml: a push to main that passes ci.yml is released by ci.yml (ADR 134)',
