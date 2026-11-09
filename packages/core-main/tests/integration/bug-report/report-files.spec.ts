@@ -59,3 +59,19 @@ describe('report files, handing out and gathering', () => {
     expect(readFileSync(gathered[1], 'utf8')).toBe('video')
   })
 })
+
+describe('report files, uploaded from the phone', () => {
+  it('saves an upload under its own name only, and hands it out', async () => {
+    const reportsDir = makeTempDir('reports-')
+    const files = createReportFiles(reportsDir)
+
+    const upload = await files.saveUpload('../../etc/IMG_2210.MOV', Buffer.from('video'), AT)
+
+    expect(upload).toEqual({
+      path: join(reportsDir, 'uploads', '2026-11-09T14-02-03-004Z', 'IMG_2210.MOV'),
+      name: 'IMG_2210.MOV',
+      bytes: 5,
+    })
+    expect(files.isGranted(upload.path)).toBe(true)
+  })
+})

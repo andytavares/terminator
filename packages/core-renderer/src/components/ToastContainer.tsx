@@ -7,7 +7,7 @@ import { openBugReport } from '../stores/bug-report.store'
 /** An error toast with nothing else to offer offers a bug report about it (ADR 156). A window
  * without bug reports (the remote) offers none. */
 function reportAction(type: string, message: string) {
-  if (type !== 'error' || window.electronAPI?.bugReport === undefined) return undefined
+  if (type !== 'error' || window.electronAPI?.bugReport?.capture === undefined) return undefined
   return { label: 'Report', onSelect: () => openBugReport(`The app said: ${message}\n\n`) }
 }
 

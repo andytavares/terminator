@@ -329,6 +329,13 @@ describe('RemoteServer GET /mobile/ with a ticket', () => {
     expect(allSetCookies(res)).toContain('HttpOnly')
   })
 
+  it('loads the bridge script, so the phone can send a bug report', async () => {
+    vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+    mockTicketStore.consumeTicket.mockReturnValueOnce('__mobile__')
+    const res = await remoteServer.inject({ method: 'GET', url: '/mobile/?t=valid-ticket' })
+    expect(res.body).toContain('remote-shim.js')
+  })
+
   it('returns 503 when renderer is not built (valid ticket)', async () => {
     mockTicketStore.consumeTicket.mockReturnValueOnce('__mobile__')
     failNextRead()

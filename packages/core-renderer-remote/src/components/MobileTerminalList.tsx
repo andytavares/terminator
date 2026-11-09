@@ -17,6 +17,7 @@ interface Props {
   onSelectTerminal: (t: { sessionId: string; cwd: string }) => void
   onCreateTerminal: (workspaceId: string, folderPath: string) => void
   onAssignWorkspace: (sessionId: string, workspaceId: string | null) => void
+  onReportBug: () => void
 }
 
 interface TerminalButtonProps {
@@ -111,7 +112,30 @@ function groupTerminals(workspaces: Workspace[], terminals: TerminalSession[]) {
   return { groups, scratch: terminals.filter((t) => !assigned.has(t.sessionId)) }
 }
 
-export function MobileTerminalList({ workspaces, terminals, ...handlers }: Props) {
+type ListHandlers = Pick<Props, 'onSelectTerminal' | 'onCreateTerminal' | 'onAssignWorkspace'>
+
+interface WorkspaceGroupsProps {
+  groups: ReturnType<typeof groupTerminals>['groups']
+  handlers: ListHandlers
+  consumeLongPress: () => boolean
+}
+
+function WorkspaceGroups({ groups, handlers, consumeLongPress }: WorkspaceGroupsProps) {
+  return (
+    <>
+      {groups.map((group) => (
+        <WorkspaceGroup
+          key={group.ws.id}
+          {...group}
+          {...handlers}
+          consumeLongPress={consumeLongPress}
+        />
+      ))}
+    </>
+  )
+}
+
+export function MobileTerminalList({ workspaces, terminals, onReportBug, ...handlers }: Props) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const openTerminalMenu: OpenMenu = (sessionId, x, y) => setContextMenu({ sessionId, x, y })
   const longPress = useLongPress(openTerminalMenu)
@@ -119,14 +143,11 @@ export function MobileTerminalList({ workspaces, terminals, ...handlers }: Props
 
   return (
     <div className="mobile-list">
-      {groups.map((group) => (
-        <WorkspaceGroup
-          key={group.ws.id}
-          {...group}
-          {...handlers}
-          consumeLongPress={longPress.consumeLongPress}
-        />
-      ))}
+      <WorkspaceGroups
+        groups={groups}
+        handlers={handlers}
+        consumeLongPress={longPress.consumeLongPress}
+      />
       <ScratchTerminals
         terminals={scratch}
         longPress={longPress}
@@ -139,6 +160,9 @@ export function MobileTerminalList({ workspaces, terminals, ...handlers }: Props
         onAssignWorkspace={handlers.onAssignWorkspace}
         onClose={() => setContextMenu(null)}
       />
+      <button type="button" className="mobile-list__report-bug" onClick={onReportBug}>
+        Report a bug
+      </button>
     </div>
   )
 }

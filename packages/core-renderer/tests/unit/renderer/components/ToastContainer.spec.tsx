@@ -77,7 +77,7 @@ describe('ToastContainer — leaves expiry to the store', () => {
 describe('ToastContainer — report an error', () => {
   it('offers to report an error, starting the report with what the toast said', async () => {
     const user = userEvent.setup()
-    installElectronApi({ bugReport: {} })
+    installElectronApi({ bugReport: { capture: vi.fn() } })
     useBugReportStore.setState(useBugReportStore.getInitialState())
     withToasts([{ id: '9', type: 'error', message: 'Push failed' }])
     render(<ToastContainer />)

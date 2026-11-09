@@ -8,8 +8,10 @@ import {
 import type { Workspace, TerminalSession } from './api/remote-client'
 import { MobileTerminalList } from './components/MobileTerminalList'
 import { MobileTerminalView } from './components/MobileTerminalView'
+import { MobileBugReport } from './components/MobileBugReport'
 
-type Route = { view: 'list' } | { view: 'terminal'; sessionId: string; cwd: string }
+type Route =
+  { view: 'list' } | { view: 'terminal'; sessionId: string; cwd: string } | { view: 'report' }
 
 export function MobileApp() {
   const [route, setRoute] = useState<Route>({ view: 'list' })
@@ -28,6 +30,8 @@ export function MobileApp() {
     return <MobileTerminalView sessionId={route.sessionId} cwd={route.cwd} onBack={handleBack} />
   }
 
+  if (route.view === 'report') return <MobileBugReport onBack={() => setRoute({ view: 'list' })} />
+
   return (
     <MobileTerminalList
       workspaces={workspaces}
@@ -38,6 +42,7 @@ export function MobileApp() {
         await assignTerminalWorkspace(sessionId, workspaceId).catch(() => undefined)
         refreshTerminals()
       }}
+      onReportBug={() => setRoute({ view: 'report' })}
     />
   )
 }

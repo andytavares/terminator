@@ -28,6 +28,20 @@ async function saveCapture(reportsDir: string, png: Buffer, at: Date): Promise<R
   return describeFile(path)
 }
 
+/** Writes a file the phone sent to `<reports>/uploads/<timestamp>/`, under its own name only: a
+ * name with folders in it cannot write anywhere else. */
+async function saveUpload(
+  reportsDir: string,
+  { name, data }: { name: string; data: Buffer },
+  at: Date
+) {
+  const folder = join(reportsDir, 'uploads', stamp(at))
+  await mkdir(folder, { recursive: true })
+  const path = join(folder, basename(name))
+  await writeFile(path, data)
+  return describeFile(path)
+}
+
 /** Copies the files into one new folder, `<reports>/<timestamp>/`, and answers their new paths. */
 async function gather(reportsDir: string, paths: readonly string[], at: Date): Promise<string[]> {
   const folder = join(reportsDir, stamp(at))
@@ -47,6 +61,9 @@ export function createReportFiles(reportsDir: string) {
   return {
     /** Writes a PNG of the window to `<reports>/captures/`. */
     saveCapture: async (png: Buffer, at: Date) => grant(await saveCapture(reportsDir, png, at)),
+    /** A file the phone sent with its report. */
+    saveUpload: async (name: string, data: Buffer, at: Date) =>
+      grant(await saveUpload(reportsDir, { name, data }, at)),
     /** Files the user chose in the picker. */
     add: async (paths: readonly string[]) =>
       (await Promise.all(paths.map(describeFile))).map(grant),

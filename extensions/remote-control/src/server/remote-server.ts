@@ -237,7 +237,11 @@ async function sendMobilePage(
   const { reply } = exchange
   if (!admitToSurface(parts, 'mobile', exchange)) return reply.redirect('/')
   try {
-    const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
+    // The bridge gives the phone window.electronAPI, which its bug report posts through.
+    const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8').replace(
+      /<head[^>]*>/i,
+      (m) => `${m}\n    ${SHIM_TAG}`
+    )
     return reply.type('text/html').send(html)
   } catch {
     return reply.status(503).send('Mobile renderer not built. Run: npm run build:remote')

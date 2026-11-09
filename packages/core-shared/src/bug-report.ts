@@ -64,6 +64,11 @@ export interface ReportSubmission {
   files: string[]
 }
 
+/** A report from the phone: its files travel with it, as base64. */
+export interface UploadedReport extends Omit<ReportSubmission, 'files'> {
+  uploads: Array<{ name: string; data: string }>
+}
+
 export interface ReportFailure {
   ok: false
   error: 'SIGNED_OUT' | 'FAILED' | 'VALIDATION_ERROR' | 'CAPTURE_FAILED'
@@ -136,4 +141,21 @@ export function newIssueUrl(report: ReportText): string {
     url = formUrl({ ...report, description: `${description.trimEnd()}${CUT_SHORT}` })
   }
   return url
+}
+
+export interface ReportFacts {
+  status: ReportingStatus | null
+  details: string | null
+}
+
+interface FactsSource {
+  status(): Promise<ReportingStatus>
+  details(): Promise<{ details: string }>
+}
+
+/** Whether gh can post, and the app details the report would carry: what both report screens
+ * show before anything is sent. */
+export async function loadReportFacts(source: FactsSource): Promise<ReportFacts> {
+  const [status, { details }] = await Promise.all([source.status(), source.details()])
+  return { status, details }
 }

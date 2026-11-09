@@ -25,6 +25,7 @@ vi.mock('../../../../src/components/MobileTerminalList', () => ({
     onSelectTerminal,
     onCreateTerminal,
     onAssignWorkspace,
+    onReportBug,
   }: ComponentProps<typeof MobileTerminalList>) => (
     <div>
       <ul aria-label="workspaces">
@@ -42,6 +43,16 @@ vi.mock('../../../../src/components/MobileTerminalList', () => ({
       </button>
       <button onClick={() => onCreateTerminal('w1', '/workspace')}>new terminal</button>
       <button onClick={() => onAssignWorkspace('s1', 'w1')}>assign workspace</button>
+      <button onClick={onReportBug}>report a bug</button>
+    </div>
+  ),
+}))
+
+vi.mock('../../../../src/components/MobileBugReport', () => ({
+  MobileBugReport: ({ onBack }: { onBack: () => void }) => (
+    <div>
+      <span>bug report</span>
+      <button onClick={onBack}>leave report</button>
     </div>
   ),
 }))
@@ -159,5 +170,19 @@ describe('MobileApp when the server fails — refreshes the terminals after a fa
     await user.click(screen.getByRole('button', { name: 'back' }))
     expect(mockListTerminals).toHaveBeenCalledTimes(3)
     expect(screen.getByRole('button', { name: 'open terminal' }).textContent).toBe('open terminal')
+  })
+})
+
+describe('MobileApp, bug report', () => {
+  it('opens the bug report from the list, and comes back to the list', async () => {
+    const user = userEvent.setup()
+    const { MobileApp } = await import('../../../../src/MobileApp')
+    render(<MobileApp />)
+
+    await user.click(screen.getByRole('button', { name: 'report a bug' }))
+    expect(screen.getByText('bug report')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'leave report' }))
+
+    expect(screen.getByRole('button', { name: 'report a bug' })).toBeTruthy()
   })
 })

@@ -23,7 +23,7 @@ export interface BugReportDeps {
   run: RunCommand
   /** Where gh runs. Any directory does: every call names the repository. */
   cwd: string
-  files: Pick<ReportFiles, 'saveCapture' | 'add' | 'isGranted' | 'gather'>
+  files: Pick<ReportFiles, 'saveCapture' | 'saveUpload' | 'add' | 'isGranted' | 'gather'>
   /** App and system versions, as the report carries them. */
   appDetails: () => string
   /** A PNG of the window the report was started from; null when there is none. */
@@ -45,6 +45,16 @@ const ReportSchema = z.object({
 })
 
 type ReportInput = z.infer<typeof ReportSchema>
+
+/** A report from the phone, whose files arrive with it as base64: the phone cannot hand main a
+ * path. Five files of up to 10 MB stay well inside the remote bridge's message limit. */
+const UploadedReportSchema = ReportSchema.omit({ files: true }).extend({
+  uploads: z
+    .array(z.object({ name: z.string().min(1).max(200), data: z.string().max(14_000_000) }))
+    .max(5),
+})
+
+type UploadedReport = z.infer<typeof UploadedReportSchema>
 
 const invalid = { ok: false, error: 'VALIDATION_ERROR', message: 'The report could not be read.' }
 
@@ -86,6 +96,19 @@ async function submit(input: ReportInput, deps: BugReportDeps) {
   })
   if (filed.ok) recordUsage({ feature: 'core.bug-report.post', via: 'click' })
   return filed
+}
+
+async function submitUploaded({ uploads, ...report }: UploadedReport, deps: BugReportDeps) {
+  const decoded = uploads.map(({ name, data }) => ({ name, data: Buffer.from(data, 'base64') }))
+  const problem = decoded
+    .map(({ name, data }) => attachmentProblem(name, data.length))
+    .find(Boolean)
+  if (problem) return { ok: false, error: 'VALIDATION_ERROR', message: problem }
+  const at = deps.now()
+  const saved = await Promise.all(
+    decoded.map(({ name, data }) => deps.files.saveUpload(name, data, at))
+  )
+  return submit({ ...report, files: saved.map((file) => file.path) }, deps)
 }
 
 async function openInBrowser(input: ReportInput, deps: BugReportDeps) {
@@ -153,6 +176,12 @@ function sendingChannels(deps: BugReportDeps) {
       schema: ReportSchema,
       invalid,
       run: (input) => submit(input, deps),
+    }),
+    defineChannel({
+      channel: 'bug-report:submit-uploaded',
+      schema: UploadedReportSchema,
+      invalid,
+      run: (input) => submitUploaded(input, deps),
     }),
     defineChannel({
       channel: 'bug-report:open-in-browser',

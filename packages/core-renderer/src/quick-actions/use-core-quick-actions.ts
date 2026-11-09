@@ -290,7 +290,7 @@ function coreActionDeps(
     onToggleSidebarMode: toggleSidebarMode,
     onStartWork: () => useStartWorkStore.getState().openLauncher(),
     onTaskSwitcher: () => useTaskSwitcher.getState().show(),
-    canReportBug: window.electronAPI.bugReport !== undefined,
+    canReportBug: window.electronAPI.bugReport?.capture !== undefined,
     onReportBug: () => openBugReport(),
   }
 }

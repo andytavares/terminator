@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState, type JSX } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Camera, Globe, Paperclip, Video, X } from 'lucide-react'
 import { Checkbox, Dialog, type DialogAction } from '@terminator/extension-ui'
-import type {
-  ReportAttachment,
-  ReportingStatus,
-  ReportSubmission,
+import {
+  loadReportFacts,
+  type ReportAttachment,
+  type ReportFacts,
+  type ReportingStatus,
+  type ReportSubmission,
 } from '../../../core-shared/src/bug-report'
 import { useBugReportStore, type ReportPhase } from '../stores/bug-report.store'
 import { recordUse } from '../usage/record'
@@ -22,14 +24,10 @@ const NOT_READY: Record<Extract<ReportingStatus, { ready: false }>['reason'], st
 }
 
 /** Whether gh can post, and the app details the report would carry. */
-function useReportFacts(): { status: ReportingStatus | null; details: string | null } {
-  const [status, setStatus] = useState<ReportingStatus | null>(null)
-  const [details, setDetails] = useState<string | null>(null)
-  useEffect(() => {
-    void window.electronAPI.bugReport.status().then(setStatus)
-    void window.electronAPI.bugReport.details().then((answer) => setDetails(answer.details))
-  }, [])
-  return { status, details }
+function useReportFacts(): ReportFacts {
+  const [facts, setFacts] = useState<ReportFacts>({ status: null, details: null })
+  useEffect(() => void loadReportFacts(window.electronAPI.bugReport).then(setFacts), [])
+  return facts
 }
 
 /** The report as typed so far, and its files. */

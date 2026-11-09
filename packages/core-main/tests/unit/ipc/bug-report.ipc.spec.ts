@@ -41,6 +41,11 @@ function fakeDeps(): BugReportDeps & { granted: Set<string> } {
         paths.map((path) => (granted.add(path), path === VIDEO.path ? VIDEO : CAPTURE))
       ),
       isGranted: (path: string) => granted.has(path),
+      saveUpload: vi.fn(async (name: string, data: Buffer) => {
+        const file = { path: `/reports/uploads/${name}`, name, bytes: data.length }
+        granted.add(file.path)
+        return file
+      }),
       gather: vi.fn(async (paths: readonly string[]) =>
         paths.map((p) => `/reports/gathered/${p.split('/').pop()}`)
       ),
@@ -216,5 +221,48 @@ describe('bug-report:open-in-browser', () => {
 
     expect(reply).toMatchObject({ ok: false, error: 'VALIDATION_ERROR' })
     expect(deps.openExternal).not.toHaveBeenCalled()
+  })
+})
+
+const upload = (name: string, text: string) => ({
+  name,
+  data: Buffer.from(text).toString('base64'),
+})
+
+describe('bug-report:submit-uploaded', () => {
+  it('saves the phone’s files and files the issue with them', async () => {
+    vi.mocked(deps.run).mockResolvedValue(
+      output({ stdout: 'https://github.com/andytavares/terminator/issues/9\n' })
+    )
+
+    const reply = await handlerFor('bug-report:submit-uploaded')(
+      {},
+      { ...REPORT, files: undefined, uploads: [upload('IMG_1.PNG', 'png')] }
+    )
+
+    expect(reply).toMatchObject({ ok: true, number: 9 })
+    expect(deps.files.saveUpload).toHaveBeenCalledWith(
+      'IMG_1.PNG',
+      Buffer.from('png'),
+      expect.any(Date)
+    )
+    expect(vi.mocked(deps.run).mock.calls[0][0].args).toContain('/reports/uploads/IMG_1.PNG')
+  })
+})
+
+describe('bug-report:submit-uploaded, refused', () => {
+  it('refuses a file GitHub would refuse, saving nothing', async () => {
+    const reply = await handlerFor('bug-report:submit-uploaded')(
+      {},
+      { ...REPORT, uploads: [upload('notes.txt', 'text')] }
+    )
+
+    expect(reply).toEqual({
+      ok: false,
+      error: 'VALIDATION_ERROR',
+      message: 'notes.txt is not an image or a video GitHub accepts.',
+    })
+    expect(deps.files.saveUpload).not.toHaveBeenCalled()
+    expect(deps.run).not.toHaveBeenCalled()
   })
 })
