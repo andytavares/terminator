@@ -62,4 +62,6 @@ flowchart TD
 - **The description is always clamped**, with **Show full description**. A Brief no longer controls the clamp, and `summaryShown` is deleted.
 - **Icons are flat.** Strip, rail and Brief icons take the text colour. A quiet or neutral state is drawn at 60% opacity. This replaces the coloured status icons above. The failing strip cell keeps its tinted background and red label. The Brief is no longer drawn in `--tm-agent`.
 
+- **Attention decides emphasis (2026-11-09).** A strip cell that needs the reviewer (failing or pending checks, conflicts, behind the base, a review requested of you) carries `data-attention="true"` and is semibold amber, or red for a blocker. Every other cell is muted. In the rail, a signal off its calm default (medium or high risk, untested functions, more branches) is semibold in its colour. Review plan rows show the chapter name, then its one-line summary.
+
 The review plan is not clamped, so a PR with many chapters still makes the Change tab long. Summarize keeps its place and behaviour. The renderings are under "Amended" in `docs/research/pr-overview-redesign.html`.
