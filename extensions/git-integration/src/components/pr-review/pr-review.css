@@ -377,10 +377,13 @@
   overflow: visible;
   padding-bottom: 6px;
 }
+/* Row 1: number, name, counts, risk dot, check. Row 2: the summary, under the name, full width. */
 .chapter-nav-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
   width: 100%;
   padding: 10px 12px 6px;
   background: none;
@@ -399,11 +402,7 @@
   font-variant-numeric: tabular-nums;
 }
 .chapter-nav-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
+  display: contents;
 }
 /* Level 2: the chapter's name. */
 .chapter-nav-name {
@@ -412,6 +411,8 @@
   color: var(--tm-text-primary);
 }
 .chapter-nav-summary {
+  grid-column: 2 / -1;
+  grid-row: 2;
   color: var(--tm-text-muted);
   font-size: var(--tm-font-size-sm);
 }
@@ -433,7 +434,7 @@
 .chapter-nav-risk-dot {
   width: 7px;
   height: 7px;
-  margin-top: 5px;
+  align-self: center;
   border-radius: 50%;
   flex-shrink: 0;
 }
