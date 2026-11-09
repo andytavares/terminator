@@ -1,0 +1,32 @@
+# Filled in by Terminator's Help › Report a Bug… when the GitHub CLI cannot post the report
+# (ADR 156). The app fills these fields through URL parameters named after their ids, so keep the
+# ids as they are (tests/integration/github/bug-report-form.spec.ts).
+name: Bug report
+description: Something in Terminator does not work as it should.
+labels: ['bug']
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: input
+    id: opened-from
+    attributes:
+      label: Opened from
+      description: The screen you were on.
+  - type: upload
+    id: attachments
+    attributes:
+      label: Screenshots or videos
+      description: Drag in the files from the Finder window Terminator opened. Up to 10 MB each.
+    validations:
+      required: false
+      accept: '.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov,.webm'
+  - type: textarea
+    id: app-details
+    attributes:
+      label: App details
+      description: The Terminator version, the system version and the installed extensions.
+      render: text
