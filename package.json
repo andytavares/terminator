@@ -51,7 +51,7 @@
     "typecheck:specs": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/typecheck/tsconfig.test.tsbuildinfo -p tsconfig.test.json",
     "build:termctl": "npm run build -w @terminator/termctl",
     "test:root": "TERMINATOR_TESTS=root vitest run",
-    "check:repo": "npm run lint:deps && npm run lint:unused && npm run lint:duplicates && npm run lint:workflows && npm run format:check && turbo run lint:root typecheck:specs test:root test:lint-rules --output-logs=errors-only",
+    "check:repo": "turbo run lint:deps lint:unused lint:duplicates lint:workflows format:check lint:root typecheck:specs test:root test:lint-rules --output-logs=errors-only",
     "check:packages": "turbo run lint typecheck test --output-logs=errors-only",
     "check:packages:ci": "turbo run lint typecheck test:coverage --output-logs=errors-only",
     "test:lint-rules": "vitest run tests/integration/lint/"

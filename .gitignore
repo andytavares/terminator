@@ -32,3 +32,4 @@ playwright-report/
 storybook-static/
 
 .stryker-tmp/
+.turbo/

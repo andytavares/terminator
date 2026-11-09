@@ -25,6 +25,12 @@
     "build-storybook": { "outputs": ["storybook-static/**"] },
     "test:stories": { "dependsOn": ["transit"] },
     "test:visual": { "dependsOn": ["build-storybook"] },
+    // The repository-wide checks no workspace owns; they run side by side, every time.
+    "//#lint:deps": { "cache": false },
+    "//#lint:unused": { "cache": false },
+    "//#lint:duplicates": { "cache": false },
+    "//#lint:workflows": { "cache": false },
+    "//#format:check": { "cache": false },
     "//#typecheck:specs": { "cache": false },
     "//#lint:root": { "cache": false },
     "//#test:root": { "cache": false },
