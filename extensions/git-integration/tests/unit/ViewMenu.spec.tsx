@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ViewMenu } from '../../src/components/pr-review/ViewMenu'
+import { ViewMenu, type FileFilters } from '../../src/components/pr-review/ViewMenu'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 
 vi.mock('@terminator/extension-ui', async (importOriginal) => ({
@@ -30,7 +30,25 @@ function resetStore() {
     fileListHidden: false,
     diffViewMode: 'unified',
     hideFormattingHunks: true,
+    groupBy: 'all',
   })
+}
+
+function fileFilters(over: Partial<FileFilters> = {}): FileFilters {
+  return {
+    focusMode: false,
+    onToggleFocusMode: vi.fn(),
+    ownedCount: 0,
+    ownedOnly: false,
+    onToggleOwnedOnly: vi.fn(),
+    ...over,
+  }
+}
+
+function renderMenu(over: Partial<FileFilters> = {}) {
+  const filters = fileFilters(over)
+  render(<ViewMenu filters={filters} />)
+  return filters
 }
 
 beforeEach(() => {
@@ -40,7 +58,7 @@ beforeEach(() => {
 
 describe('ViewMenu', () => {
   it('opens the popover and shows the default state with no dot', async () => {
-    render(<ViewMenu />)
+    renderMenu()
     expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'View' }))
     expect(screen.getByRole('radiogroup', { name: 'Comment visibility' })).toBeTruthy()
@@ -54,7 +72,7 @@ describe('ViewMenu', () => {
   ])(
     'sets comment visibility to $visibility from the $radioName radio',
     async ({ radioName, visibility }) => {
-      render(<ViewMenu />)
+      renderMenu()
       await userEvent.click(screen.getByRole('button', { name: 'View' }))
       const radio = screen.getByRole('radio', { name: radioName })
       await userEvent.click(radio)
@@ -65,7 +83,7 @@ describe('ViewMenu', () => {
 
   it('shows a dot and "View (changed)" accessible name when a setting is non-default', async () => {
     useReviewUiStore.getState().setAgentNotesOn(false)
-    render(<ViewMenu />)
+    renderMenu()
     expect(screen.getByRole('button', { name: 'View (changed)' })).toBeTruthy()
   })
 })
@@ -73,7 +91,7 @@ describe('ViewMenu', () => {
 describe('ViewMenu — says comments are hidden in the button name, not as separate text', () => {
   it('says comments are hidden in the button name, not as separate text', () => {
     useReviewUiStore.getState().setCommentVisibility('hidden')
-    render(<ViewMenu />)
+    renderMenu()
     expect(screen.queryByText('Comments hidden')).toBeNull()
     const button = screen.getByRole('button', { name: 'View · comments hidden' })
     expect(button.getAttribute('title')).toBe('View · comments hidden')
@@ -87,7 +105,7 @@ describe('ViewMenu — says comments are hidden in the button name, not as separ
     'sets agent notes on to $expectedOn from the $radioName radio',
     async ({ startOn, menuName, radioName, expectedOn }) => {
       useReviewUiStore.getState().setAgentNotesOn(startOn)
-      render(<ViewMenu />)
+      renderMenu()
       await userEvent.click(screen.getByRole('button', { name: menuName }))
       await userEvent.click(screen.getByRole('radio', { name: radioName }))
       expect(useReviewUiStore.getState().agentNotesOn).toBe(expectedOn)
@@ -97,7 +115,7 @@ describe('ViewMenu — says comments are hidden in the button name, not as separ
 
 describe('ViewMenu — diff view mode', () => {
   it('switches diff view mode to Split and back to Unified', async () => {
-    render(<ViewMenu />)
+    renderMenu()
     await userEvent.click(screen.getByRole('button', { name: 'View' }))
     await userEvent.click(screen.getByRole('radio', { name: 'Split' }))
     expect(useReviewUiStore.getState().diffViewMode).toBe('split')
@@ -108,7 +126,7 @@ describe('ViewMenu — diff view mode', () => {
 
 describe('ViewMenu — hide-formatting-hunks switch', () => {
   it('toggles hide-formatting-hunks via the switch', async () => {
-    render(<ViewMenu />)
+    renderMenu()
     await userEvent.click(screen.getByRole('button', { name: 'View' }))
     const toggle = screen.getByRole('switch', { name: /Hide formatting-only hunks/ })
     expect(toggle.getAttribute('aria-checked')).toBe('true')
@@ -118,13 +136,36 @@ describe('ViewMenu — hide-formatting-hunks switch', () => {
   })
 })
 
-describe('ViewMenu — renders the sinceNote when provided', () => {
-  it.each([
-    { sinceNote: 'Showing a1b2… head', noteCount: 1 },
-    { sinceNote: undefined, noteCount: 0 },
-  ])('renders $noteCount sinceNote for sinceNote $sinceNote', async ({ sinceNote, noteCount }) => {
-    render(<ViewMenu sinceNote={sinceNote} />)
+describe('ViewMenu — files group', () => {
+  it('groups the file list by chapters from the saved File list setting', async () => {
+    renderMenu()
     await userEvent.click(screen.getByRole('button', { name: 'View' }))
-    expect(screen.queryAllByText(/Showing/)).toHaveLength(noteCount)
+    await userEvent.click(screen.getByRole('radio', { name: 'Chapters' }))
+    expect(useReviewUiStore.getState().groupBy).toBe('chapters')
+  })
+
+  it('hides the file list from the Show file list switch', async () => {
+    renderMenu()
+    await userEvent.click(screen.getByRole('button', { name: 'View' }))
+    const toggle = screen.getByRole('switch', { name: /Show file list/ })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await userEvent.click(toggle)
+    expect(useReviewUiStore.getState().fileListHidden).toBe(true)
+  })
+
+  it('turns on focus mode and only my files from their switches', async () => {
+    const filters = renderMenu({ ownedCount: 3 })
+    await userEvent.click(screen.getByRole('button', { name: 'View' }))
+    await userEvent.click(screen.getByRole('switch', { name: /Focus mode/ }))
+    await userEvent.click(screen.getByRole('switch', { name: /Only my files/ }))
+    expect(filters.onToggleFocusMode).toHaveBeenCalledTimes(1)
+    expect(filters.onToggleOwnedOnly).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables Only my files and says none owned when the viewer owns no changed file', async () => {
+    renderMenu({ ownedCount: 0 })
+    await userEvent.click(screen.getByRole('button', { name: 'View' }))
+    const toggle = screen.getByRole('switch', { name: /Only my files.*none owned/ })
+    expect(toggle.hasAttribute('disabled')).toBe(true)
   })
 })

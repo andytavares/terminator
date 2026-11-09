@@ -55,11 +55,6 @@ vi.mock('../../src/components/pr-review/DiffLineRows', async (importOriginal) =>
     SplitLineRow: counted(actual.SplitLineRow),
   }
 })
-vi.mock('../../src/components/pr-review/ViewMenu', () => ({
-  ViewMenu: ({ sinceNote }: { sinceNote?: string | null }) => (
-    <div data-testid="view-menu">{sinceNote}</div>
-  ),
-}))
 vi.mock('../../src/components/pr-review/UsesPopover', () => ({
   UsesPopover: ({
     uses,
@@ -581,34 +576,16 @@ describe('ReviewDiffPane — shows loading diff message while fetching', () => {
   })
 })
 
-describe('ReviewDiffPane — shows viewed badge when file is already viewed', () => {
-  it('shows a checked Viewed box for a viewed file and unmarks it on click', async () => {
-    const user = userEvent.setup()
-    const prStore = await useRealPrStore()
-    prStore.setState({ viewedFiles: new Set(['src/foo.ts']) })
-    await renderPane()
-    const box = screen.getByRole('checkbox', { name: 'Viewed' }) as HTMLInputElement
-    expect(box.checked).toBe(true)
-    await user.click(box)
-    expect(prStore.getState().viewedFiles.has('src/foo.ts')).toBe(false)
-    expect(box.checked).toBe(false)
+describe('ReviewDiffPane — section viewed toggle', () => {
+  it('labels each hunk checkbox "Section viewed" on screen, apart from the file Viewed box', async () => {
+    await renderTwoHunks()
+    const boxes = await findFirstHunk()
+    expect(screen.getAllByText('Section viewed')).toHaveLength(boxes.length)
+    expect(screen.queryByText('Viewed')).toBeNull()
   })
 })
 
-describe('ReviewDiffPane — marks the file viewed from the header checkbox without leaving it', () => {
-  it('marks the file viewed from the header checkbox without leaving it', async () => {
-    const user = userEvent.setup()
-    const prStore = await useRealPrStore()
-    const onMarkViewed = vi.fn()
-    await renderPane({ onMarkViewed })
-    const box = screen.getByRole('checkbox', { name: 'Viewed' }) as HTMLInputElement
-    expect(box.checked).toBe(false)
-    await user.click(box)
-    expect(prStore.getState().viewedFiles.has('src/foo.ts')).toBe(true)
-    expect(box.checked).toBe(true)
-    expect(onMarkViewed).not.toHaveBeenCalled()
-  })
-
+describe('ReviewDiffPane — risk', () => {
   it('calls onShowRisk when the Why? button is clicked', async () => {
     const user = userEvent.setup()
     const onShowRisk = vi.fn()
@@ -1574,7 +1551,6 @@ describe('ReviewDiffPane — fetch and render cost', () => {
     })
     const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
     view.rerender(<ReviewDiffPane {...defaultProps} />)
-    expect(await screen.findByRole('checkbox', { name: 'Viewed' })).toHaveProperty('checked', true)
     expect(mockPrFileDiff).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('Loading diff…')).toBeNull()
     expect(screen.getByText(codeLine('const viewedMark = 1'))).toBeTruthy()

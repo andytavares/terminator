@@ -60,6 +60,50 @@
   animation: pr-spin 0.7s linear infinite;
 }
 
+/* Opening a pull request: the busy row's action, the pop-out's opening screen, and why it failed. */
+.rd-row[aria-busy='true'] .tmui-button__icon,
+.pr-open-spinner {
+  animation: pr-spin 0.7s linear infinite;
+}
+.pr-open-failure {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 16px 10px;
+  color: var(--tm-danger);
+  font-size: var(--tm-font-size-sm);
+}
+.pr-open-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  color: var(--tm-text-muted);
+  text-align: center;
+}
+.pr-open-screen h3 {
+  margin: 0;
+  color: var(--tm-text-primary);
+  font-size: var(--tm-font-size-md);
+}
+.pr-open-screen p {
+  margin: 0;
+  font-size: var(--tm-font-size-sm);
+}
+.pr-open-spinner {
+  width: 20px;
+  height: 20px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rd-row[aria-busy='true'] .tmui-button__icon,
+  .pr-open-spinner {
+    animation: none;
+  }
+}
+
 /* Filter pills */
 
 /* Search, open/closed and age: the three controls that scope the list, on the
@@ -318,36 +362,78 @@
   font-size: var(--tm-font-size-md);
 }
 
-/* ─── Rail: Files | Chapters ─────────────────────────────────────────────── */
+/* ─── ChapterNav: one outline of chapter headers, the current one's files under it ── */
 
-.pr-rail-chapters .chapter-nav-meta {
-  margin-left: auto;
-}
-
-/* ─── ChapterNav ──────────────────────────────────────────────────────────── */
-
-/* The design system's vertical tab list draws each tab; this lays out a chapter's row. */
-.chapter-nav-tab {
+.chapter-nav {
   display: flex;
-  width: 100%;
-  gap: 6px;
-  white-space: normal;
+  flex-direction: column;
+  overflow-y: auto;
+  flex: 1;
 }
+.chapter-nav-group + .chapter-nav-group {
+  border-top: 1px solid var(--tm-border);
+}
+.chapter-nav-group .file-tree {
+  overflow: visible;
+  padding-bottom: 6px;
+}
+.chapter-nav-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-sm);
+}
+.chapter-nav-header:hover {
+  background: var(--tm-overlay-subtle);
+}
+.chapter-nav-num {
+  min-width: 14px;
+  color: var(--tm-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.chapter-nav-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+/* Level 2: the chapter's name. */
 .chapter-nav-name {
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tm-text-primary);
+}
+.chapter-nav-summary {
+  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-sm);
 }
 .chapter-nav-meta {
-  font-size: var(--tm-font-size-xs);
+  white-space: nowrap;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 .chapter-nav-check {
-  font-size: var(--tm-font-size-xs);
+  display: inline-flex;
   color: var(--tm-success);
+}
+.chapter-nav-check svg {
+  width: 12px;
+  height: 12px;
 }
 
 .chapter-nav-risk-dot {
   width: 7px;
   height: 7px;
+  margin-top: 5px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -359,39 +445,6 @@
 }
 .chapter-nav-risk-dot--high {
   background: var(--tm-danger);
-}
-
-/* ─── ChapterFileList ─────────────────────────────────────────────────────── */
-
-.chapter-file-list {
-  overflow-y: auto;
-  flex: 1;
-}
-
-.chapter-file-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  cursor: pointer;
-  font-size: var(--tm-font-size-sm);
-  border-bottom: 1px solid var(--tm-border);
-  user-select: none;
-  transition: background 0.1s;
-}
-.chapter-file-row:hover {
-  background: var(--tm-overlay-subtle);
-}
-/* The selected row is a solid accent fill with white text (WCAG 1.4.11, 1.4.3). */
-.chapter-file-row--active,
-.chapter-file-row--active:hover {
-  background: var(--tm-accent);
-}
-.chapter-file-row--active {
-  color: #fff;
-}
-.chapter-file-row--drag-over {
-  border-top: 2px solid var(--tm-accent);
 }
 
 /* ─── ReviewDiffPane ──────────────────────────────────────────────────────── */

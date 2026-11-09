@@ -48,7 +48,6 @@ function baseProps(overrides: Partial<ReviewHeaderProps> = {}): ReviewHeaderProp
     onAskAgent: vi.fn(),
     onRefresh: vi.fn(),
     refreshing: false,
-    onToggleFileList: vi.fn(),
     onOpenKeyboardHelp: vi.fn(),
     onClose: vi.fn(),
     ...overrides,
@@ -87,14 +86,18 @@ describe('ReviewHeader (continued) — checks pill', () => {
     expect(screen.getByRole('button', { name: /1 of 2 checks pending/i })).toBeTruthy()
   })
 
-  it('shows passing count when all pass', () => {
+  it('is a quiet "Checks pass" status, not a pill, when every check passes', () => {
     render(<ReviewHeader {...baseProps({ checks: passing })} />)
-    expect(screen.getByRole('button', { name: /2 checks passing/i })).toBeTruthy()
+    const status = screen.getByRole('button', { name: 'Checks pass' })
+    expect(status.classList.contains('rh-pill')).toBe(false)
   })
 
-  it('uses the singular "check" for a single passing check', () => {
-    render(<ReviewHeader {...baseProps({ checks: [{ name: 'only', state: 'pass' }] })} />)
-    expect(screen.getByRole('button', { name: /1 check passing/i })).toBeTruthy()
+  it.each([
+    { checks: failing, name: /1 of 2 checks failing/i, tone: 'rh-pill--fail' },
+    { checks: pending, name: /1 of 2 checks pending/i, tone: 'rh-pill--pending' },
+  ])('is the warning pill when a check is not passing ($tone)', ({ checks, name, tone }) => {
+    render(<ReviewHeader {...baseProps({ checks })} />)
+    expect(screen.getByRole('button', { name }).classList.contains(tone)).toBe(true)
   })
 })
 
@@ -181,7 +184,7 @@ describe('ReviewHeader (continued)', () => {
 
     it('says how many files are viewed and how long is left', () => {
       render(<ReviewHeader {...baseProps({ viewedCount: 4, totalFiles: 23, minutesLeft: 26 })} />)
-      expect(screen.getByText('4 of 23 viewed · about 26 min left')).toBeTruthy()
+      expect(screen.getByText('4 of 23 viewed · 26 min left')).toBeTruthy()
     })
 
     it('leaves the time out when nothing is left to read', () => {
@@ -228,23 +231,23 @@ describe('ReviewHeader (continued) — More menu', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
   })
 
-  it('opens a menu with role=menu and calls onToggleFocusMode, closing after', async () => {
+  it('lists only actions, no settings', async () => {
     const user = userEvent.setup()
-    const onToggleFocusMode = vi.fn()
-    render(<ReviewHeader {...baseProps({ onToggleFocusMode })} />)
+    render(<ReviewHeader {...baseProps({ onShowOverview: vi.fn(), onPopOut: vi.fn() })} />)
     await openMenu(user)
-    expect(screen.getByRole('menu')).toBeTruthy()
-    await user.click(screen.getByRole('menuitemcheckbox', { name: /focus mode/i }))
-    expect(onToggleFocusMode).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('menu')).toBeNull()
+    const items = within(screen.getByRole('menu')).getAllByRole('menuitem')
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Overviewi',
+      'Pause review',
+      'Refresh pull request',
+      'Pop out',
+      'Keyboard shortcuts?',
+    ])
   })
 
-  it('shows "On" next to Focus mode item when focusMode is true', async () => {
-    const user = userEvent.setup()
-    render(<ReviewHeader {...baseProps({ focusMode: true })} />)
-    await openMenu(user)
-    const item = screen.getByRole('menuitemcheckbox', { name: /focus mode.*on/i })
-    expect(item.getAttribute('aria-checked')).toBe('true')
+  it('holds the View menu in the header', () => {
+    render(<ReviewHeader {...baseProps()} />)
+    expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
   })
 })
 
@@ -265,34 +268,24 @@ describe('ReviewHeader (continued) — More menu — calls onShowOverview and cl
     await openMenu(user)
     expect(screen.queryByRole('menuitem', { name: /overview/i })).toBeNull()
   })
-
-  it('calls onToggleFileList for Hide file list and closes', async () => {
-    const user = userEvent.setup()
-    const onToggleFileList = vi.fn()
-    render(<ReviewHeader {...baseProps({ onToggleFileList })} />)
-    await openMenu(user)
-    await user.click(screen.getByRole('menuitem', { name: /hide file list/i }))
-    expect(onToggleFileList).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('menu')).toBeNull()
-  })
 })
 
-describe('ReviewHeader (continued) — More menu — calls onRefresh for Refresh PR and closes', () => {
-  it('calls onRefresh for Refresh PR and closes', async () => {
+describe('ReviewHeader (continued) — More menu — calls onRefresh for Refresh pull request and closes', () => {
+  it('calls onRefresh for Refresh pull request and closes', async () => {
     const user = userEvent.setup()
     const onRefresh = vi.fn()
     render(<ReviewHeader {...baseProps({ onRefresh })} />)
     await openMenu(user)
-    await user.click(screen.getByRole('menuitem', { name: /refresh pr/i }))
+    await user.click(screen.getByRole('menuitem', { name: /refresh pull request/i }))
     expect(onRefresh).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
-  it('disables Refresh PR while refreshing', async () => {
+  it('disables Refresh pull request while refreshing', async () => {
     const user = userEvent.setup()
     render(<ReviewHeader {...baseProps({ refreshing: true })} />)
     await openMenu(user)
-    const item = screen.getByRole('menuitem', { name: /refresh pr/i })
+    const item = screen.getByRole('menuitem', { name: /refresh pull request/i })
     expect(item.hasAttribute('disabled')).toBe(true)
   })
 })
@@ -369,24 +362,6 @@ describe('ReviewHeader — submit and pause', () => {
 })
 
 describe('ReviewHeader — only my files', () => {
-  it('counts the files the viewer owns and toggles the filter from the More menu', async () => {
-    const user = userEvent.setup()
-    const onToggleOwnedOnly = vi.fn()
-    render(<ReviewHeader {...baseProps({ ownedCount: 3, onToggleOwnedOnly })} />)
-    await openMenu(user)
-    const item = screen.getByRole('menuitemcheckbox', { name: /only my files.*3/i })
-    await user.click(item)
-    expect(onToggleOwnedOnly).toHaveBeenCalledTimes(1)
-  })
-
-  it('is disabled when the viewer owns no changed file', async () => {
-    const user = userEvent.setup()
-    render(<ReviewHeader {...baseProps({ ownedCount: 0 })} />)
-    await openMenu(user)
-    const item = screen.getByRole('menuitemcheckbox', { name: /only my files/i })
-    expect(item.hasAttribute('disabled')).toBe(true)
-  })
-
   it('shows a pressed pill while the filter is on, and turns it off on click', async () => {
     const user = userEvent.setup()
     const onToggleOwnedOnly = vi.fn()

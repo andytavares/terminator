@@ -1,9 +1,8 @@
 import React from 'react'
 import { Flame } from 'lucide-react'
 import { plural } from '@terminator/extension-sdk'
-import { ViewMenu } from '../ViewMenu'
 import { UsesPopover } from '../UsesPopover'
-import type { PrChangedFile, PrHead, ReadingStep } from '../../../schemas/pr-review.schema'
+import type { PrChangedFile, ReadingStep } from '../../../schemas/pr-review.schema'
 import { splitPath } from '../../text'
 import './file-header.css'
 
@@ -11,15 +10,13 @@ type ReadingStepUse = ReadingStep['uses'][number]
 
 export interface FileHeaderProps {
   file: PrChangedFile
-  head: PrHead
-  isViewed: boolean
   viewedFiles: Set<string>
   showChangedSince: boolean
   usesWithDef: ReadingStepUse[]
+  /** Which head the diff shows, when it is not the pull request's latest. */
   menuNote: string | null
   onShowRisk: () => void
   onPeekDefinition: () => void
-  setViewed: (head: PrHead, path: string, viewed: boolean) => void
 }
 
 function FileTitle(props: { file: PrChangedFile }) {
@@ -57,23 +54,6 @@ function ChangedSince() {
     <span className="fh-changed" title="Changed since you viewed">
       Changed since you viewed
     </span>
-  )
-}
-
-function ViewedToggle(props: FileHeaderProps) {
-  const { file, head, isViewed } = props
-  return (
-    <label className="fh-viewed">
-      <input
-        type="checkbox"
-        checked={isViewed}
-        onChange={() => props.setViewed(head, file.path, !isViewed)}
-      />
-      Viewed
-      <kbd className="tmui-kbd" aria-hidden="true">
-        v
-      </kbd>
-    </label>
   )
 }
 
@@ -125,8 +105,7 @@ export function FileHeader(props: FileHeaderProps) {
         <RiskChip file={file} onShowRisk={props.onShowRisk} />
         {props.showChangedSince && <ChangedSince />}
         <span className="fh-spacer" />
-        <ViewMenu sinceNote={props.menuNote} />
-        <ViewedToggle {...props} />
+        {props.menuNote && <span className="fh-note">{props.menuNote}</span>}
       </div>
       <WhyHere {...props}>
         {uses.length > 0 && <span className="fh-sep">·</span>}

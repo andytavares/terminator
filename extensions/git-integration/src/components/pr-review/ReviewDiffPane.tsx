@@ -342,28 +342,18 @@ function menuNote(pane: PaneState): string | null {
   return pane.w.view.loaded.sinceNote ?? historyNote
 }
 
-function toggleFileViewed(store: ReviewStore) {
-  return (head: PrHead, path: string, viewed: boolean) => {
-    if (viewed) store.markFileViewed(head, path)
-    else store.unmarkFileViewed(head, path)
-  }
-}
-
 function PaneHeader({ pane, props }: { pane: PaneState; props: Props }) {
   const { store, ui } = pane.w
   const { file } = props
   return (
     <FileHeader
       file={file}
-      head={pane.ctx.head}
-      isViewed={store.viewedFiles.has(file.path)}
       viewedFiles={store.viewedFiles}
       showChangedSince={store.changedSince.has(file.path) && ui.diffRange === 'since'}
       usesWithDef={pane.usesWithDef}
       menuNote={menuNote(pane)}
       onShowRisk={props.onShowRisk}
       onPeekDefinition={pane.nav.peekDefinition}
-      setViewed={toggleFileViewed(store)}
     />
   )
 }

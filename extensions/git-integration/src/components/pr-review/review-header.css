@@ -44,9 +44,10 @@
   flex-shrink: 0;
 }
 
+/* Level 1: the title, with Submit review the only other emphasised control. */
 .rh-title {
-  font-size: var(--tm-font-size-sm);
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--tm-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -130,7 +131,7 @@
 
 .rh-progress-text {
   font-size: var(--tm-font-size-sm);
-  color: var(--tm-text-secondary);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -228,4 +229,26 @@
   padding: 0 6px;
   border-radius: 999px;
   line-height: 17px;
+}
+
+/* Passing checks are level 3: a dot and muted text, until a check fails or is pending. */
+.rh-checks-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-muted);
+}
+.rh-checks-quiet:hover {
+  color: var(--tm-text-primary);
+}
+.rh-checks-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tm-success);
 }
