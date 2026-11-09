@@ -70,6 +70,7 @@ import { ELECTRON_API_MANIFEST } from '../../../../core-shared/src/electron-api/
 import { registerAppInfoHandlers, registerDialogHandlers } from '../../../src/ipc/app.ipc.js'
 import { registerDbIpcHandlers } from '../../../src/ipc/db.ipc.js'
 import { registerEditorHandlers } from '../../../src/ipc/editor.ipc.js'
+import { registerBugReportHandlers, type BugReportDeps } from '../../../src/ipc/bug-report.ipc.js'
 import { registerExtensionHandlers } from '../../../src/ipc/extension.ipc.js'
 import { registerFsHandlers } from '../../../src/ipc/fs.ipc.js'
 import { registerGitHandlers } from '../../../src/ipc/git.ipc.js'
@@ -94,6 +95,7 @@ function registerEveryCoreHandler(): void {
   registerDialogHandlers(noWindow)
   registerDbIpcHandlers()
   registerEditorHandlers()
+  registerBugReportHandlers(partialFake<BugReportDeps>({}))
   registerExtensionHandlers(partialFake<ExtensionHost>({}), vi.fn())
   registerFsHandlers()
   registerGitHandlers()

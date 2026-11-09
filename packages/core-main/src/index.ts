@@ -70,6 +70,8 @@ import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
 import { stopRunningCommands } from './shell/command-runner.js'
 import { registerEditorHandlers } from './ipc/editor.ipc.js'
+import { registerBugReportHandlers } from './ipc/bug-report.ipc.js'
+import { electronBugReportDeps, setReportSourceWindow } from './bug-report/electron-deps.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { registerLogHandlers } from './ipc/log.ipc.js'
 import { registerNotificationHandlers } from './ipc/notification.ipc.js'
@@ -229,6 +231,14 @@ function openAbout(): void {
   mainWindow?.webContents.send('menu:open-about')
 }
 
+/** Help › Report a Bug…: remembers the window it was chosen in, for "Capture window", and opens
+ * the report in the main window, which draws every dialog (ADR 156). */
+function reportBug(): void {
+  setReportSourceWindow(BrowserWindow.getFocusedWindow() ?? mainWindow)
+  mainWindow?.webContents.send('menu:report-bug')
+  if (mainWindow) revealWindow(mainWindow)
+}
+
 function extensionViewMenuItems(): Electron.MenuItemConstructorOptions[] {
   return listNativeViewMenuItems().map(
     (item) =>
@@ -266,6 +276,14 @@ function appNameMenu(): Electron.MenuItemConstructorOptions[] {
   ]
 }
 
+function helpMenu(): Electron.MenuItemConstructorOptions {
+  return buildHelpMenu(app.getName(), {
+    openAbout,
+    openExternal: (url) => void shell.openExternal(url),
+    reportBug,
+  })
+}
+
 function setupMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     ...appNameMenu(),
@@ -292,7 +310,7 @@ function setupMenu(): void {
       (channel, payload) => mainWindow?.webContents.send(channel, payload),
       sessionOfWindow(BrowserWindow.getFocusedWindow())
     ),
-    buildHelpMenu(app.getName(), openAbout, (url) => void shell.openExternal(url)),
+    helpMenu(),
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
@@ -492,6 +510,12 @@ function registerToolHandlers(): void {
   registerDbIpcHandlers()
   registerDialogHandlers(() => mainWindow)
   registerAppHandlers()
+  registerBugReportHandlers(
+    electronBugReportDeps(
+      () => mainWindow,
+      () => extensionHost.listAll()
+    )
+  )
 }
 
 function broadcastToWindows(channel: string, data: unknown): void {
