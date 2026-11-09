@@ -165,6 +165,13 @@ button {
   border-radius: var(--tm-radius-sm);
 }
 
+/* lib/pause-animations.ts marks the root while the window is hidden or out of focus. */
+:root[data-window-idle] *,
+:root[data-window-idle] *::before,
+:root[data-window-idle] *::after {
+  animation-play-state: paused !important;
+}
+
 /* ── Context Menus ───────────────────────────────────────────── */
 .ctx-menu {
   min-width: 160px;
