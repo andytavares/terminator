@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-shared-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-shared-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
-    "lint": "eslint .",
-    "test": "cd ../.. && vitest run packages/core-shared/"
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run packages/core-shared/",
+    "test:coverage": "cd ../.. && vitest run packages/core-shared/ --coverage.enabled --coverage.reportsDirectory=packages/core-shared/coverage"
   },
   "dependencies": {
     "@terminator/extension-sdk": "6.3.0"

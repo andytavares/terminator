@@ -47,7 +47,8 @@
   "license": "MIT",
   "scripts": {
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-extension-sdk-tsconfig.tsbuildinfo -p tsconfig.json",
-    "lint": "eslint .",
-    "test": "cd ../.. && vitest run packages/extension-sdk/"
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run packages/extension-sdk/",
+    "test:coverage": "cd ../.. && vitest run packages/extension-sdk/ --coverage.enabled --coverage.reportsDirectory=packages/extension-sdk/coverage"
   }
 }

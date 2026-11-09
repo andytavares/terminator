@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-renderer-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-renderer-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
-    "lint": "eslint .",
-    "test": "cd ../.. && vitest run packages/core-renderer/"
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run packages/core-renderer/",
+    "test:coverage": "cd ../.. && vitest run packages/core-renderer/ --coverage.enabled --coverage.reportsDirectory=packages/core-renderer/coverage"
   },
   "dependencies": {
     "@terminator/core-shared": "1.0.0",

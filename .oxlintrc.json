@@ -1,0 +1,574 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "react"],
+  "jsPlugins": [
+    "./scripts/oxlint-plugin/index.mjs",
+    {
+      "name": "react-hooks-js",
+      "specifier": "eslint-plugin-react-hooks"
+    }
+  ],
+  "categories": {
+    "correctness": "off"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2020": true
+  },
+  "options": {
+    "typeAware": true
+  },
+  "ignorePatterns": [
+    "**/dist/",
+    "**/out/",
+    "**/build/",
+    "**/storybook-static/",
+    "**/coverage/",
+    ".worktrees/",
+    ".venv/",
+    ".claude/",
+    "**/*.min.js",
+    "extensions/*/src/index.js"
+  ],
+  "rules": {
+    "constructor-super": "error",
+    "for-direction": "error",
+    "getter-return": "error",
+    "no-async-promise-executor": "error",
+    "no-case-declarations": "error",
+    "no-class-assign": "error",
+    "no-compare-neg-zero": "error",
+    "no-cond-assign": "error",
+    "no-const-assign": "error",
+    "no-constant-binary-expression": "error",
+    "no-constant-condition": "error",
+    "no-control-regex": "error",
+    "no-debugger": "error",
+    "no-delete-var": "error",
+    "no-dupe-class-members": "error",
+    "no-dupe-else-if": "error",
+    "no-dupe-keys": "error",
+    "no-duplicate-case": "error",
+    "no-empty": "error",
+    "no-empty-character-class": "error",
+    "no-empty-pattern": "error",
+    "no-empty-static-block": "error",
+    "no-ex-assign": "error",
+    "no-extra-boolean-cast": "error",
+    "no-fallthrough": "error",
+    "no-func-assign": "error",
+    "no-global-assign": "error",
+    "no-import-assign": "error",
+    "no-invalid-regexp": "error",
+    "no-irregular-whitespace": "error",
+    "no-loss-of-precision": "error",
+    "no-misleading-character-class": "error",
+    "no-new-native-nonconstructor": "error",
+    "no-nonoctal-decimal-escape": "error",
+    "no-obj-calls": "error",
+    "no-prototype-builtins": "error",
+    "no-redeclare": "error",
+    "no-regex-spaces": "error",
+    "no-self-assign": "error",
+    "no-setter-return": "error",
+    "no-shadow-restricted-names": "error",
+    "no-sparse-arrays": "error",
+    "no-this-before-super": "error",
+    "no-unassigned-vars": "error",
+    "no-undef": "error",
+    "no-unexpected-multiline": "error",
+    "no-unreachable": "error",
+    "no-unsafe-finally": "error",
+    "no-unsafe-negation": "error",
+    "no-unsafe-optional-chaining": "error",
+    "no-unused-labels": "error",
+    "no-unused-private-class-members": "error",
+    "no-useless-assignment": "error",
+    "no-useless-backreference": "error",
+    "no-useless-catch": "error",
+    "no-useless-escape": "error",
+    "no-with": "error",
+    "preserve-caught-error": "error",
+    "require-yield": "error",
+    "use-isnan": "error",
+    "valid-typeof": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-array-constructor": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-unused-expressions": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/prefer-namespace-keyword": "error",
+    "typescript/triple-slash-reference": "error",
+    "typescript/no-explicit-any": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "react-hooks-js/static-components": "error",
+    "react-hooks-js/use-memo": "error",
+    "react-hooks-js/preserve-manual-memoization": "error",
+    "react-hooks-js/incompatible-library": "warn",
+    "react-hooks-js/immutability": "error",
+    "react-hooks-js/globals": "error",
+    "react-hooks-js/refs": "error",
+    "react-hooks-js/set-state-in-effect": "error",
+    "react-hooks-js/error-boundaries": "error",
+    "react-hooks-js/purity": "error",
+    "react-hooks-js/set-state-in-render": "error",
+    "react-hooks-js/unsupported-syntax": "warn",
+    "react-hooks-js/config": "error",
+    "react-hooks-js/gating": "error",
+    "terminator/restricted-syntax": ["error", "hex-color-style"],
+    "max-lines-per-function": [
+      "error",
+      {
+        "max": 30,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "complexity": ["error", 10],
+    "max-params": ["error", 3]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.{ts,tsx,mts,cts}"],
+      "rules": {
+        "constructor-super": "off",
+        "getter-return": "off",
+        "no-class-assign": "off",
+        "no-const-assign": "off",
+        "no-dupe-class-members": "off",
+        "no-dupe-keys": "off",
+        "no-func-assign": "off",
+        "no-import-assign": "off",
+        "no-new-native-nonconstructor": "off",
+        "no-obj-calls": "off",
+        "no-redeclare": "off",
+        "no-setter-return": "off",
+        "no-this-before-super": "off",
+        "no-undef": "off",
+        "no-unreachable": "off",
+        "no-unsafe-negation": "off",
+        "no-with": "off",
+        "no-var": "error",
+        "prefer-const": "error",
+        "prefer-rest-params": "error",
+        "prefer-spread": "error"
+      }
+    },
+    {
+      "files": ["packages/core-main/src/**/*.ts"],
+      "excludeFiles": [
+        "packages/core-main/src/ipc/invoke-table.ts",
+        "packages/core-main/src/extensions/api.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "./channel-registrar.js",
+                "importNames": ["handleChannel"],
+                "message": "Register invoke channels with registerInvokeTable (ADR 096)."
+              },
+              {
+                "name": "../ipc/channel-registrar.js",
+                "importNames": ["handleChannel"],
+                "message": "Register invoke channels with registerInvokeTable (ADR 096)."
+              },
+              {
+                "name": "./ipc/channel-registrar.js",
+                "importNames": ["handleChannel"],
+                "message": "Register invoke channels with registerInvokeTable (ADR 096)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["extensions/*/src/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@terminator/**",
+                  "!@terminator/extension-sdk",
+                  "!@terminator/extension-sdk/**",
+                  "!@terminator/extension-ui",
+                  "!@terminator/extension-ui/**"
+                ],
+                "message": "An extension imports only @terminator/extension-sdk and @terminator/extension-ui among workspace packages; another extension is reached through its activate() exports (ADR 094)."
+              },
+              {
+                "regex": "^(\\.\\./){2,}",
+                "message": "This path leaves the extension. Import core types and helpers from @terminator/extension-sdk, components from @terminator/extension-ui (Constitution II)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["extensions/*/src/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@terminator/**",
+                  "!@terminator/extension-sdk",
+                  "!@terminator/extension-sdk/**",
+                  "!@terminator/extension-ui",
+                  "!@terminator/extension-ui/**"
+                ],
+                "message": "An extension imports only @terminator/extension-sdk and @terminator/extension-ui among workspace packages; another extension is reached through its activate() exports (ADR 094)."
+              },
+              {
+                "regex": "^(\\.\\./){3,}",
+                "message": "This path leaves the extension. Import core types and helpers from @terminator/extension-sdk, components from @terminator/extension-ui (Constitution II)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["extensions/*/src/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@terminator/**",
+                  "!@terminator/extension-sdk",
+                  "!@terminator/extension-sdk/**",
+                  "!@terminator/extension-ui",
+                  "!@terminator/extension-ui/**"
+                ],
+                "message": "An extension imports only @terminator/extension-sdk and @terminator/extension-ui among workspace packages; another extension is reached through its activate() exports (ADR 094)."
+              },
+              {
+                "regex": "^(\\.\\./){4,}",
+                "message": "This path leaves the extension. Import core types and helpers from @terminator/extension-sdk, components from @terminator/extension-ui (Constitution II)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["extensions/*/src/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@terminator/**",
+                  "!@terminator/extension-sdk",
+                  "!@terminator/extension-sdk/**",
+                  "!@terminator/extension-ui",
+                  "!@terminator/extension-ui/**"
+                ],
+                "message": "An extension imports only @terminator/extension-sdk and @terminator/extension-ui among workspace packages; another extension is reached through its activate() exports (ADR 094)."
+              },
+              {
+                "regex": "^(\\.\\./){5,}",
+                "message": "This path leaves the extension. Import core types and helpers from @terminator/extension-sdk, components from @terminator/extension-ui (Constitution II)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["extensions/*/src/*/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@terminator/**",
+                  "!@terminator/extension-sdk",
+                  "!@terminator/extension-sdk/**",
+                  "!@terminator/extension-ui",
+                  "!@terminator/extension-ui/**"
+                ],
+                "message": "An extension imports only @terminator/extension-sdk and @terminator/extension-ui among workspace packages; another extension is reached through its activate() exports (ADR 094)."
+              },
+              {
+                "regex": "^(\\.\\./){6,}",
+                "message": "This path leaves the extension. Import core types and helpers from @terminator/extension-sdk, components from @terminator/extension-ui (Constitution II)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["extensions/*/src/*/*/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@terminator/**",
+                  "!@terminator/extension-sdk",
+                  "!@terminator/extension-sdk/**",
+                  "!@terminator/extension-ui",
+                  "!@terminator/extension-ui/**"
+                ],
+                "message": "An extension imports only @terminator/extension-sdk and @terminator/extension-ui among workspace packages; another extension is reached through its activate() exports (ADR 094)."
+              },
+              {
+                "regex": "^(\\.\\./){7,}",
+                "message": "This path leaves the extension. Import core types and helpers from @terminator/extension-sdk, components from @terminator/extension-ui (Constitution II)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "tests/**/*.{ts,tsx}",
+        "extensions/*/tests/**/*.{ts,tsx}",
+        "packages/*/tests/**/*.{ts,tsx}",
+        "packages/test-support/**/*.ts"
+      ],
+      "excludeFiles": [
+        "packages/test-support/src/eventually.ts",
+        "packages/test-support/src/hang-bound.ts",
+        "packages/test-support/src/leak-guard.ts"
+      ],
+      "rules": {
+        "terminator/restricted-syntax": ["error", "spec-signals"]
+      }
+    },
+    {
+      "files": ["tests/unit/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/extensions/*/src/**"],
+                "message": "Test an extension's code in extensions/<name>/tests (T-NO-DUPLICATE)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx",
+        "packages/*/tests/**/*.ts",
+        "packages/*/tests/**/*.tsx",
+        "packages/test-support/**/*.ts"
+      ],
+      "rules": {
+        "typescript/no-floating-promises": [
+          "error",
+          {
+            "ignoreVoid": false
+          }
+        ],
+        "typescript/await-thenable": "error",
+        "typescript/no-misused-promises": "error"
+      }
+    },
+    {
+      "files": ["**/*.spec.ts", "**/*.spec.tsx"],
+      "excludeFiles": ["tests/e2e/**"],
+      "plugins": ["eslint", "typescript", "react", "vitest", "jest"],
+      "rules": {
+        "vitest/valid-expect": "error",
+        "vitest/valid-expect-in-promise": "error",
+        "vitest/require-awaited-expect-poll": "error",
+        "vitest/no-focused-tests": "error",
+        "jest/no-done-callback": "error",
+        "vitest/expect-expect": [
+          "error",
+          {
+            "assertFunctionNames": ["expect", "expect*", "assert*", "screen.find*", "within.find*"]
+          }
+        ],
+        "vitest/no-conditional-expect": "error",
+        "vitest/no-standalone-expect": "error",
+        "terminator/restricted-syntax": ["error", "spec-signals", "one-path-per-test"],
+        "vitest/no-disabled-tests": "error"
+      }
+    },
+    {
+      "files": ["**/*.spec.tsx"],
+      "jsPlugins": ["eslint-plugin-testing-library"],
+      "rules": {
+        "testing-library/await-async-utils": "error",
+        "testing-library/await-async-events": "error",
+        "testing-library/no-wait-for-side-effects": "error",
+        "testing-library/prefer-find-by": "error",
+        "testing-library/prefer-user-event": [
+          "error",
+          {
+            "allowedMethods": [
+              "drop",
+              "dragStart",
+              "dragOver",
+              "dragEnd",
+              "dragLeave",
+              "dragEnter",
+              "scroll",
+              "wheel",
+              "load",
+              "contextMenu",
+              "touchStart",
+              "touchMove",
+              "touchEnd"
+            ]
+          }
+        ],
+        "testing-library/prefer-presence-queries": "error",
+        "testing-library/prefer-screen-queries": "error",
+        "testing-library/no-node-access": "error"
+      }
+    },
+    {
+      "files": ["tests/e2e/**/*.ts", "packages/extension-ui/visual/**/*.ts"],
+      "jsPlugins": ["eslint-plugin-playwright"],
+      "rules": {
+        "playwright/prefer-web-first-assertions": "error",
+        "playwright/missing-playwright-await": "error",
+        "playwright/no-wait-for-selector": "error",
+        "playwright/no-wait-for-timeout": "error",
+        "playwright/no-networkidle": "error",
+        "playwright/no-force-option": "error",
+        "playwright/no-element-handle": "error",
+        "playwright/no-useless-await": "error",
+        "playwright/no-skipped-test": [
+          "error",
+          {
+            "allowConditional": false
+          }
+        ],
+        "playwright/no-conditional-in-test": "error"
+      }
+    },
+    {
+      "files": ["**/*.cjs"],
+      "rules": {
+        "typescript/no-require-imports": "off"
+      }
+    },
+    {
+      "files": ["packages/core-renderer/src/**/*.{ts,tsx}"],
+      "excludeFiles": ["**/*.spec.ts", "**/*.spec.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["zod", "**/shared/schemas/*"],
+                "allowTypeImports": true,
+                "message": "The renderer ships without zod: a value from a schema module bundles all of zod into the renderer chunk. Import the type, or keep the value in a module without zod."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/core-renderer/src/sidebar/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**",
+                  "!./**",
+                  "!../../../core-shared/src/types/index",
+                  "!../home/local-storage"
+                ],
+                "allowTypeImports": true,
+                "message": "A pure layer value-imports only its siblings and ../../../core-shared/src/types/index or ../home/local-storage; import the type, or pass the value in (ADR-027)."
+              }
+            ]
+          }
+        ],
+        "terminator/restricted-syntax": ["error", "pure-layer-clock"]
+      }
+    },
+    {
+      "files": ["packages/core-renderer/src/home/*.ts"],
+      "excludeFiles": ["packages/core-renderer/src/home/{dismissals,focus-store,local-storage}.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**", "!./**", "!../sidebar/**", "!@terminator/extension-sdk/plain"],
+                "allowTypeImports": true,
+                "message": "A pure layer value-imports only its siblings and the sidebar layer (../sidebar/) or @terminator/extension-sdk/plain; import the type, or pass the value in (ADR-027)."
+              }
+            ]
+          }
+        ],
+        "terminator/restricted-syntax": ["error", "pure-layer-clock"]
+      }
+    },
+    {
+      "files": ["packages/core-renderer/src/components/**/*.tsx"],
+      "rules": {
+        "terminator/restricted-syntax": ["error", "branch-not-project"]
+      }
+    },
+    {
+      "files": ["extensions/*/src/**/*.tsx", "packages/extension-ui/src/**/*.tsx"],
+      "rules": {
+        "terminator/restricted-syntax": ["error", "extension-ui"]
+      }
+    }
+  ]
+}

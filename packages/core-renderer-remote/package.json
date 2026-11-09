@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-core-renderer-remote-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
-    "lint": "eslint .",
-    "test": "cd ../.. && vitest run packages/core-renderer-remote/"
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run packages/core-renderer-remote/",
+    "test:coverage": "cd ../.. && vitest run packages/core-renderer-remote/ --coverage.enabled --coverage.reportsDirectory=packages/core-renderer-remote/coverage"
   },
   "dependencies": {
     "@terminator/core-shared": "1.0.0"

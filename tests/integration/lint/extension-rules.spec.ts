@@ -1,37 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { ESLint } from 'eslint'
-import path from 'node:path'
+import { lintCases } from './oxlint-sandbox'
 
-/** The rules `eslint.config.mjs` applies to extension source, against the real config, loaded
- * once before any case: it imports the TypeScript compiler, about a second of CPU. */
+/** The rules .oxlintrc.json applies to extension source, against the real config. */
 
-const repoRoot = path.resolve(__dirname, '../../..')
-const eslint = new ESLint({
-  cwd: repoRoot,
-  overrideConfigFile: path.join(repoRoot, 'eslint.config.mjs'),
-})
-// The first lint of each kind of file also loads the parser and the rules it runs.
-const warmUp: [string, string][] = [
-  ['extensions/notepad/src/index.ts', "import { z } from 'zod'\nexport const s = z.string()\n"],
-  [
-    'extensions/notepad/src/View.tsx',
-    'export const A = () => <p title="a">{b ? \'c\' : null}</p>\n',
-  ],
-]
-for (const [file, code] of warmUp) {
-  await eslint.lintText(code, { filePath: path.join(repoRoot, file) })
-}
-
-async function messagesOf(code: string, file: string, ruleId: string) {
-  const [result] = await eslint.lintText(code, { filePath: path.join(repoRoot, file) })
-  return result.messages.filter((m) => m.ruleId === ruleId).map((m) => m.message)
+async function messagesOf(code: string, file: string, rule: string) {
+  const findings = (await lintCases([{ file, code }])).get(file) ?? []
+  return findings.filter((finding) => finding.rule === rule).map(({ message }) => message)
 }
 
 /** The import boundary (Constitution II, ADR 094): extension source imports
  * the SDK, the design system, npm packages and its own files, and nothing else. */
 async function rejected(specifier: string, file: string): Promise<boolean> {
   const code = `import { value } from '${specifier}'\nexport const used = value\n`
-  return (await messagesOf(code, file, 'no-restricted-imports')).length > 0
+  return (await messagesOf(code, file, 'eslint/no-restricted-imports')).length > 0
 }
 
 const rejectedCases: [string, string, string][] = [
@@ -83,7 +64,7 @@ describe('extension import boundary — allowed', () => {
  * channel names and imports carrying the same words: a rule that cannot tell
  * `task-vault:vault:add-task` from "saved to vault" gets switched off. */
 function syntaxMessagesFor(code: string, file = 'extensions/notepad/src/components/X.tsx') {
-  return messagesOf(code, file, 'no-restricted-syntax')
+  return messagesOf(code, file, 'terminator/restricted-syntax')
 }
 
 describe('extension vocabulary rule — rejects implementation words in what the reader sees', () => {

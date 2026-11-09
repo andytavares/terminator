@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { globSync } from 'node:fs'
 import { join } from 'node:path'
 
-// ESLint does not see CSS, so the stylesheet half of the layer contract is
+// oxlint does not see CSS, so the stylesheet half of the layer contract is
 // guarded here. Before this, extension CSS carried 14 distinct z-index values
 // from 1 to 9999 and stacking was decided by whoever picked the larger number.
 

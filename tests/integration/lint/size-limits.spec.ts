@@ -1,28 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { ESLint } from 'eslint'
-import path from 'node:path'
+import { lintCases } from './oxlint-sandbox'
 
-/** The function size limits `eslint.config.mjs` applies to every file, against the real
- * config, loaded once as in extension-rules.spec.ts. */
+/** The function size limits .oxlintrc.json applies to every file, against the real config. */
 
-const repoRoot = path.resolve(__dirname, '../../..')
-const eslint = new ESLint({
-  cwd: repoRoot,
-  overrideConfigFile: path.join(repoRoot, 'eslint.config.mjs'),
-})
-// The first lint of each kind of file also loads the parser and the rules it runs.
-for (const file of [
-  'packages/core-renderer/src/warm-up.ts',
-  'packages/core-renderer/src/WarmUp.tsx',
-]) {
-  await eslint.lintText('export const a = 1\n', { filePath: path.join(repoRoot, file) })
+const SIZE_RULES = new Set([
+  'eslint/max-lines-per-function',
+  'eslint/complexity',
+  'eslint/max-params',
+])
+
+async function rulesBroken(code: string, file: string): Promise<string[]> {
+  return ((await lintCases([{ file, code }])).get(file) ?? []).map(({ rule }) => rule)
 }
 
-const SIZE_RULES = new Set(['max-lines-per-function', 'complexity', 'max-params'])
-
 async function sizeRulesBroken(code: string, file: string): Promise<string[]> {
-  const [result] = await eslint.lintText(code, { filePath: path.join(repoRoot, file) })
-  return result.messages.flatMap((m) => (m.ruleId && SIZE_RULES.has(m.ruleId) ? [m.ruleId] : []))
+  return (await rulesBroken(code, file)).filter((rule) => SIZE_RULES.has(rule))
 }
 
 const longFunction = `export function long(): number {\n${Array.from(
@@ -42,7 +34,6 @@ const COVERED = [
   'packages/extension-sdk/src/example.ts',
   'packages/extension-ui/src/Example.tsx',
   'packages/extension-ui/stories/Example.stories.tsx',
-  // Specs are linted with type information, so each is a spec a test project includes.
   'packages/core-renderer/tests/unit/renderer/App.render-count.spec.tsx',
   'packages/core-renderer-remote/tests/unit/renderer-remote/App.spec.tsx',
   'packages/core-renderer/tests/unit/ConfirmDialog.spec.tsx',
@@ -54,21 +45,19 @@ const COVERED = [
 
 describe('function size limits for every file', () => {
   it.each(COVERED)('reject a function over 30 lines in %s', async (file) => {
-    expect(await sizeRulesBroken(longFunction, file)).toEqual(['max-lines-per-function'])
+    expect(await sizeRulesBroken(longFunction, file)).toEqual(['eslint/max-lines-per-function'])
   })
 
   it.each(COVERED)('reject four parameters and complexity 11 in %s', async (file) => {
-    expect(await sizeRulesBroken(fourParams, file)).toEqual(['max-params'])
-    expect(await sizeRulesBroken(branchy, file)).toEqual(['complexity'])
+    expect(await sizeRulesBroken(fourParams, file)).toEqual(['eslint/max-params'])
+    expect(await sizeRulesBroken(branchy, file)).toEqual(['eslint/complexity'])
   })
 })
 
 describe('no explicit any', () => {
   it.each(COVERED)('is an error in %s', async (file) => {
-    const [result] = await eslint.lintText('export const v: any = 1\n', {
-      filePath: path.join(repoRoot, file),
-    })
-    const anyRule = result.messages.find((m) => m.ruleId === '@typescript-eslint/no-explicit-any')
-    expect(anyRule?.severity).toBe(2)
+    expect(await rulesBroken('export const v: any = 1\n', file)).toContain(
+      'typescript/no-explicit-any'
+    )
   })
 })

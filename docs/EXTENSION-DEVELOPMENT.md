@@ -163,7 +163,7 @@ Reloading an extension (or disabling and enabling it) runs your backend's code a
 
 ## What an extension may import
 
-An extension imports only `@terminator/extension-sdk`, the design system `@terminator/extension-ui`, npm packages declared in its own `package.json`, and its own files. Do not import core source (`src/**`), another extension or any other workspace package. `eslint.config.mjs` enforces this. `npm run lint` fails on a relative import that leaves the extension's directory and on any other `@terminator/*` package.
+An extension imports only `@terminator/extension-sdk`, the design system `@terminator/extension-ui`, npm packages declared in its own `package.json`, and its own files. Do not import core source (`src/**`), another extension or any other workspace package. `.oxlintrc.json` enforces this. `npm run lint` fails on a relative import that leaves the extension's directory and on any other `@terminator/*` package.
 
 | Entry                                      | What it holds                                                                                                                                                                       |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -421,7 +421,7 @@ Every colour, space, radius, font and layer comes from the `--tm-*` tokens in `p
 - Checkboxes and radios are themed by the injected stylesheet. Do not restyle them; `accent-color` has no effect.
 - Diff and syntax colours (`--tm-diff-*`, `--tm-syntax-*`) clear WCAG AA against their backgrounds in both themes (`packages/core-renderer/tests/unit/renderer/diff-syntax-contrast.spec.ts`).
 
-`docs/EXTENSION-STYLE.md` holds the house rules: vocabulary, sentence case, button voice, empty states, icons, colour and layering. ESLint enforces its vocabulary rules on `extensions/*/src/**/*.tsx`.
+`docs/EXTENSION-STYLE.md` holds the house rules: vocabulary, sentence case, button voice, empty states, icons, colour and layering. oxlint enforces its vocabulary rules on `extensions/*/src/**/*.tsx`.
 
 ---
 
