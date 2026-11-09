@@ -1,0 +1,101 @@
+{
+  "runs": 3,
+  "view": "terminal",
+  "focusedRuns": 3,
+  "footprintMB": {
+    "Browser": 86.8,
+    "GPU": 662.7,
+    "Utility": 7.8,
+    "Tab": 97.2,
+    "Extension Host": 39.6,
+    "Agent": 31,
+    "Other child": 24.6,
+    "MCP relay": 26,
+    "total": 974.6
+  },
+  "cpuPercent": {
+    "Browser": 0.2,
+    "GPU": 0.8,
+    "Utility": 0,
+    "Tab": 0.5,
+    "Extension Host": 0.1,
+    "Agent": 0,
+    "Other child": 0,
+    "MCP relay": 0,
+    "total": 1.7
+  },
+  "workingSetMB": {
+    "Browser": 248,
+    "GPU": 112,
+    "Utility": 170,
+    "Tab": 229
+  },
+  "perRun": [
+    {
+      "footprintMB": {
+        "Browser": 87.25,
+        "GPU": 680.5,
+        "Utility": 7.730143229166667,
+        "Tab": 99.16666666666667,
+        "Extension Host": 39.583333333333336,
+        "Agent": 35,
+        "Other child": 24.78125,
+        "MCP relay": 26
+      },
+      "cpuPercent": {
+        "Browser": 0.2557765060698671,
+        "GPU": 0.7673295182096016,
+        "Utility": 0,
+        "Tab": 0.6234552335453014,
+        "Extension Host": 0.14387428466430033,
+        "Agent": 0.04795809488810011,
+        "Other child": 0,
+        "MCP relay": 0
+      }
+    },
+    {
+      "footprintMB": {
+        "Browser": 86.83333333333333,
+        "GPU": 662.6666666666666,
+        "Utility": 7.823893229166667,
+        "Tab": 94.83333333333333,
+        "Extension Host": 39.583333333333336,
+        "Agent": 31,
+        "Other child": 24.578125,
+        "MCP relay": 26
+      },
+      "cpuPercent": {
+        "Browser": 0.17693632177095292,
+        "GPU": 0.6434048064398289,
+        "Utility": 0,
+        "Tab": 0.4182131241858888,
+        "Extension Host": 0.0643404806439829,
+        "Agent": 0,
+        "Other child": 0,
+        "MCP relay": 0
+      }
+    },
+    {
+      "footprintMB": {
+        "Browser": 86.41666666666667,
+        "GPU": 662.5833333333334,
+        "Utility": 7.7666015625,
+        "Tab": 97.16666666666667,
+        "Extension Host": 39.5,
+        "Agent": 31,
+        "Other child": 24.125,
+        "MCP relay": 26
+      },
+      "cpuPercent": {
+        "Browser": 0.21410077995908175,
+        "GPU": 0.8716960326905471,
+        "Utility": 0.015292912854220117,
+        "Tab": 0.5352519498977043,
+        "Extension Host": 0.0611716514168805,
+        "Agent": 0,
+        "Other child": 0,
+        "MCP relay": 0
+      }
+    }
+  ]
+}

@@ -89,7 +89,13 @@ const LAUNCH_DEADLINE_MS = E2E_LAUNCH_HANG_MS
 const WINDOW_STATE_READ_MS = 1000
 const FAILED_LAUNCH_CLOSE_MS = 2500
 
-/** Starts Electron on the profile, with the e2e environment beneath `env`. */
+/** Extra Electron switches for this machine, space-separated in E2E_ELECTRON_ARGS. A Linux runner
+ * sets `--no-sandbox`: Chromium's sandbox needs a setuid helper or user namespaces it does not grant. */
+function machineArgs(): string[] {
+  return (process.env.E2E_ELECTRON_ARGS ?? '').split(' ').filter(Boolean)
+}
+
+/** Starts Electron on the profile, with this machine's switches and the e2e environment beneath `env`. */
 function startElectron(
   userDataDir: string,
   env: Record<string, string>
@@ -99,7 +105,13 @@ function startElectron(
     // modal "reopen windows?" alert on the next launch of the same bundle,
     // which blocks startup until firstWindow times out. The argument domain
     // turns that restore off for this process only.
-    args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
+    args: [
+      '.',
+      ...machineArgs(),
+      `--user-data-dir=${userDataDir}`,
+      '-ApplePersistenceIgnoreState',
+      'YES',
+    ],
     env: { ...e2eEnv(userDataDir), ...env },
   })
 }
@@ -129,6 +141,7 @@ async function firstReadyWindow(app: ElectronApplication, steps: LaunchSteps): P
     throw new Error(`The app's window is ${size.join('×')}, not 1280×800: the screen resized it.`)
   }
   steps.reached('size')
+  await moveWindowOffPointer(app)
   await Promise.all([
     untilAnnounced(app, 'drawn', windowId).then(() => steps.reached('drawn')),
     untilAnnounced(app, 'focused', windowId).then(() => steps.reached('focused')),
@@ -277,6 +290,18 @@ export async function launchApp(
       new Error(`${message} (${steps.describe()})`, { cause: error })
     )
   }
+}
+
+/** Moves the window off the X server's pointer on Linux: Chromium synthesizes a button-less
+ * mousemove there whenever a view under it changes, which abandons a drag in progress. */
+async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
+  if (process.platform !== 'linux') return
+  await app.evaluate(({ BrowserWindow, screen }) => {
+    const pointer = screen.getCursorScreenPoint()
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.setPosition(window.getBounds().x, pointer.y + 1)
+    }
+  })
 }
 
 /** Resolves once the main process announces `kind` for `subject` (packages/core-main/src/e2e-readiness.ts):

@@ -123,13 +123,19 @@ async function displayMenuIsAnchoredOnTop(page: Page): Promise<void> {
   await sidebar.evaluate((element: HTMLElement, before) => (element.style.width = before), width)
 }
 
-test("the sidebar marks only the session on screen, nothing under Home, and draws a row's menu whole", async () => {
-  const { page } = handle
-  await test.step('marks the terminal row of the branch on screen', () =>
-    marksTheTerminalOnScreen(page))
-  await test.step('marks only the newer repo once it is on screen', () => marksOnlyTheNewRepo(page))
-  await test.step('marks nothing under Home', () => marksNothingUnderHome(page))
-  await test.step('draws the Display menu under its button, over the pane beside a narrow sidebar', () =>
-    displayMenuIsAnchoredOnTop(page))
-  await test.step("draws a row's menu whole, on top of everything", () => rowMenuIsDrawnWhole(page))
-})
+test(
+  "the sidebar marks only the session on screen, nothing under Home, and draws a row's menu whole",
+  { tag: '@mac' },
+  async () => {
+    const { page } = handle
+    await test.step('marks the terminal row of the branch on screen', () =>
+      marksTheTerminalOnScreen(page))
+    await test.step('marks only the newer repo once it is on screen', () =>
+      marksOnlyTheNewRepo(page))
+    await test.step('marks nothing under Home', () => marksNothingUnderHome(page))
+    await test.step('draws the Display menu under its button, over the pane beside a narrow sidebar', () =>
+      displayMenuIsAnchoredOnTop(page))
+    await test.step("draws a row's menu whole, on top of everything", () =>
+      rowMenuIsDrawnWhole(page))
+  }
+)

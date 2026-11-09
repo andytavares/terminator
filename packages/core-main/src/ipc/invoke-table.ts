@@ -1,6 +1,12 @@
 import type { IpcMainInvokeEvent, WebContents } from 'electron'
 import type { z } from 'zod'
-import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import {
+  defineChannel,
+  dispatchChannel,
+  noPayload,
+  validationError,
+  type ChannelSpec,
+} from '@terminator/extension-sdk'
 import { handleChannel } from './channel-registrar.js'
 
 // Schema-driven registration for validated invoke channels. Each row declares
@@ -86,6 +92,24 @@ export function failureOf(error: unknown): { error: string; message: string } {
     error: typeof code === 'string' ? code : 'failed',
     message: error instanceof Error ? error.message : String(error),
   }
+}
+
+/** A no-payload channel that runs `action` on the options once they resolve, and answers `true`. */
+export function changeChannel<Options>(
+  channel: string,
+  action: (options: Options) => Promise<void>,
+  options: Promise<Options>
+): ChannelSpec {
+  return defineChannel({
+    channel,
+    schema: noPayload,
+    invalid: validationError,
+    run: async () => {
+      await action(await options)
+      return { data: true }
+    },
+    onError: failureOf,
+  })
 }
 
 export function registerInvokeTable(specs: ReadonlyArray<InvokeRow>): void {

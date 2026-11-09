@@ -10,11 +10,13 @@ import { useSettingsStore } from './stores/settings.store'
 import { initExtensions } from './extensions/loader'
 import { installLogInterceptor } from './logger'
 import { exposeTerminalRows } from './terminal/terminal-rows'
+import { installAnimationPause } from './lib/pause-animations'
 import { installIconTooltips } from '@terminator/extension-ui'
 
 installLogInterceptor()
 exposeTerminalRows()
 installIconTooltips()
+installAnimationPause()
 
 const view = new URLSearchParams(window.location.search).get('view')
 

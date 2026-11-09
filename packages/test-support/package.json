@@ -5,7 +5,8 @@
   "description": "The sealed test environment, guards and fakes every spec uses",
   "type": "module",
   "scripts": {
-    "lint": "eslint .",
-    "test": "cd ../.. && vitest run packages/test-support/"
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run packages/test-support/",
+    "test:coverage": "cd ../.. && vitest run packages/test-support/ --coverage.enabled --coverage.reportsDirectory=packages/test-support/coverage"
   }
 }

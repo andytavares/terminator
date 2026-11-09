@@ -1,0 +1,2783 @@
+[
+  {
+    "name": "close_terminal",
+    "description": "Closes one terminal session and ends its process.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        }
+      },
+      "required": ["sessionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "list_terminal_sessions",
+    "description": "Lists the terminal sessions that are running in Terminator.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "close_all_terminals",
+    "description": "Closes every terminal session and ends their processes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "list_workspaces",
+    "description": "Lists the workspaces in the Terminator sidebar.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "create_workspace",
+    "description": "Creates a workspace in the Terminator sidebar.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "folderPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "tags": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        }
+      },
+      "required": ["name", "folderPath", "color", "tags"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "update_workspace",
+    "description": "Changes the name, colour or other fields of a workspace.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "folderPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "tags": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "delete_workspace",
+    "description": "Deletes a workspace and its projects from Terminator.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "reorder_workspaces",
+    "description": "Sets the order of the workspaces in the sidebar.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": ["ids"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_projects",
+    "description": "Lists the projects of a workspace.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["workspaceId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "create_project",
+    "description": "Adds a project folder to a workspace.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "gitBranch": {
+          "type": "string"
+        },
+        "worktreePath": {
+          "type": "string"
+        },
+        "isWorktree": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": ["workspaceId", "name", "isWorktree"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "delete_project",
+    "description": "Removes a project from its workspace.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "update_project_branch",
+    "description": "Records the git branch that a project shows.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "gitBranch": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id", "gitBranch"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "rename_project",
+    "description": "Renames a project.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": ["id", "name"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "reorder_projects",
+    "description": "Sets the order of the projects in a workspace.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": ["workspaceId", "ids"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "is_git_repo",
+    "description": "Tells whether a folder is a git repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "current_branch",
+    "description": "Returns the checked-out branch of a repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "git_change_stats",
+    "description": "Counts the changed files and lines in a repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_branches",
+    "description": "Lists the branches of a repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "git_fetch",
+    "description": "Fetches a repository from its remote.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "git_checkout",
+    "description": "Checks out a branch, which changes the files in the working tree.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["path", "branch"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "create_branch",
+    "description": "Creates a git branch.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["path", "branch"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "suggest_worktree_path",
+    "description": "Suggests a folder for a new worktree of a branch.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "repoRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseDir": {
+          "type": "string"
+        }
+      },
+      "required": ["repoRoot", "branch"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "create_worktree",
+    "description": "Creates a git worktree for a branch.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "repoRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "worktreePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "isNewBranch": {
+          "type": "boolean"
+        }
+      },
+      "required": ["repoRoot", "worktreePath", "branch", "isNewBranch"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "remove_worktree",
+    "description": "Removes a git worktree and its folder.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "repoRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "worktreePath": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["repoRoot", "worktreePath"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "list_worktrees",
+    "description": "Lists the worktrees of a repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_global_settings",
+    "description": "Returns the global Terminator settings.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "update_global_settings",
+    "description": "Changes global Terminator settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "patch": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["patch"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_workspace_settings",
+    "description": "Returns the settings of a workspace.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["workspaceId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "update_workspace_settings",
+    "description": "Changes the settings of a workspace.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "patch": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["workspaceId", "patch"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_extensions",
+    "description": "Lists the installed Terminator extensions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "install_extension",
+    "description": "Installs a Terminator extension, which runs its code.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "directoryPath": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["directoryPath"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "toggle_extension",
+    "description": "Turns a Terminator extension on or off.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": ["id", "enabled"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "uninstall_extension",
+    "description": "Uninstalls a Terminator extension.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "reload_extension",
+    "description": "Reloads a Terminator extension.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_extension_settings_schemas",
+    "description": "Lists the settings that each extension declares.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_extension_settings",
+    "description": "Returns the current values of the extension settings.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "update_extension_setting",
+    "description": "Changes one global extension setting.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {}
+      },
+      "required": ["key"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "update_extension_workspace_setting",
+    "description": "Changes one extension setting for a workspace.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {}
+      },
+      "required": ["workspaceId", "key"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_extension_commands",
+    "description": "Lists the commands that the extensions declare.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "open_path",
+    "description": "Opens a file or folder with its default macOS app, which runs an app or script.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["filePath"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "detect_editors",
+    "description": "Lists the code editors installed on this Mac.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "open_in_editor",
+    "description": "Opens a folder in a code editor.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderPath": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["folderPath"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_app_info",
+    "description": "Returns the Terminator version and platform.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_notifications",
+    "description": "Lists the Terminator notifications.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "dismiss_notification",
+    "description": "Dismisses a Terminator notification.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "trigger_notification_action",
+    "description": "Runs an action button of a notification.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "notifId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["notifId", "actionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "get_system_metrics",
+    "description": "Returns CPU and memory use of this Mac.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_process_metrics",
+    "description": "Returns CPU and memory use of the Terminator processes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_session_records",
+    "description": "Lists the recorded sessions of a workspace.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "set_session_description",
+    "description": "Sets the description of a recorded session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "projectId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "workspaceName": {
+              "type": ["string", "null"]
+            },
+            "projectName": {
+              "type": ["string", "null"]
+            },
+            "branch": {
+              "type": ["string", "null"]
+            },
+            "tabTitle": {
+              "type": "string"
+            },
+            "shell": {
+              "type": ["string", "null"]
+            },
+            "startedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sessionId",
+            "projectId",
+            "workspaceName",
+            "projectName",
+            "branch",
+            "tabTitle",
+            "shell",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "description": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["session", "description"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "set_session_link",
+    "description": "Links a recorded session to an issue or pull request.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "projectId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "workspaceName": {
+              "type": ["string", "null"]
+            },
+            "projectName": {
+              "type": ["string", "null"]
+            },
+            "branch": {
+              "type": ["string", "null"]
+            },
+            "tabTitle": {
+              "type": "string"
+            },
+            "shell": {
+              "type": ["string", "null"]
+            },
+            "startedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sessionId",
+            "projectId",
+            "workspaceName",
+            "projectName",
+            "branch",
+            "tabTitle",
+            "shell",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "link": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "tracker": {
+                  "type": "string",
+                  "enum": ["linear"]
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["tracker", "key"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["session", "link"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "forget_session_record",
+    "description": "Deletes a session record.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["sessionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "list_tasks",
+    "description": "Lists the tasks on Home.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "create_task",
+    "description": "Creates a task on Home.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "lanes": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "repoRoot": {
+                "type": "string",
+                "minLength": 1
+              },
+              "branch": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["repoRoot", "branch"],
+            "additionalProperties": false
+          }
+        },
+        "ticket": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "tracker": {
+                  "type": "string",
+                  "enum": ["linear"]
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["tracker", "key"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["title", "lanes"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "update_task",
+    "description": "Changes the fields of a task.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "focus": {
+          "type": "boolean"
+        },
+        "ticket": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "tracker": {
+                  "type": "string",
+                  "enum": ["linear"]
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["tracker", "key"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "done": {
+          "type": "boolean"
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "add_task_lane",
+    "description": "Adds a lane to a task.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lane": {
+          "type": "object",
+          "properties": {
+            "repoRoot": {
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["repoRoot", "branch"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["id", "lane"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "remove_task_lane",
+    "description": "Removes a lane from a task.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lane": {
+          "type": "object",
+          "properties": {
+            "repoRoot": {
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["repoRoot", "branch"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["id", "lane"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "archive_task",
+    "description": "Archives a task or brings it back.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archived": {
+          "type": "boolean"
+        }
+      },
+      "required": ["id", "archived"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "delete_task",
+    "description": "Deletes a task.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "merge_task",
+    "description": "Merges one task into another.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "into": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["from", "into"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_agent_usage",
+    "description": "Returns the token use and cost of an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "from": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "to": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_thread_summary",
+    "description": "Summarises the work of a task in one paragraph.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "ticketKey": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "sessions": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "state": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "lastAssistantTexts": {
+                "maxItems": 5,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              },
+              "firstUserPrompt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["state", "lastAssistantTexts", "firstUserPrompt"],
+            "additionalProperties": false
+          }
+        },
+        "pullRequest": {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "isDraft": {
+              "type": "boolean"
+            },
+            "checksLine": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "required": ["number", "isDraft", "checksLine"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["title", "sessions"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_agent_asks",
+    "description": "Lists the questions that agent sessions wait on.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_agent_turns",
+    "description": "Tells which agent sessions are in a turn.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_agents",
+    "description": "Lists the running agent sessions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_known_agents",
+    "description": "Lists the agents Terminator can start and whether each is installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "start_agent",
+    "description": "Starts an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "agentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resume": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "agentMeta": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tab": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": ["projectId", "title"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["cwd"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "prompt_agent",
+    "description": "Sends a prompt to an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "text": {
+          "type": "string"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mimeType": {
+                "type": "string",
+                "minLength": 1
+              },
+              "data": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["mimeType", "data"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["sessionId", "text"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "steer_agent",
+    "description": "Sends a message to an agent session during its turn.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "text"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "cancel_agent_turn",
+    "description": "Cancels the current turn of an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": ["sessionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "answer_agent",
+    "description": "Answers a permission question of an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "optionId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["sessionId", "requestId", "optionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "close_agent",
+    "description": "Closes an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": ["sessionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "agent_history",
+    "description": "Returns the updates of an agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": ["sessionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_open_agent_asks",
+    "description": "Lists the open permission questions of agent sessions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_home_feed",
+    "description": "Returns the items of the Home feed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "run_home_feed_action",
+    "description": "Runs an action of a Home feed item.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "itemId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["source", "itemId", "actionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "list_schedules",
+    "description": "Lists the scheduled runs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "create_schedule",
+    "description": "Creates a scheduled run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "repoRoot": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runAs": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["once", "repeat"]
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repeat": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "every": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 999
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": ["minute", "hour", "day", "week", "month"]
+                },
+                "days": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  }
+                },
+                "between": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "to": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        }
+                      },
+                      "required": ["from", "to"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "overlap": {
+                  "type": "string",
+                  "enum": ["skip", "start"]
+                }
+              },
+              "required": ["every", "unit", "days", "between", "overlap"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "newWorktree": {
+          "type": "boolean"
+        },
+        "agentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "repoRoot",
+        "prompt",
+        "runAs",
+        "kind",
+        "time",
+        "date",
+        "repeat",
+        "branch",
+        "newWorktree",
+        "agentId"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "delete_schedule",
+    "description": "Deletes a scheduled run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "update_schedule",
+    "description": "Changes a scheduled run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repoRoot": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runAs": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["once", "repeat"]
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repeat": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "every": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 999
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": ["minute", "hour", "day", "week", "month"]
+                },
+                "days": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  }
+                },
+                "between": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "to": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        }
+                      },
+                      "required": ["from", "to"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "overlap": {
+                  "type": "string",
+                  "enum": ["skip", "start"]
+                }
+              },
+              "required": ["every", "unit", "days", "between", "overlap"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "newWorktree": {
+          "type": "boolean"
+        },
+        "agentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "repoRoot",
+        "prompt",
+        "runAs",
+        "kind",
+        "time",
+        "date",
+        "repeat",
+        "branch",
+        "newWorktree",
+        "agentId"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "pause_schedule",
+    "description": "Pauses or resumes a scheduled run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paused": {
+          "type": "boolean"
+        }
+      },
+      "required": ["id", "paused"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "run_schedule_now",
+    "description": "Starts a scheduled run now.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "suggest_branch_name",
+    "description": "Suggests a branch name for a prompt.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["prompt"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_integration_status",
+    "description": "Returns the connection state of the issue trackers.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tracker": {
+          "type": "string",
+          "enum": ["linear"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "set_my_issues_filter",
+    "description": "Sets which issues count as mine in a tracker.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tracker": {
+          "type": "string",
+          "enum": ["linear"]
+        },
+        "mine": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "assignee"
+            },
+            "email": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": ["kind", "email"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tracker", "mine"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_my_issues",
+    "description": "Lists the issues assigned to me.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tracker": {
+          "type": "string",
+          "enum": ["linear"]
+        },
+        "limit": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 200
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "search_issues",
+    "description": "Searches the issue tracker.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "term": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tracker": {
+          "type": "string",
+          "enum": ["linear"]
+        },
+        "limit": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 200
+        }
+      },
+      "required": ["term"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_issue",
+    "description": "Returns one issue from the tracker.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tracker": {
+          "type": "string",
+          "enum": ["linear"]
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "refresh": {
+          "type": "boolean"
+        }
+      },
+      "required": ["tracker", "key"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "comment_on_issue",
+    "description": "Adds a comment to an issue.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tracker": {
+          "type": "string",
+          "enum": ["linear"]
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["tracker", "key", "body"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "link_issue",
+    "description": "Links an issue to a project.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "tracker": {
+          "type": "string",
+          "enum": ["linear"]
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "injectContext": {
+          "type": "boolean"
+        }
+      },
+      "required": ["projectId", "tracker", "key"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "get_issue_link",
+    "description": "Returns the issue linked to a project.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "unlink_issue",
+    "description": "Removes the issue link of a project.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "preview_issue_context",
+    "description": "Shows the issue context that agents of a project get.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "set_inject_issue_context",
+    "description": "Turns issue context for the agents of a project on or off.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "injectContext": {
+          "type": "boolean"
+        }
+      },
+      "required": ["projectId", "injectContext"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "alert",
+    "description": "Shows an alert to the person on Terminator Home (with Dismiss) and as a notification. An alert with the same title and source within a day replaces the earlier one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "default": "",
+          "type": "string"
+        },
+        "home": {
+          "default": true,
+          "type": "boolean"
+        },
+        "notify": {
+          "default": true,
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["title"]
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "start_work",
+    "description": "Starts work on a prompt in Terminator, as Start work on Home does.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace": {
+          "description": "Workspace name or id",
+          "type": "string",
+          "minLength": 1
+        },
+        "runAs": {
+          "type": "string",
+          "enum": ["agent", "claude-terminal"]
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["prompt"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "open_session",
+    "description": "Shows a Terminator session in the main window.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["sessionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "open_terminal",
+    "description": "Opens a terminal tab in a folder, and can run a command in it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace": {
+          "description": "Workspace name or id",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["cwd"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "open_in_window",
+    "description": "Moves a Terminator session into its own window.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["sessionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "list_quick_actions",
+    "description": "Lists the quick actions that the Cmd+P panel shows.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "run_quick_action",
+    "description": "Runs a quick action that does not close or delete anything.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "run_destructive_quick_action",
+    "description": "Runs a quick action that closes or deletes something.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "run_extension_command",
+    "description": "Runs an extension command that does not close or delete anything.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["command"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "run_destructive_extension_command",
+    "description": "Runs an extension command that closes or deletes something.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["command"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "check_for_update",
+    "description": "Checks GitHub Releases for a newer Terminator and downloads it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "install_update",
+    "description": "Restarts Terminator into the downloaded update. This closes every terminal and agent.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  },
+  {
+    "name": "show_window",
+    "description": "Shows and focuses the Terminator main window.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_session_here",
+    "description": "Moves this Claude Code session to a Terminator terminal tab, which runs claude --resume once this session exits. `workspace` names the Terminator workspace to open it in.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace": {
+          "type": "string",
+          "description": "A Terminator workspace name."
+        }
+      }
+    },
+    "annotations": {
+      "destructiveHint": false
+    }
+  }
+]

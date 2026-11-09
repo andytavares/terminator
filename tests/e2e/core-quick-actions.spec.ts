@@ -294,14 +294,18 @@ test.describe('core quick actions', () => {
     await stub.shutDown()
   })
 
-  test('every core action changes what the operator sees, issue actions included', async () => {
-    const { page } = handle
-    await createWorkspace(page, 'QA One', e2eTempDir('qa1-'))
-    await createWorkspace(page, 'QA Two', e2eTempDir('qa2-'))
-    await addAndSelectProject(page, 'QA One', 'alpha')
-    await terminalActions(page)
-    await sessionActions(page)
-    await navigationQuickActions(page)
-    await issueActions(handle)
-  })
+  test(
+    'every core action changes what the operator sees, issue actions included',
+    { tag: '@mac' },
+    async () => {
+      const { page } = handle
+      await createWorkspace(page, 'QA One', e2eTempDir('qa1-'))
+      await createWorkspace(page, 'QA Two', e2eTempDir('qa2-'))
+      await addAndSelectProject(page, 'QA One', 'alpha')
+      await terminalActions(page)
+      await sessionActions(page)
+      await navigationQuickActions(page)
+      await issueActions(handle)
+    }
+  )
 })

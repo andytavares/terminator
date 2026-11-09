@@ -6,7 +6,10 @@ import { IntegrationsSettings } from '../../../../src/components/settings/Integr
 import { useIntegrationsStore } from '../../../../src/stores/integrations.store'
 import { useToastStore } from '../../../../src/stores/toast.store'
 import type { TrackerConnection } from '../../../../../core-shared/src/types/index'
-import type { ClaudeCodeStatus } from '../../../../../core-shared/src/electron-api/manifest'
+import type {
+  ClaudeCodeStatus,
+  TermctlStatus,
+} from '../../../../../core-shared/src/electron-api/manifest'
 
 const api = {
   status: vi.fn(),
@@ -20,6 +23,12 @@ const claudeCode = {
   status: vi.fn<() => Promise<unknown>>(),
   connect: vi.fn(),
   disconnect: vi.fn(),
+}
+
+const termctl = {
+  status: vi.fn<() => Promise<unknown>>(),
+  install: vi.fn<() => Promise<unknown>>(),
+  uninstall: vi.fn<() => Promise<unknown>>(),
 }
 
 function connection(over: Partial<TrackerConnection> = {}): TrackerConnection {
@@ -48,7 +57,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   // Pending, so the Claude Code block stays empty in the tracker tests.
   claudeCode.status.mockReturnValue(new Promise(() => {}))
-  vi.stubGlobal('electronAPI', { integrations: api, claudeCode })
+  termctl.status.mockReturnValue(new Promise(() => {}))
+  vi.stubGlobal('electronAPI', { integrations: api, claudeCode, termctl })
   // The component imports this same store instance; zustand state is
   // module-level and would otherwise leak into the next test.
   useIntegrationsStore.setState({ connections: [], connectError: {}, loading: false })
@@ -369,5 +379,71 @@ describe('IntegrationsSettings — Claude Code on the remote client', () => {
     await renderWith([connection()])
     await screen.findByText('Linear')
     expect(screen.queryByText('Claude Code')).toBeNull()
+  })
+})
+
+const termctlStatus = (state: TermctlStatus['state']): { data: TermctlStatus } => ({
+  data: { state, path: '/usr/local/bin/termctl' },
+})
+
+async function renderTermctl(state: TermctlStatus['state']) {
+  termctl.status.mockResolvedValue(termctlStatus(state))
+  api.status.mockResolvedValue({ connections: [connection()] })
+  render(<IntegrationsSettings />)
+  await screen.findByText('termctl')
+}
+
+describe('IntegrationsSettings — termctl', () => {
+  it('says termctl is not installed, and offers Install command', async () => {
+    await renderTermctl('not-installed')
+    expect(
+      screen.getByText("Not installed. Run Terminator's tools from any terminal.")
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Install command' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Uninstall' })).toBeNull()
+  })
+
+  it('says where termctl is installed, and offers Uninstall', async () => {
+    await renderTermctl('installed')
+    expect(screen.getByText('Installed at /usr/local/bin/termctl')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Uninstall' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Install command' })).toBeNull()
+  })
+
+  it('says another program owns the path, and offers no action', async () => {
+    await renderTermctl('other')
+    expect(screen.getByText('/usr/local/bin/termctl belongs to another program.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Install command' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Uninstall' })).toBeNull()
+  })
+})
+
+describe('IntegrationsSettings — termctl actions', () => {
+  it('installs, then shows the status it reads again', async () => {
+    const user = userEvent.setup()
+    await renderTermctl('not-installed')
+    termctl.install.mockResolvedValue({ data: true })
+    termctl.status.mockResolvedValue(termctlStatus('installed'))
+    await user.click(screen.getByRole('button', { name: 'Install command' }))
+    await screen.findByText('Installed at /usr/local/bin/termctl')
+    expect(termctl.install).toHaveBeenCalledTimes(1)
+  })
+
+  it('uninstalls, then shows the status it reads again', async () => {
+    const user = userEvent.setup()
+    await renderTermctl('installed')
+    termctl.uninstall.mockResolvedValue({ data: true })
+    termctl.status.mockResolvedValue(termctlStatus('not-installed'))
+    await user.click(screen.getByRole('button', { name: 'Uninstall' }))
+    await screen.findByText("Not installed. Run Terminator's tools from any terminal.")
+    expect(termctl.uninstall).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows why an install failed in the status line', async () => {
+    const user = userEvent.setup()
+    await renderTermctl('not-installed')
+    termctl.install.mockResolvedValue({ error: 'failed', message: 'User canceled.' })
+    await user.click(screen.getByRole('button', { name: 'Install command' }))
+    await screen.findByText('User canceled.')
   })
 })

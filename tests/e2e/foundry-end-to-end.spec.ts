@@ -42,27 +42,31 @@ test.afterAll(async () => {
   for (const dir of [repo, bare]) rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
 })
 
-test('an idea becomes a plan, is handed off, and ends as a draft pull request', async () => {
-  const id = await createTypedOrder(handle, {
-    repo,
-    text: 'add a document that says what the stub changed',
-    missing: 'the order was not created',
-  })
-  await listOrdersInForge(handle, id)
-  await openListedOrder(handle, id)
+test(
+  'an idea becomes a plan, is handed off, and ends as a draft pull request',
+  { tag: '@mac' },
+  async () => {
+    const id = await createTypedOrder(handle, {
+      repo,
+      text: 'add a document that says what the stub changed',
+      missing: 'the order was not created',
+    })
+    await listOrdersInForge(handle, id)
+    await openListedOrder(handle, id)
 
-  await foundry.getByRole('button', { name: 'Draft the plan' }).first().click()
-  await expect(foundry.getByRole('button', { name: /^Plan.*1 unit/ })).toBeVisible()
-  await expect(foundry.getByRole('button', { name: /^Red team/ })).toContainText(
-    'Clean after round 1'
-  )
+    await foundry.getByRole('button', { name: 'Draft the plan' }).first().click()
+    await expect(foundry.getByRole('button', { name: /^Plan.*1 unit/ })).toBeVisible()
+    await expect(foundry.getByRole('button', { name: /^Red team/ })).toContainText(
+      'Clean after round 1'
+    )
 
-  await foundry.getByRole('button', { name: 'Hand off with Direct' }).click()
+    await foundry.getByRole('button', { name: 'Hand off with Direct' }).click()
 
-  await expect.poll(() => stub.pullRequests.length).toBe(1)
-  expect(stub.pullRequests[0].isDraft).toBe(true)
-  expect(git(bare, 'rev-parse', '--verify', stub.pullRequests[0].headRefName)).not.toBe('')
-  // The line finished: the operator is asked to take the draft out of draft.
-  await expect(foundry.getByText(/Mark the draft for .* ready\?/).first()).toBeVisible()
-  expect(stub.calls.some((call) => call.args.slice(0, 2).join(' ') === 'pr create')).toBe(true)
-})
+    await expect.poll(() => stub.pullRequests.length).toBe(1)
+    expect(stub.pullRequests[0].isDraft).toBe(true)
+    expect(git(bare, 'rev-parse', '--verify', stub.pullRequests[0].headRefName)).not.toBe('')
+    // The line finished: the operator is asked to take the draft out of draft.
+    await expect(foundry.getByText(/Mark the draft for .* ready\?/).first()).toBeVisible()
+    expect(stub.calls.some((call) => call.args.slice(0, 2).join(' ') === 'pr create')).toBe(true)
+  }
+)

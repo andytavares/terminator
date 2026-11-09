@@ -1,2 +1,4 @@
 npx lint-staged
-npm run check
+npm run check:repo
+# The packages the staged and unstaged changes reach, against the last commit (ADR 154).
+TURBO_SCM_BASE=HEAD npm run check:packages -- --affected

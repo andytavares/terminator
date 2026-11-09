@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import { parse } from '@babel/parser'
 
 // Rule 2 (CLAUDE.md): a literal naming an ecosystem's tool belongs in `hints/`, not in
-// code. Comments are never string, template or regex tokens, so they are not read.
+// code. Comments are never string, template or regex nodes, so they are not read.
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src')
 
@@ -38,14 +38,30 @@ const ECOSYSTEM = new RegExp(
   'i'
 )
 
-const LITERALS = new Set([
-  ts.SyntaxKind.StringLiteral,
-  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
-  ts.SyntaxKind.TemplateHead,
-  ts.SyntaxKind.TemplateMiddle,
-  ts.SyntaxKind.TemplateTail,
-  ts.SyntaxKind.RegularExpressionLiteral,
-])
+const LITERALS = new Set(['StringLiteral', 'DirectiveLiteral', 'TemplateElement', 'RegExpLiteral'])
+
+interface SyntaxNode {
+  type: string
+  start: number
+  end: number
+  loc: { start: { line: number } }
+}
+
+const isNode = (value: unknown): value is SyntaxNode =>
+  typeof value === 'object' && value !== null && 'type' in value
+
+/** Every string, template chunk and regex in the tree under `node`. */
+function literalsIn(node: unknown): SyntaxNode[] {
+  if (Array.isArray(node)) return node.flatMap(literalsIn)
+  if (!isNode(node)) return []
+  const own = LITERALS.has(node.type) ? [node] : []
+  return [
+    ...own,
+    ...Object.values(node)
+      .filter((v) => typeof v === 'object')
+      .flatMap(literalsIn),
+  ]
+}
 
 function sourceFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -55,60 +71,20 @@ function sourceFiles(directory: string): string[] {
   })
 }
 
-function tokenise(file: string): ts.Scanner {
-  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, undefined, undefined)
-  const text = fs.readFileSync(file, 'utf8')
-  scanner.setText(text)
-  scanner.setLanguageVariant(
-    file.endsWith('x') ? ts.LanguageVariant.JSX : ts.LanguageVariant.Standard
-  )
-  return scanner
-}
-
-/** Finds where a template literal's `${…}` closes, so its next chunk is scanned as template text. */
-class TemplateTracker {
-  private openedAt: number[] = []
-  private depth = 0
-
-  next(scanner: ts.Scanner): ts.SyntaxKind {
-    let kind = scanner.scan()
-    if (kind === ts.SyntaxKind.SlashToken || kind === ts.SyntaxKind.SlashEqualsToken) {
-      kind = scanner.reScanSlashToken()
-    }
-    if (kind === ts.SyntaxKind.OpenBraceToken) this.depth += 1
-    if (kind === ts.SyntaxKind.CloseBraceToken) kind = this.close(scanner, kind)
-    if (kind === ts.SyntaxKind.TemplateHead || kind === ts.SyntaxKind.TemplateMiddle) {
-      this.openedAt.push(this.depth)
-    }
-    return kind
-  }
-
-  private close(scanner: ts.Scanner, kind: ts.SyntaxKind): ts.SyntaxKind {
-    if (this.openedAt.at(-1) !== this.depth) {
-      this.depth -= 1
-      return kind
-    }
-    this.openedAt.pop()
-    return scanner.reScanTemplateToken(false)
-  }
-}
-
 /** `file:line literal` for each ecosystem literal in one file. */
 function hitsIn(file: string): string[] {
-  const scanner = tokenise(file)
-  const tracker = new TemplateTracker()
   const text = fs.readFileSync(file, 'utf8')
-  const hits: string[] = []
-  for (
-    let kind = tracker.next(scanner);
-    kind !== ts.SyntaxKind.EndOfFileToken;
-    kind = tracker.next(scanner)
-  ) {
-    if (!LITERALS.has(kind) || !ECOSYSTEM.test(scanner.getTokenText())) continue
-    const line = text.slice(0, scanner.getTokenStart()).split('\n').length
-    hits.push(`${path.relative(sourceRoot, file)}:${line} ${scanner.getTokenText().trim()}`)
-  }
-  return hits
+  const plugins: ('typescript' | 'jsx')[] = file.endsWith('x')
+    ? ['typescript', 'jsx']
+    : ['typescript']
+  const tree = parse(text, { sourceType: 'module', plugins })
+  return literalsIn(tree.program)
+    .map((node) => ({
+      line: node.loc.start.line,
+      literal: text.slice(node.start, node.end).trim(),
+    }))
+    .filter(({ literal }) => ECOSYSTEM.test(literal))
+    .map(({ line, literal }) => `${path.relative(sourceRoot, file)}:${line} ${literal}`)
 }
 
 describe('the extension assumes no ecosystem', () => {

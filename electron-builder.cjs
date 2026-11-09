@@ -42,6 +42,8 @@ module.exports = {
       filter: extensionRuntimeModules(__dirname, EXTENSION_EXTERNALS).map((name) => `${name}/**/*`),
     },
   ],
+  // termctl, which the launcher in userData runs from process.resourcesPath.
+  extraResources: [{ from: 'apps/termctl/dist/termctl.mjs', to: 'termctl/termctl.mjs' }],
   asarUnpack: [
     // The adapter runs as a child process, which cannot read from inside app.asar.
     '**/node_modules/@agentclientprotocol/**',

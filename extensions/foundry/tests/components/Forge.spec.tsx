@@ -1397,7 +1397,7 @@ function forgeTheReasonTests() {
     await waitFor(() => {
       const call = invoke.mock.calls.find((c) => c[0] === 'foundry:order.converge')
       expect(call).toBeTruthy()
-      const message = String((call?.[1] as { message?: string }).message ?? '')
+      const message = String((call?.[1] as { message?: string } | undefined)?.message ?? '')
       expect(message).toContain('Invalid enum value')
       expect(message).toContain('Answer again with the proposal as your structured output')
       expect(message).not.toContain('proposal.json')

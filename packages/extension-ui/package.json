@@ -28,8 +28,9 @@
     "test:stories": "vitest run --config vitest.stories.config.ts",
     "test:visual": "playwright test --config playwright.visual.config.ts",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-extension-ui-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/packages-extension-ui-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
-    "lint": "eslint .",
-    "test": "cd ../.. && vitest run packages/extension-ui/"
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run packages/extension-ui/",
+    "test:coverage": "cd ../.. && vitest run packages/extension-ui/ --coverage.enabled --coverage.reportsDirectory=packages/extension-ui/coverage"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",

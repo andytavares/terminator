@@ -69,7 +69,9 @@ function taskVaultRendererAppCaptureCommandTests() {
     const { useVaultNavStore } = await import('../../src/stores/vault-nav.store')
     render(<App />)
     const [, handler] = mockOn.mock.calls[0]
-    act(() => handler(undefined))
+    act(() => {
+      handler(undefined)
+    })
     expect(useVaultNavStore.getState().showCaptureModal).toBe(true)
   })
 

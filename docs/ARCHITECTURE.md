@@ -265,7 +265,7 @@ A raw `z-index` number in an extension is a lint error.
 
 **Contrast** is verified by rendering, not by reading the stylesheet. `tests/e2e/extension-smoke.spec.ts` walks every visible text node in each extension view, in both themes. It resolves the real composited backdrop through the translucent layers above the node and asserts WCAG AA. `color-mix` and layered alpha resolve only in a browser.
 
-The written rules for extension UI are in [EXTENSION-STYLE.md](EXTENSION-STYLE.md). Its vocabulary rules are ESLint selectors with a fixture spec.
+The written rules for extension UI are in [EXTENSION-STYLE.md](EXTENSION-STYLE.md). Its vocabulary rules are oxlint selectors with a fixture spec.
 
 ---
 
@@ -424,7 +424,7 @@ Each row is handed one `RowContext` with those actions, the collapse state and t
 
 ### The view-model layer
 
-`packages/core-renderer/src/sidebar/` holds the pure core. **These modules import nothing but types**: no React, no store, no `Date.now()`. `now` is always a parameter. `npm run lint` guards the directory and not any one module (`pureLayers` in `eslint.config.mjs`), so a file added here inherits the rule.
+`packages/core-renderer/src/sidebar/` holds the pure core. **These modules import nothing but types**: no React, no store, no `Date.now()`. `now` is always a parameter. `npm run lint` guards the directory and not any one module (the `packages/core-renderer/src/sidebar/*.ts` override in `.oxlintrc.json`), so a file added here inherits the rule.
 
 | Module                                                    | Role                                                                                     |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -558,6 +558,8 @@ ADR 145. Any Claude Code session on this Mac reaches Terminator through one MCP 
    - **Renderer tools** (`packages/core-shared/src/mcp/renderer-tools.ts`): Start work, sessions, quick actions and extension commands. Main pushes an `McpCall` over `mcp:call` (`packages/core-main/src/mcp/renderer-tools.ts`). `McpHost` (`packages/core-renderer/src/mcp/`) runs it and answers over `mcp:answer` with the same id.
 
 A destructive tool carries `anthropic/requiresUserInteraction` (`toolMarks` in `packages/core-main/src/mcp/tool-types.ts`), so Claude Code asks on every call, over allow rules. Quick actions and extension commands have a plain tool and a destructive tool. The plain tool refuses a destructive target. Scheduled runs add every destructive Terminator tool to their ask rules (`packages/core-main/src/home/unattended-run.ts`). The remote client has no `claudeCode` API: the server is for this Mac only.
+
+`termctl` runs the same tools from a shell. At every start, `startTermctlCommand` (`packages/core-main/src/index.ts`) writes the launcher `<userData>/termctl/termctl`, which runs `termctl.mjs` (`Resources/termctl/termctl.mjs` when packaged, `apps/termctl/dist/termctl.mjs` in development) with Electron in node mode and the socket in `TERMINATOR_MCP_SOCKET`. Settings › Integrations links `/usr/local/bin/termctl` to it over `termctl:*` (`packages/core-main/src/integrations/termctl-command.ts`).
 
 ---
 
@@ -983,6 +985,10 @@ Every function in the extension, its specs included, is within the size limits t
 - [ADR-134: CI releases each merge](adr/134-ci-releases-each-merge.md) — the release is the last job of `ci.yml` on a push to `main`, after the checks that push ran; `release.yml` and its full test run are gone.
 - [ADR-136: a real order runs before Foundry changes ship](adr/136-a-real-order-runs-before-foundry-changes-ship.md) — superseded by ADR-151: the canary is removed.
 - [ADR-151: CI runs everything, once, with nothing fancy](adr/151-ci-runs-everything-once-with-nothing-fancy.md) — every run tests everything once; only the app, the story screenshots and the release run on macOS; the pre-commit hook runs `npm run check`, the scripts CI runs.
+- [ADR-152: The core is split into workspace packages, run by Turborepo](adr/152-the-core-is-split-into-workspace-packages.md) — core-shared, core-main, core-renderer, core-renderer-remote, test-support; relative imports; the Electron app stays at the root.
+- [ADR-153: TypeScript 7 and oxlint replace TypeScript 6 and ESLint](adr/153-typescript-7-and-oxlint-replace-typescript-6-and-eslint.md) — `tsc` from TypeScript 7; oxlint with type-aware rules and the repository's rules in `scripts/oxlint-plugin/`.
+- [ADR-154: A pull request checks what it reaches, on Linux; main checks everything](adr/154-pull-requests-check-what-they-reach-on-linux.md) — Turborepo `--affected` and its cache on pull requests and in the pre-commit hook; E2E and story screenshots on Linux; macOS only on main.
+- [ADR-155: termctl is an MCP client of the running app, shipped inside it](adr/155-termctl-is-an-mcp-client-shipped-in-the-app.md) — the relay's hello, then MCP; tool names become `noun verb` commands; an Ink full-screen view; a launcher Settings links into `/usr/local/bin`.
 - [ADR-070: E2E is deterministic and selective](adr/070-e2e-is-deterministic-and-selective.md) — no retries and flakes fixed at their cause; its selection is superseded by ADR-151.
 - [ADR-072: a review reads definitions before their callers](adr/072-a-review-reads-definitions-before-callers.md) — tree-sitter orders a PR's files so a function comes before the code that calls it.
 - [ADR-073: the review agent reads, and never writes](adr/073-the-review-agent-reads-and-never-writes.md) — headless `claude -p` with Read, Grep and Glob only, in a worktree at the PR head; findings stay private until posted.

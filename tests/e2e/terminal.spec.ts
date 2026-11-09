@@ -177,10 +177,14 @@ async function terminalsAreManaged(): Promise<void> {
   )
 }
 
-test('terminals are opened, followed, navigated and closed across branches', async () => {
-  await terminalsOpenAndFollow()
-  await terminalsAreManaged()
-})
+test(
+  'terminals are opened, followed, navigated and closed across branches',
+  { tag: '@mac' },
+  async () => {
+    await terminalsOpenAndFollow()
+    await terminalsAreManaged()
+  }
+)
 
 // ── Flow 2: a split terminal, in the sidebar and on the Overview wall ───────
 
@@ -246,13 +250,20 @@ async function wallDrawsNoGapsBetweenLetters(): Promise<void> {
   expect(widths.drawn).toBeCloseTo(widths.expected, -1)
 }
 
-test('a split terminal is listed a step in under its branch, and drawn on the wall without gaps', async () => {
-  await workspaceWithBranch('Split', 'probe')
-  await runInVisibleTerminal(handle.page, `echo ${PROBE}`)
-  await addAndSelectProject(handle.page, 'Split', 'panes')
-  await test.step('the sidebar draws each level of the tree a step in', paneStepsInUnderItsTerminal)
-  await test.step(
-    'the wall draws a terminal from another branch with no gaps between letters',
-    wallDrawsNoGapsBetweenLetters
-  )
-})
+test(
+  'a split terminal is listed a step in under its branch, and drawn on the wall without gaps',
+  { tag: '@mac' },
+  async () => {
+    await workspaceWithBranch('Split', 'probe')
+    await runInVisibleTerminal(handle.page, `echo ${PROBE}`)
+    await addAndSelectProject(handle.page, 'Split', 'panes')
+    await test.step(
+      'the sidebar draws each level of the tree a step in',
+      paneStepsInUnderItsTerminal
+    )
+    await test.step(
+      'the wall draws a terminal from another branch with no gaps between letters',
+      wallDrawsNoGapsBetweenLetters
+    )
+  }
+)

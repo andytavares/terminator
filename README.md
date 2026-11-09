@@ -24,7 +24,7 @@ An extension-first, AI-focused terminal emulator built on Electron. It organizes
 - **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell.
 - **Quick Actions** — `Cmd+P` opens a leader + which-key panel. A letter acts immediately (`g` opens the Git group, then `p` pushes). `/` (or `Cmd+P` again) switches to fuzzy search over label, category and description. Every action that cannot run right now shows dimmed with its reason, not hidden. Pinned actions (`Cmd+.`) sit first, then your most-used actions in a "Pinned & recent" row. Both survive a restart. The panel covers core terminal, session and workspace actions and the v1 extensions (Git, Notepad, Task Vault, Foundry). You can also define your own shell and Claude-prompt actions in Settings, with the variables `{cwd} {branch} {worktree} {repo} {issue} {selection}`. See [ADR-057](docs/adr/057-quick-actions-are-a-leader-panel.md) and the [user guide](docs/user-guide/USER-GUIDE.md#8-quick-actions).
 - **Extension system** — Extensions install from **any directory on disk**. Without a change to core code they contribute settings sections, sidebar panels, global tabs, workspace-scoped tabs (hover-reveal icons on repo headers), top-bar menu items, native View menu items, quick-action commands, and terminal event hooks. Extension UIs run in isolated `WebContentsView` contexts. Extensions can use any React version or framework, and an update needs no app rebuild. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md) and [`packages/extension-sdk/`](packages/extension-sdk/) for type-safe third-party development.
-- **Shared extension UI** — [`packages/extension-ui`](packages/extension-ui/) is the single implementation of the dialog, confirm, popover, toast and empty-state behaviour. It is published to the bundled extensions, to third parties, and to the core itself. It is source-only, with React as a peer dependency. An extension view is a separate document, so a dialog renders inside it ([ADR-038](docs/adr/038-dialogs-render-in-the-extension-view.md)). Escape closes only the innermost surface. Stacking comes from a named four-step scale, not raw `z-index` numbers. Extension views carry both light and dark themes. Tests assert WCAG AA by rendering every surface in both themes, not by reading the stylesheet. House rules: [Extension Style Guide](docs/EXTENSION-STYLE.md), with ESLint enforcing the vocabulary rules.
+- **Shared extension UI** — [`packages/extension-ui`](packages/extension-ui/) is the single implementation of the dialog, confirm, popover, toast and empty-state behaviour. It is published to the bundled extensions, to third parties, and to the core itself. It is source-only, with React as a peer dependency. An extension view is a separate document, so a dialog renders inside it ([ADR-038](docs/adr/038-dialogs-render-in-the-extension-view.md)). Escape closes only the innermost surface. Stacking comes from a named four-step scale, not raw `z-index` numbers. Extension views carry both light and dark themes. Tests assert WCAG AA by rendering every surface in both themes, not by reading the stylesheet. House rules: [Extension Style Guide](docs/EXTENSION-STYLE.md), with oxlint enforcing the vocabulary rules.
 - **Git Integration** — Built-in first-party extension: a Git tab for staging and committing, and PR creation through the `gh` CLI. Configurable per workspace. Refreshes automatically on file changes. **Write message** drafts the commit message from the staged diff. With staged changes, **Open PR** opens one dialog that drafts the branch, commit message, title and body, then commits, pushes and opens the pull request. A stacked pull request offers **Merge stack**, which merges from the bottom and retargets each layer onto the default branch. A merged pull request says **Merged** and offers **Open revert PR**. The Worktrees tab can remove worktrees by rules (after the pull request merges, after idle days, with no commits of their own, with closed sessions), never one with work you would lose, and **Clean up now** reports what it removed and kept. **Keep the default branch up to date** fast-forwards it on each refresh.
 - **MergeFlow** — Intent-first, card-based conflict resolver built into the git-integration extension. When a `git merge` produces conflicts, a "Resolve conflicts →" button appears in the Git tab. MergeFlow shows each conflict as a two-panel diff (yours vs. theirs) with author info and commit context for each side. It offers Keep Mine / Keep Theirs / Keep Both / Edit manually / Ask AI actions. Navigation is keyboard-first: `M` (keep mine), `T` (keep theirs), `B` (keep both modal), `E` (manual editor), `Enter` (confirm), `←`/`→` (prev/next conflict), `Cmd+Z` (undo last decision), `Cmd+Shift+A` (AI suggestion panel), `Esc` (close modal). Session state persists across restarts, so you can resume an interrupted resolution session. The commit flow stages all resolved files and runs the merge commit in one click.
 - **Reviews list** — The global Reviews view lists pull requests that need you (requested of you first, then re-reviews and team requests), your own, and ones you are involved in. **Repositories** in its header opens a picker of every repository your account can reach, grouped by owner, with search and select-all per owner. The list then searches only those repositories (empty means all). If GitHub fails to answer a section, that section shows its own short error and Retry while the rest still load.
@@ -198,10 +198,10 @@ After that, the app updates itself. It checks for a new release at launch and ev
 | `npm run storybook`        | The design system's Storybook                                                    |
 | `npm run test:stories`     | The design system's stories run as tests                                         |
 | `npm run test:visual`      | The design system's screenshot tests (Playwright)                                |
-| `npm run lint`             | ESLint                                                                           |
+| `npm run lint`             | oxlint                                                                           |
 | `npm run lint:deps`        | syncpack: one exact version per dependency, and one copy of React and the editor |
 | `npm run lint:unused`      | knip: no unused files, exports or dependencies                                   |
-| `npm run check`            | Every lint, the format check, the typecheck and the tests: the pre-commit hook   |
+| `npm run check`            | Every lint, the format check, the typecheck and the tests, for every package     |
 | `npm run lint:duplicates`  | jscpd: no copy-pasted code                                                       |
 | `npm run typecheck`        | TypeScript check of the core, packages and extensions, specs included (no emit)  |
 | `npm run format`           | Prettier format                                                                  |
@@ -268,36 +268,36 @@ The built-in extensions in `extensions/` are the working examples, and `packages
 
 ## Key Design Decisions
 
-| Decision                                              | Record                                                                      |
-| ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| PTY processes live in main process only               | [ADR-001](docs/adr/001-pty-in-main-process.md)                              |
-| electron-store for persistence                        | [ADR-003](docs/adr/003-electron-store-for-persistence.md)                   |
-| xterm.js instances are never destroyed on tab switch  | [ADR-004](docs/adr/004-xterm-instances-persist-on-tab-switch.md)            |
-| Native fs.watch instead of chokidar                   | [ADR-005](docs/adr/005-native-fswatcher-over-chokidar.md)                   |
-| Sandboxed shell execution for extensions              | [ADR-006](docs/adr/006-sandboxed-shell-exec-for-extensions.md)              |
-| Bundled-first extension distribution (no marketplace) | [ADR-007](docs/adr/007-bundled-first-extension-distribution.md)             |
-| Extensions compile to CommonJS with esbuild           | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)                   |
-| `gh` CLI for all GitHub PR review operations          | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                            |
-| Heuristic file ordering for code review (v1)          | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)                       |
-| Sanitised HTML in PR comments                         | [ADR-091](docs/adr/091-sanitised-html-in-pr-comments.md)                    |
-| The Inbox is a band on the Forge                      | [ADR-092](docs/adr/092-the-inbox-is-a-band-on-the-forge.md)                 |
-| Stay on Electron and TypeScript                       | [ADR-093](docs/adr/093-stay-on-electron-and-typescript.md)                  |
-| Extensions follow the VS Code model (extension host)  | [ADR-094](docs/adr/094-extensions-follow-the-vs-code-model.md)              |
-| Coverage is gated by Codecov                          | [ADR-095](docs/adr/095-coverage-is-gated-by-codecov.md)                     |
-| Every IPC channel has a schema                        | [ADR-096](docs/adr/096-every-ipc-channel-has-a-schema.md)                   |
-| One version per dependency                            | [ADR-097](docs/adr/097-one-version-per-dependency.md)                       |
-| One design system, documented in Storybook            | [ADR-098](docs/adr/098-one-design-system-documented-in-storybook.md)        |
-| `node:sqlite` replaces PGlite                         | [ADR-099](docs/adr/099-node-sqlite-replaces-pglite.md)                      |
-| Remote Control credentials                            | [ADR-100](docs/adr/100-remote-control-credentials.md)                       |
-| No native terminal daemon                             | [ADR-101](docs/adr/101-no-terminal-daemon.md)                               |
-| Extension shell commands run only in declared roots   | [ADR-102](docs/adr/102-shell-exec-runs-in-declared-roots.md)                |
-| Each extension has its own data folder                | [ADR-103](docs/adr/103-each-extension-has-its-own-data-folder.md)           |
-| Unused code is a CI gate (knip)                       | [ADR-104](docs/adr/104-unused-code-is-a-ci-gate.md)                         |
-| Duplicate code is a CI gate (jscpd)                   | [ADR-105](docs/adr/105-duplicate-code-is-a-ci-gate.md)                      |
-| TypeScript 6.0.3 until typescript-eslint supports 7   | [ADR-106](docs/adr/106-typescript-6-until-the-lint-toolchain-supports-7.md) |
-| Temporal in extension backends, not in views          | [ADR-108](docs/adr/108-temporal-in-extension-backends-not-in-views.md)      |
-| A file watch belongs to the view that asked           | [ADR-109](docs/adr/109-a-file-watch-belongs-to-the-view-that-asked.md)      |
-| Modal surfaces use the native dialog element          | [ADR-110](docs/adr/110-modal-surfaces-use-the-native-dialog-element.md)     |
+| Decision                                                | Record                                                                             |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| PTY processes live in main process only                 | [ADR-001](docs/adr/001-pty-in-main-process.md)                                     |
+| electron-store for persistence                          | [ADR-003](docs/adr/003-electron-store-for-persistence.md)                          |
+| xterm.js instances are never destroyed on tab switch    | [ADR-004](docs/adr/004-xterm-instances-persist-on-tab-switch.md)                   |
+| Native fs.watch instead of chokidar                     | [ADR-005](docs/adr/005-native-fswatcher-over-chokidar.md)                          |
+| Sandboxed shell execution for extensions                | [ADR-006](docs/adr/006-sandboxed-shell-exec-for-extensions.md)                     |
+| Bundled-first extension distribution (no marketplace)   | [ADR-007](docs/adr/007-bundled-first-extension-distribution.md)                    |
+| Extensions compile to CommonJS with esbuild             | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)                          |
+| `gh` CLI for all GitHub PR review operations            | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                                   |
+| Heuristic file ordering for code review (v1)            | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)                              |
+| Sanitised HTML in PR comments                           | [ADR-091](docs/adr/091-sanitised-html-in-pr-comments.md)                           |
+| The Inbox is a band on the Forge                        | [ADR-092](docs/adr/092-the-inbox-is-a-band-on-the-forge.md)                        |
+| Stay on Electron and TypeScript                         | [ADR-093](docs/adr/093-stay-on-electron-and-typescript.md)                         |
+| Extensions follow the VS Code model (extension host)    | [ADR-094](docs/adr/094-extensions-follow-the-vs-code-model.md)                     |
+| Coverage is gated by Codecov                            | [ADR-095](docs/adr/095-coverage-is-gated-by-codecov.md)                            |
+| Every IPC channel has a schema                          | [ADR-096](docs/adr/096-every-ipc-channel-has-a-schema.md)                          |
+| One version per dependency                              | [ADR-097](docs/adr/097-one-version-per-dependency.md)                              |
+| One design system, documented in Storybook              | [ADR-098](docs/adr/098-one-design-system-documented-in-storybook.md)               |
+| `node:sqlite` replaces PGlite                           | [ADR-099](docs/adr/099-node-sqlite-replaces-pglite.md)                             |
+| Remote Control credentials                              | [ADR-100](docs/adr/100-remote-control-credentials.md)                              |
+| No native terminal daemon                               | [ADR-101](docs/adr/101-no-terminal-daemon.md)                                      |
+| Extension shell commands run only in declared roots     | [ADR-102](docs/adr/102-shell-exec-runs-in-declared-roots.md)                       |
+| Each extension has its own data folder                  | [ADR-103](docs/adr/103-each-extension-has-its-own-data-folder.md)                  |
+| Unused code is a CI gate (knip)                         | [ADR-104](docs/adr/104-unused-code-is-a-ci-gate.md)                                |
+| Duplicate code is a CI gate (jscpd)                     | [ADR-105](docs/adr/105-duplicate-code-is-a-ci-gate.md)                             |
+| TypeScript 7 and oxlint replace TypeScript 6 and ESLint | [ADR-153](docs/adr/153-typescript-7-and-oxlint-replace-typescript-6-and-eslint.md) |
+| Temporal in extension backends, not in views            | [ADR-108](docs/adr/108-temporal-in-extension-backends-not-in-views.md)             |
+| A file watch belongs to the view that asked             | [ADR-109](docs/adr/109-a-file-watch-belongs-to-the-view-that-asked.md)             |
+| Modal surfaces use the native dialog element            | [ADR-110](docs/adr/110-modal-surfaces-use-the-native-dialog-element.md)            |
 
 ## Contributing
 

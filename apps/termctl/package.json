@@ -1,0 +1,24 @@
+{
+  "name": "@terminator/termctl",
+  "version": "1.0.0",
+  "private": true,
+  "description": "termctl: Terminator's MCP tools from a shell, or as a full-screen TUI",
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/build-termctl.mjs",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/apps-termctl-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/apps-termctl-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run apps/termctl/",
+    "test:coverage": "cd ../.. && vitest run apps/termctl/ --coverage.enabled --coverage.reportsDirectory=apps/termctl/coverage"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@terminator/core-shared": "1.0.0",
+    "ink": "8.0.0",
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@terminator/core-main": "1.0.0",
+    "@terminator/test-support": "1.0.0"
+  }
+}

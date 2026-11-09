@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mcpSocketPath } from '../../../src/mcp/socket-path'
+import { mcpSocketPath } from '../../../../core-shared/src/mcp/socket-path'
 
 const tmp = '/var/folders/xy/T'
 

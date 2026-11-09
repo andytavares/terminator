@@ -58,12 +58,14 @@ import { startMcpServer } from './mcp/mcp-server.js'
 import { installRelayScript } from './mcp/relay-script.js'
 import { manifestTools } from './mcp/manifest-tools.js'
 import { alertTool } from './mcp/alert-tool.js'
-import { mcpSocketPath } from './mcp/socket-path.js'
+import { mcpSocketPath } from '../../core-shared/src/mcp/socket-path.js'
 import { moveSessionTool } from './mcp/move-session.js'
 import { registerRendererTools, rendererTools } from './mcp/renderer-tools.js'
 import { appTools } from './mcp/app-tools.js'
 import { registerWithClaude } from './mcp/registration.js'
 import { registerClaudeCodeHandlers } from './ipc/claude-code.ipc.js'
+import { registerTermctlHandlers } from './ipc/termctl.ipc.js'
+import { termctlScriptPath, writeLauncher } from './integrations/termctl-command.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
 import { stopRunningCommands } from './shell/command-runner.js'
@@ -460,11 +462,23 @@ function startTerminatorMcpServer(userHooks: Promise<void>): void {
     ([relayPath]) => ({ relayPath, socketPath, directory })
   )
   registerClaudeCodeHandlers(registration)
+  startTermctlCommand(socketPath)
   void Promise.all([registration, userHooks])
     .then(([options]) => registerWithClaude(options))
     .catch((error) =>
       logger.error('could not start the Terminator MCP server', { error: String(error) })
     )
+}
+
+/** termctl's launcher, written at every start, and the channels that put it on the PATH. */
+function startTermctlCommand(socketPath: string): void {
+  const directory = join(app.getPath('userData'), 'termctl')
+  const input = { execPath: process.execPath, scriptPath: termctlScriptPath(), socketPath }
+  const options = writeLauncher(directory, input).then((launcherPath) => ({
+    launcherPath,
+    binDirectory: '/usr/local/bin',
+  }))
+  registerTermctlHandlers(options)
 }
 
 /** Shell, editor, files, logging, notifications, metrics, the database, dialogs and the app. */

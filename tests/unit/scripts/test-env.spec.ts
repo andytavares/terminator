@@ -45,4 +45,10 @@ describe('what a test process keeps of its surroundings', () => {
     expect(env.ELECTRON_OVERRIDE_DIST_PATH).toBe('/e')
     expect(env.GITHUB_ACTIONS).toBe('true')
   })
+
+  it('keeps the X display a Linux run gives the app, which needs one to open a window', () => {
+    const env = testEnvironment(SEALED, { DISPLAY: ':99', XAUTHORITY: '/tmp/xvfb-run.auth' })
+    expect(env.DISPLAY).toBe(':99')
+    expect(env.XAUTHORITY).toBe('/tmp/xvfb-run.auth')
+  })
 })

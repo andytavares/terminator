@@ -1,13 +1,47 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
-  // Turborepo runs each workspace's checks side by side. Nothing is cached: every run checks
-  // everything once (Constitution XIV, ADR 151). The root tasks cover what no workspace owns.
+  // A pull request and the pre-commit hook run the tasks of the packages a change reaches
+  // (--affected) and replay a passed task whose inputs are unchanged; a push to main runs every
+  // task with --force (Constitution XIV, ADR 154). The core packages import each other by
+  // relative path, so `transit` carries each dependency's hash into its dependents' tasks.
   "envMode": "loose",
+  "globalDependencies": [
+    ".nvmrc",
+    ".npmrc",
+    ".oxlintrc.json",
+    "scripts/oxlint-plugin/**",
+    "scripts/test-env.mjs",
+    "tsconfig.extension.json",
+    "tsconfig.test.json",
+    "vitest.config.ts"
+  ],
   "tasks": {
-    "typecheck": { "cache": false },
-    "lint": { "cache": false },
-    "test": { "cache": false },
+    "transit": { "dependsOn": ["^transit"] },
+    "typecheck": { "dependsOn": ["transit"] },
+    "lint": { "dependsOn": ["transit"] },
+    "test": { "dependsOn": ["transit"] },
+    // CI's run of the same specs, with the coverage report Codecov reads.
+    "test:coverage": { "dependsOn": ["transit"], "outputs": ["coverage/**"] },
+    "build-storybook": { "outputs": ["storybook-static/**"] },
+    "test:stories": { "dependsOn": ["transit"] },
+    "test:visual": { "dependsOn": ["build-storybook"] },
+    // The repository-wide checks no workspace owns; they run side by side, every time.
+    "//#lint:deps": { "cache": false },
+    "//#lint:unused": { "cache": false },
+    "//#lint:duplicates": { "cache": false },
+    "//#lint:workflows": { "cache": false },
+    "//#format:check": { "cache": false },
     "//#typecheck:specs": { "cache": false },
-    "//#lint:root": { "cache": false }
+    "//#lint:root": { "cache": false },
+    "//#test:root": { "cache": false },
+    // The specs of the repository's lint rules: they run again only when a rule or a spec changes.
+    "//#test:lint-rules": {
+      "inputs": [
+        ".oxlintrc.json",
+        "scripts/oxlint-plugin/**",
+        "tests/integration/lint/**",
+        "packages/test-support/src/temp-dir.ts"
+      ]
+    }
   }
 }

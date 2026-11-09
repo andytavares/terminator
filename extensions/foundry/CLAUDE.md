@@ -73,7 +73,7 @@ extensions/foundry/src/renderer` is the count to keep small.
 
 `npm run lint` limits every function here, specs included, to 30 lines
 (blank lines and comments aside), complexity 10 and three parameters
-(`eslint.config.mjs`). Split a component that outgrows the limits into a state hook, a
+(`.oxlintrc.json`). Split a component that outgrows the limits into a state hook, a
 plain function that works out what it draws, and named parts. The state hook
 calls the others in the order of their effects, because effects run in that
 order. Split a spec `describe` longer than 30 lines into describes by topic.

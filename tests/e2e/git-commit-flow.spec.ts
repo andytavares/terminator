@@ -370,9 +370,13 @@ const CHANGE_TO_PULL_REQUEST: Steps = [
   ],
 ]
 
-test('a change is diffed, staged, committed through its hooks, pushed and opened as a pull request', async () => {
-  await runSteps(CHANGE_TO_PULL_REQUEST)
-})
+test(
+  'a change is diffed, staged, committed through its hooks, pushed and opened as a pull request',
+  { tag: '@mac' },
+  async () => {
+    await runSteps(CHANGE_TO_PULL_REQUEST)
+  }
+)
 
 // The settings flow: two more checkouts, told apart in the sidebar by their branch names.
 

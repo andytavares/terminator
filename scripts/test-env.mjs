@@ -23,6 +23,9 @@ const PASSED_THROUGH = [
   'USER',
   'LOGNAME',
   'TERM',
+  // The X display xvfb-run gives a Linux run (ADR 154): Electron opens no window without it.
+  'DISPLAY',
+  'XAUTHORITY',
 ]
 
 /** The time zone of every test process and every app a test launches, so both read one "today". */

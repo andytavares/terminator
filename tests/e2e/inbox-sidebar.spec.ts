@@ -54,7 +54,7 @@ test.afterEach(async () => {
   await closeApp(handle)
 })
 
-test('a terminal opened on a dismissed branch shows in the Inbox', async () => {
+test('a terminal opened on a dismissed branch shows in the Inbox', { tag: '@mac' }, async () => {
   const { page } = handle
   await createWorkspace(page, 'quicknote', gitFolder())
   await projectGroup(page, 'main').click()

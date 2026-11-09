@@ -6,8 +6,9 @@
   "scripts": {
     "build:renderer": "vite build --config vite.renderer.config.mts",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-notepad-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-notepad-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
-    "lint": "eslint .",
-    "test": "cd ../.. && vitest run extensions/notepad/"
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run extensions/notepad/",
+    "test:coverage": "cd ../.. && vitest run extensions/notepad/ --coverage.enabled --coverage.reportsDirectory=extensions/notepad/coverage"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",

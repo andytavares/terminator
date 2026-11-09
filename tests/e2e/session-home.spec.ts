@@ -128,18 +128,23 @@ async function outputLeavesInFlightOrder(page: Page): Promise<void> {
   await expect.poll(() => tasksOrder(page)).toEqual(['feature-b', DESCRIPTION])
 }
 
-test('a session is kept on Home under the work it serves, and what is written about it names that work', async () => {
-  const { page } = handle
-  await test.step('the app opens on Home with nothing open', () => opensOnHomeWithNothingOpen(page))
-  await test.step('Home lists a terminal under Tasks, as the branch it runs on', () =>
-    listsTerminalUnderItsWork(page))
-  await test.step('describing a session from its tab names the work on Home', () =>
-    descriptionNamesTheWork(page))
-  await test.step('linking a session says where to connect a tracker when none is', () =>
-    linkDialogNamesWhereToConnect(page))
-  await test.step('the link dialog closes on Escape', () => linkDialogClosesOnEscape(page))
-  await test.step("Home's group menu opens inside the window", () =>
-    groupMenuOpensInsideTheWindow(page))
-  await test.step('output in a session leaves Tasks in the order it had', () =>
-    outputLeavesInFlightOrder(page))
-})
+test(
+  'a session is kept on Home under the work it serves, and what is written about it names that work',
+  { tag: '@mac' },
+  async () => {
+    const { page } = handle
+    await test.step('the app opens on Home with nothing open', () =>
+      opensOnHomeWithNothingOpen(page))
+    await test.step('Home lists a terminal under Tasks, as the branch it runs on', () =>
+      listsTerminalUnderItsWork(page))
+    await test.step('describing a session from its tab names the work on Home', () =>
+      descriptionNamesTheWork(page))
+    await test.step('linking a session says where to connect a tracker when none is', () =>
+      linkDialogNamesWhereToConnect(page))
+    await test.step('the link dialog closes on Escape', () => linkDialogClosesOnEscape(page))
+    await test.step("Home's group menu opens inside the window", () =>
+      groupMenuOpensInsideTheWindow(page))
+    await test.step('output in a session leaves Tasks in the order it had', () =>
+      outputLeavesInFlightOrder(page))
+  }
+)

@@ -4,7 +4,7 @@ The five bundled extensions were written at different times and are not consiste
 
 Scope: every string an extension shows on screen, in the five bundled extensions and in `packages/extension-ui`. Identifiers, IPC channel names, CSS class names, database columns and type names are **not** in scope. They keep their names.
 
-Enforcement: the three vocabulary rules below are `no-restricted-syntax` selectors in `eslint.config.mjs`, scoped to `extensions/*/src/**/*.tsx` and `packages/extension-ui/src/**/*.tsx`. Their fixture spec is `tests/unit/lint/extension-rules.spec.ts`. A reviewer applies every other rule here.
+Enforcement: the three vocabulary rules below are selectors of the `terminator/restricted-syntax` rule (`scripts/oxlint-plugin/index.mjs`), which `.oxlintrc.json` scopes to `extensions/*/src/**/*.tsx` and `packages/extension-ui/src/**/*.tsx`. Their fixture spec is `tests/integration/lint/extension-rules.spec.ts`. A reviewer applies every other rule here.
 
 ---
 
@@ -95,7 +95,7 @@ Constitution Principle XII: lucide-react only, flat, inheriting `currentColor`.
 ❌ <Check size={14} />
 ```
 
-A size outside those three gets a rule on its own selector, not a fourth scale step. Examples are an empty state's 36px glyph and a status dot's 7px tick. The `size` prop is an ESLint error, with two named exemptions. `<select size={n}>` is the HTML rows attribute. A generator that computes a raster from a pixel count (`QRCodeSVG`) cannot be sized with CSS.
+A size outside those three gets a rule on its own selector, not a fourth scale step. Examples are an empty state's 36px glyph and a status dot's 7px tick. The `size` prop is an oxlint error, with two named exemptions. `<select size={n}>` is the HTML rows attribute. A generator that computes a raster from a pixel count (`QRCodeSVG`) cannot be sized with CSS.
 
 **No unicode as a visual element.** When `⚠ ✓ ✕ ← → ↑ ↓ ↺ ↻ ▸ ▾ ℹ ✦` stand for a state or an action, use `TriangleAlert`, `Check`, `X`, `ArrowLeft`,
 `ChevronRight`, `ChevronUp`, `ArrowDown`, `RotateCcw`, `RefreshCw`,

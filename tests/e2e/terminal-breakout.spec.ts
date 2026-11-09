@@ -86,41 +86,45 @@ async function threeTerminalsSecondSelected(workspace: string): Promise<string[]
   return titles
 }
 
-test('a terminal moves to its own window with its scrollback and docks back where it was', async () => {
-  const { page, app } = handle
-  const titles = await test.step('three terminals, the second holds a marker', () =>
-    threeTerminalsSecondSelected('WS-Breakout'))
+test(
+  'a terminal moves to its own window with its scrollback and docks back where it was',
+  { tag: '@mac' },
+  async () => {
+    const { page, app } = handle
+    const titles = await test.step('three terminals, the second holds a marker', () =>
+      threeTerminalsSecondSelected('WS-Breakout'))
 
-  const breakout = await test.step('the menu moves it to its own window', async () => {
-    const opened = app.waitForEvent('window')
-    await clickWindowMenuItem('Move Terminal to Its Own Window')
-    return opened
-  })
+    const breakout = await test.step('the menu moves it to its own window', async () => {
+      const opened = app.waitForEvent('window')
+      await clickWindowMenuItem('Move Terminal to Its Own Window')
+      return opened
+    })
 
-  await test.step('the new window names the terminal and still shows its scrollback', async () => {
-    await expect(breakout.getByRole('tab')).toContainText(titles[1])
-    await expect.poll(() => rowsOf(breakout)).toContain('breakout-marker-1')
-  })
+    await test.step('the new window names the terminal and still shows its scrollback', async () => {
+      await expect(breakout.getByRole('tab')).toContainText(titles[1])
+      await expect.poll(() => rowsOf(breakout)).toContain('breakout-marker-1')
+    })
 
-  await test.step('the terminal is live in the new window', () =>
-    echoInto(breakout, 'breakout-marker-2'))
+    await test.step('the terminal is live in the new window', () =>
+      echoInto(breakout, 'breakout-marker-2'))
 
-  await test.step('the main window keeps the other two tabs, in order', async () => {
-    await expect(sessionTabs()).toHaveCount(2)
-    await expect(sessionTabs().first()).toContainText(titles[0])
-    await expect(sessionTabs().last()).toContainText(titles[2])
-  })
+    await test.step('the main window keeps the other two tabs, in order', async () => {
+      await expect(sessionTabs()).toHaveCount(2)
+      await expect(sessionTabs().first()).toContainText(titles[0])
+      await expect(sessionTabs().last()).toContainText(titles[2])
+    })
 
-  await test.step('closing the new window docks the terminal back in second place', async () => {
-    await breakout.close()
-    await expect(sessionTabs()).toHaveCount(3)
-    await expect(sessionTabs().nth(1)).toContainText(titles[1])
-    await expect(sessionTabs().nth(1)).toHaveClass(/tab-bar__tab--active/)
-    await expect.poll(() => rowsOf(page)).toMatch(/breakout-marker-1[\s\S]*breakout-marker-2/)
-  })
-})
+    await test.step('closing the new window docks the terminal back in second place', async () => {
+      await breakout.close()
+      await expect(sessionTabs()).toHaveCount(3)
+      await expect(sessionTabs().nth(1)).toContainText(titles[1])
+      await expect(sessionTabs().nth(1)).toHaveClass(/tab-bar__tab--active/)
+      await expect.poll(() => rowsOf(page)).toMatch(/breakout-marker-1[\s\S]*breakout-marker-2/)
+    })
+  }
+)
 
-test('a terminal still draws after moving out, back and out again', async () => {
+test('a terminal still draws after moving out, back and out again', { tag: '@mac' }, async () => {
   await test.step('three terminals, the second holds a marker', () =>
     threeTerminalsSecondSelected('WS-Redraw'))
 
@@ -157,31 +161,35 @@ async function dragTab(page: Page, tab: Locator, to: { x: number; y: number }): 
   await page.mouse.up()
 }
 
-test('a tab dragged out of the window opens on release, and dragged back docks', async () => {
-  const { page, app } = handle
-  const titles = await test.step('three terminals, the second holds a marker', () =>
-    threeTerminalsSecondSelected('WS-Drag'))
+test(
+  'a tab dragged out of the window opens on release, and dragged back docks',
+  { tag: '@mac' },
+  async () => {
+    const { page, app } = handle
+    const titles = await test.step('three terminals, the second holds a marker', () =>
+      threeTerminalsSecondSelected('WS-Drag'))
 
-  const breakout =
-    await test.step('letting go of the tab left of the window opens it there', async () => {
-      const opened = app.waitForEvent('window')
-      await dragTab(page, sessionTabs().nth(1), { x: -300, y: 200 })
-      return opened
+    const breakout =
+      await test.step('letting go of the tab left of the window opens it there', async () => {
+        const opened = app.waitForEvent('window')
+        await dragTab(page, sessionTabs().nth(1), { x: -300, y: 200 })
+        return opened
+      })
+
+    await test.step('the window holds the terminal and its scrollback', async () => {
+      await expect(breakout.getByRole('tab')).toContainText(titles[1])
+      await expect.poll(() => rowsOf(breakout)).toContain('breakout-marker-1')
+      await expect(sessionTabs()).toHaveCount(2)
     })
 
-  await test.step('the window holds the terminal and its scrollback', async () => {
-    await expect(breakout.getByRole('tab')).toContainText(titles[1])
-    await expect.poll(() => rowsOf(breakout)).toContain('breakout-marker-1')
-    await expect(sessionTabs()).toHaveCount(2)
-  })
-
-  await test.step('letting go of its tab over the main window docks it in second place', async () => {
-    const mainOrigin = await page.evaluate(() => ({ x: window.screenX, y: window.screenY }))
-    const target = await pagePointOf(breakout, { x: mainOrigin.x + 400, y: mainOrigin.y + 300 })
-    const closed = breakout.waitForEvent('close')
-    await dragTab(breakout, breakout.getByRole('tab'), target)
-    await closed
-    await expect(sessionTabs()).toHaveCount(3)
-    await expect(sessionTabs().nth(1)).toContainText(titles[1])
-  })
-})
+    await test.step('letting go of its tab over the main window docks it in second place', async () => {
+      const mainOrigin = await page.evaluate(() => ({ x: window.screenX, y: window.screenY }))
+      const target = await pagePointOf(breakout, { x: mainOrigin.x + 400, y: mainOrigin.y + 300 })
+      const closed = breakout.waitForEvent('close')
+      await dragTab(breakout, breakout.getByRole('tab'), target)
+      await closed
+      await expect(sessionTabs()).toHaveCount(3)
+      await expect(sessionTabs().nth(1)).toContainText(titles[1])
+    })
+  }
+)

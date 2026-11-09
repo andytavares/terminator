@@ -26,6 +26,8 @@ An end-to-end reference for every feature and extension in Terminator — an ext
 18. [Extension: Task Vault](#18-extension-task-vault)
 19. [Extension: Remote Control](#19-extension-remote-control)
 
+To run Terminator's tools from a shell, see [termctl](termctl.md).
+
 ---
 
 ## 1. What is Terminator?
@@ -261,7 +263,7 @@ Open Settings with **`Cmd+,`** or **View → Open Settings**.
 | **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home, Sidebar (Tree or Inbox) |
 | **Terminal**       | Default shell, scrollback limit                                                                        |
 | **Agents**         | Default agent and your own ACP agents — see below                                                      |
-| **Integrations**   | Connect Linear and Claude Code — see below                                                             |
+| **Integrations**   | Connect Linear and Claude Code, and install `termctl` — see below                                      |
 | **Extensions**     | Enable/disable individual extensions                                                                   |
 | **Remote Control** | Enable local server, port, ngrok tunnel, session password                                              |
 
@@ -278,6 +280,16 @@ Open Settings with **`Cmd+,`** or **View → Open Settings**.
 **Where it lives.** Terminator encrypts the credential with your operating system's keychain (`safeStorage`) in `integrations.json` in the app's data directory. Only the main process reads it. No part of the interface can ask for it back. Status only reports _whether_ a tracker is connected and _which account_ the credential proved to belong to. The connect and disconnect actions are also the only two settings that Remote Control deliberately does not allow. An authenticated browser on your LAN has no business writing your API keys.
 
 **Disconnecting** destroys the credential. Anything you linked to a branch stays linked, because it is your association, not the tracker's. It works again as soon as you reconnect.
+
+### Integrations — the termctl command
+
+`termctl` runs the Terminator MCP server's tools from any terminal. With no arguments, it opens a full-screen view. The **termctl** row in **Settings → Integrations** puts it on your `PATH`:
+
+- **Install command** links `/usr/local/bin/termctl` to a launcher in Terminator's data folder. If your user cannot write to `/usr/local/bin`, macOS asks for an administrator's password.
+- **Uninstall** removes the link. Terminator removes only its own link.
+- If another program's `termctl` is in `/usr/local/bin`, the row says so and offers no action.
+
+If the install fails, for example because you cancelled the password prompt, the row shows the reason. `termctl` reaches Terminator only while the app runs.
 
 ### Per-workspace overrides
 

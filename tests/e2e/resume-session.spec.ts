@@ -223,7 +223,7 @@ async function resumedFromQuickActions(page: Page): Promise<void> {
   await expect(page.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()
 }
 
-test('a conversation is resumed, and only when it can be', async () => {
+test('a conversation is resumed, and only when it can be', { tag: '@mac' }, async () => {
   const folder = e2eTempDir('resume-')
   const run: Conversations = {
     folder,

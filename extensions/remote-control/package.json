@@ -6,8 +6,9 @@
   "scripts": {
     "build:renderer": "vite build --config vite.renderer.config.mts",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-remote-control-tsconfig.tsbuildinfo -p tsconfig.json && tsc --noEmit --incremental --tsBuildInfoFile ../../node_modules/.cache/typecheck/extensions-remote-control-tsconfig.test.tsbuildinfo -p tsconfig.test.json",
-    "lint": "eslint .",
-    "test": "cd ../.. && vitest run extensions/remote-control/"
+    "lint": "oxlint .",
+    "test": "cd ../.. && vitest run extensions/remote-control/",
+    "test:coverage": "cd ../.. && vitest run extensions/remote-control/ --coverage.enabled --coverage.reportsDirectory=extensions/remote-control/coverage"
   },
   "dependencies": {
     "@fastify/static": "10.1.7",

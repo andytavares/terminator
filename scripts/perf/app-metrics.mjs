@@ -2,6 +2,7 @@
 // per process after it settles, and terminal throughput.
 //   node scripts/perf/app-metrics.mjs [--runs=5] [--settle-ms=9000] [--throughput]
 //                                     [--electron-arg=<flag>]... [--extensions=each]
+//                                     [--scenario=working-session] [--view=terminal|overview]
 // Each run uses a throw-away profile. Memory comes from app.getAppMetrics()
 // (https://www.electronjs.org/docs/latest/api/app#appgetappmetrics), which
 // reports the same numbers on every platform.
@@ -10,10 +11,18 @@
 // extension enabled, with a probe that loads nothing (the host's own cost), with
 // each bundled extension enabled alone beside the probe, and with all of them.
 // The probe also reports process.memoryUsage() from inside the host.
+//
+// --scenario=working-session (macOS): 4 terminals, 1 stub agent tab, 2 MCP relays, every extension
+// on, the last terminal on screen (--view=overview: the Overview); then 60 s of each process's
+// physical footprint (`footprint -p`) and CPU time.
 import { _electron as electron } from 'playwright'
+import { Client } from '@modelcontextprotocol/client'
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const THROUGHPUT_BYTES = 50 * 1024 * 1024
 
@@ -47,11 +56,11 @@ async function hostMemory(app) {
   }
 }
 
-async function launchTimed(profile) {
+async function launchTimed(profile, env = {}) {
   const launchedAt = performance.now()
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${profile}`, ...electronArgs()],
-    env: { ...process.env, NODE_ENV: 'test' },
+    env: { ...process.env, NODE_ENV: 'test', ...env },
   })
   const attached = performance.now() - launchedAt
   const page = await app.firstWindow()
@@ -348,6 +357,233 @@ async function measureEachExtension(runs, settleMs) {
   }
 }
 
+const STUB_AGENT = fileURLToPath(
+  new URL('../../tests/e2e/fixtures/acp-stub-agent.mjs', import.meta.url)
+)
+// packages/core-shared/src/types/index.ts: the project a tab outside every workspace belongs to.
+const SCRATCH_PROJECT_ID = '00000000-0000-0000-0000-000000000000'
+const SAMPLE_SECONDS = 60
+const SAMPLE_EVERY_MS = 5000
+
+// The stub agent seeded as `claude`, as tests/e2e/helpers.ts does, so no real agent starts.
+function seedStubAgent(profile) {
+  const stub = {
+    id: 'claude',
+    label: 'Claude Code',
+    command: process.execPath,
+    args: [STUB_AGENT, join(profile, 'agent-record.jsonl')],
+  }
+  const agents = { default: 'claude', custom: [stub] }
+  writeFileSync(join(profile, 'settings.json'), JSON.stringify({ global: { agents } }))
+}
+
+// The socket of packages/core-main/src/mcp/socket-path.ts: in the profile, or in temp when too long.
+async function mcpSocket(app, profile) {
+  const inProfile = join(profile, 'mcp.sock')
+  if (Buffer.byteLength(inProfile) <= 103) return inProfile
+  const temp = await app.evaluate(({ app: electronApp }) => electronApp.getPath('temp'))
+  const { createHash } = await import('node:crypto')
+  return join(
+    temp,
+    `terminator-mcp-${createHash('sha256').update(profile).digest('hex').slice(0, 16)}.sock`
+  )
+}
+
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Starts the relay the app wrote, as Claude Code's registration does (tests/e2e/mcp.spec.ts).
+async function connectRelay(app, profile) {
+  const relayPath = join(profile, 'mcp', 'mcp-relay.cjs')
+  const socketPath = await mcpSocket(app, profile)
+  while (!existsSync(relayPath) || !existsSync(socketPath)) await pause(100)
+  const electronBinary = await app.evaluate(() => process.execPath)
+  const transport = new StdioClientTransport({
+    command: electronBinary,
+    args: [relayPath, socketPath],
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  })
+  const client = new Client({ name: 'perf', version: '1.0.0' })
+  await client.connect(transport)
+  return { client, pid: transport.pid }
+}
+
+// 4 terminal tabs that print output, the last one on screen, then an agent tab.
+async function openWorkingTabs(client, profile) {
+  for (let tab = 0; tab < 4; tab++) {
+    const command = `ls -la /usr/bin | head -200; seq 1 2000`
+    await client.callTool({ name: 'open_terminal', arguments: { cwd: profile, command } })
+  }
+  const tab = { projectId: SCRATCH_PROJECT_ID, title: 'Perf agent' }
+  await client.callTool({ name: 'start_agent', arguments: { cwd: profile, tab } })
+}
+
+// Every process under `root`, by pid, from one `ps` listing.
+function descendants(root) {
+  const rows = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' })
+  const parsed = rows
+    .trim()
+    .split('\n')
+    .map((row) => row.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/))
+  const found = new Map()
+  const queue = [root]
+  while (queue.length > 0) {
+    const parent = queue.shift()
+    for (const [, pid, ppid, command] of parsed) {
+      if (Number(ppid) !== parent) continue
+      found.set(Number(pid), command)
+      queue.push(Number(pid))
+    }
+  }
+  return found
+}
+
+// A name for each process: Electron's own types, then the agent, relays and shells.
+async function labelProcesses(app, relayPids) {
+  const metrics = await app.evaluate(({ app: electronApp }) => electronApp.getAppMetrics())
+  const labels = new Map(
+    metrics.map((m) => [m.pid, m.name === HOST_NAME ? 'Extension Host' : m.type])
+  )
+  const mainPid = metrics.find((m) => m.type === 'Browser').pid
+  for (const [pid, command] of descendants(mainPid)) {
+    if (labels.has(pid)) continue
+    labels.set(pid, command.includes('acp-stub-agent') ? 'Agent' : 'Other child')
+  }
+  for (const pid of relayPids) labels.set(pid, 'MCP relay')
+  return labels
+}
+
+const UNIT_MB = { B: 1 / 1048576, KB: 1 / 1024, MB: 1, GB: 1024 }
+
+// Physical footprint in MB of each pid, from one `footprint` call.
+function footprints(pids) {
+  const args = pids.flatMap((pid) => ['-p', String(pid)])
+  const output = execFileSync('footprint', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const result = new Map()
+  for (const [, pid, amount, unit] of output.matchAll(
+    /\[(\d+)\]: .*?Footprint: ([\d.]+) (B|KB|MB|GB)/g
+  ))
+    result.set(Number(pid), Number(amount) * UNIT_MB[unit])
+  return result
+}
+
+// CPU seconds used so far by each pid (ps `time` is [[dd-]hh:]mm:ss.cc).
+function cpuSeconds(pids) {
+  const output = execFileSync('ps', ['-o', 'pid=,time=', '-p', pids.join(',')], {
+    encoding: 'utf8',
+  })
+  const result = new Map()
+  for (const row of output.trim().split('\n')) {
+    const [pid, time] = row.trim().split(/\s+/)
+    const seconds = time.split(':').reduce((sum, part) => sum * 60 + Number(part), 0)
+    result.set(Number(pid), seconds)
+  }
+  return result
+}
+
+// Sums a per-pid map into per-label totals.
+function byLabel(labels, perPid) {
+  const totals = {}
+  for (const [pid, label] of labels) totals[label] = (totals[label] ?? 0) + (perPid.get(pid) ?? 0)
+  return totals
+}
+
+// Footprint every 5 s over 60 s, averaged; mean CPU % over the whole 60 s.
+async function sampleSession(labels) {
+  const pids = [...labels.keys()]
+  const cpuBefore = cpuSeconds(pids)
+  const startedAt = performance.now()
+  const samples = []
+  for (let at = 0; at < SAMPLE_SECONDS * 1000; at += SAMPLE_EVERY_MS) {
+    samples.push(byLabel(labels, footprints(pids)))
+    await pause(SAMPLE_EVERY_MS)
+  }
+  const elapsed = (performance.now() - startedAt) / 1000
+  const cpuAfter = cpuSeconds(pids)
+  const cpuPercent = new Map(
+    pids.map((pid) => [
+      pid,
+      (100 * ((cpuAfter.get(pid) ?? 0) - (cpuBefore.get(pid) ?? 0))) / elapsed,
+    ])
+  )
+  const footprintMB = Object.fromEntries(
+    Object.keys(samples[0]).map((label) => [
+      label,
+      samples.reduce((sum, s) => sum + s[label], 0) / samples.length,
+    ])
+  )
+  return { footprintMB, cpuPercent: byLabel(labels, cpuPercent) }
+}
+
+async function showView(page) {
+  if (cliOption('view', 'terminal') !== 'overview') return
+  await page.getByRole('button', { name: /^Overview/ }).click()
+  await page.getByRole('heading', { name: 'Overview' }).waitFor()
+}
+
+async function measureWorkingSessionOnce(settleMs) {
+  const profile = mkdtempSync(join(tmpdir(), 'tp-'))
+  seedStubAgent(profile)
+  const { app, page } = await launchTimed(profile)
+  const relays = []
+  try {
+    relays.push(await connectRelay(app, profile), await connectRelay(app, profile))
+    await openWorkingTabs(relays[0].client, profile)
+    await showView(page)
+    await page.waitForTimeout(settleMs)
+    await waitUntilIdle(app)
+    const labels = await labelProcesses(
+      app,
+      relays.map((relay) => relay.pid)
+    )
+    const focused = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().some((w) => w.isFocused())
+    )
+    return {
+      focused,
+      workingSetMB: await memoryByProcessType(app),
+      ...(await sampleSession(labels)),
+    }
+  } finally {
+    for (const relay of relays) await relay.client.close()
+    await app.close()
+    rmSync(profile, { recursive: true, force: true })
+  }
+}
+
+function summariseWorkingSession(results) {
+  const labels = Object.keys(results[0].footprintMB)
+  const median = (read) => Number(middleValue(results.map(read)).toFixed(1))
+  const footprintMB = Object.fromEntries(
+    labels.map((l) => [l, median((r) => r.footprintMB[l] ?? 0)])
+  )
+  const cpuPercent = Object.fromEntries(labels.map((l) => [l, median((r) => r.cpuPercent[l] ?? 0)]))
+  return {
+    runs: results.length,
+    view: cliOption('view', 'terminal'),
+    focusedRuns: results.filter((r) => r.focused).length,
+    footprintMB: {
+      ...footprintMB,
+      total: median((r) => Object.values(r.footprintMB).reduce((a, b) => a + b, 0)),
+    },
+    cpuPercent: {
+      ...cpuPercent,
+      total: median((r) => Object.values(r.cpuPercent).reduce((a, b) => a + b, 0)),
+    },
+    workingSetMB: mediansByKey(
+      results,
+      Object.keys(results[0].workingSetMB),
+      (r, t) => r.workingSetMB[t] ?? 0
+    ),
+    perRun: results.map((r) => ({ footprintMB: r.footprintMB, cpuPercent: r.cpuPercent })),
+  }
+}
+
+async function measureWorkingSession(runs, settleMs) {
+  const results = []
+  for (let run = 0; run < runs; run++) results.push(await measureWorkingSessionOnce(settleMs))
+  return summariseWorkingSession(results)
+}
+
 async function measureApp(runs, settleMs) {
   const withThroughput = process.argv.includes('--throughput')
   const results = []
@@ -357,8 +593,11 @@ async function measureApp(runs, settleMs) {
 
 const runs = Number(cliOption('runs', '5'))
 const settleMs = Number(cliOption('settle-ms', '9000'))
-const summary =
-  cliOption('extensions', '') === 'each'
-    ? await measureEachExtension(runs, settleMs)
-    : await measureApp(runs, settleMs)
+const scenarios = {
+  each: () => measureEachExtension(runs, settleMs),
+  'working-session': () => measureWorkingSession(runs, settleMs),
+  default: () => measureApp(runs, settleMs),
+}
+const scenario = cliOption('extensions', '') === 'each' ? 'each' : cliOption('scenario', 'default')
+const summary = await scenarios[scenario]()
 console.log(JSON.stringify(summary, null, 2))

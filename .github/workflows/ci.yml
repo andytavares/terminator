@@ -19,12 +19,13 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Every job runs on Ubuntu except the ones that need a Mac: the app (Start, E2E), the story
-# screenshots (the baselines are macOS renders) and the signed release. Every run tests everything,
-# once, with no retry (ADR 151). The pre-commit hook runs the same npm scripts (npm run check).
+# A pull request runs, on Ubuntu, the tasks of the packages its change reaches and replays a passed
+# task whose inputs are unchanged; a push to main runs everything with --force, then the macOS job
+# (Start and the @mac specs), then the release (Constitution XIV, ADR 154). Nothing retries. The
+# pre-commit hook runs the same Turborepo tasks (package.json, scripts check:repo and check:packages).
 jobs:
-  lint:
-    name: Lint
+  check:
+    name: Check
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -40,163 +41,199 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Turborepo's results and Prettier's, kept between runs. A miss only means the task runs.
+      - name: Restore task results
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .turbo
+            node_modules/.cache/prettier
+          key: tasks-${{ runner.os }}-${{ github.sha }}
+          restore-keys: tasks-${{ runner.os }}-
+
       # A change to the lockfile must leave no high or critical advisory (Constitution IV;
       # overrides are listed in docs/CONTRIBUTING.md).
       - name: Security audit
         run: git diff --quiet "$(git merge-base origin/main HEAD)" HEAD -- package-lock.json || npm audit --audit-level=high
 
-      # One exact version per dependency (syncpack), and no second copy of a package that must
-      # be single, one editor state and one React (scripts/check-single-copies.mjs, #290).
-      - name: Dependencies
-        run: npm run lint:deps
+      # syncpack, knip, jscpd, the workflows, Prettier, and the root's own lint, typecheck and specs.
+      # TMPDIR is an empty directory for the run, and the step fails if a spec leaves anything in it
+      # (scripts/check-temp-leaks.mjs).
+      - name: Repository checks
+        run: node scripts/check-temp-leaks.mjs npm run check:repo
 
-      # Unused files, exports and dependencies (knip.jsonc, ADR 104).
-      - name: Unused code
-        run: npm run lint:unused
+      # Each package's lint, typecheck and specs with coverage: on a pull request the packages the
+      # change reaches against its base branch, on main every package with nothing replayed.
+      - name: Package checks
+        env:
+          TURBO_SCM_BASE: origin/${{ github.base_ref || 'main' }}
+          SCOPE: ${{ github.event_name == 'push' && '--force' || '--affected' }}
+        run: node scripts/check-temp-leaks.mjs npm run check:packages:ci -- "$SCOPE"
 
-      # Copy-pasted code in src, packages and extensions (.jscpd.json, ADR 105).
-      - name: Duplicate code
-        run: npm run lint:duplicates
-
-      - name: Lint
-        run: npm run lint
-
-      # The workflows themselves, and the scripts in their run steps, by pinned actionlint and
-      # shellcheck (scripts/workflow-lint.mjs).
-      - name: Workflows
-        run: npm run lint:workflows
-
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-24.04-arm
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      # An outside service never gates: a Codecov outage is not a test failure. Each package that ran
+      # or replayed its specs left coverage/lcov.info; the uploader finds them all.
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
-          node-version-file: .nvmrc
-          cache: 'npm'
+          fail_ci_if_error: false
+          flags: unittests
+          name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-  format:
-    name: Format
-    runs-on: ubuntu-24.04-arm
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Check formatting
-        run: npm run format:check
-
-  # Every story is a test (ADR 098): it renders in Chromium and runs its play function, in the
-  # light and the dark theme. The build proves the Storybook site itself still compiles.
+  # Every story renders in Chromium and runs its play function, in both themes (ADR 098), when the
+  # design system is reached. The build proves the Storybook site still compiles.
   stories:
     name: Stories
     runs-on: ubuntu-24.04-arm
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Reached by the change
+        id: reach
+        env:
+          TURBO_SCM_BASE: origin/${{ github.base_ref || 'main' }}
+        run: echo "run=$(node scripts/affected.mjs @terminator/extension-ui ${{ github.event_name == 'push' && '--all' || '' }})" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.reach.outputs.run == 'true'
         with:
           node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
+        if: steps.reach.outputs.run == 'true'
         run: npm ci
 
       - name: Install Chromium
+        if: steps.reach.outputs.run == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Test stories
+        if: steps.reach.outputs.run == 'true'
         run: npm run test:stories
 
       - name: Build Storybook
+        if: steps.reach.outputs.run == 'true'
         run: npm run build-storybook
 
-  # Screenshots of every story against the macOS baselines in
-  # packages/extension-ui/visual/__screenshots__/darwin (ADR 098): what a Mac draws, so on a Mac.
-  # A story with no baseline fails; the `update-story-baselines` label writes it
-  # (.github/workflows/story-baselines.yml).
+  # Screenshots of every story against the Linux baselines in
+  # packages/extension-ui/visual/__screenshots__/linux (ADR 098, ADR 154). A story with no baseline
+  # fails; the `update-story-baselines` label writes it (.github/workflows/story-baselines.yml).
   story-screenshots:
     name: Story screenshots
-    runs-on: macos-26
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install chromium
-
-      - name: Build Storybook
-        run: npm run build-storybook
-
-      - name: Compare story screenshots
-        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=none
-
-  # The whole Vitest suite, once, with coverage. Codecov's codecov/patch check reads the coverage.
-  test:
-    name: Test
     runs-on: ubuntu-24.04-arm
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Reached by the change
+        id: reach
+        env:
+          TURBO_SCM_BASE: origin/${{ github.base_ref || 'main' }}
+        run: echo "run=$(node scripts/affected.mjs @terminator/extension-ui ${{ github.event_name == 'push' && '--all' || '' }})" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.reach.outputs.run == 'true'
         with:
           node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
+        if: steps.reach.outputs.run == 'true'
         run: npm ci
 
-      # TMPDIR is an empty directory for the run, and the step fails if a spec leaves anything in
-      # it (scripts/check-temp-leaks.mjs): specs that never removed their temporary directories
-      # once filled a disk with ~22,000.
-      - name: Test
-        run: node scripts/check-temp-leaks.mjs npm test -- --coverage
+      - name: Install Chromium
+        if: steps.reach.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium
 
-      # An outside service never gates: a Codecov outage is not a test failure.
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+      - name: Build Storybook
+        if: steps.reach.outputs.run == 'true'
+        run: npm run build-storybook
+
+      - name: Compare story screenshots
+        if: steps.reach.outputs.run == 'true'
+        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=none
+
+  # The Playwright suite in three shards under a virtual display: on a pull request the specs the
+  # change reaches (scripts/e2e-select.mjs), on main all of them. The specs tagged @mac run in the
+  # macOS job on main. No retries (playwright.config.ts): a test that fails once fails the build.
+  e2e:
+    name: E2E (${{ matrix.shard }}/3)
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      # Every shard runs to the end, so one run reports every failing spec rather than the first.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fail_ci_if_error: false
-          files: coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
+          fetch-depth: 0
 
-  # The app started the way a developer starts it, from a clean checkout with no
-  # npm cache: `npm run dev`, and `npm run preview` after `npm run build`. A
-  # fresh install once could not start at all ("Error: Electron uninstall")
-  # while every other job passed, because none of them ran these scripts.
-  # scripts/smoke-start.mjs checks for App ready, every extension activated, and
-  # no error or uncaught exception, then quits the app.
-  start:
-    name: Start
+      - name: Specs the change reaches
+        id: select
+        env:
+          TURBO_SCM_BASE: origin/${{ github.base_ref || 'main' }}
+        run: echo "specs=$(node scripts/e2e-select.mjs ${{ github.event_name == 'push' && '--all' || '' }} | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.select.outputs.specs != ''
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      # A virtual display for Electron and Chromium, and zsh, which the terminal specs start.
+      - name: Install system packages
+        if: steps.select.outputs.specs != ''
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb zsh
+
+      - name: Install dependencies
+        if: steps.select.outputs.specs != ''
+        run: npm ci
+
+      - name: Build
+        if: steps.select.outputs.specs != ''
+        run: npm run build && npm run pretest:e2e
+
+      # Some specs drive a plain Chromium: the browser remote renderer and the extension views.
+      - name: Install Chromium
+        if: steps.select.outputs.specs != ''
+        run: npx playwright install --with-deps chromium
+
+      # The display is larger than the 1280×800 window every spec lays out (tests/e2e/helpers.ts).
+      # Chromium's sandbox needs a setuid helper or user namespaces the runner does not grant.
+      - name: Run E2E suite
+        if: steps.select.outputs.specs != ''
+        env:
+          SPECS: ${{ steps.select.outputs.specs }}
+          E2E_ELECTRON_ARGS: --no-sandbox
+        run: |
+          # SPECS is a list of paths; word splitting passes one argument per spec.
+          # shellcheck disable=SC2086
+          xvfb-run -a --server-args='-screen 0 1920x1080x24' npx playwright test $SPECS --grep-invert @mac --shard=${{ matrix.shard }}/3 --workers=2 --reporter=dot --pass-with-no-tests
+
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 14
+
+  # On a push to main, once the Ubuntu jobs pass: the app started the way a developer starts it
+  # (`npm run dev`, `npm run preview` after `npm run build`), the packaged app, and the specs tagged
+  # @mac. scripts/smoke-start.mjs checks for App ready, every extension activated, and no error.
+  mac:
+    name: macOS
+    needs: [check, stories, story-screenshots, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: macos-26
 
     steps:
@@ -226,71 +263,32 @@ jobs:
       - name: npm run preview
         run: node scripts/smoke-start.mjs preview
 
-      # The packaged app from the same electron-builder.cjs the release uses,
-      # unsigned and not notarized. It once started with no extensions at all:
-      # they were not in app.asar.
+      # The packaged app from the same electron-builder.cjs the release uses, unsigned and not
+      # notarized. It once started with no extensions at all: they were not in app.asar.
       - name: Packaged app
         run: |
           npx electron-builder --mac dir --publish never -c.mac.identity=null -c.mac.notarize=false
           node scripts/smoke-start.mjs exec "$PWD/dist/mac-arm64/Terminator.app/Contents/MacOS/Terminator"
 
-  # The whole Playwright suite in three shards (Playwright's --shard), each from a fresh build.
-  # No retries (playwright.config.ts): a test that fails once fails the build.
-  e2e:
-    name: E2E (${{ matrix.shard }}/3)
-    runs-on: macos-26
-    strategy:
-      # Every shard runs to the end, so one run reports every failing spec rather than the first.
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      # The Electron binary on macOS arm64 can have an invalid code signature
-      # (dyld errno=85), causing intermittent "Process failed to launch"
-      # failures. Force-extract the binary (install.js is idempotent) and
-      # ad-hoc re-sign it before launching the suite.
+      # The Electron binary on macOS arm64 can have an invalid code signature (dyld errno=85).
+      # Force-extract the binary (install.js is idempotent) and ad-hoc re-sign it first.
       - name: Re-sign Electron (macOS arm64 code-signature workaround)
         run: |
           node node_modules/electron/install.js
           codesign --force --deep --sign - node_modules/electron/dist/Electron.app
 
-      # Some specs drive a plain Chromium: the browser remote renderer and the extension views.
       - name: Install Chromium
         run: npx playwright install chromium
 
-      - name: Run E2E suite
-        run: npx playwright test --shard=${{ matrix.shard }}/3 --workers=2 --reporter=dot
+      - name: Run the @mac specs
+        run: npx playwright test --grep @mac --workers=2 --reporter=dot --pass-with-no-tests
 
       - name: Upload failure traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: test-results-${{ matrix.shard }}
+          name: test-results-mac
           path: test-results/
-          retention-days: 14
-
-      # The app logs git's own words when it cannot answer (git.ipc.ts); Electron writes the log
-      # under the runner's real home, not the sealed one, so it is kept here or not at all.
-      - name: Upload app log
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: app-log-${{ matrix.shard }}
-          path: ~/Library/Logs/@andytavares/terminator/
           retention-days: 14
 
   # A push to main that passes every check is released (ADR 134). The bump commit's [skip ci]
@@ -298,7 +296,7 @@ jobs:
   # is released with the next one.
   release:
     name: Package & Release
-    needs: [lint, typecheck, format, stories, story-screenshots, test, start, e2e]
+    needs: [check, stories, story-screenshots, e2e, mac]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: macos-26
     concurrency:
