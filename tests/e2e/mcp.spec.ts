@@ -6,7 +6,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { closeApp, e2eTempDir, launchApp, openSettingsSection, type AppHandle } from './helpers'
 import { sealedAppEnvironment } from './e2e-environment'
 import { openHome } from './session-views'
-import { mcpSocketPath } from '../../packages/core-main/src/mcp/socket-path'
+import { mcpSocketPath } from '../../packages/core-shared/src/mcp/socket-path'
 
 // The Terminator MCP server (ADR 145): a client starts the relay as Claude Code would, over the
 // app's own Electron in node mode, and each tool it calls shows on screen.

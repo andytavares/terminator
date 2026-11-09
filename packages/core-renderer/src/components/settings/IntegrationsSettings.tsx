@@ -1,10 +1,13 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useCallback, useEffect, useState } from 'react'
-import { Check, Copy, Link2, Plug, RefreshCw, X } from 'lucide-react'
+import { Check, Copy, Download, Link2, Plug, RefreshCw, X } from 'lucide-react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { recordUse } from '../../usage/record'
 import { useToastStore } from '../../stores/toast.store'
-import type { ClaudeCodeStatus } from '../../../../core-shared/src/electron-api/manifest'
+import type {
+  ClaudeCodeStatus,
+  TermctlStatus,
+} from '../../../../core-shared/src/electron-api/manifest'
 import type { TrackerConnection, TrackerId } from '../../../../core-shared/src/types/index'
 import './IntegrationsSettings.css'
 
@@ -308,6 +311,84 @@ function ClaudeCodeRow(): React.JSX.Element | null {
   )
 }
 
+function termctlText(status: TermctlStatus, failure: string | null): string {
+  if (failure !== null) return failure
+  if (status.state === 'installed') return `Installed at ${status.path}`
+  if (status.state === 'other') return `${status.path} belongs to another program.`
+  return "Not installed. Run Terminator's tools from any terminal."
+}
+
+type TermctlResult = { data: unknown } | { error: string; message: string }
+
+/** termctl's link in /usr/local/bin, and why the last change failed. Stays null where the API
+ * does not exist: the remote client omits it, since the command runs on this Mac only. */
+function useTermctlStatus() {
+  const [status, setStatus] = useState<TermctlStatus | null>(null)
+  const [failure, setFailure] = useState<string | null>(null)
+  const reload = useCallback(
+    () =>
+      (window.electronAPI.termctl?.status() ?? Promise.resolve(undefined)).then((result) => {
+        if (result !== undefined && 'data' in result) setStatus(result.data)
+      }),
+    []
+  )
+  useEffect(() => {
+    void reload()
+  }, [reload])
+  const change = (action: () => Promise<TermctlResult>) => async (): Promise<void> => {
+    const result = await action()
+    setFailure('error' in result ? result.message : null)
+    await reload()
+  }
+  return { status, failure, change }
+}
+
+interface TermctlActionsProps {
+  status: TermctlStatus
+  change: ReturnType<typeof useTermctlStatus>['change']
+}
+
+function TermctlActions({ status, change }: TermctlActionsProps): React.JSX.Element | null {
+  const termctl = window.electronAPI.termctl
+  if (status.state === 'other') return null
+  return (
+    <div className="integrations__actions">
+      {status.state === 'installed' ? (
+        <button
+          className="ext-btn ext-btn--danger"
+          onClick={() => void change(termctl.uninstall)()}
+        >
+          <X />
+          <span>Uninstall</span>
+        </button>
+      ) : (
+        <button className="ext-btn" onClick={() => void change(termctl.install)()}>
+          <Download />
+          <span>Install command</span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+function TermctlRow(): React.JSX.Element | null {
+  const { status, failure, change } = useTermctlStatus()
+  if (status === null) return null
+  return (
+    <div className="integrations__tracker">
+      <div className="integrations__header">
+        <span
+          className={`integrations__dot integrations__dot--${status.state === 'installed' ? 'on' : 'off'}`}
+          aria-hidden="true"
+        />
+        <span className="integrations__name">termctl</span>
+        <span className="integrations__status">{termctlText(status, failure)}</span>
+      </div>
+      <TermctlActions status={status} change={change} />
+    </div>
+  )
+}
+
 export function IntegrationsSettings(): React.JSX.Element {
   const { loadConnections, subscribe } = useIntegrationsStore(
     useShallow((s) => ({ loadConnections: s.loadConnections, subscribe: s.subscribe }))
@@ -330,6 +411,7 @@ export function IntegrationsSettings(): React.JSX.Element {
         leave this machine. Every part of the app reads this one connection.
       </p>
       <ClaudeCodeRow />
+      <TermctlRow />
       <TrackerRow tracker="linear" />
     </div>
   )

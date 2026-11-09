@@ -195,6 +195,11 @@ export interface ClaudeCodeStatus {
   command: string
   reason?: string
 }
+/** Whether `path` (/usr/local/bin/termctl) is our link, another program's file, or nothing. */
+export interface TermctlStatus {
+  state: 'installed' | 'not-installed' | 'other'
+  path: string
+}
 type DetailedFailure = { error: string; message?: string }
 type SessionRecordResult<Data> = Promise<{ data: Data } | { error: string; message: string }>
 type TaskResult = Promise<{ data: Task } | { error: string; message: string }>
@@ -1938,6 +1943,33 @@ export const ELECTRON_API_MANIFEST = [
     path: 'claudeCode.disconnect',
     kind: 'invoke',
     channel: 'claude-code:disconnect',
+    mcp: false,
+    signature: signature<() => Promise<{ data: true } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+
+  // ── termctl on the PATH (Settings › Integrations; core only) ──
+  method({
+    path: 'termctl.status',
+    kind: 'invoke',
+    channel: 'termctl:status',
+    mcp: false,
+    signature:
+      signature<() => Promise<{ data: TermctlStatus } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'termctl.install',
+    kind: 'invoke',
+    channel: 'termctl:install',
+    mcp: false,
+    signature: signature<() => Promise<{ data: true } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'termctl.uninstall',
+    kind: 'invoke',
+    channel: 'termctl:uninstall',
     mcp: false,
     signature: signature<() => Promise<{ data: true } | { error: string; message: string }>>(),
     remote: 'omit',

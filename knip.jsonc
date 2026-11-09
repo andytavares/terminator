@@ -22,7 +22,7 @@
       // servers' throwaway CA (tracker-stub.ts, jira-stub.ts) and jq shapes the
       // gh stub's --jq output (github-stub-gh.ts). Both ship on GitHub's runners.
       "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}"],
-      "ignoreBinaries": ["openssl", "jq"],
+      "ignoreBinaries": ["openssl", "jq", "footprint"],
       "vite": { "config": ["vite.config.remote.ts"] },
       "vitest": { "config": ["vitest.config.ts", "vitest.live.config.ts"] },
       // tests/integration/remote-bridge-allowlist.spec.ts drives Remote Control's
@@ -56,6 +56,11 @@
     "packages/core-renderer-remote": {
       // The scripts of index.html and mobile.html, built by vite.config.remote.ts.
       "entry": ["src/main.tsx", "src/mobile.main.tsx"],
+      "ignoreDependencies": ["@terminator/core-shared", "@terminator/test-support"],
+    },
+    "apps/termctl": {
+      // The command's entry, bundled by scripts/build-termctl.mjs.
+      "entry": ["src/bin.ts"],
       "ignoreDependencies": ["@terminator/core-shared", "@terminator/test-support"],
     },
     "packages/extension-ui": {

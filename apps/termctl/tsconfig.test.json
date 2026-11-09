@@ -1,0 +1,6 @@
+{
+  // Type-checks this package's specs (`npm run typecheck`), with the compiler options of the root
+  // tsconfig.test.json. A program per package keeps each lint and typecheck process small.
+  "extends": "../../tsconfig.test.json",
+  "include": ["tests/**/*", "../../packages/core-renderer/src/electron-api.d.ts"]
+}
