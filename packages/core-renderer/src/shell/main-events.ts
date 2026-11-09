@@ -73,7 +73,13 @@ function subscribeShellMenu(events: MenuEvents | undefined, handlers: MenuHandle
     events?.onMenuOpenAbout?.(handlers.openAbout),
     events?.onMenuToggleSidebar?.(countedShortcut('core.toggle-sidebar', handlers.toggleSidebar)),
     events?.onMenuCloseTab?.(closeTabOf),
-    window.electronAPI.bugReport?.onMenuReportBug(
+  ]
+}
+
+/** Help › Report a Bug…; the browser remote has bug report channels but no menu. */
+function subscribeBugReport(): Unsubscribe[] {
+  return [
+    window.electronAPI.bugReport?.onMenuReportBug?.(
       countedShortcut('core.report-bug', () => openBugReport())
     ),
   ]
@@ -126,6 +132,7 @@ export function useMenuEvents(handlers: MenuHandlers): void {
       ...subscribeSurfaceMenu(events),
       ...subscribeTaskMenu(events),
       ...subscribeBreakout(events),
+      ...subscribeBugReport(),
     ]
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe?.())
   }, [openSettings, openAbout, toggleSidebar])

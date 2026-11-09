@@ -77,3 +77,21 @@ describe('useMenuEvents — Report a Bug', () => {
     expect(recorded()).toEqual([{ feature: 'core.report-bug', via: 'menu' }])
   })
 })
+
+describe('useMenuEvents — the browser remote', () => {
+  it('subscribes to the rest when bug reports have no menu event there', () => {
+    const openSettings = pushedEvent<[]>()
+    // The browser remote has the bug report status and details, but no menu.
+    installElectronApi({
+      usage: { recordUse },
+      extensionEvents: { onMenuOpenSettings: openSettings.addListener },
+      bugReport: { status: vi.fn() },
+    })
+
+    renderHook(() =>
+      useMenuEvents({ openSettings: vi.fn(), openAbout: vi.fn(), toggleSidebar: vi.fn() })
+    )
+
+    expect(openSettings.listening).toBe(true)
+  })
+})
