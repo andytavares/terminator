@@ -19,6 +19,7 @@ const INTEGRATION_INCLUDE = [
   'tests/integration/**/*.spec.{ts,tsx,js}',
   'packages/*/tests/integration/**/*.spec.{ts,tsx,js}',
   'extensions/*/tests/integration/**/*.spec.{ts,tsx,js}',
+  'apps/*/tests/integration/**/*.spec.{ts,tsx,js}',
 ]
 
 // happy-dom, not jsdom: jsdom validates every CSS declaration CodeMirror and the
@@ -34,10 +35,18 @@ const NODE_INCLUDE = [
   'packages/*/tests/**/*.spec.ts',
   'extensions/*/tests/**/*.spec.ts',
   'extensions/*/tests/**/*.spec.js',
+  'apps/*/tests/**/*.spec.{ts,tsx}',
   'packages/core-main/src/remote/__tests__/**/*.spec.ts',
   'packages/core-main/src/ipc/__tests__/**/*.spec.ts',
   'packages/core-shared/src/**/__tests__/**/*.spec.ts',
 ]
+
+// `npm run test:root` runs only the root's own specs (tests/): every workspace runs its own.
+// The lint rules' specs are their own cached task, `npm run test:lint-rules`.
+const OTHER_WORKSPACES =
+  process.env.TERMINATOR_TESTS === 'root'
+    ? ['packages/**', 'extensions/**', 'apps/**', 'tests/integration/lint/**']
+    : []
 
 export default defineConfig({
   test: {
@@ -77,6 +86,7 @@ export default defineConfig({
           environment: 'node',
           include: NODE_INCLUDE,
           exclude: [
+            ...OTHER_WORKSPACES,
             ...configDefaults.exclude,
             ...INTEGRATION_INCLUDE,
             // `.ts` specs under renderer-remote need the DOM — run them in the
@@ -97,7 +107,12 @@ export default defineConfig({
           provide: { testTier: 'unit' },
           environment: 'jsdom',
           include: JSDOM_INCLUDE,
-          exclude: [...configDefaults.exclude, ...HAPPY_DOM_INCLUDE, ...INTEGRATION_INCLUDE],
+          exclude: [
+            ...OTHER_WORKSPACES,
+            ...configDefaults.exclude,
+            ...HAPPY_DOM_INCLUDE,
+            ...INTEGRATION_INCLUDE,
+          ],
         },
       },
       {
@@ -107,7 +122,7 @@ export default defineConfig({
           provide: { testTier: 'unit' },
           environment: 'happy-dom',
           include: HAPPY_DOM_INCLUDE,
-          exclude: [...configDefaults.exclude, ...INTEGRATION_INCLUDE],
+          exclude: [...OTHER_WORKSPACES, ...configDefaults.exclude, ...INTEGRATION_INCLUDE],
         },
       },
       {
@@ -117,7 +132,7 @@ export default defineConfig({
           provide: { testTier: 'integration' },
           environment: 'node',
           include: INTEGRATION_INCLUDE,
-          exclude: configDefaults.exclude,
+          exclude: [...configDefaults.exclude, ...OTHER_WORKSPACES],
         },
       },
     ],

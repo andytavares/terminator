@@ -93,14 +93,14 @@ async function installed(name) {
 const stepsOf = (workflow, job) => workflow.jobs[job]?.steps ?? []
 const stepNamed = (workflow, job, name) => stepsOf(workflow, job).find((step) => step.name === name)
 /** The jobs that run the app or draw as a Mac does, in ci.yml's order. */
-const MAC_JOBS = ['story-screenshots', 'start', 'e2e', 'release']
+const MAC_JOBS = ['mac', 'release']
 const MAC = 'macos-26'
 /** GitHub runs five macOS jobs at a time on every plan below Enterprise: more queue. */
 const MAC_RUNNER_LIMIT = 5
 
 /**
  * @typedef {{ name?: string, run?: string, uses?: string, with?: Record<string, unknown> }} Step
- * @typedef {{ 'runs-on'?: string, needs?: string | string[], strategy?: Record<string, any>, steps?: Step[] }} Job
+ * @typedef {{ 'runs-on'?: string, if?: string, needs?: string | string[], strategy?: Record<string, any>, steps?: Step[] }} Job
  * @typedef {{ on?: { pull_request?: { branches?: string[] } | null }, jobs: Record<string, Job> }} Workflow
  */
 
@@ -120,15 +120,26 @@ function storybookBuiltBeforeCompare({ ci }) {
   return built > -1 && built < names.indexOf('Compare story screenshots')
 }
 
-function macJobsOnly({ ci, text }) {
+// A pull request runs on Ubuntu only; macOS runs on a push to main (ADR 154).
+function macJobsOnly({ ci }) {
   const jobs = Object.entries(ci.jobs)
   const macJobs = jobs.filter(([, job]) => job['runs-on'] === MAC).map(([id]) => id)
   const runners = new Set(jobs.map(([, job]) => job['runs-on']))
+  const onPushOnly = macJobs.every((id) =>
+    String(ci.jobs[id].if).includes("github.event_name == 'push'")
+  )
   return (
     isDeepStrictEqual(macJobs, MAC_JOBS) &&
     isDeepStrictEqual(runners, new Set([MAC, 'ubuntu-24.04-arm'])) &&
-    !/apt-get/.test(text['ci.yml'])
+    onPushOnly
   )
+}
+
+// The e2e job needs a virtual display and zsh; every other job uses the runner image as it is.
+function aptGetOnlyInE2e({ ci }) {
+  return Object.entries(ci.jobs)
+    .filter(([id]) => id !== 'e2e')
+    .every(([, job]) => !JSON.stringify(job.steps ?? []).includes('apt-get'))
 }
 
 // A macOS job that waits for another macOS job never runs beside it.
@@ -140,12 +151,18 @@ function macRunnersAtOnce({ ci }) {
     .reduce((sum, count) => sum + count, 0)
 }
 
-// `npm run check` is what the pre-commit hook runs: each of its commands, `npm run lint` and the
-// rest, must be a step of ci.yml too.
+// The pre-commit hook runs check:repo and check:packages; CI runs check:repo and check:packages:ci,
+// which are the same tasks with the specs' coverage report.
 function preCommitRunsWhatCiRuns({ text }) {
   const { scripts } = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
-  const commands = scripts.check.split('&&').map((command) => command.trim())
-  return commands.every((command) => text['ci.yml'].includes(command))
+  const sameTasks =
+    scripts['check:packages:ci'] === scripts['check:packages'].replace(' test ', ' test:coverage ')
+  return (
+    scripts.check === 'npm run check:repo && npm run check:packages' &&
+    sameTasks &&
+    text['ci.yml'].includes('npm run check:repo') &&
+    text['ci.yml'].includes('npm run check:packages:ci')
+  )
 }
 
 function noBaselineWritten({ ci }) {
@@ -171,9 +188,10 @@ const POLICIES = [
     storybookBuiltBeforeCompare,
   ],
   [
-    `Only ${MAC_JOBS.join(', ')} run on ${MAC}, every other job on ubuntu-24.04-arm, and nothing runs apt-get`,
+    `Only ${MAC_JOBS.join(', ')} run on ${MAC}, on a push to main only; every other job on ubuntu-24.04-arm (ADR 154)`,
     macJobsOnly,
   ],
+  ['Only the e2e job installs system packages with apt-get', aptGetOnlyInE2e],
   [
     `At most ${MAC_RUNNER_LIMIT} macOS runners start at once: GitHub runs no more below Enterprise`,
     (workflows) => macRunnersAtOnce(workflows) <= MAC_RUNNER_LIMIT,
@@ -189,13 +207,13 @@ const POLICIES = [
       ci.jobs.e2e?.strategy?.['fail-fast'] === false,
   ],
   [
-    'ci.yml runs every script of `npm run check`, the pre-commit hook, so the two cannot drift (ADR 151)',
+    "ci.yml runs `npm run check:repo` and `npm run check:packages:ci`, the pre-commit hook's tasks with coverage, so the two cannot drift (ADR 154)",
     preCommitRunsWhatCiRuns,
   ],
   [
-    'Codecov never fails the Test job: fail_ci_if_error is false',
+    'Codecov never fails the Check job: fail_ci_if_error is false',
     ({ ci }) =>
-      stepsOf(ci, 'test').find((step) => String(step.uses).startsWith('codecov/'))?.with
+      stepsOf(ci, 'check').find((step) => String(step.uses).startsWith('codecov/'))?.with
         ?.fail_ci_if_error === false,
   ],
   [

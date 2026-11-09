@@ -63,14 +63,25 @@ const BROKEN_POLICIES = [
   },
   {
     broken: 'a job on macOS that runs on Ubuntu',
-    rule: /^Only story-screenshots, start, e2e, release run on macos-26/,
-    breaks: (copy: Workflows) => (copy.ci.jobs.lint['runs-on'] = 'macos-26'),
+    rule: /^Only mac, release run on macos-26/,
+    breaks: (copy: Workflows) => (copy.ci.jobs.check['runs-on'] = 'macos-26'),
+  },
+  {
+    broken: 'the macOS job on a pull request',
+    rule: /^Only mac, release run on macos-26/,
+    breaks: (copy: Workflows) => (copy.ci.jobs.mac.if = 'always()'),
+  },
+  {
+    broken: 'apt-get outside the e2e job',
+    rule: /^Only the e2e job installs system packages/,
+    breaks: (copy: Workflows) =>
+      copy.ci.jobs.check.steps?.push({ run: 'sudo apt-get install -y jq' }),
   },
   {
     broken: 'a check the pre-commit hook runs and CI does not',
-    rule: /^ci\.yml runs every script of `npm run check`/,
+    rule: /^ci\.yml runs `npm run check:repo` and `npm run check:packages:ci`/,
     breaks: (copy: Workflows) =>
-      (copy.text['ci.yml'] = copy.text['ci.yml'].replace('npm run lint:deps', '')),
+      (copy.text['ci.yml'] = copy.text['ci.yml'].replace('npm run check:repo', '')),
   },
   {
     broken: 'CI only on pull requests into main',

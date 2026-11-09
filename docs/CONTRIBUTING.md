@@ -61,7 +61,7 @@ The `release` job in `ci.yml` signs with the Developer ID Application certificat
 
 ### Before you commit
 
-The pre-commit hook (`.husky/pre-commit`) runs `npx lint-staged` (Prettier and ESLint on the staged files) and then `npm run check`. That script runs every check CI runs, as the same npm scripts: `lint:deps`, `lint:unused`, `lint:duplicates`, `lint`, `lint:workflows`, `format:check`, `typecheck` and `npm test`. `npm run lint:workflows` fails if `.github/workflows/ci.yml` leaves one of them out, so the two cannot drift ([ADR 151](adr/151-ci-runs-everything-once-with-nothing-fancy.md)). E2E does not run before a commit: run `npm run test:e2e` yourself for a change it covers. CI runs it on every pull request.
+The pre-commit hook (`.husky/pre-commit`) runs `npx lint-staged` (Prettier and oxlint on the staged files), then `npm run check:repo`, then `npm run check:packages -- --affected` against the last commit. `check:repo` runs syncpack, knip, jscpd, the workflow lint, the format check, and the root's own lint, typecheck and specs. `check:packages` runs each workspace's `lint`, `typecheck` and `test` through Turborepo, only for the packages the change reaches, and replays a task whose inputs have not changed since it passed. CI runs the same tasks, with coverage (`check:packages:ci`); `npm run lint:workflows` fails if `.github/workflows/ci.yml` leaves one out ([ADR 154](adr/154-pull-requests-check-what-they-reach-on-linux.md)). `npm run check` runs everything. E2E does not run before a commit: run `npm run test:e2e` yourself for a change it covers. CI runs the specs the change reaches on every pull request.
 
 ### Run tests
 
@@ -74,7 +74,7 @@ npm run test:stories    # The design system's Storybook stories, run as tests
 npm run test:visual     # The design system's screenshot tests
 ```
 
-**Which tests run.** `npm test` runs every unit and integration spec, once, with no retry. CI runs the same suite with coverage on every pull request and every push to main. A push to main that passes is released ([ADR 134](adr/134-ci-releases-each-merge.md), [ADR 151](adr/151-ci-runs-everything-once-with-nothing-fancy.md)).
+**Which tests run.** `npm test` runs every unit and integration spec, once, with no retry. A pull request runs the specs of the packages it reaches, with coverage; a push to main runs every spec, replaying nothing. A push to main that passes is released ([ADR 134](adr/134-ci-releases-each-merge.md), [ADR 154](adr/154-pull-requests-check-what-they-reach-on-linux.md)).
 
 **Temporary directories.** A spec makes a temporary directory with `makeTempDir(prefix)` from `packages/test-support/src/temp-dir.ts`, never with `mkdtempSync` in `os.tmpdir()`. `packages/test-support/setup.ts` removes every one after the spec file ends, passed or failed. An E2E spec uses `e2eTempDir(prefix)` from `tests/e2e/helpers.ts`. `tests/e2e/global-teardown.ts` removes it with the run's root. CI runs the suite through `node scripts/check-temp-leaks.mjs`. That script points `TMPDIR` at an empty directory (read by [`os.tmpdir()`](https://nodejs.org/api/os.html#ostmpdir), git, sh and mktemp) and fails if anything is left in it. Run it locally the same way: `node scripts/check-temp-leaks.mjs npx vitest run`. Specs that skipped this once left ~22,000 folders in `/tmp` in a day and filled the disk.
 
@@ -107,14 +107,14 @@ The suite runs in the background, so the machine stays usable while it runs. `la
 
 - A flow is one `test()` named for what the user achieves, made of `test.step()`s that each name a behaviour. A spec file launches the app once. A flow restarts the app only when surviving the restart is what it checks. A check of one component or one channel is a unit or component test, not a new e2e test.
 
-- Never sleep. Wait on the condition that you assert next: a locator assertion, or `expect.poll`. ESLint rejects `waitForTimeout` in `tests/e2e`.
+- Never sleep. Wait on the condition that you assert next: a locator assertion, or `expect.poll`. oxlint rejects `waitForTimeout` in `tests/e2e`.
 - Every flow passes alone (`npx playwright test tests/e2e/<file>:<line>`). The exception is a file that is `test.describe.serial` because a later flow reads what an earlier flow stored. Run such a file as a whole.
 - Before you send keys to a surface that you just opened, assert that it has focus.
 - An extension view is an iframe ([ADR 114](adr/114-extension-views-are-frames-in-the-window.md)), and three things follow. First, the browser routes a click by the last frame it drew. Click into a host dialog that opened over a view only after the dialog is drawn: `openSettingsSection` waits for that. Second, a key pressed while focus is in a view reaches the host only for ⌘P and ⌘,, which the frame shim forwards. For any other key, move focus first. Third, a theme or setting reaches a view as a message after the host has it, so poll the view for it. `launchApp()` emulates focus in every view, as Playwright does for the page, so focus and blur fire there even when the window is not the active application.
 - Launch the app through `launchApp()`. It isolates the profile. It runs the terminals on a fixture zsh config (`tests/e2e/fixtures/zdotdir`) whose `claude` is a stub, so no real agent runs. It turns off macOS window restore, whose crash prompt blocks startup. A launch that does not reach the sidebar in 25 s fails. The failure shows each window's state (its URL, whether it was still loading, whether its renderer crashed, or that main did not answer) and the app's own output. Close the app with `closeApp()`. It returns only after the app's process has exited (it kills the process after 5 s). Then it fails the spec if any process that the app started is still running 3 s later, and kills those processes and every process under them (`tests/e2e/leftover-processes.ts`). It finds them by the launch's marker in their environment and by the app's process tree, taken just before the close. This also covers the git and gh commands that the core runs with an environment of their own. Leaked processes add up on a CI runner until `fork` fails with `EAGAIN`, so a process that your feature starts must end when the app quits.
 - Read what a terminal shows with `readTerminalRows(page)` from `tests/e2e/helpers.ts`, never from `.xterm-rows`. A visible terminal draws with WebGL into a canvas, and the DOM holds none of its text. `readTerminalRows` reads xterm's buffer through `window.terminatorE2E`, which the app sets up in `packages/core-renderer/src/terminal/terminal-rows.ts`. It reads every open terminal, hidden ones too, one after another. When the row's terminal or its place on screen matters, read one pane with `readTerminalRowsIn(screen)`. Here `screen` is that pane's `.xterm-screen` (`visibleTerminalScreen(page)` for the first one on screen).
 - **Live specs** (`tests/live/`, `npm run test:live`) start real agent options against the real Claude adapter and the operator's signed-in `claude`. They never run in CI. The Playwright live specs were deleted: `launchApp` seeds a stub agent and stub `claude`/`gh` first on PATH, so they could not reach a real agent.
-- CI runs every spec once, in three shards with Playwright's `--shard` ([ADR 151](adr/151-ci-runs-everything-once-with-nothing-fancy.md)).
+- CI runs the specs a change reaches (`scripts/e2e-select.mjs`) once, on Ubuntu under `xvfb-run`, in three shards with Playwright's `--shard`; a push to main runs them all. A spec tagged `@mac` runs only in the macOS job on main ([ADR 154](adr/154-pull-requests-check-what-they-reach-on-linux.md)).
 
 ### Build extensions
 
@@ -129,19 +129,19 @@ npm run build:extensions   # compile all extensions
 ### Lint and format
 
 ```bash
-npm run lint       # ESLint (zero errors required)
+npm run lint       # oxlint (zero errors required)
 npm run lint:deps  # syncpack: exact versions, one per package; no second copy of React or the editor state
 npm run lint:unused  # knip: no unused files, exports or dependencies
 npm run lint:duplicates  # jscpd: no copy-pasted code
 npm run lint:workflows   # actionlint + shellcheck on .github/workflows, pinned versions
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
-npm run check      # Every check above, the format check and npm test: what the pre-commit hook runs
+npm run check      # Everything: check:repo, then every package's lint, typecheck and specs
 ```
 
 The root `npx tsc --noEmit` checks nothing. Use `npm run typecheck`. It runs every workspace's `typecheck` script through Turborepo (`turbo.json`), plus the root's `typecheck:specs`. That covers the core packages, both published packages and every extension, each with its specs. Each core package checks its specs with its own `tsconfig.test.json`. The root `tsconfig.test.json` checks `packages/test-support` and the root `tests/` (e2e, live, and the specs of the scripts and configs). Playwright runs the e2e specs without checking their types, so this is the only check they get. Vitest and Playwright strip types without checking them. So every project whose `tsconfig.json` covers only its sources has a `tsconfig.test.json` beside it. That file extends the config and adds the project's tests. This applies to each extension and to the design system. For an extension, its `typecheck` script runs `tsconfig.json` and `tsconfig.test.json`, which adds `tests/`, Vitest's globals and Node 24's library. For the design system, the added tests are its Playwright screenshot suite, `visual/`. The extension SDK's `tsconfig.json` already includes its `tests/`. A new extension written in TypeScript adds both files and a `typecheck` script that runs both, incrementally (`node_modules/.cache/typecheck`), as the other extensions' `package.json` files do. Task Vault has a third file, `tsconfig.view.json`. It checks the view from `src/renderer/main.tsx` without the `Temporal` types that its backend has. The view also runs in the phone's browser, and iPhone Safari has no `Temporal` ([ADR 108](adr/108-temporal-in-extension-backends-not-in-views.md)). CI's Typecheck job runs `npm run typecheck`. Both `lint` and `typecheck` must pass with **0 errors** before you open a PR. Warnings are acceptable but must not accumulate.
 
-`npm run lint` holds every function in every JavaScript and TypeScript file to size limits (the last block of `eslint.config.mjs`). This includes specs, stories, scripts and configs. The limits are:
+`npm run lint` holds every function in every JavaScript and TypeScript file to size limits (the top-level `rules` of `.oxlintrc.json`). This includes specs, stories, scripts and configs. The limits are:
 
 - at most 30 lines, blank lines and comments aside (`max-lines-per-function`);
 - complexity at most 10 (`complexity`);
@@ -149,7 +149,7 @@ The root `npx tsc --noEmit` checks nothing. Use `npm run typecheck`. It runs eve
 
 Tests are functions too. Split a `describe` callback longer than 30 lines into describes named by topic. Put shared hooks into a module-level setup function (`function useX(): void { beforeEach(...) }`) that each describe calls. Do not split an e2e describe that shares one app through `beforeAll`, or is `test.describe.serial`, because its tests depend on the app and the order they run in. Instead, make each test's body a named function above it, and let the describe list the story (`test('title', stepName)`). Split a React component that outgrows the limits the way [Thinking in React](https://react.dev/learn/thinking-in-react) describes. Use named subcomponents for the parts of the UI, and hooks for state and effects that belong together (`packages/core-renderer/src/shell/` holds the ones that `App.tsx` wires up). Keep its hooks in the order they were called, because effects run in that order. Foundry's Forge, Floor and factory hall each gather their hooks in one hook that calls the others in sequence (`useForgeState`, `useFloor`, `useFactoryHall`). Each works out what it draws in a plain function beside it (`deriveForge`, `hallModel`). Check code that draws or lays something out against what it did before the split, call for call, and not only against its specs. Pass more than three values as one named object, and only where that is the natural shape.
 
-`npm run lint` also rejects an explicit `any` (`@typescript-eslint/no-explicit-any` is an error). A spec fakes part of an object with `partialFake` (`packages/test-support/src/fakes.ts`), never `as unknown as`. Two `any`s remain. Each has an `eslint-disable` comment that says why: the IPC handler signature that mirrors Electron's own (`packages/core-main/src/ipc/channel-registrar.ts`) and electron-store's constraint on a schema (`packages/core-main/src/storage/cached-store.ts`).
+`npm run lint` also rejects an explicit `any` (`typescript/no-explicit-any` is an error). A spec fakes part of an object with `partialFake` (`packages/test-support/src/fakes.ts`), never `as unknown as`. Two `any`s remain. Each has an `eslint-disable` comment that says why: the IPC handler signature that mirrors Electron's own (`packages/core-main/src/ipc/channel-registrar.ts`) and electron-store's constraint on a schema (`packages/core-main/src/storage/cached-store.ts`).
 
 `npm run lint:unused` runs [knip](https://knip.dev) with `knip.jsonc` and must report nothing ([ADR 104](adr/104-unused-code-is-a-ci-gate.md)). Its plugins find the entry points. These are electron-vite's main, preload and renderer inputs, each extension's `src/index.ts` and view, the Vite, Vitest, Playwright and Storybook configs, and the `exports` of the SDK and the design system, which are their public API. When it reports something:
 
@@ -231,7 +231,7 @@ Test location by type:
 3. Declare it in `packages/core-shared/src/electron-api/manifest.ts` with its `signature`. The native and remote adapters, the remote allowlist and the renderer's `window.electronAPI` type all come from that one entry. If extension views need it, mark it `extensionView`: the frame's `window.electronAPI` is built from the manifest, so nothing else is written by hand.
 4. Register it in the appropriate `packages/core-main/src/ipc/*.ipc.ts` file as a row of `registerInvokeTable([...invokeSpec({ channel, schema, invalid, run })])` in `packages/core-main/src/ipc/invoke-table.ts`.
 
-Register core invoke channels **only** through that table ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)). `schema` is a required field, so a channel without one does not compile. `invalid` is the response returned when the payload fails the schema. `onError` (optional) maps a throwing `run` to a response. A channel that takes no payload uses `noPayload`. Do not call `handleChannel` from a handler module: ESLint rejects the import outside the table and the extension API. Do not write a "rejects a malformed payload" test for the new channel. `packages/core-main/tests/unit/ipc/core-channel-schemas.spec.ts` already asserts that every registered core channel has a schema and rejects a payload of the wrong type.
+Register core invoke channels **only** through that table ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)). `schema` is a required field, so a channel without one does not compile. `invalid` is the response returned when the payload fails the schema. `onError` (optional) maps a throwing `run` to a response. A channel that takes no payload uses `noPayload`. Do not call `handleChannel` from a handler module: oxlint rejects the import outside the table and the extension API. Do not write a "rejects a malformed payload" test for the new channel. `packages/core-main/tests/unit/ipc/core-channel-schemas.spec.ts` already asserts that every registered core channel has a schema and rejects a payload of the wrong type.
 
 ---
 
@@ -295,7 +295,7 @@ Per the constitution (Principle IV):
 
 Before you open a PR, verify:
 
-- [ ] `npm run check` passes (the pre-commit hook runs it)
+- [ ] The pre-commit hook passes (`npm run check:repo` and the packages your change reaches)
 - [ ] `npm run build:extensions` succeeds with no compile errors
 - [ ] The PR adds no unused imports, unused variables, or dead code
 - [ ] The PR updates the documentation for every changed behavior (see the table above)

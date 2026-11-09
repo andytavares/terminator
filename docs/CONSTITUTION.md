@@ -1,4 +1,25 @@
 <!--
+SYNC IMPACT REPORT (11.0.0)
+===========================
+Version change: 10.0.1 → 11.0.0 (MAJOR: three rules of Principle XIV redefined, ADR 154)
+
+Modified principles:
+  - XIV "Every run tests everything" becomes "A pull request checks what it reaches; main
+    checks everything": a pull request and the pre-commit hook run what `turbo --affected`
+    selects; a push to main runs everything before the release.
+  - XIV "One run decides": a pull request may replay a passed task whose inputs are
+    byte-identical from the Turborepo cache; main replays nothing. Retries stay forbidden.
+  - XIV "Local checks and CI run the same npm scripts" becomes "... the same tasks": every pull
+    request job runs on Ubuntu, E2E and story screenshots included; Start, the `@mac` specs and
+    the release run on macOS on main only.
+  Approved by the maintainer on 2026-11-08 in the design interview ("Affected on PRs, all on
+  main", "E2E on Linux too", "Screenshots to Linux", "macOS job on main only").
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (10.0.1)
 ===========================
 Version change: 10.0.0 → 10.0.1 (PATCH: paths corrected; no rule changed)
@@ -449,7 +470,9 @@ code has no value. It is a defect. ADR 123 records the reasoning.
   a fixed seed) is forbidden.
 - **One run decides.** A check's verdict is its first run. Never retry or rerun a failing test into a pass, in CI, locally, or in Foundry's final check. Fix it
   at its cause, or delete it together with the behavior it claimed to cover. Nothing repeats a
-  test: every CI run runs every test once (ADR 151).
+  test: a run runs each test it selects once. On a pull request, a task whose inputs are
+  byte-identical to a task that passed may replay that pass from the Turborepo cache instead of
+  running again; a failed task is never cached. A push to `main` replays nothing (ADR 154).
 - **No skipped test.** Skipping a test (`skip`, `fixme`, `todo`, `skipIf`, a `test.skip` that
   depends on the machine) is forbidden. A live spec whose credentials or checkout are missing
   fails and says which.
@@ -466,18 +489,22 @@ code has no value. It is a defect. ADR 123 records the reasoning.
   reaches a test. A unit spec opens no socket; an integration or end-to-end spec connects only to
   loopback. A stub that has no answer fails. It
   never falls through to the real tool.
-- **Local checks and CI run the same npm scripts.** The pre-commit hook runs `npm run check`:
-  every lint script, `format:check`, `typecheck` and `npm test`. `.github/workflows/ci.yml` runs
-  each of those scripts with the Node in `.nvmrc`, and `npm run lint:workflows` fails if it
-  leaves one out. CI runs on Ubuntu, except the jobs that need a Mac: Start, E2E, the story
-  screenshots and the signed release. There is no local CI simulation. ADR 151.
+- **Local checks and CI run the same tasks.** The pre-commit hook and `.github/workflows/ci.yml`
+  run the same Turborepo tasks (`turbo.json`) with the Node in `.nvmrc`: every lint task,
+  `format:check`, `typecheck` and the tests. `npm run lint:workflows` fails if ci.yml leaves one
+  out. Every pull request job runs on Ubuntu, the E2E suite and the story screenshots included.
+  Only Start, the end-to-end specs tagged `@mac` and the signed release run on macOS, on a push
+  to `main`, before the release. There is no local CI simulation. ADR 154.
 - **Outside services never gate.** An advisory database, the artifact store or a registry
   MUST NOT turn a change red that did not touch what they check. The one exception is
   Codecov's `codecov/patch`, which gates the lines a change adds or modifies (Principle VI).
-- **Every run tests everything.** Every CI run, on a pull request and on a push to `main`, runs
-  the whole Vitest suite and the whole Playwright suite. A push to `main` that passes is
-  released (ADR 134, ADR 151).
-- **Enforced, not trusted.** `eslint.config.mjs` rejects sleeps, ticks, time limits and
+- **A pull request checks what it reaches; `main` checks everything.** A pull request, and the
+  pre-commit hook, run the tasks of the packages the change reaches, as `turbo run --affected`
+  computes them; a change to a root config, the lockfile or a global dependency reaches every
+  package. A push to `main` runs every task and the whole Playwright suite, and a push that
+  passes is released (ADR 134, ADR 154).
+- **Enforced, not trusted.** `.oxlintrc.json`, with the repository's rules in `scripts/oxlint-plugin/`, rejects sleeps,
+  ticks, time limits and
   promises left unawaited in specs. These rules MUST NOT be disabled, suppressed or
   loosened.
 
@@ -506,4 +533,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions that affect this project.
 
-**Version**: 10.0.1 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-11-08
+**Version**: 11.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-11-08
