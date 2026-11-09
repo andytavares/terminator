@@ -7,6 +7,7 @@ import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '@termina
 import { registerHealthRoute } from './routes/health.route.js'
 import { registerTerminalRoutes } from './routes/terminal.routes.js'
 import { registerWorkspaceRoutes } from './routes/workspace.routes.js'
+import { registerBugReportRoutes } from './routes/bug-report.routes.js'
 import { registerAuthMiddleware } from './auth.middleware.js'
 import { registerLoginRoute } from './routes/login.route.js'
 import { AuthRateLimiter } from './auth-rate-limiter.js'
@@ -298,6 +299,7 @@ async function registerApi(parts: RemoteServerParts): Promise<ServerConnections>
     listWorkspaces: deps.listWorkspaces,
     listProjects: deps.listProjects,
   })
+  await registerBugReportRoutes(fastify, { invokeChannel: deps.invokeChannel })
   const terminalCleanup = await registerTerminalRoutes(fastify, {
     ptyManager: options.ptyManager,
     ticketStore,

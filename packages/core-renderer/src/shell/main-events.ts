@@ -19,6 +19,7 @@ import { revealSession } from '../terminal/navigate-to-session'
 import { useTaskSwitcher } from '../components/task-switcher/task-switcher.store'
 import { dockBack, toggleBreakout } from '../terminal/breakout'
 import { switchLane } from '../terminal/switch-lane'
+import { openBugReport } from '../stores/bug-report.store'
 
 // What the main process tells the window: menu accelerators, notifications,
 // and what extensions ask the shell to do.
@@ -75,6 +76,15 @@ function subscribeShellMenu(events: MenuEvents | undefined, handlers: MenuHandle
   ]
 }
 
+/** Help › Report a Bug…; the browser remote has bug report channels but no menu. */
+function subscribeBugReport(): Unsubscribe[] {
+  return [
+    window.electronAPI.bugReport?.onMenuReportBug?.(
+      countedShortcut('core.report-bug', () => openBugReport())
+    ),
+  ]
+}
+
 /** Closes the terminal of the breakout window the accelerator was pressed in, else the active tab. */
 function closeTabOf(sessionId: string | null): void {
   if (sessionId) void useSessionStore.getState().closeSession(sessionId)
@@ -122,6 +132,7 @@ export function useMenuEvents(handlers: MenuHandlers): void {
       ...subscribeSurfaceMenu(events),
       ...subscribeTaskMenu(events),
       ...subscribeBreakout(events),
+      ...subscribeBugReport(),
     ]
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe?.())
   }, [openSettings, openAbout, toggleSidebar])

@@ -25,6 +25,8 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+const mockOnReportBug = vi.fn()
+
 async function renderList(workspaces: Workspace[], terminals: TerminalSession[]) {
   const { MobileTerminalList } = await import('../../../../src/components/MobileTerminalList')
   return render(
@@ -34,6 +36,7 @@ async function renderList(workspaces: Workspace[], terminals: TerminalSession[])
       onSelectTerminal={mockOnSelectTerminal}
       onCreateTerminal={mockOnCreateTerminal}
       onAssignWorkspace={mockOnAssignWorkspace}
+      onReportBug={mockOnReportBug}
     />
   )
 }
@@ -361,5 +364,16 @@ describe('MobileTerminalList — backdrop touchStart does not close context menu
     // click on backdrop closes it
     await user.click(backdrop)
     expect(screen.queryByText('Move to workspace')).toBeNull()
+  })
+})
+
+describe('MobileTerminalList, report a bug', () => {
+  it('offers a bug report below the terminals', async () => {
+    const user = userEvent.setup()
+    await renderList([], [])
+
+    await user.click(screen.getByRole('button', { name: 'Report a bug' }))
+
+    expect(mockOnReportBug).toHaveBeenCalled()
   })
 })

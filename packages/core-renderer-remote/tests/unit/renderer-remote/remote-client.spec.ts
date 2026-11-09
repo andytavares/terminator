@@ -167,3 +167,59 @@ describe('credentials', () => {
     expect(replace).toHaveBeenCalledWith('/')
   })
 })
+
+describe('bug report status and details', () => {
+  it('reads whether the desktop can post, and the app details', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ready: true, login: 'octocat' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ details: 'Terminator 0.1.198' }) })
+    const { bugReportStatus, bugReportDetails } = await import('../../../src/api/remote-client')
+
+    expect(await bugReportStatus()).toEqual({ ready: true, login: 'octocat' })
+    expect(await bugReportDetails()).toEqual({ details: 'Terminator 0.1.198' })
+    expect(mockFetch.mock.calls.map(([path]) => path)).toEqual([
+      '/api/bug-report/status',
+      '/api/bug-report/details',
+    ])
+  })
+
+  it('rejects when the desktop does not answer', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 500 })
+    const { bugReportStatus, bugReportDetails } = await import('../../../src/api/remote-client')
+
+    await expect(bugReportStatus()).rejects.toThrow('bugReportStatus failed: 500')
+    await expect(bugReportDetails()).rejects.toThrow('bugReportDetails failed: 500')
+  })
+})
+
+describe('submitBugReport', () => {
+  const report = {
+    title: 't',
+    description: 'd',
+    origin: 'Phone remote',
+    includeDetails: true,
+    uploads: [{ name: 'a.png', data: 'cG5n' }],
+  }
+
+  it('POSTs the report and answers with the issue', async () => {
+    const posted = { ok: true, number: 7, url: 'https://github.com/o/r/issues/7' }
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => posted })
+    const { submitBugReport } = await import('../../../src/api/remote-client')
+
+    expect(await submitBugReport(report)).toEqual(posted)
+    const [path, init] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/api/bug-report')
+    expect(JSON.parse(init.body as string)).toEqual(report)
+  })
+
+  it('answers a refusal as a failure that says so', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 413 })
+    const { submitBugReport } = await import('../../../src/api/remote-client')
+
+    expect(await submitBugReport(report)).toEqual({
+      ok: false,
+      error: 'FAILED',
+      message: 'The desktop refused the report (413).',
+    })
+  })
+})

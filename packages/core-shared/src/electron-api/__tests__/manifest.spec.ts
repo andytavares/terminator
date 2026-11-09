@@ -38,6 +38,10 @@ describe('ELECTRON_API_MANIFEST', () => {
 // diff in this test, even though the runtime set is derived from the manifest.
 const EXPECTED_REMOTE_CHANNELS = [
   'app:get-info',
+  // A bug report from the phone (ADR 156).
+  'bug-report:status',
+  'bug-report:details',
+  'bug-report:submit-uploaded',
   'terminal:create',
   'terminal:attach',
   'terminal:close',

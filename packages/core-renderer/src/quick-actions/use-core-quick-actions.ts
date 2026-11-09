@@ -28,6 +28,7 @@ import { useNavigationStore } from '../stores/navigation.store'
 import { goBack, goForward } from '../stores/navigation-sync'
 import { toggleBreakout } from '../terminal/breakout'
 import { toggleSidebarMode } from '../components/sidebar/sidebar-mode'
+import { openBugReport } from '../stores/bug-report.store'
 
 /** What the app shell does on behalf of an action: its own dialogs, panes and toggles. */
 export interface ShellCommands {
@@ -289,6 +290,8 @@ function coreActionDeps(
     onToggleSidebarMode: toggleSidebarMode,
     onStartWork: () => useStartWorkStore.getState().openLauncher(),
     onTaskSwitcher: () => useTaskSwitcher.getState().show(),
+    canReportBug: window.electronAPI.bugReport?.capture !== undefined,
+    onReportBug: () => openBugReport(),
   }
 }
 

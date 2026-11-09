@@ -45,6 +45,13 @@ import type {
   WorktreeInfo,
 } from '../types/index'
 import type { ChangeStats } from '../schemas/git.schema'
+import type {
+  ReportAttachment,
+  ReportFailure,
+  ReportSubmission,
+  ReportingStatus,
+  UploadedReport,
+} from '../bug-report'
 import type { FramePortRequest } from '../frame-wire'
 import { OPEN_FRAME_PORT_CHANNEL } from '../frame-wire'
 import type {
@@ -1240,6 +1247,82 @@ export const ELECTRON_API_MANIFEST = [
     },
     signature: signature<() => Promise<AppInfo>>(),
     extensionView: 'shared',
+  }),
+
+  // ── bug reports (a public GitHub issue through the user's gh; ADR 156; core only) ──
+  // Not MCP tools: a public issue goes out only on the user's own click. The phone reaches status,
+  // details and submitUploaded; capturing, the file picker and the browser are this Mac's.
+  method({
+    path: 'bugReport.status',
+    kind: 'invoke',
+    channel: 'bug-report:status',
+    mcp: false,
+    signature: signature<() => Promise<ReportingStatus>>(),
+  }),
+  method({
+    path: 'bugReport.details',
+    kind: 'invoke',
+    channel: 'bug-report:details',
+    mcp: false,
+    signature: signature<() => Promise<{ details: string }>>(),
+  }),
+  method({
+    path: 'bugReport.submitUploaded',
+    kind: 'invoke',
+    channel: 'bug-report:submit-uploaded',
+    mcp: false,
+    signature:
+      signature<
+        (
+          report: UploadedReport
+        ) => Promise<{ ok: true; number: number; url: string } | ReportFailure>
+      >(),
+  }),
+  method({
+    path: 'bugReport.capture',
+    kind: 'invoke',
+    channel: 'bug-report:capture',
+    mcp: false,
+    signature:
+      signature<() => Promise<{ ok: true; attachment: ReportAttachment } | ReportFailure>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'bugReport.pick',
+    kind: 'invoke',
+    channel: 'bug-report:pick',
+    mcp: false,
+    signature: signature<() => Promise<{ attachments: ReportAttachment[] }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'bugReport.submit',
+    kind: 'invoke',
+    channel: 'bug-report:submit',
+    mcp: false,
+    signature:
+      signature<
+        (
+          report: ReportSubmission
+        ) => Promise<{ ok: true; number: number; url: string } | ReportFailure>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'bugReport.openInBrowser',
+    kind: 'invoke',
+    channel: 'bug-report:open-in-browser',
+    mcp: false,
+    signature: signature<(report: ReportSubmission) => Promise<{ ok: true } | ReportFailure>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'bugReport.onMenuReportBug',
+    kind: 'event',
+    channel: 'menu:report-bug',
+    signature: signature<(handler: () => void) => Unsubscribe>(),
+    toHandlerArgs: () => [],
+    remote: 'omit',
   }),
 
   // ── breakout ──────────────────────────────────────────────────────────────

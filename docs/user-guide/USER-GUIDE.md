@@ -25,6 +25,7 @@ An end-to-end reference for every feature and extension in Terminator — an ext
 17. [Extension: Notepad](#17-extension-notepad)
 18. [Extension: Task Vault](#18-extension-task-vault)
 19. [Extension: Remote Control](#19-extension-remote-control)
+20. [Reporting a Bug](#20-reporting-a-bug)
 
 To run Terminator's tools from a shell, see [termctl](termctl.md).
 
@@ -741,6 +742,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Find in an agent tab                 | `Cmd+F`                                |
 | Clear terminal                       | `Cmd+K`                                |
 | Quick actions                        | `Cmd+P`                                |
+| Report a bug                         | `Cmd+Shift+B`                          |
 | Settings                             | `Cmd+,`                                |
 | Toggle Overview screen               | `Cmd+Shift+E`                          |
 | Open Home                            | `Cmd+~`                                |
@@ -1184,10 +1186,46 @@ The viewer limit is how many browsers can watch one terminal at once. Terminator
 
 Go to the URL on any device. Log in with the session password. The server adapts to the viewport:
 
-| Viewport                        | Experience                                                                                                                                                                                                                                                                           |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Desktop / tablet** (≥ 768 px) | The full Electron renderer through `/app/` — the complete Terminator UI.                                                                                                                                                                                                             |
-| **Mobile** (< 768 px)           | A mobile UI at `/mobile/`: scrollable workspace/terminal list, full-screen xterm.js terminal view with a control-key toolbar (Ctrl+C, Ctrl+D, Tab, Esc, ↑, ↓), and automatic reconnect through the Page Visibility API (3 attempts × 2 s). Tested on iOS 16+ / Android 12+ (Chrome). |
+| Viewport                        | Experience                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Desktop / tablet** (≥ 768 px) | The full Electron renderer through `/app/` — the complete Terminator UI.                                                                                                                                                                                                                                                                                                                                                               |
+| **Mobile** (< 768 px)           | A mobile UI at `/mobile/`: scrollable workspace/terminal list, full-screen xterm.js terminal view with a control-key toolbar (Ctrl+C, Ctrl+D, Tab, Esc, ↑, ↓), and automatic reconnect through the Page Visibility API (3 attempts × 2 s). **Report a bug** at the bottom of the list sends a bug report with photos and videos from the phone (see [Reporting a Bug](#20-reporting-a-bug)). Tested on iOS 16+ / Android 12+ (Chrome). |
+
+---
+
+## 20. Reporting a Bug
+
+A bug report becomes a **public issue** on [github.com/andytavares/terminator](https://github.com/andytavares/terminator/issues), with your text and any screenshots or videos. Anyone can read it, so check screenshots for tokens and private paths before you send.
+
+### Opening a report
+
+- **Help › Report a Bug…** or `Cmd+Shift+B`, from any screen, an extension or a terminal in its own window.
+- **Report a bug** in Quick Actions (`Cmd+P`).
+- **Report** on an error toast. The report starts with what the toast said.
+
+The report notes the screen you were on ("from: Code Reviews").
+
+### What goes in it
+
+- **Title** and **What happened, and what you expected**.
+- **Capture window** takes a screenshot of the window you opened the report from. The report hides while it captures.
+- **Add files** attaches images (PNG, JPEG, GIF, WebP) and videos (MP4, MOV, WebM). Each file can be up to 10 MB, GitHub's limit for images and for videos on free plans. Terminator has no screen recorder: record a video with macOS (`Cmd+Shift+5`) and add the file.
+- **Include app details** adds the Terminator version, the macOS version and your installed extensions. The report shows exactly what it will send. Untick it to leave them out.
+
+### Sending it
+
+Terminator posts the issue through the [GitHub CLI](https://cli.github.com) on your Mac, as the account `gh` is signed in to. The report says which account before you send.
+
+| The report says                               | What happens                                                                                                                                             |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Posting as @you**                           | **Post issue** uploads the files and creates the issue. You get its number and **Open on GitHub**.                                                       |
+| gh is not installed / not signed in / too old | **Continue in browser** opens GitHub's bug report form, filled in, and a Finder window holding your files. Drag them into the form and press **Create**. |
+
+You can close the report while it posts. The result arrives as a toast.
+
+### From the phone
+
+In Remote Control's mobile page, **Report a bug** sits below the terminal list. Pick photos or videos (up to 5, 10 MB each). The desktop posts the issue with its own GitHub CLI, so it appears under the desktop's GitHub account. If the desktop cannot post, **Open GitHub** opens the filled-in form on the phone, where you attach the files yourself.
 
 ---
 

@@ -47,8 +47,11 @@ describe('View menu', () => {
 describe('Help menu', () => {
   it('opens About, named after the app', () => {
     const openAbout = vi.fn()
-    const submenu = buildHelpMenu('Terminator', openAbout, vi.fn())
-      .submenu as Electron.MenuItemConstructorOptions[]
+    const submenu = buildHelpMenu('Terminator', {
+      openAbout,
+      openExternal: vi.fn(),
+      reportBug: vi.fn(),
+    }).submenu as Electron.MenuItemConstructorOptions[]
     const about = submenu.find((item) => item.label === 'About Terminator')!
     ;(about.click as () => void)()
     expect(openAbout).toHaveBeenCalledTimes(1)
@@ -56,10 +59,28 @@ describe('Help menu', () => {
 
   it('hands the repository URL to the browser from View on GitHub', () => {
     const openExternal = vi.fn()
-    const submenu = buildHelpMenu('Terminator', vi.fn(), openExternal)
-      .submenu as Electron.MenuItemConstructorOptions[]
+    const submenu = buildHelpMenu('Terminator', {
+      openAbout: vi.fn(),
+      openExternal,
+      reportBug: vi.fn(),
+    }).submenu as Electron.MenuItemConstructorOptions[]
     ;(submenu.find((item) => item.label === 'View on GitHub')!.click as () => void)()
     expect(openExternal).toHaveBeenCalledWith('https://github.com/anthropics/terminator')
+  })
+})
+
+describe('Help menu, bug report', () => {
+  it('starts a bug report on Cmd+Shift+B', () => {
+    const reportBug = vi.fn()
+    const submenu = buildHelpMenu('Terminator', {
+      openAbout: vi.fn(),
+      openExternal: vi.fn(),
+      reportBug,
+    }).submenu as Electron.MenuItemConstructorOptions[]
+    const item = submenu.find((candidate) => candidate.label === 'Report a Bug…')!
+    expect(item.accelerator).toBe('CmdOrCtrl+Shift+B')
+    ;(item.click as () => void)()
+    expect(reportBug).toHaveBeenCalledTimes(1)
   })
 })
 

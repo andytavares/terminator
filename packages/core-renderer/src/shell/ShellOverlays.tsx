@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react'
 import { useExtensionRegistry } from '../extensions/registry'
 import { NotificationPanel } from '../components/NotificationPanel'
 import { AboutDialog } from '../components/AboutDialog'
+import { BugReportHost } from '../components/BugReportDialog'
 import { NameTerminalDialog } from '../components/NameTerminalDialog'
 import { LogWindow } from '../components/LogWindow'
 import { ToastContainer } from '../components/ToastContainer'
@@ -71,6 +72,7 @@ function ShellDialogs(state: ShellOverlayState): React.JSX.Element {
         </Suspense>
       )}
       {state.aboutOpen && <AboutDialog onClose={state.closeAbout} />}
+      <BugReportHost />
       {state.pendingTab && (
         <NameTerminalDialog
           defaultName={state.pendingTab.defaultName}

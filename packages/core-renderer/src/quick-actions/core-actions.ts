@@ -58,6 +58,9 @@ export interface CoreActionDeps {
   onToggleSidebarMode(): void
   onOpenSettings(): void
   onToggleLog(): void
+  /** Bug reports exist in this window: the desktop app, not the remote. */
+  canReportBug: boolean
+  onReportBug(): void
   canGoBack: boolean
   canGoForward: boolean
   hasClosedTab: boolean
@@ -387,6 +390,15 @@ const TOP_ACTIONS: CoreActionSpec[] = [
     group: 'top',
     shortcut: '⌘⇧L',
     run: (d) => d.onToggleLog(),
+  },
+  {
+    id: 'core.report-bug',
+    label: 'Report a bug',
+    group: 'top',
+    // Help › Report a Bug…, a menu accelerator.
+    shortcut: '⌘⇧B',
+    unavailable: (d) => (d.canReportBug ? undefined : 'Report bugs from the desktop app'),
+    run: (d) => d.onReportBug(),
   },
 ]
 

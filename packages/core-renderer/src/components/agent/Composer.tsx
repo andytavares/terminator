@@ -19,6 +19,7 @@ import {
 } from '../../stores/attached-context.store'
 import { useTabDragStore } from '../../terminal/tab-drag'
 import { CitationCommentPopover } from './cite'
+import { readBase64 } from '../../../../core-shared/src/read-base64'
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -30,14 +31,6 @@ interface Attachment {
   /** Base64 without the data URL prefix. */
   data: string
 }
-
-const readBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
 
 /** Why a file cannot go to the agent, in plain words; null when it can. */
 function imageProblem(file: File): string | null {

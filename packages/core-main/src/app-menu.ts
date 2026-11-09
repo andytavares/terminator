@@ -52,16 +52,22 @@ export function buildViewMenu(actions: ViewMenuActions): Electron.MenuItemConstr
   }
 }
 
+export interface HelpMenuActions {
+  openAbout: () => void
+  openExternal: (url: string) => void
+  reportBug: () => void
+}
+
 export function buildHelpMenu(
   appName: string,
-  openAbout: () => void,
-  openExternal: (url: string) => void
+  { openAbout, openExternal, reportBug }: HelpMenuActions
 ): Electron.MenuItemConstructorOptions {
   return {
     label: 'Help',
     submenu: [
       { label: `About ${appName}`, click: openAbout },
       { type: 'separator' },
+      { label: 'Report a Bug…', accelerator: 'CmdOrCtrl+Shift+B', click: reportBug },
       { label: 'View on GitHub', click: () => openExternal(REPOSITORY_URL) },
     ],
   }
