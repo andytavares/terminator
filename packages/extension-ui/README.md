@@ -174,18 +174,15 @@ npm run test:visual -- --update-snapshots # (inside this package) write new base
 `playwright.visual.config.ts` serves `storybook-static` with `vite preview`. `visual/stories.visual.ts` takes one screenshot per story in its `index.json`, at 1280×800, after
 the play function of the story and the fonts have finished. Baselines are
 per platform (`visual/__screenshots__/{platform}/`), as the
-[Playwright docs](https://playwright.dev/docs/test-snapshots) advise. CI
-compares on macOS only, in the Stories job, because Terminator ships only for macOS.
-Generate baselines on macOS with the Chromium build that the pinned Playwright installs
-(`npx playwright install chromium`).
-The Stories job runs with `--update-snapshots=missing`. It compares every committed baseline.
-A story without a baseline fails and gets a baseline written, which the job uploads
-as the `story-baselines-macos` artifact. To commit the baselines, add the
-`update-story-baselines` label to the pull request. The Story baselines workflow
-(`.github/workflows/story-baselines.yml`) then writes the missing baselines on macOS into `__screenshots__/darwin/` under `visual/`
-(`snapshotPathTemplate` in `playwright.visual.config.ts`),
-commits them to the branch and removes the label. It never overwrites an existing
-baseline. Review the committed images in the diff of the pull request.
+[Playwright docs](https://playwright.dev/docs/test-snapshots) advise. CI compares on Linux
+(`ubuntu-24.04-arm`), in the Story screenshots job, when a change reaches the design system
+(ADR 154). It runs with `--update-snapshots=none`, so a story without a baseline fails. To commit
+the missing baselines, add the `update-story-baselines` label to the pull request. The Story
+baselines workflow (`.github/workflows/story-baselines.yml`) then writes them on the same runner
+into `__screenshots__/linux/` under `visual/` (`snapshotPathTemplate` in
+`playwright.visual.config.ts`), commits them to the branch and removes the label. It never
+overwrites an existing baseline. Review the committed images in the diff of the pull request.
+The `darwin/` baselines serve a local `npm run test:visual` on a Mac.
 
 Add a component here before you use it anywhere else, with a behaviour spec in
 `tests/unit/packages/extension-ui` and a story file in `stories/` (use `inLight`

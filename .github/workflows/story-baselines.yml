@@ -1,6 +1,6 @@
 name: Story baselines
 
-# Writes the macOS screenshot baselines for stories that have none or that changed, and commits
+# Writes the Linux screenshot baselines for stories that have none or that changed, and commits
 # them to the pull request's branch (ADR 098). Baselines are per platform, so
 # they are made on the platform that compares them
 # (https://playwright.dev/docs/test-snapshots). Runs only when a maintainer adds
