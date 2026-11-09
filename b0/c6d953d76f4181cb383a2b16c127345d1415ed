@@ -1,0 +1,26 @@
+extensions/git-integration/src/review/apply-reading-order.ts
+  s_130229c15a2ccb::t_b243b2dcde4dfe 44-46
+  s_130229c15a2ccb::t_d18d3513ed02cb 21,30-43,47-53
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_130229c15a2ccb::t_d18d3513ed02cb 63-64
+extensions/git-integration/tests/unit/review-wiring.spec.ts
+  s_130229c15a2ccb::t_5e19e44d4bb51f 78,80,111,113
+  s_130229c15a2ccb::t_1f52a3ec2ccdc3 82-83,85
+  s_130229c15a2ccb::t_b8d305acedcd60 81,84,86-110,112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b0c6d953d76f4181cb383a2b16c127345d1415ed",
+  "prompts": {},
+  "sessions": {
+    "s_130229c15a2ccb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0f7aafaa-c842-4d1d-8831-76cee73d9df4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
