@@ -56,9 +56,9 @@ const PR_SCOPE: AgentScope = {
   chapter: null,
 }
 
-const LIST_MODE_OPTIONS = [
-  { value: 'full', label: 'Files' },
-  { value: 'guided', label: 'Chapters' },
+const GROUP_BY_OPTIONS = [
+  { value: 'all', label: 'All files' },
+  { value: 'chapters', label: 'Chapters' },
 ] as const
 
 type ReviewStore = ReturnType<typeof usePrReviewStore.getState>
@@ -184,7 +184,8 @@ function useUiState() {
       agentPanelScope: ui.agentPanelScope,
       openAgentPanel: ui.openAgentPanel,
       fileListHidden: ui.fileListHidden,
-      toggleFileList: ui.toggleFileList,
+      groupBy: ui.groupBy,
+      setGroupBy: ui.setGroupBy,
     }))
   )
 }
@@ -194,7 +195,6 @@ function useViewState(store: ReviewStore) {
   const [showResume, setShowResume] = useState(() => isStaleReviewSession(store.lastAccessedAt))
   const [showSubmit, setShowSubmit] = useState(false)
   const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'guided' | 'full'>('full')
   const [refreshing, setRefreshing] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [ownedOnly, setOwnedOnly] = useState(false)
@@ -206,8 +206,6 @@ function useViewState(store: ReviewStore) {
     setShowSubmit,
     showRiskFor,
     setShowRiskFor,
-    viewMode,
-    setViewMode,
     refreshing,
     setRefreshing,
     focusMode,
@@ -307,6 +305,14 @@ function stepFile(r: ReviewState, delta: 1 | -1): void {
   goToFile(r, target)
 }
 
+/** Sets the open file's viewed mark from the footer box, without leaving the file. */
+function setOpenFileViewed(r: ReviewState, viewed: boolean): void {
+  const { activeFile } = r.position
+  if (!activeFile) return
+  if (viewed) r.store.markFileViewed(headOf(r), activeFile.path)
+  else r.store.unmarkFileViewed(headOf(r), activeFile.path)
+}
+
 function markOpenFileViewed(r: ReviewState): void {
   const { activeFile } = r.position
   if (!activeFile) return
@@ -353,6 +359,7 @@ function actionHandlers(r: ReviewState) {
   const { store, view, props } = r
   return {
     markViewed: () => markOpenFileViewed(r),
+    toggleOpenFileViewed: (viewed: boolean) => setOpenFileViewed(r, viewed),
     finishChapter: () => finishChapter(r),
     pause: () => {
       store.setPaused(headOf(r), new Date().toISOString())
@@ -465,40 +472,27 @@ function Header({ r, h }: { r: ReviewState; h: Handlers }) {
       onPopOut={r.props.onPopOut}
       onRefresh={h.refresh}
       refreshing={view.refreshing}
-      onToggleFileList={ui.toggleFileList}
       onOpenKeyboardHelp={() => ui.setKeyboardHelpOpen(true)}
       onClose={r.props.onClose}
     />
   )
 }
 
+/** The sidebar's Files / Chapters switch: a shortcut to the saved File list setting. */
 function ListHeader({ r }: { r: ReviewState }) {
-  const { view, displayPr, position } = r
-  const viewedInChapter = position.orderedFiles.filter((f) =>
-    r.store.viewedFiles.has(f.path)
-  ).length
+  const { ui, displayPr } = r
   return (
     <div className="pr-review-panel-header">
       {displayPr.chapters.length > 1 && (
         <SegmentedControl
           label="File list mode"
           size="sm"
-          options={[...LIST_MODE_OPTIONS]}
-          value={view.viewMode}
-          onChange={view.setViewMode}
+          options={[...GROUP_BY_OPTIONS]}
+          value={ui.groupBy}
+          onChange={ui.setGroupBy}
         />
       )}
       {displayPr.chapters.length <= 1 && <span className="pr-review-chapter-name">Files</span>}
-      {view.viewMode === 'guided' && position.activeChapter && (
-        <>
-          <span className="pr-review-chapter-count">
-            Chapter {position.activeChapterIndex + 1} of {displayPr.chapters.length}
-          </span>
-          <span className="pr-review-chapter-count">
-            {viewedInChapter}/{position.orderedFiles.length}
-          </span>
-        </>
-      )}
     </div>
   )
 }
@@ -506,10 +500,7 @@ function ListHeader({ r }: { r: ReviewState }) {
 function GuidedList({ r, h, chapter }: { r: ReviewState; h: Handlers; chapter: Chapter }) {
   const { repoRoot, pr } = r.props
   return (
-    <>
-      <div className="pr-rail-chapters">
-        <ChapterNav chapters={r.displayPr.chapters} onSelectChapter={h.selectChapter} />
-      </div>
+    <ChapterNav chapters={r.displayPr.chapters} onSelectChapter={h.selectChapter}>
       <ChapterFileList
         repoRoot={repoRoot}
         prNumber={pr.number}
@@ -518,13 +509,13 @@ function GuidedList({ r, h, chapter }: { r: ReviewState; h: Handlers; chapter: C
         currentFilePath={r.position.activeFile?.path ?? null}
         onSelectFile={h.selectFile}
       />
-    </>
+    </ChapterNav>
   )
 }
 
 function LeftPanel({ r, h }: { r: ReviewState; h: Handlers }) {
   const { activeChapter } = r.position
-  const guided = r.view.viewMode === 'guided' && activeChapter
+  const guided = r.ui.groupBy === 'chapters' && activeChapter
   return (
     <aside
       className="pr-review-panel pr-review-panel--left"
@@ -590,8 +581,23 @@ function Resume({ r }: { r: ReviewState }) {
   )
 }
 
+/** "file 4 of 5" over the whole review, or "<chapter> · file 2 of 2 · chapter 2 of 3". */
+function positionText(r: ReviewState): string {
+  const { activeChapter, activeChapterIndex, activeFile, resolvedIndex, orderedFiles } = r.position
+  if (!activeFile || !activeChapter) return ''
+  if (r.ui.groupBy === 'all') {
+    const all = reviewSequence(r.displayPr, r.store.fileOrderOverrides)
+    const at = all.findIndex((e) => e.chapterId === activeChapter.id && e.path === activeFile.path)
+    return `file ${at + 1} of ${all.length}`
+  }
+  const file = `file ${resolvedIndex + 1} of ${orderedFiles.length}`
+  const chapter = `chapter ${activeChapterIndex + 1} of ${r.displayPr.chapters.length}`
+  return `${activeChapter.name} · ${file} · ${chapter}`
+}
+
 function CentrePane({ r, h }: { r: ReviewState; h: Handlers }) {
   const { position, view } = r
+  const openPath = position.activeFile?.path
   return (
     <main className="pr-review-panel pr-review-panel--centre">
       <DiffArea r={r} h={h} />
@@ -600,6 +606,9 @@ function CentrePane({ r, h }: { r: ReviewState; h: Handlers }) {
         {...neighbourNames(r)}
         isLastFile={position.resolvedIndex === position.orderedFiles.length - 1}
         isLastChapter={position.activeChapterIndex === r.displayPr.chapters.length - 1}
+        position={positionText(r)}
+        isViewed={!!openPath && r.store.viewedFiles.has(openPath)}
+        onToggleViewed={h.toggleOpenFileViewed}
         onPrevFile={h.prevFile}
         onMarkViewed={h.markViewed}
         onFinishChapter={h.finishChapter}

@@ -15,6 +15,7 @@
   min-width: 0;
   position: relative;
   font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-muted);
 }
 
 .rs-cell + .rs-cell {
@@ -45,13 +46,11 @@
 }
 
 .rs-label {
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
-  color: var(--tm-text-primary);
 }
 
 .rs-detail {
-  color: var(--tm-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,8 +85,18 @@
   opacity: 0.6;
 }
 
-.rs-cell--quiet .rs-label {
-  color: var(--tm-text-secondary);
+/* A settled cell stays muted; a cell that needs the reviewer is amber and semibold. */
+.rs-cell[data-attention='true'] {
+  color: var(--tm-warning);
+  font-weight: 600;
+}
+
+.rs-cell[data-attention='true'] .rs-label {
+  font-weight: 600;
+}
+
+.rs-cell--bad[data-attention='true'] {
+  color: var(--tm-danger);
 }
 
 .rs-cell--bad {

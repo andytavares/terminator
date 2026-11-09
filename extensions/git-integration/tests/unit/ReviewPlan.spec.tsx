@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ReviewPlan } from '../../src/components/pr-review/ReviewPlan'
 import { makeFile } from './overview-fixtures'
@@ -10,7 +10,9 @@ function file(path: string, level: 'low' | 'medium' | 'high' = 'low'): PrChanged
   return makeFile(path, { level, composite: null, dominantDriver: '' }, 1)
 }
 
-function chapter(fields: Pick<Chapter, 'id' | 'name' | 'files' | 'estimatedMinutes'>): Chapter {
+type ChapterFields = Pick<Chapter, 'id' | 'name' | 'files' | 'estimatedMinutes' | 'summary'>
+
+function chapter(fields: ChapterFields): Chapter {
   return { ...fields, status: 'not-started' }
 }
 
@@ -18,6 +20,7 @@ const chapters: Chapter[] = [
   chapter({
     id: 'c1',
     name: 'Settings store and debounce',
+    summary: 'Changes markViewed and viewAll · 1 test file',
     files: [file('src/a/store.ts', 'high')],
     estimatedMinutes: 12,
   }),
@@ -78,5 +81,19 @@ describe('ReviewPlan rows and headings', () => {
   it('totals the minutes across chapters in the heading line', () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
     expect(screen.getByText('2 chapters · about 20 min')).toBeTruthy()
+  })
+})
+
+describe('ReviewPlan chapter summary', () => {
+  it("shows a chapter's summary line under its name", () => {
+    render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
+    const row = screen.getByRole('button', { name: /Start here: Settings store and debounce/ })
+    expect(within(row).getByText('Changes markViewed and viewAll · 1 test file')).toBeTruthy()
+  })
+
+  it('shows no summary line for a chapter without one', () => {
+    render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
+    const row = screen.getByRole('button', { name: /Start here: Panel layout/ })
+    expect(within(row).queryByTestId('chapter-summary')).toBeNull()
   })
 })

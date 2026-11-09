@@ -75,7 +75,42 @@ describe('applyReadingOrder', () => {
     ])
     expect(out[3].files[2].whyHere).toBe('Renders HealthChips (step 5)')
   })
+})
 
+describe('applyReadingOrder — chapter summary', () => {
+  it('summarises each chapter by the symbols its steps change and its test files', () => {
+    const review = chapter('review', ['src/session.ts', 'src/store.ts', 'tests/session.spec.ts'])
+    review.files[2] = { ...review.files[2], tier: 2 }
+    const out = applyReadingOrder(
+      [review],
+      [
+        { ...step(1, 'src/session.ts', 'Defines markViewed'), symbol: 'markViewed' },
+        { ...step(2, 'src/store.ts', 'Calls markViewed (step 1)'), symbol: 'viewAll' },
+        step(3, 'tests/session.spec.ts', 'Tests step 1, read right after it'),
+      ]
+    )
+    expect(out[0].summary).toBe('Changes markViewed and viewAll · 1 test file')
+  })
+
+  it('names at most three symbols in a chapter summary and counts the rest', () => {
+    const paths = ['src/a.ts', 'src/b.ts', 'src/c.ts', 'src/d.ts', 'src/e.ts']
+    const out = applyReadingOrder(
+      [chapter('many', paths)],
+      paths.map((p, i) => ({ ...step(i + 1, p, 'Defines it'), symbol: `s${i + 1}` }))
+    )
+    expect(out[0].summary).toBe('Changes s1, s2, s3 and 2 more')
+  })
+
+  it('gives a chapter no summary when none of its steps names a symbol', () => {
+    const out = applyReadingOrder(
+      [chapter('docs', ['docs/guide.md'])],
+      [step(1, 'docs/guide.md', 'No dependencies detected in this PR')]
+    )
+    expect(out[0].summary).toBeUndefined()
+  })
+})
+
+describe('applyReadingOrder — without steps', () => {
   it('leaves chapters untouched when there is no reading order', () => {
     expect(applyReadingOrder(chapters, [])).toBe(chapters)
   })

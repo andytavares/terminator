@@ -7,6 +7,7 @@ type AgentRequest = 'review' | 'explain' | 'ask'
 export type CommentVisibility = 'all' | 'unresolved' | 'hidden'
 type DiffRange = 'since' | 'whole'
 export type DiffViewMode = 'unified' | 'split'
+type GroupBy = 'chapters' | 'all'
 
 /** A line range the reviewer has selected in the diff, for the float bar and the agent. */
 export interface LineSelection {
@@ -47,6 +48,7 @@ interface Prefs {
   fileListHidden: boolean
   diffViewMode: DiffViewMode
   hideFormattingHunks: boolean
+  groupBy: GroupBy
   queueSort: SortMode
   dashboardSort: SortMode
 }
@@ -58,6 +60,7 @@ const DEFAULT_PREFS: Prefs = {
   fileListHidden: false,
   diffViewMode: 'unified',
   hideFormattingHunks: true,
+  groupBy: 'all',
   queueSort: 'newest',
   dashboardSort: 'newest',
 }
@@ -82,6 +85,7 @@ interface ReviewUiStore extends Prefs {
   toggleFileList(): void
   setDiffViewMode(mode: DiffViewMode): void
   setHideFormattingHunks(on: boolean): void
+  setGroupBy(groupBy: GroupBy): void
   setQueueSort(mode: SortMode): void
   setDashboardSort(mode: SortMode): void
   setSelection(s: LineSelection | null): void
@@ -132,6 +136,7 @@ function prefsOf(state: ReviewUiStore): Prefs {
     fileListHidden: state.fileListHidden,
     diffViewMode: state.diffViewMode,
     hideFormattingHunks: state.hideFormattingHunks,
+    groupBy: state.groupBy,
     queueSort: state.queueSort,
     dashboardSort: state.dashboardSort,
   }
@@ -154,6 +159,7 @@ function prefActions(set: SetState, get: GetState) {
     toggleFileList: () => persist({ fileListHidden: !get().fileListHidden }),
     setDiffViewMode: (mode: DiffViewMode) => persist({ diffViewMode: mode }),
     setHideFormattingHunks: (on: boolean) => persist({ hideFormattingHunks: on }),
+    setGroupBy: (groupBy: GroupBy) => persist({ groupBy }),
     setQueueSort: (mode: SortMode) => persist({ queueSort: mode }),
     setDashboardSort: (mode: SortMode) => persist({ dashboardSort: mode }),
   }

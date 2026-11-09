@@ -25,7 +25,7 @@
   display: flex;
   min-width: 0;
   font-family: var(--tm-font-mono);
-  font-size: var(--tm-font-size-md);
+  font-size: 16px;
   white-space: nowrap;
 }
 
@@ -86,14 +86,10 @@
   flex: 1;
 }
 
-.fh-viewed {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.fh-note {
   font-size: var(--tm-font-size-sm);
-  color: var(--tm-text-secondary);
+  color: var(--tm-text-muted);
   white-space: nowrap;
-  cursor: pointer;
 }
 
 .fh-why {

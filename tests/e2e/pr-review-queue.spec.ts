@@ -87,6 +87,37 @@ async function theQueueListsAndSearchNarrows(): Promise<void> {
   await expect(view.locator('.rd-row')).toHaveCount(3)
 }
 
+async function aPullRequestThatFailsToOpenSaysWhyAndRetries(): Promise<void> {
+  const view = await openCodeReviews(handle, 'Review Queue')
+  stub.pullRequest(3).failFiles = true
+  await queueRow(view, 'Tidy docs').click()
+  const failure = view.getByRole('alert').filter({ hasText: 'Could not open #3.' })
+  await expect(failure).toContainText('Bad Gateway')
+
+  stub.pullRequest(3).failFiles = false
+  await failure.getByRole('button', { name: 'Retry' }).click()
+  await expect(view.getByRole('heading', { level: 1 })).toContainText('Tidy docs')
+  await view.getByRole('button', { name: 'Close' }).click()
+  await expect(queueRow(view, 'Tidy docs')).toBeVisible()
+}
+
+async function aPopOutThatFailsToOpenSaysWhyAndRetries(): Promise<void> {
+  const view = await openPrOverview('Tidy docs')
+  stub.pullRequest(3).failFiles = true
+  await view.getByRole('button', { name: 'Open in focused window' }).click()
+  const popout = await popoutPage(handle, 'prNumber=3')
+  const failed = popout.getByRole('heading', { name: 'Could not open pull request #3' })
+  await expect(failed).toBeVisible()
+  await expect(popout.getByText(/Bad Gateway/)).toBeVisible()
+
+  stub.pullRequest(3).failFiles = false
+  await popout.getByRole('button', { name: 'Retry' }).click()
+  await expect(popout.getByRole('heading', { level: 1 })).toContainText('Tidy docs')
+  await popout.close()
+  await view.getByRole('button', { name: 'Close' }).click()
+  await expect(queueRow(view, 'Tidy docs')).toBeVisible()
+}
+
 async function aDiscussionCommentIsPosted(): Promise<void> {
   const view = await openPrOverview('Add subtract')
   await view.getByRole('tab', { name: 'Discussion, 1' }).click()
@@ -175,6 +206,14 @@ async function anApprovalFromThePopOutReachesGitHub(): Promise<void> {
 /** The flow's steps in order, each titled with the behaviour it checks. */
 const STEPS: Array<[title: string, run: () => Promise<void>]> = [
   ['the queue lists the open pull requests, and search narrows it', theQueueListsAndSearchNarrows],
+  [
+    'a pull request that fails to open says why under its row, and Retry opens it',
+    aPullRequestThatFailsToOpenSaysWhyAndRetries,
+  ],
+  [
+    'a pop-out window whose pull request fails to open says why, and Retry opens it',
+    aPopOutThatFailsToOpenSaysWhyAndRetries,
+  ],
   ['a comment in the discussion is posted to the pull request', aDiscussionCommentIsPosted],
   [
     'a draft is marked ready, and a branch behind main is brought up to date',

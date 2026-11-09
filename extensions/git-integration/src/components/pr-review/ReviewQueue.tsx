@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { RefreshCw, X } from 'lucide-react'
+import { ExternalLink, RefreshCw, X } from 'lucide-react'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useReviewUiStore } from '../../stores/review-ui.store'
@@ -8,10 +8,13 @@ import { SortSelect } from './SortSelect'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
 import { PrRow, shortAge, type MetaPart } from './DiffSize'
 import { choose } from '../text'
+import { pullRequestUrl, type OpenStatus } from '../../review/open-status'
 import './review-dashboard.css'
 
 interface Props {
   repoRoot: string
+  /** The pull request being opened, or the one that did not open. */
+  openStatus?: OpenStatus
   onOpenPr: (pr: ReviewQueuePR) => void
   onRefresh: (options?: { search?: string }) => Promise<void>
   onDismissPr: (prNumber: number) => Promise<void>
@@ -136,6 +139,8 @@ function QueueBanners({ store, refresh }: { store: QueueStore; refresh: QueueRef
 
 interface QueueRowsProps {
   store: QueueStore
+  repoRoot: string
+  openStatus: OpenStatus
   searchQuery: string
   onOpenPr: Props['onOpenPr']
   onDismissPr: Props['onDismissPr']
@@ -163,13 +168,21 @@ function QueueRows(props: QueueRowsProps) {
           onOpen={props.onOpenPr}
           onDismiss={props.onDismissPr}
           currentUserLogin={store.currentUserLogin}
+          repoRoot={props.repoRoot}
+          status={choose(props.openStatus?.prNumber === pr.number, props.openStatus, null)}
         />
       ))}
     </div>
   )
 }
 
-export function ReviewQueue({ onOpenPr, onRefresh, onDismissPr }: Props) {
+export function ReviewQueue({
+  repoRoot,
+  openStatus = null,
+  onOpenPr,
+  onRefresh,
+  onDismissPr,
+}: Props) {
   const store = usePrReviewStore()
   const refresh = useQueueRefresh(onRefresh)
   const { searchQuery } = refresh
@@ -181,6 +194,8 @@ export function ReviewQueue({ onOpenPr, onRefresh, onDismissPr }: Props) {
       <div className="pr-sections">
         <QueueRows
           store={store}
+          repoRoot={repoRoot}
+          openStatus={openStatus}
           searchQuery={searchQuery}
           onOpenPr={onOpenPr}
           onDismissPr={onDismissPr}
@@ -197,6 +212,9 @@ interface QueueRowProps {
   onOpen: (pr: ReviewQueuePR) => void
   onDismiss?: (prNumber: number) => Promise<void>
   currentUserLogin: string | null
+  repoRoot: string
+  /** This row's open status: null unless it is the pull request being opened or that failed. */
+  status: OpenStatus
 }
 
 const ACTION_LABEL: Record<string, string> = { paused: 'Resume', 'in-progress': 'Continue' }
@@ -250,21 +268,50 @@ function DismissButton(props: {
   )
 }
 
-function QueueRow(props: QueueRowProps) {
-  const { pr, onDismiss } = props
-  const isSession = pr.sessionStatus === 'paused' || pr.sessionStatus === 'in-progress'
-  // A control says what happens when it is used: every one of these opens the diff.
-  const label = ACTION_LABEL[pr.sessionStatus] ?? 'Review'
+/** Why the row's pull request did not open, with the ways to try again. */
+function OpenFailure({ row, message }: { row: QueueRowProps; message: string }) {
+  const url = pullRequestUrl(row.repoRoot, row.pr.number)
   return (
-    <PrRow
-      pr={pr}
-      onOpen={() => props.onOpen(pr)}
-      meta={rowMetaParts(pr, isMine(pr, props.currentUserLogin))}
-      action={{ label, primary: isSession, always: isSession }}
-    >
-      {onDismiss && pr.sessionStatus !== 'not-started' && (
-        <DismissButton prNumber={pr.number} onDismiss={onDismiss} />
+    <div className="pr-open-failure" role="alert">
+      <span>
+        Could not open #{row.pr.number}. {message}
+      </span>
+      <Button size="sm" icon={RefreshCw} onClick={() => row.onOpen(row.pr)}>
+        Retry
+      </Button>
+      {url && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={ExternalLink}
+          onClick={() => window.electronAPI.shell.openExternal(url).catch(() => {})}
+        >
+          Open on GitHub
+        </Button>
       )}
-    </PrRow>
+    </div>
+  )
+}
+
+function QueueRow(props: QueueRowProps) {
+  const { pr, onDismiss, status } = props
+  const isSession = pr.sessionStatus === 'paused' || pr.sessionStatus === 'in-progress'
+  const busy = status?.state === 'opening'
+  // A control says what happens when it is used: every one of these opens the diff.
+  const label = choose(busy, 'Opening…', ACTION_LABEL[pr.sessionStatus] ?? 'Review')
+  return (
+    <>
+      <PrRow
+        pr={pr}
+        onOpen={() => props.onOpen(pr)}
+        meta={rowMetaParts(pr, isMine(pr, props.currentUserLogin))}
+        action={{ label, primary: isSession, always: isSession || busy, busy }}
+      >
+        {onDismiss && pr.sessionStatus !== 'not-started' && (
+          <DismissButton prNumber={pr.number} onDismiss={onDismiss} />
+        )}
+      </PrRow>
+      {status?.state === 'failed' && <OpenFailure row={props} message={status.message} />}
+    </>
   )
 }

@@ -10,6 +10,7 @@ function renderFooter(props: Partial<React.ComponentProps<typeof ReviewFooter>> 
     onMarkViewed: vi.fn(),
     onFinishChapter: vi.fn(),
     onOpenShortcuts: vi.fn(),
+    onToggleViewed: vi.fn(),
   }
   render(
     <ReviewFooter
@@ -17,6 +18,8 @@ function renderFooter(props: Partial<React.ComponentProps<typeof ReviewFooter>> 
       nextFileName="api.py"
       isLastFile={false}
       isLastChapter={false}
+      isViewed={false}
+      position="Core · file 2 of 4 · chapter 1 of 3"
       {...handlers}
       {...props}
     />
@@ -104,9 +107,30 @@ describe('ReviewFooter — what it no longer holds', () => {
     expect(screen.queryByRole('button', { name: /^Submit review/ })).toBeNull()
   })
 
-  it('opens the keyboard help from the "? Shortcuts" hint', async () => {
+  it('opens the keyboard help from the "?" button', async () => {
     const handlers = renderFooter()
-    await userEvent.click(screen.getByRole('button', { name: /Shortcuts/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }))
     expect(handlers.onOpenShortcuts).toHaveBeenCalledTimes(1)
   })
+})
+
+describe('ReviewFooter — position and the Viewed checkbox', () => {
+  it('says where the open file sits in the review', () => {
+    renderFooter()
+    expect(screen.getByText('Core · file 2 of 4 · chapter 1 of 3')).toBeTruthy()
+  })
+
+  it.each([
+    { isViewed: false, nextViewed: true },
+    { isViewed: true, nextViewed: false },
+  ])(
+    'shows the file Viewed checkbox as $isViewed and asks to set it to $nextViewed',
+    async ({ isViewed, nextViewed }) => {
+      const handlers = renderFooter({ isViewed })
+      const box = screen.getByRole('checkbox', { name: 'Viewed' }) as HTMLInputElement
+      expect(box.checked).toBe(isViewed)
+      await userEvent.click(box)
+      expect(handlers.onToggleViewed).toHaveBeenCalledWith(nextViewed)
+    }
+  )
 })

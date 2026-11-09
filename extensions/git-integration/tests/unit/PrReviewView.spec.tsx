@@ -3,6 +3,7 @@ import { describe, it, beforeAll, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { usePrReviewStore, type PrReviewStore } from '../../src/stores/pr-review.store'
+import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import { githubAPI } from '../../src/api/github'
 import { PrReviewDetailSchema } from '../../src/schemas/pr-review.schema'
 
@@ -15,7 +16,9 @@ vi.mock('../../src/api/github', () => ({
 }))
 vi.mock('../../src/hooks/usePrReview', () => ({ useLoadInlineComments: vi.fn(() => vi.fn()) }))
 vi.mock('../../src/components/pr-review/ChapterNav', () => ({
-  ChapterNav: () => <div data-testid="chapter-nav" />,
+  ChapterNav: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="chapter-nav">{children}</div>
+  ),
 }))
 vi.mock('../../src/components/pr-review/ChapterFileList', () => ({
   ChapterFileList: () => <div data-testid="chapter-file-list" />,
@@ -112,6 +115,8 @@ const mockRefresh = vi.fn().mockResolvedValue(undefined)
 beforeEach(() => {
   vi.clearAllMocks()
   usePrReviewStore.getState().reset()
+  localStorage.clear()
+  useReviewUiStore.setState({ groupBy: 'all', fileListHidden: false })
 })
 
 /** Seeds the real review store, renders the view on `mockPr` with `prOverrides`, and returns a
@@ -190,7 +195,7 @@ describe('PrReviewView — pausing', () => {
 
   it('shows review progress once, in the header, with the unviewed files estimate', async () => {
     await renderView({}, { currentFilePath: 'src/foo.ts' })
-    expect(screen.getByText('0 of 1 viewed · about 3 min left')).toBeTruthy()
+    expect(screen.getByText('0 of 1 viewed · 3 min left')).toBeTruthy()
     expect(screen.queryByText(/files reviewed/)).toBeNull()
   })
 
@@ -211,14 +216,13 @@ describe('PrReviewView — opens the Agent tab of the inspector from Ask agent, 
     expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
   })
 
-  it('hides and restores the file list from the more menu', async () => {
+  it('hides and restores the file list from the View menu', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'More review actions' }))
-    await user.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
+    await user.click(screen.getByRole('button', { name: 'View' }))
+    await user.click(screen.getByRole('switch', { name: /^Show file list/ }))
     expect(screen.queryByTestId('full-file-list')).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'More review actions' }))
-    await user.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
+    await user.click(screen.getByRole('switch', { name: /^Show file list/ }))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 })
@@ -296,7 +300,7 @@ describe('PrReviewView — shows full-file-list by default, restores it after sw
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
     await user.click(screen.getByRole('radio', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-    await user.click(screen.getByRole('radio', { name: 'Files' }))
+    await user.click(screen.getByRole('radio', { name: 'All files' }))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 })
@@ -305,7 +309,7 @@ describe('PrReviewView — refresh', () => {
   it('calls onRefresh when Refresh button is clicked', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
     await user.click(screen.getByRole('button', { name: 'More review actions' }))
-    await user.click(screen.getByRole('menuitem', { name: /^Refresh PR/ }))
+    await user.click(screen.getByRole('menuitem', { name: 'Refresh pull request' }))
     expect(mockRefresh).toHaveBeenCalled()
   })
 })
@@ -352,8 +356,8 @@ describe('PrReviewView (continued) — large-PR warning', () => {
   it('toggles focus mode on/off', async () => {
     const { user } = await renderLargePr()
     expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'More review actions' }))
-    await user.click(screen.getByRole('menuitemcheckbox', { name: /^Focus mode/ }))
+    await user.click(screen.getByRole('button', { name: 'View' }))
+    await user.click(screen.getByRole('switch', { name: /^Focus mode/ }))
     await user.click(screen.getByRole('button', { name: 'Focus mode', pressed: true }))
     expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
   })
@@ -372,8 +376,8 @@ describe('PrReviewView (continued) — large-PR warning — drops all-low-risk c
       { chapters: [lowChapter, highChapter] },
       { currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' }
     )
-    await user.click(screen.getByRole('button', { name: 'More review actions' }))
-    await user.click(screen.getByRole('menuitemcheckbox', { name: /^Focus mode/ }))
+    await user.click(screen.getByRole('button', { name: 'View' }))
+    await user.click(screen.getByRole('switch', { name: /^Focus mode/ }))
     // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
     expect(
       screen.getByRole('progressbar', { name: 'Files viewed' }).getAttribute('aria-valuemax')
@@ -520,14 +524,45 @@ describe('PrReviewView (continued) — chapter keyboard navigation — marking t
     expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
   })
 
-  it('shows "Chapter 2 of 3" in the Chapters view only', async () => {
+  it.each([
+    { groupBy: 'all' as const, text: 'file 4 of 5' },
+    { groupBy: 'chapters' as const, text: 'Two · file 2 of 2 · chapter 2 of 3' },
+  ])(
+    'says where the open file sits in the footer, grouped by $groupBy',
+    async ({ groupBy, text }) => {
+      useReviewUiStore.setState({ groupBy })
+      await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'd.ts' })
+      expect(screen.getByText(text)).toBeTruthy()
+    }
+  )
+})
+
+describe('PrReviewView — group by', () => {
+  it('opens on the saved File list setting and saves a switch made in the sidebar', async () => {
+    useReviewUiStore.setState({ groupBy: 'chapters' })
     const { user } = await renderView(
       { chapters },
-      { currentChapterId: 'ch-2', currentFilePath: 'c.ts' }
+      { currentChapterId: 'ch-1', currentFilePath: 'a.ts' }
     )
-    expect(screen.queryByText('Chapter 2 of 3')).toBeNull()
-    await user.click(screen.getByRole('radio', { name: 'Chapters' }))
-    expect(screen.getByText('Chapter 2 of 3')).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Chapters' }).getAttribute('aria-checked')).toBe(
+      'true'
+    )
+    expect(screen.getByTestId('chapter-nav')).toBeTruthy()
+    await user.click(screen.getByRole('radio', { name: 'All files' }))
+    expect(useReviewUiStore.getState().groupBy).toBe('all')
+    expect(screen.getByTestId('full-file-list')).toBeTruthy()
+  })
+})
+
+describe('PrReviewView — footer Viewed checkbox', () => {
+  it('marks the open file viewed and stays on it', async () => {
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-1', currentFilePath: 'a.ts' }
+    )
+    await user.click(screen.getByRole('checkbox', { name: 'Viewed' }))
+    expect([...usePrReviewStore.getState().viewedFiles]).toEqual(['a.ts'])
+    expect(position()).toEqual({ currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
   })
 })
 

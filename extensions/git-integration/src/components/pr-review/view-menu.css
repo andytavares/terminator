@@ -98,3 +98,11 @@
   justify-content: space-between;
   gap: 12px;
 }
+
+.vm-switch-row:disabled {
+  cursor: default;
+  color: var(--tm-text-faint);
+}
+.vm-switch-row .vm-kbd {
+  margin-left: auto;
+}

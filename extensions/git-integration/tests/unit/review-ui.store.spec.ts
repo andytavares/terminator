@@ -42,6 +42,7 @@ beforeEach(() => {
     fileListHidden: false,
     diffViewMode: 'unified',
     hideFormattingHunks: true,
+    groupBy: 'all',
   })
   useReviewUiStore.getState().resetForPr()
 })
@@ -65,6 +66,15 @@ describe('review UI store', () => {
     s.toggleFileList()
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY)!)
     expect(saved).toMatchObject({ agentNotesOn: false, diffRange: 'whole', fileListHidden: true })
+  })
+})
+
+describe('review UI store — group by', () => {
+  it('groups the file list by folders by default and remembers a switch to chapters', () => {
+    expect(useReviewUiStore.getState().groupBy).toBe('all')
+    useReviewUiStore.getState().setGroupBy('chapters')
+    expect(useReviewUiStore.getState().groupBy).toBe('chapters')
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!).groupBy).toBe('chapters')
   })
 })
 

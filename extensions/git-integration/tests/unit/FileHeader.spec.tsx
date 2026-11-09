@@ -9,9 +9,6 @@ import {
 import type { PrChangedFile } from '../../src/schemas/pr-review.schema'
 import { partialFake } from '../../../../packages/test-support/src/fakes'
 
-const { stubViewMenu } = vi.hoisted(() => ({ stubViewMenu: () => null }))
-vi.mock('../../src/components/pr-review/ViewMenu', () => ({ ViewMenu: stubViewMenu }))
-
 function changedFileAt(level: 'low' | 'medium' | 'high', churn90d: number | null): PrChangedFile {
   return partialFake<PrChangedFile>({
     path: 'backend/hardware.py',
@@ -28,14 +25,12 @@ function changedFileAt(level: 'low' | 'medium' | 'high', churn90d: number | null
 function renderFileHeader(file: PrChangedFile, over: Partial<FileHeaderProps> = {}) {
   const props = partialFake<FileHeaderProps>({
     file,
-    isViewed: false,
     viewedFiles: new Set<string>(),
     showChangedSince: false,
     usesWithDef: [],
     menuNote: null,
     onShowRisk: vi.fn(),
     onPeekDefinition: vi.fn(),
-    setViewed: vi.fn(),
     ...over,
   })
   return render(<FileHeader {...props} />)
@@ -106,9 +101,13 @@ describe('FileHeader second row', () => {
     expect(screen.queryByText(/in 90 days/)).toBeNull()
   })
 
-  it('has a Viewed checkbox with its key hint', () => {
+  it('has no Viewed checkbox, which lives in the footer beside the next file action', () => {
     renderFileHeader(changedFileAt('low', null))
-    expect(screen.getByRole('checkbox', { name: /Viewed/ })).toBeTruthy()
-    expect(screen.getByText('v')).toBeTruthy()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('shows the note about which head the diff shows', () => {
+    renderFileHeader(changedFileAt('low', null), { menuNote: 'Showing 9f0c76eb… head' })
+    expect(screen.getByText('Showing 9f0c76eb… head')).toBeTruthy()
   })
 })

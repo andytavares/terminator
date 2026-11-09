@@ -2086,6 +2086,29 @@ describe('review revamp — edge branches — maps ssh remotes, and ignores non-
   })
 })
 
+describe('github:dashboard-search — checkouts that share an origin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    captureHandlers()
+  })
+
+  it('maps a repository to the first project root listed when a worktree shares its origin', async () => {
+    const hs = handlersWithProjectRoots(['/src/widgets', '/src/widgets/.worktrees/feat'])
+    mockDashboardExec(
+      { mine: [dashboardSearchNode('acme/widgets', 1)] },
+      {
+        '/src/widgets': 'git@github.com:acme/widgets.git',
+        '/src/widgets/.worktrees/feat': 'git@github.com:acme/widgets.git',
+      }
+    )
+    const result = (await hs['github:dashboard-search']({})) as {
+      prs: Array<{ localRepoRoot: string | null }>
+    }
+    expect(result.prs[0].localRepoRoot).toBe('/src/widgets')
+  })
+})
+
 const WIDGETS_REMOTE = 'https://github.com/acme/widgets.git'
 
 /** alice's acme/widgets PR 1, "Fix bug", waiting on review with CI passing. */

@@ -410,13 +410,53 @@ describe('useLoadPrQueue — TAV-7: discards a stale currentUser response for a 
   })
 })
 
-describe('useLoadPrDetail', () => {
-  it('does nothing when repoRoot is null', async () => {
-    const { result } = renderHook(() => useLoadPrDetail(null))
-    await load(result.current, 1, vi.fn())
+/** What loading PR 7 of `repoRoot` resolves to: null when it opened, else the reason it did not. */
+async function openFailure(repoRoot: string | null = '/repo') {
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const { result } = renderHook(() => useLoadPrDetail(repoRoot))
+  let message: string | null = null
+  await act(async () => {
+    message = await result.current(7, vi.fn().mockResolvedValue(undefined))
+  })
+  return message
+}
+
+describe('useLoadPrDetail — the reason a pull request did not open', () => {
+  it('says no repository was given, and asks GitHub nothing, when repoRoot is null', async () => {
+    expect(await openFailure(null)).toBe('No repository given')
     expect(mockPrReviewDetail).not.toHaveBeenCalled()
   })
 
+  it('passes on the error text the channel sent', async () => {
+    mockPrReviewDetail.mockResolvedValue({ error: 'gh: HTTP 502 Bad Gateway' })
+    expect(await openFailure()).toBe('gh: HTTP 502 Bad Gateway')
+  })
+
+  it('names the local time GitHub lifts its rate limit at', async () => {
+    mockPrReviewDetail.mockResolvedValue({
+      error: 'RATE_LIMITED',
+      resetAt: Date.UTC(2026, 10, 9, 14, 30),
+    })
+    expect(await openFailure()).toBe('GitHub limited requests until 14:30')
+  })
+
+  it('says the view cannot read pull request data that fails the schema', async () => {
+    mockPrReviewDetail.mockResolvedValue({ pr: { invalid: true } })
+    expect(await openFailure()).toBe('GitHub sent pull request data this view cannot read')
+  })
+
+  it('passes on the message of a thrown error', async () => {
+    mockPrReviewDetail.mockRejectedValue(new Error('connection refused'))
+    expect(await openFailure()).toBe('connection refused')
+  })
+
+  it('resolves to null when the pull request opened', async () => {
+    mockPrReviewDetail.mockResolvedValue({ pr: validActivePr })
+    expect(await openFailure()).toBeNull()
+  })
+})
+
+describe('useLoadPrDetail', () => {
   it('calls prReviewDetail and invokes onSuccess callback with parsed data', async () => {
     mockPrReviewDetail.mockResolvedValue({ pr: validActivePr })
     const onSuccess = vi.fn().mockResolvedValue(undefined)

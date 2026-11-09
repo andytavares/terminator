@@ -440,6 +440,9 @@ const surfaces: Record<string, () => React.JSX.Element> = {
       nextFileName={null}
       isLastFile
       isLastChapter
+      position="file 2 of 2"
+      isViewed={false}
+      onToggleViewed={() => {}}
       onPrevFile={() => {}}
       onMarkViewed={() => {}}
       onFinishChapter={() => {}}

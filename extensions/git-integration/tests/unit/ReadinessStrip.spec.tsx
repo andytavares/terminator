@@ -139,6 +139,36 @@ describe('ReadinessStrip branch actions', () => {
   })
 })
 
+/** The strip cell that holds `label`, which carries the cell's state attributes. */
+function cellOf(label: string): Element | null {
+  return screen.getByText(label).closest('.rs-cell')
+}
+
+describe('ReadinessStrip attention', () => {
+  it.each([
+    ['failing checks', { statusChecks: [{ name: 'CI', state: 'fail' as const }] }, 'Checks'],
+    ['pending checks', { statusChecks: [{ name: 'CI', state: 'pending' as const }] }, 'Checks'],
+    ['conflicts', { mergeStateStatus: 'dirty' as const }, 'Merge'],
+    ['a branch behind its base', { mergeStateStatus: 'behind' as const }, 'Merge'],
+  ])('marks the cell as needing attention for %s', (_case, overrides, label) => {
+    renderStrip(overrides)
+    expect(cellOf(label)?.getAttribute('data-attention')).toBe('true')
+  })
+
+  it('marks the reviews cell as needing attention when my review is requested', () => {
+    renderStrip({ requestedReviewers: ['me'] }, idleBranch, true)
+    expect(cellOf('Reviews')?.getAttribute('data-attention')).toBe('true')
+  })
+
+  it('leaves passing checks, a clean merge and others awaited as not needing attention', () => {
+    renderStrip({ requestedReviewers: ['dee'], mergeStateStatus: 'clean' })
+    const states = ['Checks', 'Reviews', 'Merge'].map((label) =>
+      cellOf(label)?.getAttribute('data-attention')
+    )
+    expect(states).toEqual(['false', 'false', 'false'])
+  })
+})
+
 const TOKENS = path.resolve(__dirname, '../../../../packages/extension-ui/src/tokens.css')
 
 /** Adds the design tokens and one of the overview's stylesheets to the document, so the icons'

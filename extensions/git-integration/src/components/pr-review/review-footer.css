@@ -47,3 +47,25 @@
 .rf-sp {
   flex: 1;
 }
+
+.rf-position {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-muted);
+}
+
+.rf-viewed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+@container (max-width: 640px) {
+  .rf-position {
+    display: none;
+  }
+}

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { ArrowLeft, Sparkles, TriangleAlert, MoreHorizontal, X } from 'lucide-react'
 import { Button, IconButton, Menu, Popover } from '@terminator/extension-ui'
 import { StatusChecksBar } from './StatusChecksBar'
+import { ViewMenu } from './ViewMenu'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
 import { plural } from '@terminator/extension-sdk'
 import './review-header.css'
@@ -39,7 +40,6 @@ export interface ReviewHeaderProps {
   onPopOut?: () => void
   onRefresh: () => void
   refreshing: boolean
-  onToggleFileList: () => void
   onOpenKeyboardHelp: () => void
   onClose: () => void
 }
@@ -52,13 +52,13 @@ function checksTone(checks: StatusCheck[]): PillState {
   return 'pass'
 }
 
-/** "2 of 8 checks failing", "1 of 8 checks pending", or "8 checks passing". */
+/** "2 of 8 checks failing", "1 of 8 checks pending", or "Checks pass". */
 function checksLabel(checks: StatusCheck[]): string {
   const failCount = checks.filter((c) => c.state === 'fail').length
   const pendingCount = checks.filter((c) => c.state === 'pending').length
   if (failCount > 0) return `${failCount} of ${checks.length} checks failing`
   if (pendingCount > 0) return `${pendingCount} of ${checks.length} checks pending`
-  return `${checks.length} ${plural(checks.length, 'check')} passing`
+  return 'Checks pass'
 }
 
 /** A pill that opens a popover under itself. */
@@ -93,13 +93,22 @@ function PillPopover(props: {
   )
 }
 
+/** Passing checks are a quiet status dot; a failing or pending check is the warning pill. */
+function checksClass(tone: PillState): string {
+  if (tone === 'pass') return 'rh-checks-quiet'
+  return `rh-pill rh-pill--${tone}`
+}
+
 function ChecksPill({ checks }: { checks: StatusCheck[] }) {
+  const tone = checksTone(checks)
+  const pill = (
+    <>
+      {tone === 'pass' && <span className="rh-checks-dot" aria-hidden="true" />}
+      {checksLabel(checks)}
+    </>
+  )
   return (
-    <PillPopover
-      pillClass={`rh-pill rh-pill--${checksTone(checks)}`}
-      pill={checksLabel(checks)}
-      label="Status checks"
-    >
+    <PillPopover pillClass={checksClass(tone)} pill={pill} label="Status checks">
       <StatusChecksBar checks={checks} defaultExpanded />
     </PillPopover>
   )
@@ -164,7 +173,7 @@ function ChapterSegments(props: {
 
 function progressText(viewedCount: number, totalFiles: number, minutesLeft: number): string {
   const viewed = `${viewedCount} of ${totalFiles} viewed`
-  return minutesLeft > 0 ? `${viewed} · about ${minutesLeft} min left` : viewed
+  return minutesLeft > 0 ? `${viewed} · ${minutesLeft} min left` : viewed
 }
 
 function ReviewProgress(props: ReviewHeaderProps) {
@@ -187,8 +196,6 @@ interface MenuItemProps {
   label: string
   hint?: React.ReactNode
   disabled?: boolean
-  /** Set on a toggle: the item is then a checkbox menu item. */
-  checked?: boolean
   onSelect: () => void
 }
 
@@ -196,8 +203,7 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
   return (
     <button
       type="button"
-      role={props.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
-      aria-checked={props.checked}
+      role="menuitem"
       className="rh-menu-item"
       disabled={props.disabled}
       onClick={() => {
@@ -211,26 +217,13 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
   )
 }
 
-/** The "more" menu's items, in order; an item whose handler is absent is left out. */
+/** The "more" menu's actions, in order; settings live in the View menu. An action whose handler
+ *  is absent is left out. */
 function menuItems(props: ReviewHeaderProps): MenuItemProps[] {
   const items: (MenuItemProps | false)[] = [
-    {
-      label: 'Focus mode',
-      hint: props.focusMode && 'On',
-      checked: props.focusMode,
-      onSelect: props.onToggleFocusMode,
-    },
-    {
-      label: 'Only my files',
-      hint: props.ownedCount > 0 ? props.ownedCount : 'none owned',
-      checked: props.ownedOnly,
-      disabled: props.ownedCount === 0,
-      onSelect: props.onToggleOwnedOnly,
-    },
     !!props.onShowOverview && { label: 'Overview', hint: 'i', onSelect: props.onShowOverview },
-    { label: 'Hide file list', hint: 't', onSelect: props.onToggleFileList },
     { label: 'Pause review', onSelect: props.onPause },
-    { label: 'Refresh PR', disabled: props.refreshing, onSelect: props.onRefresh },
+    { label: 'Refresh pull request', disabled: props.refreshing, onSelect: props.onRefresh },
     !!props.onPopOut && { label: 'Pop out', onSelect: props.onPopOut },
     { label: 'Keyboard shortcuts', hint: '?', onSelect: props.onOpenKeyboardHelp },
   ]
@@ -308,12 +301,13 @@ export function ReviewHeader(props: ReviewHeaderProps): React.JSX.Element {
       {props.onShowOverview && (
         <IconButton icon={ArrowLeft} label="Back to overview" onClick={props.onShowOverview} />
       )}
+      <span className="rh-title">{props.title}</span>
       <span className="rh-num">#{props.prNumber}</span>
       {props.isDraft && <span className="rh-draft-badge">Draft</span>}
-      <span className="rh-title">{props.title}</span>
       <HeaderPills header={props} />
       <div className="rh-spacer" />
       <ReviewProgress {...props} />
+      <ViewMenu filters={props} />
       <div className="rh-actions">
         <Button
           aria-label="Ask agent about this PR"

@@ -1,16 +1,16 @@
 import React from 'react'
 import { Check } from 'lucide-react'
-import { Tab, TabList, TabsRoot } from '@terminator/extension-ui'
 import type { Chapter } from '../../schemas/pr-review.schema'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { chapterRiskLevel } from '../../github/pr-review-service'
+import { currentAttr } from './file-rows'
 
 interface Props {
   chapters: Chapter[]
   onSelectChapter?: (id: string) => void
+  /** The current chapter's file list, shown directly under its header. */
+  children?: React.ReactNode
 }
-
-type ChapterStatus = 'not-started' | 'in-progress' | 'complete'
 
 function fileCount(chapter: Chapter): string {
   const count = chapter.files.length
@@ -18,56 +18,75 @@ function fileCount(chapter: Chapter): string {
   return `${count} files`
 }
 
-function chapterName(chapter: Chapter, status: ChapterStatus): string {
+function chapterName(chapter: Chapter, complete: boolean): string {
   const name = `${chapter.name}, ${fileCount(chapter)}`
-  if (status === 'complete') return `${name}, viewed`
+  if (complete) return `${name}, viewed`
   return name
 }
 
-function chapterStatusOf(chapter: Chapter, viewedFiles: Set<string>): ChapterStatus {
-  const viewed = chapter.files.filter((f) => viewedFiles.has(f.path)).length
-  if (viewed === 0) return 'not-started'
-  if (viewed === chapter.files.length) return 'complete'
-  return 'in-progress'
+interface ChapterOutlineHeaderProps {
+  chapter: Chapter
+  num: number
+  viewedCount: number
+  isCurrent: boolean
+  onSelect: () => void
 }
 
-function chapterTab(chapter: Chapter, status: ChapterStatus) {
+function ChapterOutlineHeader(props: ChapterOutlineHeaderProps) {
+  const { chapter, viewedCount, isCurrent } = props
+  const complete = viewedCount === chapter.files.length
   return (
-    <Tab
-      key={chapter.id}
-      id={chapter.id}
-      accessibleName={chapterName(chapter, status)}
-      className={`chapter-nav-tab chapter-nav-tab--${status}`}
+    <button
+      type="button"
+      aria-label={chapterName(chapter, complete)}
+      aria-expanded={isCurrent}
+      aria-current={currentAttr(isCurrent)}
+      className="chapter-nav-header"
+      onClick={props.onSelect}
     >
-      <span className={`chapter-nav-risk-dot chapter-nav-risk-dot--${chapterRiskLevel(chapter)}`} />
-      <span className="chapter-nav-name">{chapter.name}</span>
-      <span className="chapter-nav-meta">
-        {fileCount(chapter)} · {chapter.estimatedMinutes}m
+      <span className="chapter-nav-num">{props.num}</span>
+      <span className="chapter-nav-main">
+        <span className="chapter-nav-name">{chapter.name}</span>
+        {chapter.summary && <span className="chapter-nav-summary">{chapter.summary}</span>}
       </span>
-      {status === 'complete' && (
+      <span className="chapter-nav-meta">
+        {viewedCount}/{chapter.files.length} · {chapter.estimatedMinutes} min
+      </span>
+      <span className={`chapter-nav-risk-dot chapter-nav-risk-dot--${chapterRiskLevel(chapter)}`} />
+      {complete && (
         <span className="chapter-nav-check" aria-label="complete">
           <Check aria-hidden="true" />
         </span>
       )}
-    </Tab>
+    </button>
   )
 }
 
-export function ChapterNav({ chapters, onSelectChapter }: Props) {
+/** The chapters as one outline: each header with the current chapter's files right under it. */
+export function ChapterNav({ chapters, onSelectChapter, children }: Props) {
   const currentChapterId = usePrReviewStore((s) => s.currentChapterId)
   const setCurrentChapter = usePrReviewStore((s) => s.setCurrentChapter)
   const viewedFiles = usePrReviewStore((s) => s.viewedFiles)
-  function selectChapter(id: string) {
+  if (chapters.length <= 1) return <>{children}</>
+  const activeId = chapters.find((c) => c.id === currentChapterId)?.id ?? chapters[0].id
+  const selectChapter = (id: string) => {
     setCurrentChapter(id)
     onSelectChapter?.(id)
   }
-  if (chapters.length <= 1) return null
-  const activeId = chapters.find((c) => c.id === currentChapterId)?.id ?? chapters[0].id
   return (
-    <TabsRoot selectedId={activeId} onSelect={selectChapter}>
-      <TabList label="PR chapters" orientation="vertical" className="chapter-nav">
-        {chapters.map((ch) => chapterTab(ch, chapterStatusOf(ch, viewedFiles)))}
-      </TabList>
-    </TabsRoot>
+    <nav aria-label="PR chapters" className="chapter-nav">
+      {chapters.map((chapter, index) => (
+        <section key={chapter.id} className="chapter-nav-group">
+          <ChapterOutlineHeader
+            chapter={chapter}
+            num={index + 1}
+            viewedCount={chapter.files.filter((f) => viewedFiles.has(f.path)).length}
+            isCurrent={chapter.id === activeId}
+            onSelect={() => selectChapter(chapter.id)}
+          />
+          {chapter.id === activeId && children}
+        </section>
+      ))}
+    </nav>
   )
 }

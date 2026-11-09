@@ -148,11 +148,11 @@ describe('overviewSignals tests when clean', () => {
 })
 
 describe('overviewSignals complexity, reading and health', () => {
-  it('names the branch change and the largest riser', () => {
+  it('names the branch change and the largest riser, and flags the rise', () => {
     expect(pickSignal(twoChapterPr(), 'complexity')).toMatchObject({
       value: '+23 branches',
       detail: 'Largest: selectSpecs +9',
-      tone: 'neutral',
+      tone: 'warning',
     })
   })
 })
@@ -162,7 +162,11 @@ describe('overviewSignals complexity without risers', () => {
     const pr = withInsights({
       complexity: { ...baseInsights.complexity, branchDelta: 0, functions: [] },
     })
-    expect(pickSignal(pr, 'complexity')).toMatchObject({ value: 'No change', detail: null })
+    expect(pickSignal(pr, 'complexity')).toMatchObject({
+      value: 'No change',
+      detail: null,
+      tone: 'neutral',
+    })
   })
 })
 

@@ -97,7 +97,7 @@ function complexitySignal(insights: Insights): Signal {
   const rising = largest !== undefined && largest.branchDelta > 0
   return {
     kind: 'complexity',
-    tone: 'neutral',
+    tone: choose(branchDelta > 0, 'warning', 'neutral'),
     label: 'Complexity',
     value: branchChange(branchDelta),
     detail: choose(rising, `Largest: ${largest?.name} +${largest?.branchDelta}`, null),

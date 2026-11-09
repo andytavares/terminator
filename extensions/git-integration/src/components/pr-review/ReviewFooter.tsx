@@ -1,6 +1,6 @@
 import React from 'react'
-import { ChevronLeft } from 'lucide-react'
-import { Button } from '@terminator/extension-ui'
+import { ChevronLeft, CircleHelp } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import './review-footer.css'
 import './review-layout.css'
 
@@ -10,6 +10,10 @@ export interface ReviewFooterProps {
   nextFileName: string | null
   isLastFile: boolean
   isLastChapter: boolean
+  /** Where the open file sits, e.g. "Core · file 2 of 4 · chapter 1 of 3". */
+  position: string
+  isViewed: boolean
+  onToggleViewed: (viewed: boolean) => void
   onPrevFile: () => void
   onMarkViewed: () => void
   onFinishChapter: () => void
@@ -61,14 +65,32 @@ function ForwardLabel(props: { onClick: () => void; children: React.ReactNode })
   )
 }
 
+/** The open file's Viewed box: marks it viewed or not without leaving it. */
+function ViewedToggle(props: { isViewed: boolean; onToggleViewed: (viewed: boolean) => void }) {
+  return (
+    <label className="rf-viewed">
+      <input
+        type="checkbox"
+        aria-label="Viewed"
+        checked={props.isViewed}
+        onChange={() => props.onToggleViewed(!props.isViewed)}
+      />
+      <span aria-hidden="true">Viewed</span>
+      <kbd className="tmui-kbd" aria-hidden="true">
+        v
+      </kbd>
+    </label>
+  )
+}
+
+/** The review's one action bar: shortcuts and position on the left, the file's actions right. */
 export function ReviewFooter(props: ReviewFooterProps) {
   return (
     <div className="rf-bar">
-      <Button variant="ghost" onClick={props.onOpenShortcuts}>
-        <kbd className="tmui-kbd">?</kbd>
-        <span>Shortcuts</span>
-      </Button>
+      <IconButton icon={CircleHelp} label="Keyboard shortcuts" onClick={props.onOpenShortcuts} />
+      <span className="rf-position">{props.position}</span>
       <span className="rf-sp" />
+      <ViewedToggle isViewed={props.isViewed} onToggleViewed={props.onToggleViewed} />
       <PreviousButton {...props} />
       <ForwardButton {...props} />
     </div>

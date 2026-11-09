@@ -33,7 +33,7 @@
 
 .pr-overview-title {
   margin: 0;
-  font-size: var(--tm-font-size-xl);
+  font-size: var(--tm-font-size-2xl);
   line-height: 1.3;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -111,12 +111,12 @@
   align-items: center;
   gap: var(--tm-space-1) var(--tm-space-4);
   font-size: var(--tm-font-size-sm);
-  color: var(--tm-text-secondary);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .pr-overview-meta strong {
-  color: var(--tm-text-primary);
+  color: var(--tm-text-secondary);
   font-weight: 500;
 }
 
@@ -124,7 +124,7 @@
   padding: 1px 6px;
   border-radius: var(--tm-radius-xs);
   background: var(--tm-overlay-soft);
-  color: var(--tm-text-primary);
+  color: var(--tm-text-secondary);
   font-family: var(--tm-font-mono);
   font-size: var(--tm-font-size-sm);
 }
@@ -225,7 +225,7 @@
 
 .pr-overview-section-head h2 {
   margin: 0;
-  font-size: var(--tm-font-size-md);
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
 }
 

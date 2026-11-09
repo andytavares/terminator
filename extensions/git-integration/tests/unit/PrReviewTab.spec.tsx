@@ -103,7 +103,7 @@ beforeEach(() => {
   mockInvoke.mockResolvedValue({ ok: true })
   mockOn.mockReturnValue(() => {})
   vi.mocked(useLoadPrQueue).mockReturnValue(async () => {})
-  vi.mocked(useLoadPrDetail).mockReturnValue(async () => {})
+  vi.mocked(useLoadPrDetail).mockReturnValue(async () => null)
   vi.mocked(useFetchFileMetrics).mockReturnValue(async () => {})
   vi.mocked(useLoadIssueComments).mockReturnValue(async () => {})
   vi.mocked(githubModule.githubAPI.sessionGet).mockResolvedValue({ session: null })
@@ -158,9 +158,10 @@ function storeSessionAt(key: string, headSHA: string) {
 
 /** Renders the tab and opens PR 1, whose detail loads at `headSHA`. */
 async function openPrAtHead(headSHA: string) {
-  vi.mocked(useLoadPrDetail).mockReturnValue(async (_n, onSuccess) =>
-    onSuccess(partialFake<PrReviewDetail>({ number: 1, headSHA }))
-  )
+  vi.mocked(useLoadPrDetail).mockReturnValue(async (_n, onSuccess) => {
+    await onSuccess(partialFake<PrReviewDetail>({ number: 1, headSHA }))
+    return null
+  })
   render(<PrReviewTab repoRoot="/repo" />)
   await openPr()
 }

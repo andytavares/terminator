@@ -428,11 +428,10 @@ function HunkViewedToggle(props: { ctx: PaneContext; header: string; viewed: boo
     <label className="rs-hunk-viewed">
       <input
         type="checkbox"
-        aria-label="Section viewed"
         checked={viewed}
         onChange={() => ctx.actions.toggleHunkViewed(ctx.head, ctx.file.path, header)}
       />
-      Viewed
+      Section viewed
     </label>
   )
 }

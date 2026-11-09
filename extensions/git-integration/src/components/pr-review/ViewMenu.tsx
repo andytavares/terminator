@@ -5,10 +5,20 @@ import { Button, Popover, SegmentedControl } from '@terminator/extension-ui'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import './view-menu.css'
 
-export interface ViewMenuProps {
-  /** Muted text shown at the bottom of the menu, e.g. "Showing a1b2… head". */
-  sinceNote?: string | null
+/** The review's own file filters, which live in the view rather than in the saved settings. */
+export interface FileFilters {
+  focusMode: boolean
+  onToggleFocusMode: () => void
+  /** Changed files the viewer owns; the filter has nothing to show when it is 0. */
+  ownedCount: number
+  ownedOnly: boolean
+  onToggleOwnedOnly: () => void
 }
+
+const GROUP_BY_OPTIONS = [
+  { value: 'chapters', label: 'Chapters' },
+  { value: 'all', label: 'All files' },
+] as const
 
 const COMMENT_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -38,6 +48,10 @@ function useViewSettings() {
       setDiffViewMode: s.setDiffViewMode,
       hideFormattingHunks: s.hideFormattingHunks,
       setHideFormattingHunks: s.setHideFormattingHunks,
+      groupBy: s.groupBy,
+      setGroupBy: s.setGroupBy,
+      fileListHidden: s.fileListHidden,
+      toggleFileList: s.toggleFileList,
     }))
   )
 }
@@ -73,18 +87,92 @@ function MenuGroup(props: { label: string; kbd?: string; children: React.ReactNo
   )
 }
 
-function FormattingSwitch({ v }: { v: ViewSettings }) {
+interface SwitchRowProps {
+  label: string
+  hint?: React.ReactNode
+  checked: boolean
+  disabled?: boolean
+  onToggle: () => void
+}
+
+function SwitchRow(props: SwitchRowProps) {
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={v.hideFormattingHunks}
+      aria-checked={props.checked}
       className="vm-switch-row"
-      onClick={() => v.setHideFormattingHunks(!v.hideFormattingHunks)}
+      disabled={props.disabled}
+      onClick={props.onToggle}
     >
       <span className="vm-switch" aria-hidden="true" />
-      Hide formatting-only hunks
+      {props.label}
+      {props.hint && <span className="vm-kbd">{props.hint}</span>}
     </button>
+  )
+}
+
+function ownedHint(ownedCount: number): string {
+  if (ownedCount > 0) return String(ownedCount)
+  return 'none owned'
+}
+
+function FilesGroup({ v, filters }: { v: ViewSettings; filters: FileFilters }) {
+  return (
+    <MenuGroup label="Files">
+      <SegmentedControl
+        label="File list"
+        size="sm"
+        options={[...GROUP_BY_OPTIONS]}
+        value={v.groupBy}
+        onChange={v.setGroupBy}
+      />
+      <SwitchRow
+        label="Show file list"
+        hint="t"
+        checked={!v.fileListHidden}
+        onToggle={v.toggleFileList}
+      />
+      <FilterSwitches filters={filters} />
+    </MenuGroup>
+  )
+}
+
+function FilterSwitches({ filters }: { filters: FileFilters }) {
+  return (
+    <>
+      <SwitchRow
+        label="Only my files"
+        hint={ownedHint(filters.ownedCount)}
+        checked={filters.ownedOnly}
+        disabled={filters.ownedCount === 0}
+        onToggle={filters.onToggleOwnedOnly}
+      />
+      <SwitchRow
+        label="Focus mode"
+        checked={filters.focusMode}
+        onToggle={filters.onToggleFocusMode}
+      />
+    </>
+  )
+}
+
+function DiffGroup({ v }: { v: ViewSettings }) {
+  return (
+    <MenuGroup label="Diff">
+      <SegmentedControl
+        label="Diff view mode"
+        size="sm"
+        options={[...LAYOUT_OPTIONS]}
+        value={v.diffViewMode}
+        onChange={v.setDiffViewMode}
+      />
+      <SwitchRow
+        label="Hide formatting-only hunks"
+        checked={v.hideFormattingHunks}
+        onToggle={() => v.setHideFormattingHunks(!v.hideFormattingHunks)}
+      />
+    </MenuGroup>
   )
 }
 
@@ -116,32 +204,20 @@ function AgentNotesGroup({ v }: { v: ViewSettings }) {
   )
 }
 
-function LayoutGroup({ v }: { v: ViewSettings }) {
-  return (
-    <MenuGroup label="Layout">
-      <SegmentedControl
-        label="Diff view mode"
-        size="sm"
-        options={[...LAYOUT_OPTIONS]}
-        value={v.diffViewMode}
-        onChange={v.setDiffViewMode}
-      />
-    </MenuGroup>
-  )
-}
-
-function ViewMenuGroups({ v }: { v: ViewSettings }) {
+function ViewMenuGroups({ v, filters }: { v: ViewSettings; filters: FileFilters }) {
   return (
     <>
+      <FilesGroup v={v} filters={filters} />
+      <DiffGroup v={v} />
+      <div className="vm-group-label">Notes</div>
       <CommentsGroup v={v} />
       <AgentNotesGroup v={v} />
-      <LayoutGroup v={v} />
     </>
   )
 }
 
-/** File-header menu: comments, agent notes, diff layout and the formatting filter. */
-export function ViewMenu({ sinceNote }: ViewMenuProps) {
+/** The review's one settings menu: how files are listed and filtered, the diff, and notes. */
+export function ViewMenu({ filters }: { filters: FileFilters }) {
   const [open, setOpen] = useState(false)
   const v = useViewSettings()
   const label = menuLabel(v)
@@ -163,9 +239,7 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
       </Button>
       {open && (
         <Popover label="View" align="end" onDismiss={() => setOpen(false)} className="vm-popover">
-          <ViewMenuGroups v={v} />
-          <FormattingSwitch v={v} />
-          {sinceNote && <div className="vm-since">{sinceNote}</div>}
+          <ViewMenuGroups v={v} filters={filters} />
         </Popover>
       )}
     </div>
