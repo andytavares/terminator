@@ -1,0 +1,21 @@
+packages/core-renderer-remote/tests/unit/renderer-remote/mobile/MobileBugReport.spec.tsx
+  s_8edd3e395d7769::t_7db5efc60f7141 41
+  s_8edd3e395d7769::t_13f91a73ab20a9 33-40,48,51,54-55
+  s_8edd3e395d7769::t_7496b8ab2618b7 26-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "21ab5539864fdc53d22d5de8f7f60b87846dd884",
+  "prompts": {},
+  "sessions": {
+    "s_8edd3e395d7769": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "38cb03a7-537f-4503-b1cd-091eb95ca083",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
