@@ -1,0 +1,76 @@
+packages/core-main/src/mcp/tool-types.ts
+  s_ebb345fc5d0962::t_8c6ba877bd9ff3 8-9
+packages/core-main/src/notifications/notification-manager.ts
+  s_ebb345fc5d0962::t_86a138f2220046 158-165
+packages/core-shared/src/schemas/home-feed.schema.ts
+  s_ebb345fc5d0962::t_8c6ba877bd9ff3 23-31
+packages/core-shared/src/electron-api/manifest.ts
+  s_ebb345fc5d0962::t_a40f3fff9fce5a 1426-1432
+packages/core-renderer/tests/unit/renderer/shell/notification-feed.spec.tsx
+  s_ebb345fc5d0962::t_0b9eb6b08778b9 5,24,29,31,33-37,65-70
+  s_ebb345fc5d0962::t_d40ab6ffb1596a 71-72
+packages/core-main/src/index.ts
+  s_ebb345fc5d0962::t_929055134666fd 15
+packages/core-main/src/mcp/alert-tool.ts
+  s_ebb345fc5d0962::t_86a138f2220046 59
+  s_ebb345fc5d0962::t_4df6cd79bfb191 4-11,13,22-44,50-58,71-75,79
+apps/termctl/src/socket-transport.ts
+  s_ebb345fc5d0962::t_8c6ba877bd9ff3 14
+packages/core-main/src/open-externally.ts
+  s_ebb345fc5d0962::t_2b49a3c2f690f7 1-8
+apps/termctl/src/connect.ts
+  s_ebb345fc5d0962::t_8c6ba877bd9ff3 18
+packages/core-main/src/home/scheduled-alerts.ts
+  s_ebb345fc5d0962::t_86a138f2220046 140-151
+  s_ebb345fc5d0962::t_6ab1db01cba3f7 9-21,28-35,38-40,43-45,50-74,76-82,84,91-92,95,98-99,103-121,136,152-154,156-159,162-163,165,167-168
+  s_ebb345fc5d0962::t_2c6fbd38356231 122-132,138-139,164
+  s_ebb345fc5d0962::t_3b82ea3cceb109 161
+  s_ebb345fc5d0962::t_7fd31befb4e878 133-134,160
+packages/core-renderer/src/shell/main-events.ts
+  s_ebb345fc5d0962::t_a40f3fff9fce5a 148,156-162
+packages/core-main/src/ipc/notification.ipc.ts
+  s_ebb345fc5d0962::t_2b49a3c2f690f7 15
+packages/core-main/tests/unit/mcp/alert-tool.spec.ts
+  s_ebb345fc5d0962::t_4864e3dde88647 9
+  s_ebb345fc5d0962::t_85b9928989be79 4-6,11-12,18-33,45-47,119-199
+packages/core-shared/src/electron-api/__tests__/manifest.spec.ts
+  s_ebb345fc5d0962::t_0818416968aeb4 107
+packages/extension-sdk/types/api.d.ts
+  s_ebb345fc5d0962::t_8c6ba877bd9ff3 452-460
+packages/core-main/tests/unit/notifications/notification-manager.spec.ts
+  s_ebb345fc5d0962::t_4a1b1c7d834a26 495-504
+packages/core-main/src/mcp/relay-script.ts
+  s_ebb345fc5d0962::t_8c6ba877bd9ff3 18
+packages/core-main/tests/unit/home/scheduled-alerts.spec.ts
+  s_ebb345fc5d0962::t_4a1b1c7d834a26 219-226,233
+  s_ebb345fc5d0962::t_2c6fbd38356231 209-211,234
+  s_ebb345fc5d0962::t_30e50329972827 10-17,19,36-39,113-208,212-218,227-232
+packages/core-main/tests/integration/mcp/server.spec.ts
+  s_ebb345fc5d0962::t_d9e5965489dd93 68-72,97-101,103,105
+packages/core-main/tests/unit/mcp/app-tools.spec.ts
+  s_ebb345fc5d0962::t_76cad374bda595 5
+packages/core-main/tests/unit/mcp/manifest-tools.spec.ts
+  s_ebb345fc5d0962::t_007d8a9b7df02b 24
+packages/core-main/tests/unit/mcp/move-session.spec.ts
+  s_ebb345fc5d0962::t_c5b0c93b62d28e 15-20
+packages/core-main/tests/unit/mcp/renderer-tools.spec.ts
+  s_ebb345fc5d0962::t_2908b72d8a774c 15
+packages/core-main/tests/unit/mcp/tool-types.spec.ts
+  s_ebb345fc5d0962::t_e5805941129a28 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5049e6739f04aca7a8736c5fee2d5761eb452ce1",
+  "prompts": {},
+  "sessions": {
+    "s_ebb345fc5d0962": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a463caba-6243-4d50-8bc4-faa78182791a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
