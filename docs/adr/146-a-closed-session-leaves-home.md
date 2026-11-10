@@ -1,6 +1,6 @@
 # ADR 146: A closed session leaves Home, and Dismiss deletes it
 
-**Status**: Accepted
+**Status**: Accepted, amended by [ADR 157](157-settle-is-the-one-word.md) (Dismiss became Settle and deletes nothing)
 
 **Date**: 2026-11-07
 

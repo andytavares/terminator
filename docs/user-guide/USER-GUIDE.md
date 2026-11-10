@@ -112,15 +112,16 @@ Projects live inside a workspace. A project holds one or more terminal sessions 
 The sidebar has a second mode, **Inbox**. It lists your work as cards in place of the repo tree. Turn it on in **Settings → Interface → Sidebar → Inbox**, or run **Switch sidebar: Tree / Inbox** from Quick Actions (`⌘P`). The change shows at once. **Tree** is the default and does not change.
 
 - **Order:** Work that needs you is first, then pinned work, then the rest, newest first. A card shows the title, repo and branch, the state glyph (the same five as Home), how long since it last did something, and the question when an agent asks one.
-- **Open:** Click a card or press `Enter` to show its most recent terminal. Work with no open terminal opens its task drawer on Home.
-- **Settle:** Hover a card and click **Settle** (✓) when you are done with it. It moves into **N settled** at the bottom, which starts folded. A settled card comes back to the top when its agent ends a turn or asks something.
+- **Open:** Click a card or press `Enter` to show its most recent terminal. Work with no open terminal opens the view that owns it, such as its Foundry order, or else its task drawer on Home.
+- **Open in Foundry:** A card whose work is a Foundry order has a Foundry button. It opens that order in Foundry. The same item is on the row menu on Home, in the task drawer and on the branch's menu in the tree.
+- **Settle:** Hover a card and click **Settle** when you are done with it. It moves into **N settled** at the bottom, which starts folded. A settled card comes back to the top when its agent ends a turn or asks something.
 - **Snooze:** Click the alarm clock and choose **1 hour**, **This afternoon** or **Tomorrow**. The card is settled until then.
 - **Pin:** Click the pin. A pinned card stays at the top, under the work that needs you, and never settles on its own.
 - **Auto-settle:** Work with no activity for 24 hours settles on its own. An unanswered question never does.
 - **Search and repo filter:** The search field matches title, ticket, repo and branch. **All repos** narrows the list to one repo.
 - **Keyboard:** From the search field, `↓` moves onto the first card. `↑` and `↓` move between cards.
 
-Terminator keeps settled, pinned and snoozed work for each profile on this machine. It forgets an entry 30 days after its work is gone.
+Home and the Inbox share one list of settled, pinned and snoozed work. Settle work in one and it is settled in the other. Terminator keeps the list for each profile on this machine. It forgets an entry 30 days after its work is gone.
 
 ---
 
@@ -310,9 +311,9 @@ Connect a tracker first: [Settings → Integrations](#9-settings).
 
 A branch can carry **one** issue at a time. A branch is a unit of work, and so is a ticket.
 
-**To attach one**: right-click the branch in the sidebar → **Link issue…**. The picker opens on the issues assigned to you across every connected tracker, so the common case needs no typing. Type to search, or type an issue key exactly (`TAV-42`) to jump straight to it. Each row shows which tracker it came from, because two trackers can both have a `TAV-42` and they are different issues.
+**To attach one**: right-click the branch in the sidebar → **Link ticket…**. The picker opens on the issues assigned to you across every connected tracker, so the common case needs no typing. Type to search, or type an issue key exactly (`TAV-42`) to jump straight to it. Each row shows which tracker it came from, because two trackers can both have a `TAV-42` and they are different issues.
 
-You can also reach it from [Quick Actions](#8-quick-actions) (`⌘P` → `w` → `l`) with **Link issue to project**, scoped to the branch you are in.
+You can also reach it from [Quick Actions](#8-quick-actions) (`⌘P` → `w` → `l`) with **Link ticket to branch**, scoped to the branch you are in.
 
 **The key.** Once attached, the branch's row in the sidebar carries the issue key as plain text. Click it to open the issue drawer. It used to be a bordered badge with its own state dot. The key alone already said what those said. The paragraph below describes the state colours as they appear in the drawer and the picker.
 
@@ -327,7 +328,7 @@ You can also reach it from [Quick Actions](#8-quick-actions) (`⌘P` → `w` →
 
 The dot is never the only signal. Hover the badge for the tracker, the state by name, and the issue title. Screen readers get the same text. Click the badge to open the issue.
 
-**Changing it.** If you pick a different issue, it **replaces** the attached one. Terminator warns you before it happens. Right-click the branch for **Change linked issue…**, **Copy issue key**, **Open … in tracker**, or **Unlink**.
+**Changing it.** If you pick a different issue, it **replaces** the attached one. Terminator warns you before it happens. Right-click the branch for **Change linked ticket…**, **Copy ticket key**, **Open … in tracker**, or **Unlink**.
 
 **Removing a branch** discards its association with the issue. Nothing is left behind.
 
@@ -395,7 +396,7 @@ Top to bottom, Home holds:
 - **The plan strip.** One line until you plan the day or press **Skip today**. **Plan** (`P`) opens the plan sheet (see [Plan today](#plan-today)).
 - **Needs you.** One queue across every task (see below). With nothing waiting, it is one line: "Nothing needs you.", and the number of running agents.
 - **Tasks.** One row per task, grouped by state in a fixed order: needs you, running, waiting on others, quiet, done. Quiet and Done tasks each fold into one line. Press **Show** to open it. **Group** changes the grouping to repo or none. A row shows the state, the title, the repos the task touches, what is happening now and when it last moved. The star marks a task as today's focus.
-- **The footer.** This week's shipped pull requests and how long agents waited on you, **Open Insights**, and **Archived tasks**.
+- **The footer.** This week's shipped pull requests and how long agents waited on you, **Open Insights**, **Settled (N)** and **Archived tasks**.
 
 While Home shows, the branch tree is hidden, so Home has the whole window. `Cmd+B` shows the tree for as long as you stay on Home. To keep the tree beside Home, turn off **Hide the branch tree on Home** in **Settings → Interface**.
 
@@ -414,7 +415,7 @@ Every surface draws a task's state with the same five shapes, so you can tell th
 
 A hollow, dashed **Needs you** is a guess. Terminator saw a sign that an agent is waiting, but the agent did not say so. The row and the task drawer name the sign, for example "Inferred: a numbered choice is on screen". It sits in the queue below the reported questions. A missed question leaves an agent waiting for good, while a false one costs a glance. It goes away when the agent prints again or you type into its terminal. It turns solid if Claude Code then reports it.
 
-No timer moves a task. A quiet task stays quiet until something happens on it. Only you mark a task done or archive it.
+No timer changes a task's state. Only you mark a task done or archive it. A task with no activity for 24 hours settles: it leaves the list until something happens on it, and **Settled (N)** lists it.
 
 #### Needs you
 
@@ -436,9 +437,9 @@ The drawer holds:
 - **Lanes**: one row per repo and branch, with its state, the lines changed, and its pull request and checks when it has them. A lane with no pull request shows no pull request line. **Answer** or **Open** goes to that lane's terminal;
 - **Add a repo** (makes a worktree on the same branch name in another repo) and **Add a branch I already have**;
 - the terminals on the task, how long they have run and their tokens, and a timeline;
-- the buttons **Open all lanes**, **Link a ticket**, **Rename**, **Mark done** and **Archive**.
+- the buttons **Open all lanes**, **Link ticket…**, **Rename**, **Mark done** and **Archive**, and **Open in Foundry** for a Foundry order.
 
-**Mark done** finishes a task that will never have a pull request. **Archive** hides a task without finishing it. Both keep the task's records and list it under **Archived tasks** in the footer. There, **Restore** (or **Undo done**) brings it back. `Esc` closes the drawer. Right-click a row for the same actions and for **Dismiss**, which takes a row off Home for good. The toast has **Undo**, which brings the row back. Dismiss deletes the record of every session on the row that has ended, and of each one still running as soon as it ends. Undo cannot bring a deleted record back. A row that only an extension shows, such as a pull request, stays hidden and nothing is deleted.
+**Mark done** finishes a task that will never have a pull request. **Archive** hides a task without finishing it. Both keep the task's records and list it under **Archived tasks** in the footer. There, **Restore** brings it back. `Esc` closes the drawer. Right-click a row for the same actions and for **Settle**, which takes the row off Home until its agent ends a turn or asks something. It is the same Settle as in the [Inbox sidebar](#the-inbox-sidebar). The toast has **Undo**. **Settled (N)** in the footer lists settled work, each with **Restore**. Work quiet for 24 hours settles on its own, and an unanswered question never does. Settle deletes nothing. A settled session's record goes when **Delete closed sessions after** says, as every closed session's does.
 
 #### Making a task
 
@@ -481,7 +482,7 @@ Press `Tab` to choose how to run it: as an **agent in an agent tab** (the defaul
 | `Enter`      | Expand an ask, or open the task drawer            | Both                    |
 | `1`–`9`      | Pick that numbered answer                         | An expanded ask         |
 | `R`          | Reply in your own words                           | An expanded ask         |
-| `E`          | Done: remove it from the queue                    | Needs you               |
+| `E`          | Settle: remove it from the queue                  | Needs you               |
 | `H`          | Snooze: 1 hour, this afternoon, tomorrow          | Needs you               |
 | `T`          | Open the terminal                                 | Any item with a session |
 | `P`          | Open the plan sheet                               | Home                    |
@@ -533,7 +534,7 @@ A session with no ticket can say what it is for. Right-click its tab and choose 
 
 ### Linking a session to a ticket
 
-A session shows its branch's linked ticket by default. Right-click a session's tab or its tile and choose **Link issue…** to pin a different Linear ticket to that one session. This matters when two terminals on one branch serve different tickets. **Remove session link** hands the session back to its branch's ticket. You never change the branch's own link from here. With no tracker connected, the dialog tells you to connect one in **Settings → Integrations**. The ticket that briefs an agent at start-up still comes from the branch (see [What your agent sessions are told](#what-your-agent-sessions-are-told)).
+A session shows its branch's linked ticket by default. Right-click a session's tab or its tile and choose **Link ticket…** to pin a different Linear ticket to that one session. This matters when two terminals on one branch serve different tickets. **Remove session link** hands the session back to its branch's ticket. You never change the branch's own link from here. With no tracker connected, the dialog tells you to connect one in **Settings → Integrations**. The ticket that briefs an agent at start-up still comes from the branch (see [What your agent sessions are told](#what-your-agent-sessions-are-told)).
 
 ### The Overview wall
 
@@ -543,7 +544,7 @@ A session shows its branch's linked ticket by default. Right-click a session's t
 
 Open a session from anywhere: a work thread's drawer, a tile, the sidebar, a tab, Quick Actions, or a notification. You land in its terminal with the cursor in it, ready to type.
 
-A ticket linked to one terminal shows as its key on that terminal's sidebar row, on its tab, and on its branch's row while the branch is collapsed (with **+N** when its terminals carry more than one). Right-click either to link, change or remove the ticket. **Quick actions → Link issue** links the focused terminal, and **Link issue to branch** links the branch. An agent started in that terminal gets the terminal's own ticket as context, ahead of the branch's ticket.
+A ticket linked to one terminal shows as its key on that terminal's sidebar row, on its tab, and on its branch's row while the branch is collapsed (with **+N** when its terminals carry more than one). Right-click either to link, change or remove the ticket. **Quick actions → Link ticket** links the focused terminal, and **Link ticket to branch** links the branch. An agent started in that terminal gets the terminal's own ticket as context, ahead of the branch's ticket.
 
 When an agent waits on a numbered choice (a Claude Code permission prompt, for example), its options appear as buttons on the tile and in Home's Needs you queue. Press a button to answer as if you had typed the number. Terminator reads the screen again first. It sends nothing if the question has changed or you answered it in the terminal.
 
@@ -1115,7 +1116,7 @@ Click the **calendar icon** in the sidebar header icon row. Or press **`Cmd+Shif
 | **Inbox**    | Quick-captured items awaiting triage                       |
 | **Projects** | Named project containers for related tasks                 |
 | **Areas**    | Ongoing responsibilities (PARA areas of focus)             |
-| **History**  | Past daily logs                                            |
+| **Archive**  | Past daily logs                                            |
 
 ### Today
 
