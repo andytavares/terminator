@@ -9,6 +9,8 @@ import { useWorkThreads } from '../home/useWorkThreads'
 import { useDeskSelection } from '../home/desk-selection'
 import { useStartWorkStore } from '../home/start-work'
 import { leadSessionOf } from '../home/thread-actions'
+import { openInExtension } from '../home/desk-actions'
+import { useOpenInApp } from '../home/open-in-app'
 import { compactAge } from '../home/thread-format'
 import { StateGlyph } from '../home/StateGlyph'
 import { SnoozeMenu } from '../home/SnoozeMenu'
@@ -129,10 +131,11 @@ function InboxControls({ filter, onChange, repos }: ControlsProps): React.JSX.El
   )
 }
 
-/** Shows the thread's most recent session, or its drawer on Home when none is open. */
+/** Shows the thread's most recent session, else its extension's view, else its drawer on Home. */
 function openThread(thread: WorkThread): void {
   const lead = leadSessionOf(thread)
   if (lead) return revealSession(lead.sessionId)
+  if (thread.opensIn !== null) return void openInExtension(thread.opensIn.source, thread.opensIn)
   useExtensionRegistry.getState().setActiveGlobalTab('core.home')
   useDeskSelection.getState().openThread(thread.key)
 }
@@ -189,6 +192,14 @@ function SnoozeButton({ threadKey, now }: { threadKey: string; now: number }) {
   )
 }
 
+function OpenInAppButton({ thread }: { thread: WorkThread }): React.JSX.Element | null {
+  const openInApp = useOpenInApp(thread)
+  if (!openInApp) return null
+  return (
+    <IconButton size="sm" icon={openInApp.icon} label={openInApp.label} onClick={openInApp.open} />
+  )
+}
+
 function CardActions({ thread, now, pinned, settled }: CardProps): React.JSX.Element {
   const marks = useWorkMarks.getState
   return (
@@ -200,6 +211,7 @@ function CardActions({ thread, now, pinned, settled }: CardProps): React.JSX.Ele
         pressed={pinned}
         onClick={() => marks().togglePin(thread.key, now)}
       />
+      <OpenInAppButton thread={thread} />
       <SnoozeButton threadKey={thread.key} now={now} />
       {!settled && (
         <IconButton

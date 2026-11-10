@@ -474,6 +474,8 @@ export interface ThreadFacet {
   url?: string
   /** Where the thread's result is, as buttons on its drawer (since 5.1.0). */
   links?: { label: string; url: string }[]
+  /** The command of this extension that shows the work in its own view (since 6.4.0). */
+  open?: { command: string; args?: unknown }
   closedAt: string | null
   checks?: { name: string; state: 'passed' | 'failed' | 'running'; detail?: string }[]
   /** What a merged pull request's timeline measured (ISO times; minutes for checks). */

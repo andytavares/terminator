@@ -12,6 +12,7 @@ import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { useToastStore } from '../../stores/toast.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { useOpenInApp, type OpenInApp } from './open-in-app'
 import type { WorkThread } from '../../home/work-threads'
 
 export type WorkMenuState = ReturnType<typeof useWorkMenu>
@@ -27,6 +28,7 @@ interface ItemActions {
   onStartRename: () => void
   onLink: () => void
   onRemoveWorktree: () => void
+  openInApp: OpenInApp | null
 }
 
 /** True when the lead session's project is a git worktree the workspace store can delete. */
@@ -48,6 +50,9 @@ function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): Conte
       label: 'Open terminal',
       onSelect: run(() => SESSION_ACTIONS.onOpen(lead.sessionId)),
     })
+  }
+  if (actions.openInApp) {
+    items.push({ label: actions.openInApp.label, onSelect: run(actions.openInApp.open) })
   }
   if (lead || thread.taskId !== null) {
     items.push({ label: 'Rename…', onSelect: run(actions.onStartRename) })
@@ -80,7 +85,7 @@ function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
       ? []
       : [
           {
-            label: thread.doneAt === null ? 'Mark done' : 'Undo done',
+            label: thread.doneAt === null ? 'Mark done' : 'Restore',
             separatorBefore: true,
             onSelect: run(() => void toggleDone(thread)),
           },
@@ -218,6 +223,7 @@ export function InFlightMenu({
   const { menu, openWorkMenu, closeWorkMenu } = workMenu
   const dialogs = useMenuDialogs()
   const items = buildItems(thread, {
+    openInApp: useOpenInApp(thread),
     closeMenu: closeWorkMenu,
     onStartRename,
     onLink: dialogs.openLink,

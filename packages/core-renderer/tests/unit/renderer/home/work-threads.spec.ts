@@ -516,6 +516,27 @@ describe('thread links', () => {
   })
 })
 
+describe('thread opensIn', () => {
+  const open = { command: 'show-order', args: { orderId: 'WO-1' } }
+
+  it('names the extension and command of the first facet that can open the work', () => {
+    const [thread] = buildWorkThreads(
+      input({
+        facets: [
+          facet(),
+          facet({ source: 'terminator.foundry', kind: 'order', open }),
+          facet({ source: 'other', kind: 'order', open: { command: 'later' } }),
+        ],
+      })
+    )
+    expect(thread.opensIn).toEqual({ source: 'terminator.foundry', ...open })
+  })
+
+  it('is null when no facet can open the work', () => {
+    expect(buildWorkThreads(input({ facets: [facet()] }))[0].opensIn).toBeNull()
+  })
+})
+
 describe('buildWorkThreads: a stored task with nothing running', () => {
   it('dates the task from when it was made, not from sessions it does not have', () => {
     const quiet = task({ createdAt: '2026-10-17T09:00:00.000Z' })

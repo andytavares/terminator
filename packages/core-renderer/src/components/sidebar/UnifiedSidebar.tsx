@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { Workspace } from '../../../../core-shared/src/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
+import { useWorkThreads } from '../home/useWorkThreads'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
@@ -326,6 +327,7 @@ function useRowContext({ props, data, views, rows, dialogs, links }: ContextInpu
   const collapse = useSidebarCollapse()
   const machine = useMachineFacts()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
+  const { allThreads } = useWorkThreads()
   return {
     ...machine,
     data,
@@ -338,6 +340,7 @@ function useRowContext({ props, data, views, rows, dialogs, links }: ContextInpu
     groupBy: views.view.groupBy,
     reorder: manualReorder(data, views.changeActiveView),
     workspaceTabs: Array.from(workspaceTabs.values()),
+    threads: allThreads,
     activeWorkspaceTabId: props.activeWorkspaceTabId,
     onSelectWorkspaceTab: props.onSelectWorkspaceTab,
   }

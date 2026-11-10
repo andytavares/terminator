@@ -1,6 +1,8 @@
 import { useWorkspaceStore } from '../../../../src/stores/workspace.store'
 import { useHomeFeedStore } from '../../../../src/stores/home-feed.store'
 import { useIntegrationsStore } from '../../../../src/stores/integrations.store'
+import { vi } from 'vitest'
+import { useExtensionRegistry } from '../../../../src/extensions/registry'
 import { fact } from '../sidebar/fixtures/facts'
 import { facet } from './fixtures'
 import type { MergedHomeFeed } from '../../../../../core-shared/src/schemas/home-feed.schema'
@@ -116,6 +118,36 @@ const issue = (key: string, title: string) =>
     assignee: null,
     branchName: null,
   }) as Issue
+
+/** Foundry's order for TAV-20: its facet names the command that opens the order. */
+export function seedFoundryOrder(): void {
+  useHomeFeedStore.setState({
+    facets: [
+      ...FACETS,
+      facet({
+        source: 'terminator.foundry',
+        kind: 'order',
+        workKey: { repoRoot: REPO_ROOT, branch: 'tav-20' },
+        open: { command: 'show-order', args: { orderId: 'WO-1' } },
+      }),
+    ],
+  })
+  useExtensionRegistry.setState({
+    workspaceTabs: new Map([
+      ['terminator.foundry', { id: 'terminator.foundry', label: 'Foundry', component: () => null }],
+    ]),
+  })
+}
+
+/** The extension API of a window where every command is registered; specs add it to their own. */
+export const extensionCommands = { hasCommand: vi.fn(async () => true), executeCommand: vi.fn() }
+
+/** What pressing "Open in Foundry" must run. */
+export const SHOW_ORDER = [
+  'terminator.foundry.command.show-order',
+  { projectId: null, sessionId: null, repoRoot: null },
+  { orderId: 'WO-1' },
+] as const
 
 /** Puts the workspace, tickets and published facets in the stores the Desk reads. */
 export function seedDesk(): void {

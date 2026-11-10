@@ -6,6 +6,7 @@ Minor: additive.
 
 ### Added
 
+- `ThreadFacet.open`: the command of the extension that shows the work in its own view. Home offers it as "Open in <extension name>".
 - `CommandContribution.destructive`: a command that closes, clears or deletes something. The Terminator MCP server runs it only through `run_destructive_extension_command`, which asks first. `extension.getCommands` carries it to views.
 
 ## 6.3.0

@@ -100,7 +100,15 @@ export async function openAsk(ask: DeskAsk): Promise<void> {
     if (typeof sessionId === 'string') revealSession(sessionId)
     return
   }
-  const key = await registeredCommandKey(ask.source, command)
+  await openInExtension(ask.source, ask.open)
+}
+
+/** Runs a command of the extension that owns the work, to show it in the extension's own view. */
+export async function openInExtension(
+  source: string,
+  open: { command: string; args?: unknown }
+): Promise<void> {
+  const key = await registeredCommandKey(source, open.command)
   if (key === null) {
     useToastStore.getState().addToast({
       type: 'error',
@@ -109,5 +117,5 @@ export async function openAsk(ask: DeskAsk): Promise<void> {
     return
   }
   const context = { projectId: null, sessionId: null, repoRoot: null }
-  window.electronAPI.extension.executeCommand(key, context, args)
+  window.electronAPI.extension.executeCommand(key, context, open.args)
 }

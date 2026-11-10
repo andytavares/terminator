@@ -16,6 +16,7 @@ import {
   TerminalSection,
   TimelineSection,
 } from './ThreadDrawerSections'
+import { useOpenInApp } from './open-in-app'
 import { StateGlyph } from './StateGlyph'
 import { LanesSection, TaskActions, taskCountsOf, taskSummaryOf } from './ThreadDrawerLanes'
 import type { WorkThread } from '../../home/work-threads'
@@ -50,6 +51,7 @@ function LinkButtons({ thread }: { thread: WorkThread }): React.JSX.Element {
 
 function DrawerActions({ thread }: { thread: WorkThread }): React.JSX.Element {
   const lead = leadSessionOf(thread)
+  const openInApp = useOpenInApp(thread)
   return (
     <div className="desk-dr-h__acts">
       <Button
@@ -63,6 +65,11 @@ function DrawerActions({ thread }: { thread: WorkThread }): React.JSX.Element {
       <Button size="sm" disabled={!lead?.projectId} onClick={() => void startAgentOnBranch(thread)}>
         New agent on this branch
       </Button>
+      {openInApp && (
+        <Button size="sm" onClick={openInApp.open}>
+          {openInApp.label}
+        </Button>
+      )}
       <LinkButtons thread={thread} />
     </div>
   )

@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event'
 import { InboxList } from '../../../../../src/components/sidebar/InboxSidebar'
 import { useWorkMarks } from '../../../../../src/home/work-marks'
 import { useStartWorkStore } from '../../../../../src/components/home/start-work'
+import { useExtensionRegistry } from '../../../../../src/extensions/registry'
+import { installElectronApi } from '../../../../../../test-support/src/electron-api'
 import type { WorkThread } from '../../../../../src/home/work-threads'
 import type { TaskState } from '../../../../../src/home/task-state'
 
@@ -23,6 +25,7 @@ interface Fixture {
   repoName?: string
   sessions?: Array<{ sessionId: string; lastActivityAt: number }>
   nowLine?: string
+  opensIn?: WorkThread['opensIn']
 }
 
 function threadOf(key: string, fixture: Fixture = {}): WorkThread {
@@ -39,6 +42,7 @@ function threadOf(key: string, fixture: Fixture = {}): WorkThread {
     nowLine: fixture.nowLine ?? '',
     lanes: [{ repoRoot, repoName, branch: `${key}-branch`, repoColor: null, sessionIds: [] }],
     sessions: sessions.map((s) => ({ ...s, isClosed: false })),
+    opensIn: fixture.opensIn ?? null,
   } as unknown as WorkThread
 }
 
@@ -63,8 +67,21 @@ const settledTitles = () =>
 
 const cardFor = (title: string) => screen.getByRole('listitem', { name: title })
 
+const FOUNDRY = {
+  source: 'terminator.foundry',
+  command: 'show-order',
+  args: { orderId: 'WO-1' },
+}
+const executeCommand = vi.fn()
+
 beforeEach(() => {
   vi.clearAllMocks()
+  installElectronApi({ extension: { hasCommand: vi.fn(async () => true), executeCommand } })
+  useExtensionRegistry.setState({
+    workspaceTabs: new Map([
+      ['terminator.foundry', { id: 'terminator.foundry', label: 'Foundry', component: () => null }],
+    ]),
+  })
   localStorage.clear()
   useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
 })
@@ -104,5 +121,48 @@ describe('InboxList — settling', () => {
     await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
     expect(cardTitles()).toEqual(['Work b'])
     expect(screen.getByRole('button', { name: '1 settled' })).toBeTruthy()
+  })
+})
+
+describe('InboxList — open in the extension', () => {
+  const opened = [
+    'terminator.foundry.command.show-order',
+    { projectId: null, sessionId: null, repoRoot: null },
+    { orderId: 'WO-1' },
+  ]
+
+  it('opens the work in the extension that owns it', async () => {
+    const user = userEvent.setup()
+    renderInbox([threadOf('a', { opensIn: FOUNDRY })])
+    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Open in Foundry' }))
+    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledWith(...opened))
+  })
+
+  it('offers nothing when no extension can open the work', () => {
+    renderInbox([threadOf('a')])
+    expect(within(cardFor('Work a')).queryByRole('button', { name: /^Open in / })).toBeNull()
+  })
+
+  it('says "Open in app" when the extension has no tab to name it', () => {
+    useExtensionRegistry.setState({ workspaceTabs: new Map() })
+    renderInbox([threadOf('a', { opensIn: FOUNDRY })])
+    expect(within(cardFor('Work a')).getByRole('button', { name: 'Open in app' })).toBeTruthy()
+  })
+
+  it('opens the extension view, not the drawer, from a card with no terminal', async () => {
+    const user = userEvent.setup()
+    renderInbox([threadOf('a', { opensIn: FOUNDRY })])
+    await user.click(within(cardFor('Work a')).getByText('Work a'))
+    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledWith(...opened))
+    expect(revealSession).not.toHaveBeenCalled()
+  })
+
+  it('reveals the terminal first when the card has one', async () => {
+    const user = userEvent.setup()
+    const sessions = [{ sessionId: 's1', lastActivityAt: 1 }]
+    renderInbox([threadOf('a', { opensIn: FOUNDRY, sessions })])
+    await user.click(within(cardFor('Work a')).getByText('Work a'))
+    expect(revealSession).toHaveBeenCalledWith('s1')
+    expect(executeCommand).not.toHaveBeenCalled()
   })
 })

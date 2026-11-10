@@ -48,6 +48,8 @@ const ThreadFacetSchema = z.object({
     .array(z.object({ label: z.string().min(1), url: z.string().url() }))
     .max(4)
     .optional(),
+  /** The extension command that shows this work in the extension's own view. */
+  open: z.object({ command: z.string().min(1), args: z.unknown().optional() }).optional(),
   closedAt: z.string().nullable(),
   checks: z
     .array(

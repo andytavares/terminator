@@ -267,14 +267,14 @@ async function issueActions(handle: AppHandle): Promise<void> {
   await createWorkspace(page, 'Tracked', e2eTempDir('issue-'))
   await addAndSelectProject(page, 'Tracked', 'login-fix')
   await connectLinear(page)
-  await test.step('Link issue to branch attaches a searched issue to the branch', () =>
+  await test.step('Link ticket to branch attaches a searched ticket to the branch', () =>
     linkIssueAttachesToBranch(page))
   await test.step('View opens the linked issue in the drawer', () => viewOpensIssueDrawer(page))
   await test.step('Copy ticket key puts the key on the clipboard', () =>
     copyIssueKeyFillsClipboard(handle))
   await test.step('Open in Linear hands the issue URL to the browser', () =>
     openInLinearOpensBrowser(handle))
-  await test.step('Change linked issue pins a different issue to the focused session only', () =>
+  await test.step('Change linked ticket pins a different ticket to the focused session only', () =>
     changeLinkedIssuePinsSession(page))
 }
 

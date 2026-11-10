@@ -120,7 +120,7 @@ function useLinkMenu(canLink: boolean) {
   return { menu, closeMenu: () => setMenu(null), openMenu: canLink ? openLinkMenu : undefined }
 }
 
-/** Link issue… for a session with no link of its own, else change or remove that link. Each
+/** Link ticket… for a session with no link of its own, else change or remove that link. Each
  * closes the menu first. */
 function linkItems(
   { onLinkIssue, onRemoveLink }: TerminalRowProps,
@@ -128,9 +128,9 @@ function linkItems(
   closeMenu: () => void
 ): ContextMenuItem[] {
   const run = (fn?: () => void) => afterClosing(closeMenu, () => fn?.())
-  if (key === null) return [{ label: 'Link issue…', onSelect: run(onLinkIssue) }]
+  if (key === null) return [{ label: 'Link ticket…', onSelect: run(onLinkIssue) }]
   return [
-    { label: 'Change linked issue…', onSelect: run(onLinkIssue) },
+    { label: 'Change linked ticket…', onSelect: run(onLinkIssue) },
     { label: 'Remove session link', danger: true, onSelect: run(onRemoveLink) },
   ]
 }

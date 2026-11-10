@@ -49,10 +49,11 @@ describe('wokenKeys', () => {
   })
 })
 
-
 describe('wokenKeys — facet activity', () => {
   it('does not wake a thread whose lastActivity moved while its state stayed the same', () => {
     const before = new Map<string, TaskState>([['a', 'quiet']])
-    expect(wokenKeys(before, [threadOf('a', { state: 'quiet', lastActivity: NOW + 5 })])).toEqual([])
+    expect(wokenKeys(before, [threadOf('a', { state: 'quiet', lastActivity: NOW + 5 })])).toEqual(
+      []
+    )
   })
 })

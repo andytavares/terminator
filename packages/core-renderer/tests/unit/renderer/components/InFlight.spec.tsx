@@ -13,7 +13,16 @@ import { ToastContainer } from '../../../../src/components/ToastContainer'
 import { useHomeFeedStore } from '../../../../src/stores/home-feed.store'
 import { useChangeStatsStore } from '../../../../src/stores/change-stats.store'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
-import { FACTS, REPO_ROOT, seedDesk, sendToAgentAsk, ticket } from '../home/desk-world'
+import {
+  FACTS,
+  REPO_ROOT,
+  SHOW_ORDER,
+  extensionCommands,
+  seedDesk,
+  seedFoundryOrder,
+  sendToAgentAsk,
+  ticket,
+} from '../home/desk-world'
 import { fact } from '../sidebar/fixtures/facts'
 import { task } from '../home/fixtures'
 
@@ -103,6 +112,7 @@ beforeEach(() => {
     agentUsage: { get: usageGet },
     shell: { openExternal },
     git: { changeStats: vi.fn().mockResolvedValue({ added: 412, removed: 88, files: 3 }) },
+    extension: extensionCommands,
   })
 })
 
@@ -251,6 +261,24 @@ describe('the work-thread drawer — checks', () => {
     const user = userEvent.setup()
     const drawer = within(await openBuilding(user))
     expect(drawer.queryByRole('button', { name: 'Send to agent' })).toBeNull()
+  })
+})
+
+describe('the work-thread drawer — Open in Foundry', () => {
+  it('opens the order in the extension that owns the work', async () => {
+    const user = userEvent.setup()
+    seedFoundryOrder()
+    const drawer = within(await openBuilding(user))
+    await user.click(drawer.getByRole('button', { name: 'Open in Foundry' }))
+    await waitFor(() =>
+      expect(extensionCommands.executeCommand).toHaveBeenCalledWith(...SHOW_ORDER)
+    )
+  })
+
+  it('offers none when no extension can open the work', async () => {
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
+    expect(drawer.queryByRole('button', { name: /^Open in Foundry/ })).toBeNull()
   })
 })
 
@@ -409,6 +437,26 @@ describe('the row menu — Add to task', () => {
     await rightClickRow(user, 'PR overview shows status before story')
     await user.click(openMenuItem('Add to task…'))
     expect(useAddToTaskStore.getState().lane).toEqual({ repoRoot: REPO_ROOT, branch: 'tav-20' })
+  })
+})
+
+describe('the row menu — Open in Foundry', () => {
+  it('opens the order in the extension that owns the work', async () => {
+    const user = userEvent.setup()
+    seedFoundryOrder()
+    render(<InFlight />)
+    await rightClickRow(user, 'PR overview shows status before story')
+    await user.click(openMenuItem('Open in Foundry'))
+    await waitFor(() =>
+      expect(extensionCommands.executeCommand).toHaveBeenCalledWith(...SHOW_ORDER)
+    )
+  })
+
+  it('is absent when no extension can open the work', async () => {
+    const user = userEvent.setup()
+    render(<InFlight />)
+    await rightClickRow(user, 'PR overview shows status before story')
+    expect(within(document.body).queryByRole('menuitem', { name: /^Open in / })).toBeNull()
   })
 })
 
