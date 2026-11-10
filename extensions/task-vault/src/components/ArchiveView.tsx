@@ -362,12 +362,7 @@ function ArchiveTaskRow({ task, onRestore, onDelete }: RowProps): React.JSX.Elem
         <span className="archive-task__file">{fileName}</span>
       </span>
       <span className="archive-task__actions">
-        <IconButton
-          icon={Undo2}
-          label="Restore"
-          size="sm"
-          onClick={() => onRestore(task.id)}
-        />
+        <IconButton icon={Undo2} label="Restore" size="sm" onClick={() => onRestore(task.id)} />
         <IconButton
           icon={Trash2}
           label="Delete permanently"

@@ -428,11 +428,7 @@ function FinishedActions({ row }: RowProps): React.JSX.Element {
   return (
     <span className="daily-log__task-actions">
       {(status === 'done' || removable) && (
-        <IconButton
-          icon={RotateCcw}
-          label="Restore"
-          onClick={() => void row.commands.restore()}
-        />
+        <IconButton icon={RotateCcw} label="Restore" onClick={() => void row.commands.restore()} />
       )}
       {removable && (
         <IconButton icon={Trash2} label="Remove" onClick={() => void row.commands.remove()} />

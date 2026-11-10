@@ -256,7 +256,9 @@ describe('UnifiedSidebar — the Sidebar setting', () => {
 
   it('folds a card settled in the Inbox into its settled section', async () => {
     const user = userEvent.setup()
-    mockUseSessionFacts.mockReturnValue([fact({ sessionId: 's1', name: 'api-shell', lastActivityAt: Date.now() })])
+    mockUseSessionFacts.mockReturnValue([
+      fact({ sessionId: 's1', name: 'api-shell', lastActivityAt: Date.now() }),
+    ])
     renderSidebar()
     setSidebarMode('inbox')
     const inbox = await screen.findByRole('list', { name: 'Inbox' })

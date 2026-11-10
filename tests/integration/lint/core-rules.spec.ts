@@ -87,55 +87,61 @@ describe('core renderer text', () => {
   })
 })
 
+const WORD_COMPONENT = 'packages/core-renderer/src/components/Case.tsx'
+const WORD_EXTENSION = 'extensions/task-vault/src/components/Case.tsx'
+const HOME_COMPONENT = 'packages/core-renderer/src/components/home/Case.tsx'
+const SIDEBAR_COMPONENT = 'packages/core-renderer/src/components/sidebar/Case.tsx'
+
+const RETIRED_WORD_CASES: [string, string, string][] = [
+  ['visible text', 'export const A = () => <b>Done today: 3</b>\n', WORD_COMPONENT],
+  ['a menu label', "export const m = [{ label: 'Undo done' }]\n", WORD_COMPONENT],
+  ['a ticket link', "export const m = [{ label: 'Link issue…' }]\n", WORD_COMPONENT],
+  ['a tooltip', 'export const A = () => <button title="Complete" />\n', WORD_EXTENSION],
+  [
+    'an accessible name',
+    'export const A = () => <button aria-label="Unarchive" />\n',
+    WORD_EXTENSION,
+  ],
+  [
+    'a conditional label',
+    "export const A = (on: boolean) => <b>{on ? 'Unarchive' : 'Archive'}</b>\n",
+    WORD_EXTENSION,
+  ],
+  ['a ticket dialog', 'export const A = () => <dialog title="Link an issue" />\n', WORD_COMPONENT],
+  [
+    'a session link dialog',
+    'export const A = () => <dialog title="Link a work item" />\n',
+    WORD_COMPONENT,
+  ],
+]
+
+const DISMISS_ON_WORK_CASES: [string, string, string][] = [
+  ['a Home row menu', "export const m = [{ label: 'Dismiss' }]\n", HOME_COMPONENT],
+  ['a Home footer', 'export const A = () => <b>Dismissed (2)</b>\n', HOME_COMPONENT],
+  ['an Inbox card', 'export const A = () => <button aria-label="Dismiss" />\n', SIDEBAR_COMPONENT],
+]
+
+const ALLOWED_WORD_CASES: [string, string, string][] = [
+  ['Dismiss on a notification', "export const m = [{ label: 'Dismiss' }]\n", WORD_COMPONENT],
+  ['the one word', "export const m = [{ label: 'Settle' }]\n", WORD_COMPONENT],
+  ['an identifier', 'export const linkIssue = 1\n', WORD_COMPONENT],
+  [
+    'Done that ends an edit on Home',
+    "export const A = (e: boolean) => <b>{e ? 'Done' : 'Edit'}</b>\n",
+    HOME_COMPONENT,
+  ],
+]
+
 describe('one word per action', () => {
-  const COMPONENT = 'packages/core-renderer/src/components/Case.tsx'
-  const EXTENSION = 'extensions/task-vault/src/components/Case.tsx'
-  const HOME_COMPONENT = 'packages/core-renderer/src/components/home/Case.tsx'
-  const SIDEBAR_COMPONENT = 'packages/core-renderer/src/components/sidebar/Case.tsx'
-
-  it.each([
-    ['visible text', 'export const A = () => <b>Done today: 3</b>\n', COMPONENT],
-    ['a menu label', "export const m = [{ label: 'Undo done' }]\n", COMPONENT],
-    ['a ticket link', "export const m = [{ label: 'Link issue…' }]\n", COMPONENT],
-    ['a tooltip', 'export const A = () => <button title="Complete" />\n', EXTENSION],
-    ['an accessible name', 'export const A = () => <button aria-label="Unarchive" />\n', EXTENSION],
-    [
-      'a conditional label',
-      "export const A = (on: boolean) => <b>{on ? 'Unarchive' : 'Archive'}</b>\n",
-      EXTENSION,
-    ],
-  ])('rejects a retired word in %s', async (_name, code, file) => {
+  it.each(RETIRED_WORD_CASES)('rejects a retired word in %s', async (_name, code, file) => {
     expect(await rulesHit(code, file)).toEqual(['terminator/restricted-syntax'])
   })
 
-  it.each([
-    ['a Home row menu', "export const m = [{ label: 'Dismiss' }]\n", HOME_COMPONENT],
-    ['a Home footer', 'export const A = () => <b>Dismissed (2)</b>\n', HOME_COMPONENT],
-    [
-      'an Inbox card',
-      'export const A = () => <button aria-label="Dismiss" />\n',
-      SIDEBAR_COMPONENT,
-    ],
-    ['a ticket dialog', 'export const A = () => <dialog title="Link an issue" />\n', COMPONENT],
-    [
-      'a session link dialog',
-      'export const A = () => <dialog title="Link a work item" />\n',
-      COMPONENT,
-    ],
-  ])('rejects Dismiss or an old link name on work in %s', async (_name, code, file) => {
+  it.each(DISMISS_ON_WORK_CASES)('rejects Dismiss on work in %s', async (_name, code, file) => {
     expect(await rulesHit(code, file)).toEqual(['terminator/restricted-syntax'])
   })
 
-  it('allows Done that ends an edit on Home', async () => {
-    const code = "export const A = (e: boolean) => <b>{e ? 'Done' : 'Edit'}</b>\n"
-    expect(await rulesHit(code, HOME_COMPONENT)).toEqual([])
-  })
-
-  it.each([
-    ['Dismiss on a notification', "export const m = [{ label: 'Dismiss' }]\n", COMPONENT],
-    ['the one word', "export const m = [{ label: 'Settle' }]\n", COMPONENT],
-    ['an identifier', 'export const linkIssue = 1\n', COMPONENT],
-  ])('allows %s', async (_name, code, file) => {
+  it.each(ALLOWED_WORD_CASES)('allows %s', async (_name, code, file) => {
     expect(await rulesHit(code, file)).toEqual([])
   })
 })

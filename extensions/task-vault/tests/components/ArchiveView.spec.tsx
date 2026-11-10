@@ -34,12 +34,14 @@ beforeEach(() => {
 
 afterEach(() => cleanup())
 
-describe('ArchiveView sections', () => {
+describe('ArchiveView heading', () => {
   it('is headed Archive, the name the sidebar gives it', async () => {
     render(<ArchiveView />)
     expect(await screen.findByRole('heading', { name: 'Archive' })).toBeTruthy()
   })
+})
 
+describe('ArchiveView sections', () => {
   it('names each section with its count and opens on completed tasks', async () => {
     render(<ArchiveView />)
     const tasks = await screen.findByRole('tab', { name: 'Completed tasks, 0' })

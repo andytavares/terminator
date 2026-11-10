@@ -130,9 +130,9 @@ describe('SessionLinkDialog — says where to connect a tracker when none is', (
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     await user.click(screen.getByRole('button', { name: 'pick NW-88' }))
     await user.click(screen.getByRole('button', { name: 'clear pick' }))
-    expect((screen.getByRole('button', { name: 'Link ticket' }) as HTMLButtonElement).disabled).toBe(
-      true
-    )
+    expect(
+      (screen.getByRole('button', { name: 'Link ticket' }) as HTMLButtonElement).disabled
+    ).toBe(true)
   })
 })
 
