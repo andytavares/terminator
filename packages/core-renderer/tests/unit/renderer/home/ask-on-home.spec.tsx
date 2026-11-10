@@ -11,6 +11,7 @@ import { useTaskStore } from '../../../../src/stores/task.store'
 import { useHomeFeedStore } from '../../../../src/stores/home-feed.store'
 import { useSettingsStore } from '../../../../src/stores/settings.store'
 import { defaultGlobalSettings } from '../../../../../core-shared/src/settings-defaults'
+import type { HomeAsk } from '../../../../../core-shared/src/schemas/home-feed.schema'
 import type { HomeLayout } from '../../../../../core-shared/src/schemas/settings.schema'
 import type { Task } from '../../../../../core-shared/src/schemas/tasks.schema'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
@@ -122,5 +123,64 @@ describe('A numbered question in one lane of a task', () => {
     screenSettles('api-gateway', ['answered-1'])
     expect(screen.queryByRole('region', { name: 'Needs you' })).toBeNull()
     expect(screen.getByText('Nothing needs you.')).toBeTruthy()
+  })
+})
+
+/** An alert from the api-gateway terminal, as main publishes it to the Home feed. */
+function raiseAlert(patch: Partial<HomeAsk>): void {
+  useHomeFeedStore.setState({
+    asks: [
+      {
+        source: 'claude-alerts',
+        id: 'alert-1',
+        kind: 'decide',
+        title: 'Agent says',
+        detail: '',
+        facts: [],
+        workKey: null,
+        since: new Date().toISOString(),
+        actions: [],
+        open: { command: 'core:reveal-session', args: { sessionId: 'api-gateway' } },
+        ...patch,
+      },
+    ],
+  })
+}
+
+describe('An alert a Claude terminal raised with a Reply button', () => {
+  // Needs you opens the selected answer row, so the reply field is already showing.
+  it("shows that terminal's screen beside the reply field, and sending types the reply into it", async () => {
+    useLayout('tasks')
+    const user = userEvent.setup()
+    screenRows = ['Tests pass. Ship it?']
+    raiseAlert({
+      kind: 'answer',
+      detail: 'Tests pass. Ship it?',
+      actions: [{ id: 'reply', label: 'Reply' }],
+    })
+    render(<HomeScreen />)
+
+    const needsYou = await screen.findByRole('region', { name: 'Needs you' })
+    expect(within(needsYou).getByLabelText('Terminal excerpt').textContent).toBe(
+      'Tests pass. Ship it?'
+    )
+    await user.type(
+      within(needsYou).getByRole('textbox', { name: 'Reply in your own words' }),
+      'yes{Enter}'
+    )
+
+    expect(input).toHaveBeenCalledWith('api-gateway', '\x1b[200~yes\x1b[201~\r')
+  })
+})
+
+describe('An alert with a long detail', () => {
+  it('shows its whole detail in the row', async () => {
+    useLayout('tasks')
+    const detail = `${'The migration touched forty tables. '.repeat(12)}Review before merging.`
+    raiseAlert({ detail })
+    render(<HomeScreen />)
+
+    const needsYou = await screen.findByRole('region', { name: 'Needs you' })
+    expect(within(needsYou).getByText(detail)).toBeTruthy()
   })
 })

@@ -2,6 +2,7 @@ import React from 'react'
 import {
   CircleCheck,
   CircleX,
+  ExternalLink,
   Eye,
   Flag,
   ListTodo,
@@ -185,6 +186,7 @@ function AskRowActions({
             key={action.id}
             size="sm"
             variant={quiet ? 'ghost' : 'secondary'}
+            icon={action.url ? ExternalLink : undefined}
             onClick={() => handlers.act(ask, action.id)}
           >
             {choice && <Kbd>{choice[1]}</Kbd>}

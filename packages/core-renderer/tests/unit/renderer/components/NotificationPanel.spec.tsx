@@ -141,21 +141,8 @@ describe('NotificationPanel — "Mark all read" button marks all notifications a
   })
 })
 
-describe('NotificationPanel — renders action buttons and calls triggerAction on click', () => {
+describe('NotificationPanel — source badge', () => {
   setUpNotificationPanel()
-
-  it('renders action buttons and calls triggerAction on click', async () => {
-    const user = userEvent.setup()
-    const n = makeNotif({
-      id: 'n-action',
-      actions: [{ id: 'do-it', label: 'Do it' }],
-    })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
-    render(<NotificationPanel />)
-    const actionBtn = screen.getByText('Do it')
-    await user.click(actionBtn)
-    expect(mockTriggerAction).toHaveBeenCalledWith('n-action', 'do-it')
-  })
 
   it.each([
     ['task-vault', 1],
@@ -165,6 +152,22 @@ describe('NotificationPanel — renders action buttons and calls triggerAction o
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
     expect(screen.queryAllByText(source)).toHaveLength(badges)
+  })
+})
+
+describe('NotificationPanel — action buttons come from the design system', () => {
+  setUpNotificationPanel()
+
+  it('draws each action as a design-system button that runs it and settles the row', async () => {
+    const user = userEvent.setup()
+    const n = makeNotif({ id: 'n-alert', actions: [{ id: 'action-0', label: 'Open PR' }] })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+    render(<NotificationPanel />)
+    const button = screen.getByRole('button', { name: 'Open PR' })
+    expect(button.classList).toContain('tmui-button')
+    await user.click(button)
+    expect(mockTriggerAction).toHaveBeenCalledWith('n-alert', 'action-0')
+    await eventually(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
   })
 })
 
