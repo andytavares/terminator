@@ -87,6 +87,34 @@ describe('core renderer text', () => {
   })
 })
 
+describe('one word per action', () => {
+  const COMPONENT = 'packages/core-renderer/src/components/Case.tsx'
+  const EXTENSION = 'extensions/task-vault/src/components/Case.tsx'
+
+  it.each([
+    ['visible text', 'export const A = () => <b>Done today: 3</b>\n', COMPONENT],
+    ['a menu label', "export const m = [{ label: 'Undo done' }]\n", COMPONENT],
+    ['a ticket link', "export const m = [{ label: 'Link issue…' }]\n", COMPONENT],
+    ['a tooltip', 'export const A = () => <button title="Complete" />\n', EXTENSION],
+    ['an accessible name', 'export const A = () => <button aria-label="Unarchive" />\n', EXTENSION],
+    [
+      'a conditional label',
+      "export const A = (on: boolean) => <b>{on ? 'Unarchive' : 'Archive'}</b>\n",
+      EXTENSION,
+    ],
+  ])('rejects a retired word in %s', async (_name, code, file) => {
+    expect(await rulesHit(code, file)).toEqual(['terminator/restricted-syntax'])
+  })
+
+  it.each([
+    ['Dismiss on a notification', "export const m = [{ label: 'Dismiss' }]\n", COMPONENT],
+    ['the one word', "export const m = [{ label: 'Settle' }]\n", COMPONENT],
+    ['an identifier', 'export const linkIssue = 1\n', COMPONENT],
+  ])('allows %s', async (_name, code, file) => {
+    expect(await rulesHit(code, file)).toEqual([])
+  })
+})
+
 describe('inline style colours', () => {
   it('rejects a hex colour in a style prop', async () => {
     const code = "export const A = () => <p style={{ color: '#fff' }} />\n"

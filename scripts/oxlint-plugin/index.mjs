@@ -97,6 +97,19 @@ const BRANCH_NOT_PROJECT = [
   },
 ]
 
+// One word per action, on every screen (ADR 157): Settle, Restore, Mark done, Archive, Link ticket.
+const RETIRED_WORDS =
+  '/\\b(?:Done today|Undo done|Restore to open|Unarchive|Complete|Link issue|Change linked issue)\\b/'
+const RETIRED_WORDS_MESSAGE =
+  'Each action has one word on every screen (ADR 157): Settle takes work off the list until it moves, Restore brings it back, Mark done finishes a task, Archive puts one away, Link ticket links a ticket. Dismiss stays only for notifications, toasts, alerts and findings that go for good.'
+
+const WORK_VOCABULARY = [
+  `JSXText[value=${RETIRED_WORDS}]`,
+  `Property[key.name='label'] > Literal[value=${RETIRED_WORDS}]`,
+  `JSXAttribute[name.name=/^(placeholder|title|aria-label|label)$/] > Literal[value=${RETIRED_WORDS}]`,
+  `JSXExpressionContainer > ConditionalExpression > Literal[value=${RETIRED_WORDS}]`,
+].map((selector) => ({ selector, message: RETIRED_WORDS_MESSAGE }))
+
 const VOCABULARY = '/\\b(?:vault|[Aa]rtifacts?|[Ss]talls?|ngrok)\\b/'
 const VOCABULARY_MESSAGE =
   'Extension UI says what the reader sees, not how it is stored or which vendor is behind it (docs/EXTENSION-STYLE.md): notes are saved, not "saved to vault"; a phase writes files, it does not produce "Artifacts"; a run is stuck, not a "Stall"; the address is public, the vendor is ngrok\'s business. Identifiers, IPC channels and class names keep whatever name they have — this rule only reads text, labels, placeholders, tooltips and accessible names.'
@@ -137,6 +150,7 @@ const GROUPS = {
   'pure-layer-clock': PURE_LAYER_CLOCK,
   'spec-signals': SPEC_SIGNALS,
   'branch-not-project': BRANCH_NOT_PROJECT,
+  'work-vocabulary': WORK_VOCABULARY,
   'extension-ui': EXTENSION_UI,
 }
 

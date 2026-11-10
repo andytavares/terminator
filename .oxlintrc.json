@@ -541,7 +541,9 @@
     },
     {
       "files": ["packages/core-renderer/src/home/*.ts"],
-      "excludeFiles": ["packages/core-renderer/src/home/{dismissals,focus-store,local-storage,work-marks}.ts"],
+      "excludeFiles": [
+        "packages/core-renderer/src/home/{dismissals,focus-store,local-storage,work-marks}.ts"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -561,13 +563,13 @@
     {
       "files": ["packages/core-renderer/src/components/**/*.tsx"],
       "rules": {
-        "terminator/restricted-syntax": ["error", "branch-not-project"]
+        "terminator/restricted-syntax": ["error", "branch-not-project", "work-vocabulary"]
       }
     },
     {
       "files": ["extensions/*/src/**/*.tsx", "packages/extension-ui/src/**/*.tsx"],
       "rules": {
-        "terminator/restricted-syntax": ["error", "extension-ui"]
+        "terminator/restricted-syntax": ["error", "extension-ui", "work-vocabulary"]
       }
     }
   ]
