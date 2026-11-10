@@ -132,7 +132,7 @@ function viewSwitchTests() {
     ['Inbox', 'inbox'],
     ['Projects', 'projects'],
     ['Areas', 'areas'],
-    ['History', 'archive'],
+    ['Archive', 'archive'],
   ])('shows the %s view when its sidebar button is pressed', async (label, id) => {
     const user = userEvent.setup()
     await renderVaultView()

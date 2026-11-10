@@ -184,7 +184,7 @@ async function diagramRetired(): Promise<void> {
   expect((await storedDiagram()).archivedAt).toBeTruthy()
   await notepad.getByRole('button', { name: 'Archived (1)' }).click()
 
-  await rowMenu(notepad, 'System architecture', 'Unarchive')
+  await rowMenu(notepad, 'System architecture', 'Restore')
   await expect(notepad.getByRole('button', { name: /^Archived/ })).toHaveCount(0)
   expect((await storedDiagram()).archivedAt).toBeNull()
 

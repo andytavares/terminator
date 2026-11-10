@@ -75,7 +75,7 @@ export function KeyHints({ expanded }: { expanded: boolean }): React.JSX.Element
   return (
     <span className="move__hint">
       <Kbd>J</Kbd>
-      <Kbd>K</Kbd> move <Kbd>↵</Kbd> open <Kbd>E</Kbd> done <Kbd>H</Kbd> snooze
+      <Kbd>K</Kbd> move <Kbd>↵</Kbd> open <Kbd>E</Kbd> settle <Kbd>H</Kbd> snooze
     </span>
   )
 }
@@ -89,7 +89,7 @@ function MoveFooter({ snoozed, doneToday }: Pick<DeskState, 'snoozed' | 'doneTod
           {snoozed.count} snoozed until {untilLabel(snoozed.until)}
         </span>
       )}
-      <span>Done today: {doneToday}</span>
+      <span>Settled today: {doneToday}</span>
     </footer>
   )
 }

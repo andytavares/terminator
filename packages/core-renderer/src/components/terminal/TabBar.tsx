@@ -550,7 +550,7 @@ function issueItems(input: IssueItemsInput): ContextMenuItem[] {
   const { facts, sessionId, menus, then } = input
   const hasLink = ownLinkKey(facts) !== null
   const link: ContextMenuItem = {
-    label: hasLink ? 'Change linked issue…' : 'Link issue…',
+    label: hasLink ? 'Change linked ticket…' : 'Link ticket…',
     separatorBefore: true,
     onSelect: then(() => menus.setLinkSessionId(sessionId)),
   }

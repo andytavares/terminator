@@ -54,7 +54,7 @@ function linkActions({ selected, busy, commit }: LinkCommit, onClose: () => void
   return [
     { label: 'Cancel', onSelect: onClose },
     {
-      label: busy ? 'Linking…' : selected === null ? 'Link issue' : `Link ${selected.key}`,
+      label: busy ? 'Linking…' : selected === null ? 'Link ticket' : `Link ${selected.key}`,
       tone: 'primary',
       disabled: selected === null || busy,
       onSelect: commit,

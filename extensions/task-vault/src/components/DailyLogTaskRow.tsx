@@ -430,7 +430,7 @@ function FinishedActions({ row }: RowProps): React.JSX.Element {
       {(status === 'done' || removable) && (
         <IconButton
           icon={RotateCcw}
-          label="Restore to open"
+          label="Restore"
           onClick={() => void row.commands.restore()}
         />
       )}

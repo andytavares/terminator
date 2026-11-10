@@ -176,7 +176,7 @@ function LookBackRow(props: LookBackRowProps): React.JSX.Element {
 }
 
 const dismissAsk = (ask: Sourced<HomeAsk>) => ({
-  label: `Dismiss ${ask.detail}`,
+  label: `Settle ${ask.detail}`,
   run: () => useDismissalsStore.getState().markDone(ask.id),
 })
 

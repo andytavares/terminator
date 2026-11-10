@@ -7,7 +7,7 @@ const NAV_ITEMS: Array<{ view: VaultView; label: string; icon: React.ReactNode }
   { view: 'inbox', label: 'Inbox', icon: <Inbox className="tm-icon-lg" /> },
   { view: 'projects', label: 'Projects', icon: <FolderOpen className="tm-icon-lg" /> },
   { view: 'areas', label: 'Areas', icon: <Layers className="tm-icon-lg" /> },
-  { view: 'archive', label: 'History', icon: <Archive className="tm-icon-lg" /> },
+  { view: 'archive', label: 'Archive', icon: <Archive className="tm-icon-lg" /> },
 ]
 
 export function VaultSidebar(): React.JSX.Element {

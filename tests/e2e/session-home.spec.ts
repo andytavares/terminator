@@ -70,7 +70,7 @@ async function descriptionNamesTheWork(page: Page): Promise<void> {
 
 async function openLinkDialog(page: Page): Promise<Locator> {
   await selectProject(page, 'Repo One', BRANCH)
-  await tabMenuItem(page, 'Link issue…')
+  await tabMenuItem(page, 'Link ticket…')
   return page.getByRole('dialog', { name: 'Link a work item' })
 }
 

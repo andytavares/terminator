@@ -146,7 +146,7 @@ describe('LinkIssueDialog — linking', () => {
   it('cannot link until something is picked', async () => {
     open()
     await screen.findByText('TAV-42')
-    expect((screen.getByText('Link issue') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByText('Link ticket') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('names the issue on the button once picked', async () => {

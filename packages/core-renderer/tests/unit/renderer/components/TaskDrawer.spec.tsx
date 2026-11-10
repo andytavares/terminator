@@ -6,7 +6,7 @@ import { ThreadDrawer } from '../../../../src/components/home/ThreadDrawer'
 import { useDeskSelection } from '../../../../src/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/stores/task.store'
 import { useParkedThreads } from '../../../../src/components/home/parked-threads'
-import { useDismissedThreads } from '../../../../src/components/home/dismissed-threads'
+import { useWorkMarks } from '../../../../src/home/work-marks'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
 import { FACTS, REPO_ROOT, seedDesk } from '../home/desk-world'
 import { task } from '../home/fixtures'
@@ -55,7 +55,7 @@ beforeEach(() => {
   seedDesk()
   useDeskSelection.setState({ selectedThreadKey: null, openThreadKey: null, groupBy: 'move' })
   useParkedThreads.setState({ keys: [] })
-  useDismissedThreads.setState({ dismissed: {} })
+  useWorkMarks.setState({ settled: {} })
   installElectronApi({
     homeThreadSummary: {
       get: vi.fn().mockResolvedValue({ text: 'Two agents.', generatedAt: 'now' }),
@@ -104,7 +104,7 @@ describe('the task drawer — lanes', () => {
 })
 
 describe('the task drawer — task actions', () => {
-  it.each(['Open all lanes', 'Link a ticket', 'Rename', 'Mark done', 'Archive'])(
+  it.each(['Open all lanes', 'Link ticket…', 'Rename', 'Mark done', 'Archive'])(
     'offers the task action %s',
     (name) => {
       const drawer = within(openTask())
@@ -119,11 +119,11 @@ describe('the task drawer — task actions', () => {
     expect(spies.open.mock.calls.map(([id]) => id).sort()).toEqual(['asking', 'building'])
   })
 
-  it('swaps Mark done for Undo done once the task is done', async () => {
+  it('swaps Mark done for Restore once the task is done', async () => {
     const user = userEvent.setup()
     const drawer = within(openTask())
     await user.click(drawer.getByRole('button', { name: 'Mark done' }))
-    await drawer.findByRole('button', { name: 'Undo done' })
+    await drawer.findByRole('button', { name: 'Restore' })
     expect(drawer.queryByRole('button', { name: 'Mark done' })).toBeNull()
   })
 })

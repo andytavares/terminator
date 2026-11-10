@@ -68,7 +68,7 @@ function archiveTasksRestoringAndDeletingTests() {
     const user = userEvent.setup()
     render(<ArchiveView />)
     await screen.findByText('Completed (1)')
-    await user.click(screen.getAllByRole('button', { name: 'Restore to open' })[0])
+    await user.click(screen.getAllByRole('button', { name: 'Restore' })[0])
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:restore-task')).toEqual([{ taskId: 'd1' }])
     )

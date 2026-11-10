@@ -278,7 +278,7 @@ function finishedTests() {
       onSelectTask: vi.fn(),
     })
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
-    await user.click(buttonNamed('Restore to open'))
+    await user.click(buttonNamed('Restore'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:reopen-task')).toEqual([{ taskId: 't1' }])
     expect(lastNotice()?.slice(0, 2)).toEqual(['info', 'Reopened: Write'])

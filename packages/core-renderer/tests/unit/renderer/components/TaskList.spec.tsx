@@ -4,12 +4,12 @@ import { render, screen, fireEvent, within, waitFor, act } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { TaskList } from '../../../../src/components/home/TaskList'
 import { ArchivedTasks } from '../../../../src/components/home/ArchivedTasks'
-import { DismissedTasks } from '../../../../src/components/home/DismissedTasks'
+import { SettledTasks } from '../../../../src/components/home/SettledTasks'
 import { taskKeyOf } from '../../../../src/home/task-lanes'
 import { useDeskSelection } from '../../../../src/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/stores/task.store'
 import { useParkedThreads } from '../../../../src/components/home/parked-threads'
-import { useDismissedThreads } from '../../../../src/components/home/dismissed-threads'
+import { useWorkMarks } from '../../../../src/home/work-marks'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
 import { FACTS, REPO_ROOT, seedDesk } from '../home/desk-world'
 import { task } from '../home/fixtures'
@@ -71,7 +71,7 @@ beforeEach(() => {
     expandedGroupIds: [],
   })
   useParkedThreads.setState({ keys: [] })
-  useDismissedThreads.setState({ dismissed: {} })
+  useWorkMarks.setState({ settled: {} })
   useTaskStore.setState({ tasks: [] })
   installElectronApi({})
 })
@@ -309,7 +309,7 @@ describe('ArchivedTasks', () => {
   })
 })
 
-describe('DismissedTasks', () => {
+describe('SettledTasks', () => {
   const dismissedTask = task({
     title: 'Flaky probe',
     lanes: [{ repoRoot: REPO_ROOT, branch: 'probe' }],
@@ -318,29 +318,29 @@ describe('DismissedTasks', () => {
   it('lists a dismissed task and brings it back to the list when Restore is pressed', async () => {
     const user = userEvent.setup()
     useWritableTasks([dismissedTask])
-    useDismissedThreads.getState().dismiss(taskKeyOf(dismissedTask.id), Date.now(), false)
+    useWorkMarks.getState().settle(taskKeyOf(dismissedTask.id), Date.now())
     render(
       <>
         <TaskList />
-        <DismissedTasks />
+        <SettledTasks />
       </>
     )
     expect(screen.queryByRole('button', { name: 'Flaky probe' })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Dismissed (1)' }))
+    await user.click(screen.getByRole('button', { name: 'Settled (1)' }))
     await user.click(screen.getByRole('button', { name: 'Restore Flaky probe' }))
-    await screen.findByRole('button', { name: 'Dismissed (0)' })
+    await screen.findByRole('button', { name: 'Settled (0)' })
     expect(groupHeadings()).toContain('Quiet · 2')
   })
 })
 
 describe('ArchivedTasks — done tasks', () => {
-  it('lists a done task and takes it out of the list when Undo done is pressed', async () => {
+  it('lists a done task and takes it out of the list when Restore is pressed', async () => {
     const user = userEvent.setup()
     const finished = task({ title: 'Shipped spike', doneAt: '2026-10-02T09:00:00.000Z' })
     useWritableTasks([finished])
     render(<ArchivedTasks />)
     await user.click(screen.getByRole('button', { name: 'Archived tasks (1)' }))
-    await user.click(screen.getByRole('button', { name: 'Undo done Shipped spike' }))
+    await user.click(screen.getByRole('button', { name: 'Restore Shipped spike' }))
     await screen.findByRole('button', { name: 'Archived tasks (0)' })
   })
 })

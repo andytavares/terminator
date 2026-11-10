@@ -141,14 +141,14 @@ function TaskActionButtons({ thread, onRename, onLink }: ActionButtonsProps): Re
       </Button>
       {onLink && (
         <Button size="sm" onClick={onLink}>
-          Link a ticket
+          Link ticket…
         </Button>
       )}
       <Button size="sm" onClick={onRename}>
         Rename
       </Button>
       <Button size="sm" onClick={() => void toggleDone(thread)}>
-        {thread.doneAt === null ? 'Mark done' : 'Undo done'}
+        {thread.doneAt === null ? 'Mark done' : 'Restore'}
       </Button>
       <Button size="sm" variant="ghost" onClick={() => toggleArchived(thread)}>
         {thread.archived ? 'Restore' : 'Archive'}

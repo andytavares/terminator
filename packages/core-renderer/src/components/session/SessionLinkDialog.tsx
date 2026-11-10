@@ -92,7 +92,7 @@ function linkActions(
     ...(own ? [{ label: 'Remove session link', disabled: busy, onSelect: () => write(null) }] : []),
     { label: 'Cancel', onSelect: onClose },
     {
-      label: selected === null ? 'Link issue' : `Link ${selected.key}`,
+      label: selected === null ? 'Link ticket' : `Link ${selected.key}`,
       tone: 'primary',
       disabled: selected === null || busy,
       onSelect: () =>

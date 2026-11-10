@@ -119,7 +119,7 @@ const issueRows = (page: Page) => page.locator('.link-issue__row .link-issue__ke
 async function openIssueLinkDialog(): Promise<Page> {
   const { page } = handle
   await projectGroup(page, BRANCH).click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Link issue…' }).click()
+  await page.getByRole('menuitem', { name: 'Link ticket…' }).click()
   await expect(linkDialog(page)).toBeVisible()
   return page
 }

@@ -549,7 +549,7 @@ function AreaTaskRow(props: TaskRowProps): React.JSX.Element {
       <button
         className="daily-log__task-checkbox"
         onClick={() => void (done ? tasks.restore(task.id) : tasks.complete(task.id))}
-        title={done ? 'Restore' : 'Complete'}
+        title={done ? 'Restore' : 'Mark done'}
       >
         <TaskStatusIcon status={task.status} />
       </button>
