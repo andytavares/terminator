@@ -114,7 +114,7 @@ describe('createAlerts, dismissing and refusing', () => {
 const pr = 'https://github.com/acme/shop/pull/7'
 const openOrDone = [
   { label: 'Open PR', url: pr, primary: true },
-  { label: 'Done', dismiss: true },
+  { label: 'Open and close', url: pr, dismiss: true },
 ]
 
 describe('createAlerts, buttons', () => {
@@ -123,7 +123,7 @@ describe('createAlerts, buttons', () => {
     store.receive({ title: 'PR ready', actions: openOrDone }, 'Claude · shop')
     expect(asks()[0].actions).toEqual([
       { id: 'action-0', label: 'Open PR', primary: true, url: pr, dismiss: false },
-      { id: 'action-1', label: 'Done', dismiss: true },
+      { id: 'action-1', label: 'Open and close', url: pr, dismiss: true },
       { id: 'dismiss', label: 'Dismiss', primary: false },
     ])
   })
@@ -194,11 +194,24 @@ describe('createAlerts, Reply', () => {
 })
 
 describe('createAlerts, buttons that dismiss', () => {
+  it('drops a button that only dismisses, so Dismiss shows once', () => {
+    const { store, asks } = alerts()
+    const actions = [
+      { label: 'Open PR', url: pr, primary: true },
+      { label: 'Dismiss', dismiss: true },
+    ]
+    store.receive({ title: 'PR ready', actions }, 'Claude · shop')
+    expect(asks()[0].actions).toEqual([
+      { id: 'action-0', label: 'Open PR', primary: true, url: pr, dismiss: false },
+      { id: 'dismiss', label: 'Dismiss', primary: false },
+    ])
+  })
+
   it('removes the alert when a dismissing button is pressed, and keeps it for a link button', () => {
     const { store, asks } = alerts()
     const actions = [
       { label: 'Open PR', url: pr },
-      { label: 'Done', dismiss: true },
+      { label: 'Open and close', url: pr, dismiss: true },
     ]
     store.receive({ title: 'PR ready', actions }, 'Claude · shop')
     store.act(asks()[0].id, 'action-0')
