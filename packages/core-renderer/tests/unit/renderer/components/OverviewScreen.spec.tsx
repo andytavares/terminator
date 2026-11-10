@@ -20,7 +20,7 @@ vi.mock('../../../../src/components/home/useWorkThreads', () => ({
     threads: state.threads,
     groups: [],
     allThreads: state.threads,
-    dismissedThreads: [],
+    settledThreads: [],
   }),
 }))
 vi.mock('../../../../src/components/session/LivePreview', () => ({

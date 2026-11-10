@@ -7,7 +7,7 @@ import { useDeskSelection } from '../../../../src/components/home/desk-selection
 import { useTaskStore } from '../../../../src/stores/task.store'
 import { useWorkspaceStore } from '../../../../src/stores/workspace.store'
 import { useParkedThreads } from '../../../../src/components/home/parked-threads'
-import { useDismissedThreads } from '../../../../src/components/home/dismissed-threads'
+import { useWorkMarks } from '../../../../src/home/work-marks'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
 import { FACTS, REPO_ROOT, seedDesk } from '../home/desk-world'
 import { task } from '../home/fixtures'
@@ -92,7 +92,7 @@ beforeEach(() => {
   seedWorkspaces()
   useDeskSelection.setState({ selectedThreadKey: null, openThreadKey: null, groupBy: 'move' })
   useParkedThreads.setState({ keys: [] })
-  useDismissedThreads.setState({ dismissed: {} })
+  useWorkMarks.setState({ settled: {} })
   installApi()
   launched.inBranch.mockResolvedValue('s-new')
   launched.createFromDraft.mockResolvedValue('p-new')

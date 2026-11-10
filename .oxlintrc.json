@@ -541,7 +541,7 @@
     },
     {
       "files": ["packages/core-renderer/src/home/*.ts"],
-      "excludeFiles": ["packages/core-renderer/src/home/{dismissals,focus-store,local-storage}.ts"],
+      "excludeFiles": ["packages/core-renderer/src/home/{dismissals,focus-store,local-storage,work-marks}.ts"],
       "rules": {
         "no-restricted-imports": [
           "error",

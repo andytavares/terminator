@@ -13,7 +13,7 @@ import {
 } from '../../terminal/start-session'
 import { openSnapshot } from '../../sidebar/session-facts'
 import { createFromDraft } from '../sidebar/create-project'
-import { useDismissedThreads } from './dismissed-threads'
+import { useWorkMarks } from '../../home/work-marks'
 import { workKeyId } from '../../home/work-threads'
 import { promptBranch, semanticBranch } from '../../../../core-shared/src/home/branch-name'
 import type { IssueSummary, Workspace } from '../../../../core-shared/src/types/index'
@@ -308,7 +308,7 @@ async function linkTicket(sessionId: string, issue: IssueSummary): Promise<void>
   await useSessionRecordsStore.getState().setLink(openSnapshot(session, project, workspace), ref)
 }
 
-/** Starting work on purpose undoes an earlier dismissal of it. Prompts have no thread to restore. */
+/** Starting work on purpose brings it back from Settled. Prompts have no thread to restore. */
 function restoreStarted(request: WorkRequest): void {
   const { folderPath } = request.workspace
   if (request.kind === 'prompt') return
@@ -316,7 +316,7 @@ function restoreStarted(request: WorkRequest): void {
     request.kind === 'ticket'
       ? workKeyId({ tracker: request.issue.tracker, key: request.issue.key })
       : workKeyId({ repoRoot: folderPath, branch: request.branch })
-  useDismissedThreads.getState().restore(key)
+  useWorkMarks.getState().restore(key)
 }
 
 /** Does the work. Null when it started; otherwise what to tell the person, in plain words. */

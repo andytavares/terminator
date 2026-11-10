@@ -101,7 +101,7 @@ export const FACETS = [
     whoseMove: 'others',
     tone: 'good',
     line: '#271 checks passed',
-    updatedAt: new Date(NOW - 25 * HOUR).toISOString(),
+    updatedAt: new Date(NOW - 23 * HOUR).toISOString(),
   }),
 ]
 

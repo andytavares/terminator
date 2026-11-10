@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { AlarmClock, Check, ChevronRight, Pin, Plus } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
@@ -13,10 +13,9 @@ import { compactAge } from '../home/thread-format'
 import { StateGlyph } from '../home/StateGlyph'
 import { SnoozeMenu } from '../home/SnoozeMenu'
 import { SidebarSearch } from './SidebarSearch'
-import { useInboxMarks } from './inbox-marks'
-import { filterInbox, inboxSections, wokenKeys, type InboxFilter } from './inbox'
+import { useWorkMarks } from '../../home/work-marks'
+import { filterInbox, inboxSections, type InboxFilter } from './inbox'
 import type { WorkThread } from '../../home/work-threads'
-import type { TaskState } from '../../home/task-state'
 import './InboxSidebar.css'
 
 const MINUTE_MS = 60_000
@@ -38,7 +37,7 @@ export function InboxSidebar({ now }: { now?: number }): React.JSX.Element {
   )
   const shown = useMemo(() => threads.filter((t) => !t.archived), [threads])
   useEffect(() => {
-    useInboxMarks.getState().forgetGone(new Set(allThreads.map((t) => t.key)), Date.now())
+    useWorkMarks.getState().forgetGone(new Set(allThreads.map((t) => t.key)), Date.now())
   }, [allThreads])
   return <InboxList threads={shown} now={now ?? clock} repos={repos} />
 }
@@ -53,8 +52,7 @@ interface InboxListProps {
  * @internal */
 export function InboxList({ threads, now, repos }: InboxListProps): React.JSX.Element {
   const [filter, setFilter] = useState<InboxFilter>({ text: '', repoRoot: null })
-  const marks = useInboxMarks()
-  useWakeOnActivity(threads)
+  const marks = useWorkMarks()
   const { cards, settled } = inboxSections(filterInbox(threads, filter), marks, now)
   return (
     <div className="inbox" onKeyDown={moveBetweenCards}>
@@ -79,16 +77,6 @@ export function InboxList({ threads, now, repos }: InboxListProps): React.JSX.El
 
 const emptyText = (filter: InboxFilter): string =>
   filter.text || filter.repoRoot ? 'No work matches' : 'Nothing needs you'
-
-/** Wakes settled threads whose agent ended a turn or started asking since the last render. */
-function useWakeOnActivity(threads: readonly WorkThread[]): void {
-  const before = useRef<Map<string, TaskState>>(new Map())
-  useEffect(() => {
-    const woken = wokenKeys(before.current, threads)
-    if (woken.length > 0) useInboxMarks.getState().wake(woken)
-    before.current = new Map(threads.map((t) => [t.key, t.state]))
-  }, [threads])
-}
 
 /** Arrow keys move between cards, and from the search field onto the first one. Keys from
  * anything else (the Repo select, a Snooze menu) are theirs. */
@@ -192,7 +180,7 @@ function SnoozeButton({ threadKey, now }: { threadKey: string; now: number }) {
           now={now}
           onPick={(until) => {
             setSnoozing(false)
-            useInboxMarks.getState().snooze(threadKey, until)
+            useWorkMarks.getState().snooze(threadKey, until)
           }}
           onClose={() => setSnoozing(false)}
         />
@@ -202,7 +190,7 @@ function SnoozeButton({ threadKey, now }: { threadKey: string; now: number }) {
 }
 
 function CardActions({ thread, now, pinned, settled }: CardProps): React.JSX.Element {
-  const marks = useInboxMarks.getState
+  const marks = useWorkMarks.getState
   return (
     <div className="inbox-card__actions">
       <IconButton

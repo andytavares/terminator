@@ -9,7 +9,7 @@ vi.mock('../../../../src/components/home/useWorkThreads', () => ({
     threads: [],
     groups: [],
     allThreads: threads.all,
-    dismissedThreads: [],
+    settledThreads: [],
   }),
 }))
 vi.mock('../../../../src/terminal/start-session', () => ({ resumeSession }))

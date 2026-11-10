@@ -6,7 +6,7 @@ import { InFlight } from '../../../../src/components/home/InFlight'
 import { useDeskSelection } from '../../../../src/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/stores/task.store'
 import { useParkedThreads } from '../../../../src/components/home/parked-threads'
-import { useDismissedThreads } from '../../../../src/components/home/dismissed-threads'
+import { useWorkMarks } from '../../../../src/home/work-marks'
 import { useAddToTaskStore } from '../../../../src/components/tasks/add-to-task'
 import { useToastStore } from '../../../../src/stores/toast.store'
 import { ToastContainer } from '../../../../src/components/ToastContainer'
@@ -88,7 +88,7 @@ function resetDesk(): void {
   useDeskSelection.setState({ expandedGroupIds: [] })
   useParkedThreads.setState({ keys: [] })
   useTaskStore.setState({ tasks: [] })
-  useDismissedThreads.setState({ dismissed: {}, deletesSessions: {} })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
   // Change stats are cached per project; a test that mocks other stats must not leak them.
   useChangeStatsStore.setState({ entries: new Map() })
 }
@@ -133,8 +133,8 @@ describe('In flight rows', () => {
     expect(building.getByText('tav-20')).toBeTruthy()
     expect(building.getByText('Running')).toBeTruthy()
     const waiting = within(inFlightRowNamed('Make all text in the app scale with settings'))
-    expect(waiting.getByText('Waiting on others · 1 day')).toBeTruthy()
-    expect(waiting.getByText('1 d')).toBeTruthy()
+    expect(waiting.getByText('Waiting on others · 23 hours')).toBeTruthy()
+    expect(waiting.getByText('23 h')).toBeTruthy()
   })
 })
 
@@ -351,7 +351,7 @@ const TICKETED_MENU = [
   'Rename…',
   'Add to task…',
   'Archive',
-  'Dismiss',
+  'Settle',
   'Close sessions',
   'Remove worktree…',
 ]
@@ -360,7 +360,7 @@ const SCRATCH_MENU = [
   'Rename…',
   'Link ticket…',
   'Archive',
-  'Dismiss',
+  'Settle',
   'Close sessions',
 ]
 
@@ -384,7 +384,7 @@ describe('the row menu — which items', () => {
     render(<InFlight />)
     const row = inFlightRowNamed('Make all text in the app scale with settings')
     await user.click(within(row).getByRole('button', { name: 'Work actions' }))
-    expect(contextMenuItemNames()).toEqual(['Add to task…', 'Archive', 'Dismiss'])
+    expect(contextMenuItemNames()).toEqual(['Add to task…', 'Archive', 'Settle'])
     expect(
       screen.queryByRole('dialog', { name: 'Make all text in the app scale with settings' })
     ).toBeNull()
@@ -461,7 +461,7 @@ const parkViaMenu = async (user: User, title: string, item: string): Promise<voi
   await user.click(openMenuItem(item))
 }
 
-describe('the row menu — Archive and Dismiss', () => {
+describe('the row menu — Archive and Settle', () => {
   it('Archive takes work with no stored task out of the lists', async () => {
     const user = userEvent.setup()
     render(<InFlight />)
@@ -490,15 +490,15 @@ describe('the row menu — Archive and Dismiss', () => {
   })
 })
 
-describe('the row menu — Dismiss', () => {
-  it('Dismiss hides the row and keeps it hidden while nothing new happens', async () => {
+describe('the row menu — Settle', () => {
+  it('Settle hides the row and keeps it hidden while nothing new happens', async () => {
     const user = userEvent.setup()
     render(<InFlight />)
-    await parkViaMenu(user, 'Reproduce staging 429s before release', 'Dismiss')
+    await parkViaMenu(user, 'Reproduce staging 429s before release', 'Settle')
     expect(
       screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
     ).toBeNull()
-    expect(useDismissedThreads.getState().dismissed['linear:TAV-31']).toBeDefined()
+    expect(useWorkMarks.getState().settled['linear:TAV-31']).toBeDefined()
   })
 })
 
@@ -515,9 +515,9 @@ describe('the row menu — a dismissed thread stays gone', () => {
         <ToastContainer />
       </>
     )
-    await parkViaMenu(user, TITLE, 'Dismiss')
+    await parkViaMenu(user, TITLE, 'Settle')
     expect(rowShown()).toBe(false)
-    expect(screen.getByRole('status').textContent).toContain(`Dismissed "${TITLE}"`)
+    expect(screen.getByRole('status').textContent).toContain(`Settled "${TITLE}"`)
     spies.facts = FACTS.map((f: { sessionId: string }) =>
       f.sessionId === 'asking' ? { ...f, lastActivityAt: Date.now() + 60_000 } : f
     )
@@ -533,7 +533,7 @@ describe('the row menu — a dismissed thread stays gone', () => {
   })
 })
 
-describe('the row menu — Dismiss deletes the sessions it holds', () => {
+describe('the row menu — Settle keeps the sessions it holds', () => {
   const TITLE = 'Reproduce staging 429s before release'
   const endedOnTav31 = fact({
     sessionId: 'ended-31',
@@ -545,7 +545,7 @@ describe('the row menu — Dismiss deletes the sessions it holds', () => {
     snapshot: { ...fact().snapshot, projectId: 'p31' },
   })
 
-  it('deletes the ended session record of a dismissed row, never the live one, and the row is gone', async () => {
+  it('hides the row and deletes no session record; the retention setting handles ended ones', async () => {
     const user = userEvent.setup()
     const forget = vi.fn().mockResolvedValue({ data: true })
     installElectronApi({
@@ -558,9 +558,9 @@ describe('the row menu — Dismiss deletes the sessions it holds', () => {
     spies.facts = [...FACTS, endedOnTav31]
     render(<InFlight />)
     expect(forget).not.toHaveBeenCalled()
-    await parkViaMenu(user, TITLE, 'Dismiss')
+    await parkViaMenu(user, TITLE, 'Settle')
     expect(screen.queryByRole('button', { name: TITLE })).toBeNull()
-    expect(forget.mock.calls.map(([input]) => input)).toEqual([{ sessionId: 'ended-31' }])
+    expect(forget).not.toHaveBeenCalled()
   })
 })
 

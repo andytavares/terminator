@@ -26,7 +26,7 @@ export function task(patch: Partial<Task> = {}): Task {
     ticket: null,
     focus: false,
     doneAt: null,
-    createdAt: '2026-10-18T08:00:00.000Z',
+    createdAt: new Date().toISOString(),
     archivedAt: null,
     ...patch,
   }

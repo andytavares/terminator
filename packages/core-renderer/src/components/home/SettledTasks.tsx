@@ -1,13 +1,13 @@
 import React, { useState } from 'react'
 import { Button, Popover } from '@terminator/extension-ui'
 import { useWorkThreads } from './useWorkThreads'
-import { useDismissedThreads } from './dismissed-threads'
+import { useWorkMarks } from '../../home/work-marks'
 import { recordUse } from '../../usage/record'
 import type { WorkThread } from '../../home/work-threads'
 import './Tasks.css'
 
-function DismissedRow({ thread }: { thread: WorkThread }): React.JSX.Element {
-  const restore = useDismissedThreads((s) => s.restore)
+function SettledRow({ thread }: { thread: WorkThread }): React.JSX.Element {
+  const restore = useWorkMarks((s) => s.restore)
   return (
     <li className="archived-tasks__row">
       <span className="archived-tasks__title">{thread.title}</span>
@@ -23,15 +23,15 @@ function DismissedRow({ thread }: { thread: WorkThread }): React.JSX.Element {
   )
 }
 
-function DismissedPanel({ rows, onDismiss }: { rows: WorkThread[]; onDismiss: () => void }) {
+function SettledPanel({ rows, onDismiss }: { rows: WorkThread[]; onDismiss: () => void }) {
   return (
-    <Popover label="Dismissed" onDismiss={onDismiss} align="end" className="archived-tasks__panel">
+    <Popover label="Settled" onDismiss={onDismiss} align="end" className="archived-tasks__panel">
       {rows.length === 0 ? (
-        <p className="archived-tasks__empty">No dismissed tasks.</p>
+        <p className="archived-tasks__empty">No settled tasks.</p>
       ) : (
         <ul className="archived-tasks__list">
           {rows.map((thread) => (
-            <DismissedRow key={thread.key} thread={thread} />
+            <SettledRow key={thread.key} thread={thread} />
           ))}
         </ul>
       )}
@@ -39,9 +39,9 @@ function DismissedPanel({ rows, onDismiss }: { rows: WorkThread[]; onDismiss: ()
   )
 }
 
-/** The Home footer's "Dismissed (N)" button: the rows the operator dismissed, each with Restore. */
-export function DismissedTasks(): React.JSX.Element {
-  const rows = useWorkThreads().dismissedThreads
+/** The Home footer's "Settled (N)" button: the rows the Inbox settles, each with Restore. */
+export function SettledTasks(): React.JSX.Element {
+  const rows = useWorkThreads().settledThreads
   const [open, setOpen] = useState(false)
   return (
     <span className="archived-tasks">
@@ -49,13 +49,13 @@ export function DismissedTasks(): React.JSX.Element {
         size="sm"
         variant="ghost"
         onClick={() => {
-          if (!open) recordUse('core.home.dismissed')
+          if (!open) recordUse('core.home.settled')
           setOpen(!open)
         }}
       >
-        {`Dismissed (${rows.length})`}
+        {`Settled (${rows.length})`}
       </Button>
-      {open && <DismissedPanel rows={rows} onDismiss={() => setOpen(false)} />}
+      {open && <SettledPanel rows={rows} onDismiss={() => setOpen(false)} />}
     </span>
   )
 }

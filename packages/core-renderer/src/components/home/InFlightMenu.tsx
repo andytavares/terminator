@@ -3,7 +3,7 @@ import { Ellipsis } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { afterClosing } from '../sidebar/row-events'
-import { useDismissedThreads } from './dismissed-threads'
+import { useWorkMarks } from '../../home/work-marks'
 import { leadSessionOf, toggleArchived } from './thread-actions'
 import { toggleDone } from './task-actions'
 import { openAddToTask } from '../tasks/add-to-task'
@@ -62,20 +62,18 @@ function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): Conte
   return items
 }
 
-/** Hides the row for good and offers Undo in a toast. */
-function dismissWithUndo(thread: WorkThread): void {
-  const { dismiss, restore } = useDismissedThreads.getState()
-  // Only a row that shows Terminator sessions has sessions of its own to delete.
-  dismiss(thread.key, Date.now(), thread.sessions.length > 0)
+/** Settles the row, as the Inbox does, and offers Undo in a toast. */
+function settleWithUndo(thread: WorkThread): void {
+  useWorkMarks.getState().settle(thread.key, Date.now())
   useToastStore.getState().addToast({
     type: 'info',
-    message: `Dismissed "${thread.title}"`,
+    message: `Settled "${thread.title}"`,
     duration: 6000,
-    action: { label: 'Undo', onSelect: () => restore(thread.key) },
+    action: { label: 'Undo', onSelect: () => useWorkMarks.getState().restore(thread.key) },
   })
 }
 
-/** Archive or Restore, and Dismiss: what every row offers. */
+/** Archive or Restore, and Settle: what every row offers. */
 function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
   const done: ContextMenuItem[] =
     thread.taskId === null
@@ -95,8 +93,8 @@ function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
       onSelect: run(() => toggleArchived(thread)),
     },
     {
-      label: 'Dismiss',
-      onSelect: run(() => dismissWithUndo(thread)),
+      label: 'Settle',
+      onSelect: run(() => settleWithUndo(thread)),
     },
   ]
 }
