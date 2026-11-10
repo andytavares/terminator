@@ -145,6 +145,14 @@ describe('start with a resume or a tab', () => {
       cwd: '/work',
     })
   })
+  it("opens a scheduled run's tab hidden when asked", async () => {
+    const tab = { projectId: 'p1', title: 'Nightly', hidden: true }
+    const { broadcast } = await started({ cwd: '/work', tab })
+    expect(broadcast).toHaveBeenCalledWith(
+      'terminal:adopt',
+      expect.objectContaining({ sessionId: SESSION_ID, hidden: true })
+    )
+  })
 })
 
 describe('start — recording a tab', () => {

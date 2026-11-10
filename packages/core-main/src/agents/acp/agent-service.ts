@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, realpathSync } from 'node:fs'
 import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk/unstable'
+import type { z } from 'zod'
 import type {
   CancelNotification,
   InitializeRequest,
@@ -36,6 +37,7 @@ import { makeLogger } from '../../logger.js'
 import { clearTurn, setTurn } from '../agent-turns.js'
 import { clearAsk, raiseAsk } from '../ask-watcher.js'
 import type { AgentConversation } from '../../../../core-shared/src/types/index.js'
+import type { AgentStartInputSchema } from '../../../../core-shared/src/schemas/agents.schema.js'
 import type { AgentLog } from './agent-log.js'
 
 const logger = makeLogger('agent-service')
@@ -504,7 +506,11 @@ class AcpAgentService implements AgentService {
     }
   }
 
-  private showTab(session: Session, tab: NonNullable<StartAgentInput['tab']>): void {
+  /** A tab from the renderer's `agents:start` can be a scheduled run's hidden one. */
+  private showTab(
+    session: Session,
+    tab: NonNullable<z.infer<typeof AgentStartInputSchema>['tab']>
+  ): void {
     session.hasTab = true
     this.deps.broadcast('terminal:adopt', {
       sessionId: session.id,
@@ -513,6 +519,7 @@ class AcpAgentService implements AgentService {
       scrollbackLimit: this.deps.scrollbackLimit(),
       surface: 'agent',
       cwd: session.cwd,
+      ...(tab.hidden === true ? { hidden: true } : {}),
     })
   }
 

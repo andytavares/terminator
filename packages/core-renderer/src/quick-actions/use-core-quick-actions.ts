@@ -59,7 +59,7 @@ function usePaletteSessions(): CoreSessionSummary[] {
         .map((p) => [p.id, qualifiedBranchLabel(p, repoNameById.get(p.workspaceId))])
     )
     return [...sessions.values()]
-      .filter((s) => s.status !== 'closed')
+      .filter((s) => s.status !== 'closed' && !s.hidden)
       .map((s) => ({
         id: s.id,
         projectId: s.projectId,
@@ -175,7 +175,7 @@ function terminalHandlers(
 /** Steps through the open sessions, most recently attended first. */
 function cycleRecent(c: CoreContext, delta: number): void {
   const all = [...c.sessions.values()]
-    .filter((s) => s.status !== 'closed')
+    .filter((s) => s.status !== 'closed' && !s.hidden)
     .sort((a, b) => (b.lastAttendedAt ?? 0) - (a.lastAttendedAt ?? 0))
   if (all.length < 2) return
   const idx = all.findIndex((s) => s.id === c.focusedSessionId)

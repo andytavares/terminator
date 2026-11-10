@@ -143,7 +143,7 @@ function orderedSessionsForProject(
   views: Map<string, ProjectView>,
   projectId: string
 ): TerminalSession[] {
-  const all = [...sessions.values()].filter((s) => s.projectId === projectId)
+  const all = [...sessions.values()].filter((s) => s.projectId === projectId && !s.hidden)
   const order = views.get(projectId)?.order
   if (!order) return all
   const byId = new Map(all.map((s) => [s.id, s]))
@@ -164,7 +164,7 @@ export interface NewSessionRequest {
   parentSessionId?: string
   /** One line run in the terminal once it opens, for a terminal that resumes a conversation. */
   initialCommand?: string
-  /** Opens without becoming the active tab or taking focus: a scheduled run. */
+  /** Opens hidden, without becoming the active tab or taking focus: a scheduled run. */
   background?: boolean
 }
 
@@ -189,7 +189,11 @@ interface SessionState {
     surface?: 'terminal' | 'agent'
     /** Where it runs; an agent tab shows paths relative to it. */
     cwd?: string
+    /** A scheduled run's tab, kept out of the lists until someone views it. */
+    hidden?: boolean
   }) => void
+  /** Lists a hidden session from now on. */
+  showSession: (sessionId: string) => void
   closeSession: (sessionId: string) => Promise<void>
   /** Forget a deleted project's tabs; the main process already ended them. */
   dropProjectSessions: (projectId: string) => void
@@ -301,6 +305,7 @@ function newSessionRecord(
     lastActivityAt: Date.parse(createdAt),
     agentState: 'idle',
     ...(shell === undefined ? {} : { shell }),
+    ...(request.background === true ? { hidden: true } : {}),
   }
 }
 
@@ -348,11 +353,13 @@ function adoptedSession(s: SessionData, adopted: Adopted): Partial<SessionData> 
     scrollbackLimit: adopted.scrollbackLimit,
     surface: adopted.surface,
     ...(adopted.cwd === undefined ? {} : { cwd: adopted.cwd }),
+    ...(adopted.hidden === true ? { hidden: true } : {}),
     createdAt,
     lastActivityAt: Date.parse(createdAt),
     agentState: 'idle',
   }
   const added = withSessionAdded(s, session)
+  if (session.hidden) return added
   const projectViews = new Map(added.projectViews)
   const view = viewOf(projectViews, adopted.projectId)
   // Made active when the project has nothing showing. Without this the
@@ -551,8 +558,9 @@ function lifecycleSlice(
 /** What the tabs show and what they ask for: the active tab, bells, busy and the screen. */
 function activitySlice(
   set: SetSessions
-): Slice<'stampActivity' | 'setActiveSessionForProject' | 'setSessionScreen'> {
+): Slice<'stampActivity' | 'setActiveSessionForProject' | 'setSessionScreen' | 'showSession'> {
   return {
+    showSession: (sessionId) => set((s) => patchSession(s, sessionId, { hidden: undefined }) ?? s),
     stampActivity: (sessionId, now) =>
       set((s) => patchSession(s, sessionId, { lastActivityAt: now }) ?? s),
     setActiveSessionForProject: (projectId, sessionId, now = Date.now()) =>

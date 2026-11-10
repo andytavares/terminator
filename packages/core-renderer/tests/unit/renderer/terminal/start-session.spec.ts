@@ -353,6 +353,24 @@ describe('a scheduled run starts in the background', () => {
   })
 })
 
+describe("a scheduled run's agent tab stays out of the lists", () => {
+  setUpAgentStubs()
+
+  it('asks for an agent tab on a branch that stays out of the lists', async () => {
+    await startAgentInBranch({ projectId: 'p2', title: 'Agent', prompt: 'x', unattended })
+    expect(startAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ tab: { projectId: 'p2', title: 'Agent', hidden: true } })
+    )
+  })
+
+  it('asks for a global agent tab that stays out of the lists', async () => {
+    await startGlobalPrompt({ text: 'Sum up', runAs: 'agent', unattended })
+    expect(startAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ tab: expect.objectContaining({ hidden: true }) })
+    )
+  })
+})
+
 describe('startAgentInBranch — without a prompt or an agent', () => {
   setUpAgentStubs()
 

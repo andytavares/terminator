@@ -85,6 +85,8 @@ export interface TerminalSession {
   cwd?: string
   /** What the tab draws: a terminal (absent) or an ACP agent's transcript, which has no PTY or xterm. */
   surface?: 'terminal' | 'agent'
+  /** A scheduled run's session, kept out of the tab bar and sidebar until someone views it. */
+  hidden?: boolean
   createdAt: string
   closedAt?: string
   parentSessionId?: string

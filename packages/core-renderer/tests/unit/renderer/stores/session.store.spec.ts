@@ -1212,3 +1212,75 @@ describe('createSession — resuming', () => {
     )
   })
 })
+
+describe("useSessionStore — a scheduled run's session stays out of the lists", () => {
+  setUpUseSessionStore()
+
+  it('creates a background session hidden and leaves it out of its project’s tabs', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValueOnce({ sessionId: 'mine' })
+    mockElectronAPI.terminal.create.mockResolvedValueOnce({ sessionId: 'scheduled' })
+    await useSessionStore.getState().createSession(shellRequest())
+    await useSessionStore.getState().createSession(shellRequest({ background: true }))
+    expect(useSessionStore.getState().sessions.get('scheduled')?.hidden).toBe(true)
+    expect(
+      useSessionStore
+        .getState()
+        .getSessionsForProject('proj-1')
+        .map((s) => s.id)
+    ).toEqual(['mine'])
+  })
+
+  it('lists a hidden session once it is shown', () => {
+    useSessionStore.setState({
+      sessions: new Map([['scheduled', makeSession({ id: 'scheduled', hidden: true })]]),
+    })
+    useSessionStore.getState().showSession('scheduled')
+    expect(
+      useSessionStore
+        .getState()
+        .getSessionsForProject('proj-1')
+        .map((s) => s.id)
+    ).toEqual(['scheduled'])
+  })
+})
+
+describe("adoptSession — a scheduled run's agent tab", () => {
+  setUpAdoptSession()
+
+  it('adopts a hidden agent tab without listing it or showing it', () => {
+    useSessionStore.getState().adoptSession({ ...adopted, hidden: true })
+    expect(useSessionStore.getState().getSessionsForProject('proj-1')).toEqual([])
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBeNull()
+  })
+})
+
+describe('useSessionStore — closing the active tab never shows a hidden session', () => {
+  setUpUseSessionStore()
+
+  it('activates the next listed tab, passing over a hidden one', async () => {
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', makeSession({ id: 'sess-1' })],
+        ['scheduled', makeSession({ id: 'scheduled', hidden: true })],
+        ['sess-2', makeSession({ id: 'sess-2' })],
+      ]),
+      projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-2')
+  })
+
+  it('leaves nothing active when only hidden sessions remain', async () => {
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', makeSession({ id: 'sess-1' })],
+        ['scheduled', makeSession({ id: 'scheduled', hidden: true })],
+      ]),
+      projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'sess-1' }]]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBeNull()
+  })
+})

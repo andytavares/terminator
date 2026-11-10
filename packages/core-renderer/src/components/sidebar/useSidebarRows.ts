@@ -43,7 +43,7 @@ function liveSessions(sessions: Map<string, TerminalSession>): TerminalSession[]
       const agentState = source.derive(s)
       return agentState === s.agentState ? s : { ...s, agentState }
     })
-    .filter((s) => s.status !== 'closed' || s.agentState === 'exited')
+    .filter((s) => !s.hidden && (s.status !== 'closed' || s.agentState === 'exited'))
 }
 
 /** Drops a branch's change statistics once its terminals stop printing (once per burst), as their

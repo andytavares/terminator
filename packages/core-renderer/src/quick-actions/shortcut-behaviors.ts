@@ -45,7 +45,7 @@ export function cycleMostRecentlyAttended(
   deps: SessionNavDeps
 ): void {
   const all = [...useSessionStore.getState().sessions.values()]
-    .filter((s) => s.status !== 'closed')
+    .filter((s) => s.status !== 'closed' && !s.hidden)
     .sort((a, b) => (b.lastAttendedAt ?? 0) - (a.lastAttendedAt ?? 0))
   if (all.length < 2) return
   const currentId = effectiveProjectId
