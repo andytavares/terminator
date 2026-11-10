@@ -4,9 +4,9 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { InboxList } from '../../../../../src/components/sidebar/InboxSidebar'
 import { useWorkMarks } from '../../../../../src/home/work-marks'
-import { useStartWorkStore } from '../../../../../src/components/home/start-work'
 import { useExtensionRegistry } from '../../../../../src/extensions/registry'
 import { installElectronApi } from '../../../../../../test-support/src/electron-api'
+import { eventually } from '../../../../../../test-support/src/eventually'
 import type { WorkThread } from '../../../../../src/home/work-threads'
 import type { TaskState } from '../../../../../src/home/task-state'
 
@@ -124,18 +124,18 @@ describe('InboxList — settling', () => {
   })
 })
 
-describe('InboxList — open in the extension', () => {
-  const opened = [
-    'terminator.foundry.command.show-order',
-    { projectId: null, sessionId: null, repoRoot: null },
-    { orderId: 'WO-1' },
-  ]
+const opened = [
+  'terminator.foundry.command.show-order',
+  { projectId: null, sessionId: null, repoRoot: null },
+  { orderId: 'WO-1' },
+]
 
+describe('InboxList — open in the extension', () => {
   it('opens the work in the extension that owns it', async () => {
     const user = userEvent.setup()
     renderInbox([threadOf('a', { opensIn: FOUNDRY })])
     await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Open in Foundry' }))
-    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledWith(...opened))
+    await eventually(() => expect(executeCommand).toHaveBeenCalledWith(...opened))
   })
 
   it('offers nothing when no extension can open the work', () => {
@@ -148,12 +148,14 @@ describe('InboxList — open in the extension', () => {
     renderInbox([threadOf('a', { opensIn: FOUNDRY })])
     expect(within(cardFor('Work a')).getByRole('button', { name: 'Open in app' })).toBeTruthy()
   })
+})
 
+describe('InboxList — opening a card', () => {
   it('opens the extension view, not the drawer, from a card with no terminal', async () => {
     const user = userEvent.setup()
     renderInbox([threadOf('a', { opensIn: FOUNDRY })])
     await user.click(within(cardFor('Work a')).getByText('Work a'))
-    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledWith(...opened))
+    await eventually(() => expect(executeCommand).toHaveBeenCalledWith(...opened))
     expect(revealSession).not.toHaveBeenCalled()
   })
 
