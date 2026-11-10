@@ -262,6 +262,29 @@ describe('UnifiedSidebar — the Sidebar setting', () => {
   })
 })
 
+describe('UnifiedSidebar — the Inbox mode', () => {
+  const showInbox = () =>
+    act(() => {
+      const defaults = DEFAULT_GLOBAL_SETTINGS
+      useSettingsStore.setState({
+        globalSettings: { ...defaults, ui: { ...defaults.ui, sidebarMode: 'inbox' } },
+      })
+    })
+
+  it('folds a card settled in the Inbox into its settled section', async () => {
+    const user = userEvent.setup()
+    mockUseSessionFacts.mockReturnValue([
+      fact({ sessionId: 's1', name: 'api-shell', lastActivityAt: Date.now() }),
+    ])
+    renderSidebar()
+    showInbox()
+    const inbox = await screen.findByRole('list', { name: 'Inbox' })
+    const [first] = within(inbox).getAllByRole('listitem')
+    await user.click(within(first).getByRole('button', { name: 'Settle' }))
+    expect(screen.getByRole('button', { name: '1 settled' })).toBeTruthy()
+  })
+})
+
 describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
   it('lists one row per branch and no terminals at all', () => {
     renderSidebar()
@@ -1004,7 +1027,7 @@ describe('UnifiedSidebar — issue actions on a branch header', () => {
   it('copies the issue key', async () => {
     const user = userEvent.setup()
     openBranchMenu()
-    await user.click(screen.getByText('Copy issue key'))
+    await user.click(screen.getByText('Copy ticket key'))
     expect(await navigator.clipboard.readText()).toBe('TAV-14')
   })
 })
@@ -1016,13 +1039,13 @@ describe('UnifiedSidebar — issue actions on a branch header — copies nothing
     useIntegrationsStore.setState({ links: new Map() })
     renderSidebar()
     fireEvent.contextMenu(branchRow('main'))
-    expect(screen.queryByText('Copy issue key')).toBeNull()
+    expect(screen.queryByText('Copy ticket key')).toBeNull()
   })
 
-  it('reaches the link dialog from "Change linked issue…"', async () => {
+  it('reaches the link dialog from "Change linked ticket…"', async () => {
     const user = userEvent.setup()
     openBranchMenu()
-    await user.click(screen.getByText('Change linked issue…'))
+    await user.click(screen.getByText('Change linked ticket…'))
     expect(screen.getByTestId('link-issue-dialog').textContent).toContain('Backend · main')
   })
 
@@ -1513,7 +1536,7 @@ describe('UnifiedSidebar — the terminals under a branch — linking one', () =
     renderSidebar()
     await expandMain()
     fireEvent.contextMenu(terminalRow('api-shell'))
-    await user.click(screen.getByText('Link issue…'))
+    await user.click(screen.getByText('Link ticket…'))
     expect(screen.getByTestId('session-link-dialog').textContent).toContain('api-shell')
     await user.click(screen.getByText('close-session-link'))
     expect(screen.queryByTestId('session-link-dialog')).toBeNull()
@@ -1524,7 +1547,7 @@ describe('UnifiedSidebar — the terminals under a branch — linking one', () =
     renderSidebar()
     await expandMain()
     fireEvent.contextMenu(terminalRow('api-shell'))
-    await user.click(screen.getByText('Link issue…'))
+    await user.click(screen.getByText('Link ticket…'))
     expect(screen.queryByTestId('session-link-dialog')).toBeNull()
   })
 })
@@ -1557,7 +1580,7 @@ describe('UnifiedSidebar — a pane under its terminal', () => {
     await user.click(terminalRow('pane'))
     expect(useSessionStore.getState().projectViews.get('p1')?.activeSessionId).toBe('s1-pane')
     fireEvent.contextMenu(terminalRow('pane'))
-    await user.click(screen.getByText('Link issue…'))
+    await user.click(screen.getByText('Link ticket…'))
     expect(screen.getByTestId('session-link-dialog').textContent).toContain('pane')
     await user.click(screen.getByRole('button', { name: 'Close pane' }))
     expect(closeSplitLeaf).toHaveBeenCalledWith('p1', 's1-pane')

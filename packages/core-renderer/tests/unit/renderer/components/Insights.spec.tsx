@@ -290,7 +290,7 @@ describe('Insights: dismissing a looking-back row', () => {
     useHomeFeedStore.setState({ asks: [oldestReviewAsk] })
     render(<Insights />)
     const back = card('Looking back')
-    await user.click(within(back).getByRole('button', { name: 'Dismiss Fluent #41' }))
+    await user.click(within(back).getByRole('button', { name: 'Settle Fluent #41' }))
     expect(within(back).queryByText(/Fluent #41/)).toBeNull()
     expect(useDismissalsStore.getState().entries['review:acme#41']?.kind).toBe('done')
   })

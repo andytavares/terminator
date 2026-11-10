@@ -435,7 +435,7 @@ function taskListTests() {
 function taskCompleteTests() {
   it('completes an open task', async () => {
     const user = await openTasks()
-    await user.click(within(projectCardNamed('Launch')).getByTitle('Complete'))
+    await user.click(within(projectCardNamed('Launch')).getByTitle('Mark done'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 't1' }])
     )
@@ -451,7 +451,7 @@ function taskCompleteTests() {
         task('t2', 'Kickoff', { status: 'done' }),
       ],
     }
-    await user.click(card.getByTitle('Complete'))
+    await user.click(card.getByTitle('Mark done'))
     expect(await card.findByText('2 completed/cancelled')).toBeTruthy()
   })
 

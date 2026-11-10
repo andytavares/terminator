@@ -15,7 +15,7 @@ vi.mock('../../../../src/components/home/useWorkThreads', async () => {
       threads: state.threads,
       groups: work.groupThreads(state.threads as WorkThread[]),
       allThreads: state.threads,
-      dismissedThreads: [],
+      settledThreads: [],
     }),
   }
 })

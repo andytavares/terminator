@@ -16,7 +16,7 @@ vi.mock('../../../../src/components/home/useDeskModel', () => ({
   useDeskModel: () => ({ asks: desk.asks }),
 }))
 vi.mock('../../../../src/components/home/useWorkThreads', () => ({
-  useWorkThreads: () => ({ allThreads: [], dismissedThreads: [] }),
+  useWorkThreads: () => ({ allThreads: [], settledThreads: [] }),
 }))
 vi.mock('../../../../src/components/integrations/IssueDetails', () => ({
   IssueDetails: function StubTicketDetails({ issueKey }: { issueKey: string }) {

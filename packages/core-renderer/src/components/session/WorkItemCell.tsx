@@ -137,7 +137,7 @@ function LinkIssueButton({ onLink }: { onLink: () => void }): React.JSX.Element 
     <button
       type="button"
       className="work-item__link"
-      aria-label="Link a work item"
+      aria-label="Link a ticket"
       onClick={(e) => {
         e.stopPropagation()
         onLink()

@@ -30,7 +30,7 @@ export function LinkIssueDialog(props: LinkIssueDialogProps): JSX.Element {
 
   return (
     <Dialog
-      title="Link an issue"
+      title="Link a ticket"
       onDismiss={props.onClose}
       actions={linkActions(link, props.onClose)}
     >
@@ -54,7 +54,7 @@ function linkActions({ selected, busy, commit }: LinkCommit, onClose: () => void
   return [
     { label: 'Cancel', onSelect: onClose },
     {
-      label: busy ? 'Linking…' : selected === null ? 'Link issue' : `Link ${selected.key}`,
+      label: busy ? 'Linking…' : selected === null ? 'Link ticket' : `Link ${selected.key}`,
       tone: 'primary',
       disabled: selected === null || busy,
       onSelect: commit,
@@ -127,7 +127,7 @@ function IssueChoice({ term, setTerm, link, projectName, currentKey }: IssueChoi
           className="link-issue__input"
           autoFocus
           value={term}
-          placeholder="Search, or type an issue key"
+          placeholder="Search, or type a ticket key"
           onChange={(e) => setTerm(e.target.value)}
         />
       </div>

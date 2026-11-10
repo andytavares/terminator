@@ -61,7 +61,7 @@ test('a terminal opened on a dismissed branch shows in the Inbox', { tag: '@mac'
   await expect(terminalTabs(page)).toHaveCount(1)
   await openHome(page)
   await page.getByRole('button', { name: 'Work actions' }).first().click()
-  await page.locator('.ctx-menu__item', { hasText: 'Dismiss' }).click()
+  await page.locator('.ctx-menu__item', { hasText: 'Settle' }).click()
   await projectGroup(page, 'main').click()
   await page.locator('.tab-bar__new-tab').click()
   await expect(terminalTabs(page)).toHaveCount(2)

@@ -237,7 +237,7 @@ function noteListItemContextMenuRestoringTests() {
     render(<NoteList />)
     await user.click(screen.getByRole('button', { name: /Archived/ }))
     await openRowMenu(user, rowTitled('Old'))
-    await user.click(screen.getByText('Unarchive'))
+    await user.click(screen.getByText('Restore'))
     await eventually(() =>
       expect(bridge.calls('terminator.notepad:notes.restore')).toEqual([{ id: 'n1' }])
     )

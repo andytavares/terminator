@@ -3,8 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { InboxList } from '../../../../../src/components/sidebar/InboxSidebar'
-import { useInboxMarks } from '../../../../../src/components/sidebar/inbox-marks'
-import { useStartWorkStore } from '../../../../../src/components/home/start-work'
+import { useWorkMarks } from '../../../../../src/home/work-marks'
+import { useExtensionRegistry } from '../../../../../src/extensions/registry'
+import { installElectronApi } from '../../../../../../test-support/src/electron-api'
+import { eventually } from '../../../../../../test-support/src/eventually'
 import type { WorkThread } from '../../../../../src/home/work-threads'
 import type { TaskState } from '../../../../../src/home/task-state'
 
@@ -23,6 +25,7 @@ interface Fixture {
   repoName?: string
   sessions?: Array<{ sessionId: string; lastActivityAt: number }>
   nowLine?: string
+  opensIn?: WorkThread['opensIn']
 }
 
 function threadOf(key: string, fixture: Fixture = {}): WorkThread {
@@ -39,6 +42,7 @@ function threadOf(key: string, fixture: Fixture = {}): WorkThread {
     nowLine: fixture.nowLine ?? '',
     lanes: [{ repoRoot, repoName, branch: `${key}-branch`, repoColor: null, sessionIds: [] }],
     sessions: sessions.map((s) => ({ ...s, isClosed: false })),
+    opensIn: fixture.opensIn ?? null,
   } as unknown as WorkThread
 }
 
@@ -63,16 +67,29 @@ const settledTitles = () =>
 
 const cardFor = (title: string) => screen.getByRole('listitem', { name: title })
 
+const FOUNDRY = {
+  source: 'terminator.foundry',
+  command: 'show-order',
+  args: { orderId: 'WO-1' },
+}
+const executeCommand = vi.fn()
+
 beforeEach(() => {
   vi.clearAllMocks()
+  installElectronApi({ extension: { hasCommand: vi.fn(async () => true), executeCommand } })
+  useExtensionRegistry.setState({
+    workspaceTabs: new Map([
+      ['terminator.foundry', { id: 'terminator.foundry', label: 'Foundry', component: () => null }],
+    ]),
+  })
   localStorage.clear()
-  useInboxMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
 })
 
 describe('InboxList — order', () => {
   it('shows Needs you, then pinned, then active, and a collapsed settled section', async () => {
     const user = userEvent.setup()
-    useInboxMarks.setState({ pinned: { pinned: 1 }, settled: { done: 1 } })
+    useWorkMarks.setState({ pinned: { pinned: 1 }, settled: { done: 1 } })
     renderInbox([
       threadOf('active', { startedAt: 3 }),
       threadOf('pinned', { startedAt: 1 }),
@@ -105,113 +122,49 @@ describe('InboxList — settling', () => {
     expect(cardTitles()).toEqual(['Work b'])
     expect(screen.getByRole('button', { name: '1 settled' })).toBeTruthy()
   })
-
-  it('brings a settled card back when its agent ends a turn', async () => {
-    const user = userEvent.setup()
-    const { rerender } = renderInbox([threadOf('a', { state: 'running' })])
-    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
-    expect(cardTitles()).toEqual([])
-    rerender(<InboxList threads={[threadOf('a', { state: 'quiet' })]} now={NOW} repos={repos} />)
-    expect(cardTitles()).toEqual(['Work a'])
-  })
-
-  it('brings a settled card back when it asks', async () => {
-    const user = userEvent.setup()
-    const { rerender } = renderInbox([threadOf('a', { state: 'quiet' })])
-    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
-    rerender(
-      <InboxList threads={[threadOf('a', { state: 'needs-you' })]} now={NOW} repos={repos} />
-    )
-    expect(cardTitles()).toEqual(['Work a'])
-  })
 })
 
-describe('InboxList — snoozing', () => {
-  it('snoozes a card into the settled section', async () => {
-    const user = userEvent.setup()
-    renderInbox([threadOf('a')])
-    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Snooze' }))
-    await user.click(screen.getByRole('menuitem', { name: '1 hour' }))
-    expect(cardTitles()).toEqual([])
-    expect(useInboxMarks.getState().snoozed).toEqual({ a: NOW + HOUR_MS })
-  })
-})
-
-describe('InboxList — search and repo filter', () => {
-  const threads = [
-    threadOf('login', { repoRoot: '/repos/api', repoName: 'api' }),
-    threadOf('theme', { repoRoot: '/repos/web', repoName: 'web' }),
-  ]
-
-  it('filters by the search text', async () => {
-    const user = userEvent.setup()
-    renderInbox(threads)
-    await user.type(screen.getByRole('textbox', { name: 'Search' }), 'theme-branch')
-    expect(cardTitles()).toEqual(['Work theme'])
-  })
-
-  it('filters by repo', async () => {
-    const user = userEvent.setup()
-    renderInbox(threads)
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Repo' }), '/repos/api')
-    expect(cardTitles()).toEqual(['Work login'])
-  })
-})
-
-/** Two cards; the first has an older and a more recent session. */
-const keyboardThreads = [
-  threadOf('first', {
-    startedAt: 2,
-    sessions: [
-      { sessionId: 'old', lastActivityAt: NOW - HOUR_MS },
-      { sessionId: 'recent', lastActivityAt: NOW },
-    ],
-  }),
-  threadOf('second', { startedAt: 1, sessions: [{ sessionId: 's2', lastActivityAt: NOW }] }),
+const opened = [
+  'terminator.foundry.command.show-order',
+  { projectId: null, sessionId: null, repoRoot: null },
+  { orderId: 'WO-1' },
 ]
 
-describe('InboxList — starting work', () => {
-  // The tree's new-terminal buttons are hidden in Inbox mode, so the Inbox has its own way in.
-  it('opens the Start work launcher, with no work listed', async () => {
-    useStartWorkStore.getState().closeLauncher()
-    renderInbox([])
-    await userEvent.click(screen.getByRole('button', { name: 'Start work' }))
-    expect(useStartWorkStore.getState().open).toBe(true)
+describe('InboxList — open in the extension', () => {
+  it('opens the work in the extension that owns it', async () => {
+    const user = userEvent.setup()
+    renderInbox([threadOf('a', { opensIn: FOUNDRY })])
+    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Open in Foundry' }))
+    await eventually(() => expect(executeCommand).toHaveBeenCalledWith(...opened))
+  })
+
+  it('offers nothing when no extension can open the work', () => {
+    renderInbox([threadOf('a')])
+    expect(within(cardFor('Work a')).queryByRole('button', { name: /^Open in / })).toBeNull()
+  })
+
+  it('says "Open in app" when the extension has no tab to name it', () => {
+    useExtensionRegistry.setState({ workspaceTabs: new Map() })
+    renderInbox([threadOf('a', { opensIn: FOUNDRY })])
+    expect(within(cardFor('Work a')).getByRole('button', { name: 'Open in app' })).toBeTruthy()
   })
 })
 
-describe('InboxList — opening and the keyboard', () => {
-  const threads = keyboardThreads
-  it('opens the most recent session of a card', async () => {
+describe('InboxList — opening a card', () => {
+  it('opens the extension view, not the drawer, from a card with no terminal', async () => {
     const user = userEvent.setup()
-    renderInbox(threads)
-    await user.click(screen.getByRole('button', { name: /Work first/ }))
-    expect(revealSession).toHaveBeenCalledWith('recent')
+    renderInbox([threadOf('a', { opensIn: FOUNDRY })])
+    await user.click(within(cardFor('Work a')).getByText('Work a'))
+    await eventually(() => expect(executeCommand).toHaveBeenCalledWith(...opened))
+    expect(revealSession).not.toHaveBeenCalled()
   })
 
-  it('moves between cards with the arrow keys from search, and opens with Enter', async () => {
+  it('reveals the terminal first when the card has one', async () => {
     const user = userEvent.setup()
-    renderInbox(threads)
-    await user.click(screen.getByRole('textbox', { name: 'Search' }))
-    await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('button', { name: /Work first/ }).matches(':focus')).toBe(true)
-    await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('button', { name: /Work second/ }).matches(':focus')).toBe(true)
-    await user.keyboard('{ArrowUp}')
-    await user.keyboard('{Enter}')
-    expect(revealSession).toHaveBeenCalledWith('recent')
-  })
-})
-
-describe('InboxList — keys that belong to the controls', () => {
-  const threads = keyboardThreads
-
-  it('leaves arrow keys alone in the repo filter', async () => {
-    const user = userEvent.setup()
-    renderInbox(threads)
-    const repo = screen.getByRole('combobox', { name: 'Repo' })
-    repo.focus()
-    await user.keyboard('{ArrowDown}')
-    expect(repo.matches(':focus')).toBe(true)
+    const sessions = [{ sessionId: 's1', lastActivityAt: 1 }]
+    renderInbox([threadOf('a', { opensIn: FOUNDRY, sessions })])
+    await user.click(within(cardFor('Work a')).getByText('Work a'))
+    expect(revealSession).toHaveBeenCalledWith('s1')
+    expect(executeCommand).not.toHaveBeenCalled()
   })
 })

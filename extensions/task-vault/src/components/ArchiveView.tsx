@@ -295,7 +295,7 @@ function ArchiveTabs({ data }: { data: ArchiveData }): React.JSX.Element {
 function ArchiveHeader(props: { days: number; onChange: (days: number) => void }) {
   return (
     <div className="archive-view__header">
-      <h2>History</h2>
+      <h2>Archive</h2>
       <SegmentedControl
         label="Show the last"
         size="sm"
@@ -362,12 +362,7 @@ function ArchiveTaskRow({ task, onRestore, onDelete }: RowProps): React.JSX.Elem
         <span className="archive-task__file">{fileName}</span>
       </span>
       <span className="archive-task__actions">
-        <IconButton
-          icon={Undo2}
-          label="Restore to open"
-          size="sm"
-          onClick={() => onRestore(task.id)}
-        />
+        <IconButton icon={Undo2} label="Restore" size="sm" onClick={() => onRestore(task.id)} />
         <IconButton
           icon={Trash2}
           label="Delete permanently"

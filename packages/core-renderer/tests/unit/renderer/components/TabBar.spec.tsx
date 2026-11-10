@@ -471,15 +471,15 @@ describe('TabBar — session work item', () => {
     expect(screen.getByText('ENG-4')).toBeTruthy()
   })
 
-  it('offers only "Link issue…" when the tab has no own link', async () => {
+  it('offers only "Link ticket…" when the tab has no own link', async () => {
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
     const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
-    expect(screen.getByText('Link issue…')).toBeTruthy()
+    expect(screen.getByText('Link ticket…')).toBeTruthy()
     expect(screen.queryByText('Remove session link')).toBeNull()
-    await user.click(screen.getByText('Link issue…'))
+    await user.click(screen.getByText('Link ticket…'))
     expect(screen.getByTestId('session-link-dialog')).toBeTruthy()
   })
 })
@@ -492,7 +492,7 @@ describe('TabBar — session work item — offers change and remove, and removes
     renderTabBar()
     const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
-    expect(screen.getByText('Change linked issue…')).toBeTruthy()
+    expect(screen.getByText('Change linked ticket…')).toBeTruthy()
     await user.click(screen.getByText('Remove session link'))
     await eventually(() => expect(screen.queryByText('ENG-4')).toBeNull())
   })

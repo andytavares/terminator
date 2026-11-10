@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import type { Workspace } from '../../../../core-shared/src/types/index'
+import type { Project, Workspace } from '../../../../core-shared/src/types/index'
 import type { WorkspaceTabRegistration } from '../../extensions/registry'
 import type { GroupKey } from '../../sidebar/view-model'
 import type { WorkItem } from '../../sidebar/work-item'
@@ -28,8 +28,12 @@ import type { SidebarData } from './useSidebarRows'
 import type { IssueMenuActions } from './issue-menu-items'
 import { openAddToTask } from '../tasks/add-to-task'
 import { laneOf } from '../../sidebar/task-groups'
+import { laneKeyOf } from '../../home/task-lanes'
+import { openInAppLabel } from '../home/open-in-app'
+import { openInExtension } from '../home/desk-actions'
+import type { WorkThread } from '../../home/work-threads'
 import { RepoHeader } from './RepoHeader'
-import { BranchRow } from './BranchRow'
+import { BranchRow, type BranchRowProps } from './BranchRow'
 import { TerminalRow } from './TerminalRow'
 import { useShownInMain } from './useShownInMain'
 import {
@@ -75,6 +79,8 @@ export interface RowContext {
   homeDir: string | undefined
   editorName: string | undefined
   workspaceTabs: WorkspaceTabRegistration[]
+  /** Every work thread, so a branch can find the extension view that owns its work. */
+  threads: WorkThread[]
   activeWorkspaceTabId: string | null
   onSelectWorkspaceTab: (workspaceId: string, tabId: string) => void
 }
@@ -243,6 +249,25 @@ function useBranchRowProps(row: BranchRowData, workspace: Workspace | undefined,
     issueActions: issueActionsFor(projectId, issueKey),
     onAddToTask: project && workspace ? () => openAddToTask(laneOf(project, workspace)) : undefined,
     ...branchRowActions(row, project?.gitBranch === undefined && project !== undefined, ctx),
+    openInApp: openInAppFor(project, workspace, ctx.threads),
+  }
+}
+
+/** Shows the extension view that owns the branch's work, when its work thread names one. */
+function openInAppFor(
+  project: Project | undefined,
+  workspace: Workspace | undefined,
+  threads: readonly WorkThread[]
+): BranchRowProps['openInApp'] {
+  if (!project?.gitBranch || !workspace) return undefined
+  const key = laneKeyOf(workspace.folderPath, project.gitBranch)
+  const opensIn = threads.find((t) =>
+    t.lanes.some((lane) => laneKeyOf(lane.repoRoot, lane.branch) === key)
+  )?.opensIn
+  if (!opensIn) return undefined
+  return {
+    label: openInAppLabel(opensIn.source),
+    onSelect: () => void openInExtension(opensIn.source, opensIn),
   }
 }
 

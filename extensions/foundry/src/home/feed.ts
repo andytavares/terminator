@@ -138,6 +138,7 @@ function facetsOf(row: OrderRow, now: string): ThreadFacet[] {
       tone: toneOf(standing),
       ...(row.pullUrl === null ? {} : { url: row.pullUrl }),
       ...documentLinksOf(order),
+      open: { command: 'show-order', args: { orderId: order.id } },
       closedAt: row.closedAt,
       updatedAt: row.updatedAt,
     },

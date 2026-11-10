@@ -593,7 +593,7 @@ function OpenTaskRow(props: OpenRowProps): React.JSX.Element {
       <button
         className="daily-log__task-checkbox"
         onClick={() => void tasks.complete(task.id)}
-        title="Complete"
+        title="Mark done"
       >
         <TaskStatusIcon task={task} />
       </button>

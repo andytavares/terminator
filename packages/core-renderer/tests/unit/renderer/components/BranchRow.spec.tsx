@@ -334,6 +334,28 @@ describe('BranchRow — repo actions are reachable from the row', () => {
   })
 })
 
+describe('BranchRow — open in the extension that owns the work', () => {
+  it('lists it before the repo actions and runs it', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    const repoActions = [{ id: 'git', label: 'Git', onSelect: vi.fn() }]
+    renderRow({}, { repoActions, openInApp: { label: 'Open in Foundry', onSelect } })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
+    const names = screen.getAllByRole('menuitem').map((item) => item.textContent)
+    expect(names.indexOf('Open in Foundry')).toBeLessThan(names.indexOf('Git'))
+    await user.click(screen.getByRole('menuitem', { name: 'Open in Foundry' }))
+    expect(onSelect).toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('is absent when no extension can open the work', async () => {
+    const user = userEvent.setup()
+    renderRow({}, { repoActions: [{ id: 'git', label: 'Git', onSelect: vi.fn() }] })
+    await user.pointer({ keys: '[MouseRight]', target: branchRow() })
+    expect(screen.queryByText(/^Open in /)).toBeNull()
+  })
+})
+
 describe('BranchRow — renaming', () => {
   it('commits on blur', async () => {
     const user = userEvent.setup()

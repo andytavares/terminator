@@ -47,6 +47,7 @@ function rowThread(title: string, lane: TaskLane, taskId: string): WorkThread {
     startedAt: Date.now(),
     archived: false,
     closed: false,
+    opensIn: null,
   }
 }
 

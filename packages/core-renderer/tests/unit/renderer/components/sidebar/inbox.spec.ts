@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  AUTO_SETTLE_AFTER_MS,
-  filterInbox,
-  inboxSections,
-  wokenKeys,
-  type InboxMarks,
-} from '../../../../../src/components/sidebar/inbox'
+import { filterInbox, inboxSections } from '../../../../../src/components/sidebar/inbox'
+import { AUTO_SETTLE_AFTER_MS, type WorkMarks } from '../../../../../src/home/settle'
 import type { WorkThread } from '../../../../../src/home/work-threads'
 import type { TaskState } from '../../../../../src/home/task-state'
 
@@ -37,7 +32,7 @@ function threadOf(key: string, fixture: ThreadFixture = {}): WorkThread {
   } as unknown as WorkThread
 }
 
-const noMarks: InboxMarks = { settled: {}, pinned: {}, snoozed: {} }
+const noMarks: WorkMarks = { settled: {}, pinned: {}, snoozed: {} }
 const keysOf = (threads: readonly WorkThread[]) => threads.map((t) => t.key)
 
 describe('inboxSections — order', () => {
@@ -84,25 +79,6 @@ describe('inboxSections — auto-settle', () => {
   it('brings an auto-settled thread back when it does something', () => {
     const woke = threadOf('woke', { lastActivity: NOW - 1000 })
     expect(keysOf(inboxSections([woke], noMarks, NOW).cards)).toEqual(['woke'])
-  })
-})
-
-describe('wokenKeys', () => {
-  it('names threads whose agent ended a turn or started asking', () => {
-    const before = new Map<string, TaskState>([
-      ['turn-ended', 'running'],
-      ['asked', 'quiet'],
-      ['still-running', 'running'],
-      ['still-asking', 'needs-you'],
-    ])
-    const threads = [
-      threadOf('turn-ended', { state: 'quiet' }),
-      threadOf('asked', { state: 'needs-you' }),
-      threadOf('still-running', { state: 'running' }),
-      threadOf('still-asking', { state: 'needs-you' }),
-      threadOf('new', { state: 'needs-you' }),
-    ]
-    expect(wokenKeys(before, threads)).toEqual(['turn-ended', 'asked'])
   })
 })
 

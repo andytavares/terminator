@@ -3,7 +3,7 @@ import { Ellipsis } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { afterClosing } from '../sidebar/row-events'
-import { useDismissedThreads } from './dismissed-threads'
+import { useWorkMarks } from '../../home/work-marks'
 import { leadSessionOf, toggleArchived } from './thread-actions'
 import { toggleDone } from './task-actions'
 import { openAddToTask } from '../tasks/add-to-task'
@@ -12,6 +12,7 @@ import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { useToastStore } from '../../stores/toast.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { useOpenInApp, type OpenInApp } from './open-in-app'
 import type { WorkThread } from '../../home/work-threads'
 
 export type WorkMenuState = ReturnType<typeof useWorkMenu>
@@ -27,6 +28,7 @@ interface ItemActions {
   onStartRename: () => void
   onLink: () => void
   onRemoveWorktree: () => void
+  openInApp: OpenInApp | null
 }
 
 /** True when the lead session's project is a git worktree the workspace store can delete. */
@@ -49,6 +51,9 @@ function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): Conte
       onSelect: run(() => SESSION_ACTIONS.onOpen(lead.sessionId)),
     })
   }
+  if (actions.openInApp) {
+    items.push({ label: actions.openInApp.label, onSelect: run(actions.openInApp.open) })
+  }
   if (lead || thread.taskId !== null) {
     items.push({ label: 'Rename…', onSelect: run(actions.onStartRename) })
   }
@@ -62,27 +67,25 @@ function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): Conte
   return items
 }
 
-/** Hides the row for good and offers Undo in a toast. */
-function dismissWithUndo(thread: WorkThread): void {
-  const { dismiss, restore } = useDismissedThreads.getState()
-  // Only a row that shows Terminator sessions has sessions of its own to delete.
-  dismiss(thread.key, Date.now(), thread.sessions.length > 0)
+/** Settles the row, as the Inbox does, and offers Undo in a toast. */
+function settleWithUndo(thread: WorkThread): void {
+  useWorkMarks.getState().settle(thread.key, Date.now())
   useToastStore.getState().addToast({
     type: 'info',
-    message: `Dismissed "${thread.title}"`,
+    message: `Settled "${thread.title}"`,
     duration: 6000,
-    action: { label: 'Undo', onSelect: () => restore(thread.key) },
+    action: { label: 'Undo', onSelect: () => useWorkMarks.getState().restore(thread.key) },
   })
 }
 
-/** Archive or Restore, and Dismiss: what every row offers. */
+/** Archive or Restore, and Settle: what every row offers. */
 function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
   const done: ContextMenuItem[] =
     thread.taskId === null
       ? []
       : [
           {
-            label: thread.doneAt === null ? 'Mark done' : 'Undo done',
+            label: thread.doneAt === null ? 'Mark done' : 'Restore',
             separatorBefore: true,
             onSelect: run(() => void toggleDone(thread)),
           },
@@ -95,8 +98,8 @@ function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
       onSelect: run(() => toggleArchived(thread)),
     },
     {
-      label: 'Dismiss',
-      onSelect: run(() => dismissWithUndo(thread)),
+      label: 'Settle',
+      onSelect: run(() => settleWithUndo(thread)),
     },
   ]
 }
@@ -220,6 +223,7 @@ export function InFlightMenu({
   const { menu, openWorkMenu, closeWorkMenu } = workMenu
   const dialogs = useMenuDialogs()
   const items = buildItems(thread, {
+    openInApp: useOpenInApp(thread),
     closeMenu: closeWorkMenu,
     onStartRename,
     onLink: dialogs.openLink,

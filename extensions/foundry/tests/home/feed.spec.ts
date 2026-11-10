@@ -202,6 +202,14 @@ describe('facet stage and tone', () => {
   })
 })
 
+describe('facet open command', () => {
+  it('opens the order in the Foundry view', () => {
+    const order = orderOnBranch('WO-7')
+    const [facet] = feedOf([orderRow({ order })]).facets
+    expect(facet.open).toEqual({ command: 'show-order', args: { orderId: order.id } })
+  })
+})
+
 describe('facet work keys', () => {
   it('keys a ticket order by its tracker and key', () => {
     const order = orderOnBranch('WO-1', {

@@ -32,7 +32,7 @@ export function issueMenuItems(actions: IssueMenuActions, dismiss: () => void): 
   }
 
   if (issueKey == null) {
-    return [{ label: 'Link issue…', separatorBefore: true, onSelect: run(onLinkIssue) }]
+    return [{ label: 'Link ticket…', separatorBefore: true, onSelect: run(onLinkIssue) }]
   }
 
   return [
@@ -41,8 +41,8 @@ export function issueMenuItems(actions: IssueMenuActions, dismiss: () => void): 
       separatorBefore: true,
       onSelect: run(onOpenIssue),
     },
-    { label: 'Copy issue key', onSelect: run(onCopyIssueKey) },
-    { label: 'Change linked issue…', onSelect: run(onLinkIssue) },
+    { label: 'Copy ticket key', onSelect: run(onCopyIssueKey) },
+    { label: 'Change linked ticket…', onSelect: run(onLinkIssue) },
     { label: `Unlink ${issueKey}`, onSelect: run(onUnlinkIssue) },
   ]
 }

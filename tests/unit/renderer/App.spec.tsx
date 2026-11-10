@@ -1357,8 +1357,8 @@ describe('App — Quick Actions integration (feature 057) — core actions on ta
   })
 })
 
-describe('App — Quick Actions integration (feature 057) — "Link issue" opens the dialog for the focused terminal\'s own session', () => {
-  it('"Link issue" opens the dialog for the focused terminal\'s own session', async () => {
+describe('App — Quick Actions integration (feature 057) — "Link ticket" opens the dialog for the focused terminal\'s own session', () => {
+  it('"Link ticket" opens the dialog for the focused terminal\'s own session', async () => {
     facts.sessionFacts = [{ sessionId: 's1', workItem: null }]
     setupApp({
       activeProjectId: 'proj-1',
@@ -1372,7 +1372,7 @@ describe('App — Quick Actions integration (feature 057) — "Link issue" opens
     expect(screen.getByTestId('session-link-dialog').textContent).toContain('s1')
   })
 
-  it('"Link issue to branch" opens the branch dialog rather than the session one', async () => {
+  it('"Link ticket to branch" opens the branch dialog rather than the session one', async () => {
     facts.sessionFacts = [{ sessionId: 's1', workItem: null }]
     setupApp({
       activeProjectId: 'proj-1',

@@ -111,14 +111,14 @@ describe('TerminalRow — work item', () => {
     expect(screen.queryByText('ENG-1')).toBeNull()
   })
 
-  it('offers only "Link issue…" when the session has no link', async () => {
+  it('offers only "Link ticket…" when the session has no link', async () => {
     const user = userEvent.setup()
     const onLinkIssue = vi.fn()
     renderRow({}, { onLinkIssue })
     fireEvent.contextMenu(row())
-    expect(screen.getByText('Link issue…')).toBeTruthy()
-    expect(screen.queryByText('Change linked issue…')).toBeNull()
-    await user.click(screen.getByText('Link issue…'))
+    expect(screen.getByText('Link ticket…')).toBeTruthy()
+    expect(screen.queryByText('Change linked ticket…')).toBeNull()
+    await user.click(screen.getByText('Link ticket…'))
     expect(onLinkIssue).toHaveBeenCalledOnce()
   })
 })
@@ -133,7 +133,7 @@ describe('TerminalRow — work item — offers change and remove when the sessio
       { onLinkIssue, onRemoveLink }
     )
     fireEvent.contextMenu(row())
-    expect(screen.getByText('Change linked issue…')).toBeTruthy()
+    expect(screen.getByText('Change linked ticket…')).toBeTruthy()
     await user.click(screen.getByText('Remove session link'))
     expect(onRemoveLink).toHaveBeenCalledOnce()
   })

@@ -2,7 +2,7 @@ import type { Sourced, ThreadFacet } from '../../../../../core-shared/src/schema
 import type { Task } from '../../../../../core-shared/src/schemas/tasks.schema'
 
 /** A pull-request facet with every field present, for specs to vary one at a time. */
-export function facet(patch: Partial<ThreadFacet> = {}): Sourced<ThreadFacet> {
+export function facet(patch: Partial<Sourced<ThreadFacet>> = {}): Sourced<ThreadFacet> {
   return {
     source: 'git-integration',
     workKey: { repoRoot: '/repos/terminator', branch: 'tav-31' },
@@ -26,7 +26,7 @@ export function task(patch: Partial<Task> = {}): Task {
     ticket: null,
     focus: false,
     doneAt: null,
-    createdAt: '2026-10-18T08:00:00.000Z',
+    createdAt: new Date().toISOString(),
     archivedAt: null,
     ...patch,
   }
