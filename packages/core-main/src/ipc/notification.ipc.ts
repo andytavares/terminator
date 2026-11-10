@@ -12,7 +12,7 @@ import { revealWindow } from '../background-mode'
  * sends, so the App.tsx bridge handler that already reveals a session from
  * an extension does the same for a notification.
  */
-function revealSessionOnClick(sessionId: string): void {
+export function revealSessionOnClick(sessionId: string): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
     if (win.isMinimized()) win.restore()

@@ -104,6 +104,7 @@ const EXPECTED_REMOTE_CHANNELS = [
   // rejected before the manifest existed (the old hand-written allowlist
   // missed them), so remote /app/ never received these pushes.
   'notifications:push',
+  'notifications:removed',
   'extension:toggle-panel',
   'extension:select-project-tab',
   'menu:open-settings',

@@ -155,6 +155,14 @@ class NotificationManager {
     this.records.delete(id)
   }
 
+  /** Takes back a notification the operator has not acted on: it leaves the centre in every window. */
+  withdraw(id: string): void {
+    this.records.delete(id)
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('notifications:removed', id)
+    }
+  }
+
   triggerAction(notifId: string, actionId: string): { ok: true } | { error: string } {
     const record = this.records.get(notifId)
     if (!record) return { error: 'UNKNOWN_NOTIFICATION' }

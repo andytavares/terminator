@@ -12,7 +12,12 @@ vi.mock('../../../src/notifications/notification-manager', () => ({
 vi.mock('../../../src/mcp/renderer-tools', () => ({ callRendererTool }))
 
 const ID = '3f2a9c1e-7b4d-4e0a-9f1c-2d8e6b5a4c3f'
-const caller = { sessionId: ID, claudePid: 4242, projectDir: '/Users/me/repos/shop' }
+const caller = {
+  sessionId: ID,
+  claudePid: 4242,
+  projectDir: '/Users/me/repos/shop',
+  terminalId: null,
+}
 
 let root: string
 let running: Set<number>

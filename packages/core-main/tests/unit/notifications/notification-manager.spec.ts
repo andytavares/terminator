@@ -492,3 +492,13 @@ describe('NotificationManager.create — running in the background', () => {
     expect(background.list().map((n) => n.title)).toEqual(['Task done'])
   })
 })
+
+describe('NotificationManager.withdraw', () => {
+  it('removes the notification and tells every window it is gone', () => {
+    withDefaultTargets('center')
+    const id = notificationManager.create({ type: 'info', title: 'PR ready', key: 'claudeAlert' })
+    notificationManager.withdraw(id)
+    expect(notificationManager.list().map((n) => n.id)).not.toContain(id)
+    expect(mockSend).toHaveBeenCalledWith('notifications:removed', id)
+  })
+})

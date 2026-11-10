@@ -20,7 +20,15 @@ const HomeAskSchema = z.object({
   workKey: WorkKeySchema.nullable(),
   since: z.string(),
   actions: z.array(
-    z.object({ id: z.string().min(1), label: z.string(), primary: z.boolean().optional() })
+    z.object({
+      id: z.string().min(1),
+      label: z.string(),
+      primary: z.boolean().optional(),
+      /** Opens in the default browser. */
+      url: z.string().url().optional(),
+      /** Removes the item after the action. */
+      dismiss: z.boolean().optional(),
+    })
   ),
   open: z.object({ command: z.string().min(1), args: z.unknown().optional() }),
 })

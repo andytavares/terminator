@@ -21,7 +21,7 @@ function registerFake(schema: z.ZodType, row = spec) {
   return { handler, tool }
 }
 
-const caller = { sessionId: 's1', claudePid: 1, projectDir: '/repo' }
+const caller = { sessionId: 's1', claudePid: 1, projectDir: '/repo', terminalId: null }
 
 describe('manifestTools', () => {
   it('lists the manifest tool name, description and an object schema as it is', async () => {

@@ -12,6 +12,7 @@ import {
 } from './app-updater.js'
 import { announceWindowReadiness, exposeReadinessToTests } from './e2e-readiness.js'
 import { join } from 'path'
+import { openExternally } from './open-externally.js'
 import { buildHelpMenu, buildViewMenu, tickPanelItem } from './app-menu.js'
 import {
   registerWorkspaceHandlers,
@@ -164,12 +165,6 @@ function relayPushes(win: BrowserWindow): void {
     if (!channel.startsWith('terminal:') && channel !== 'workspace:changed') {
       frameBridge.broadcast(channel, args[0] as unknown)
     }
-  }
-}
-
-function openExternally(url: string): void {
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    shell.openExternal(url).catch(() => {})
   }
 }
 

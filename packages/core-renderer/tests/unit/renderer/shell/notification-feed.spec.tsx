@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useNotificationFeed } from '../../../../src/shell/main-events'
 import { useToastStore } from '../../../../src/stores/toast.store'
+import { useNotificationStore } from '../../../../src/stores/notification.store'
 import { useShownExtensionViews } from '../../../../src/stores/shown-extension-views.store'
 import { installElectronApi, pushedEvent } from '../../../../../test-support/src/electron-api'
 
@@ -20,13 +21,20 @@ function pushedToast(source?: string): Pushed {
 }
 
 let push: ReturnType<typeof pushedEvent<[Pushed]>>
+let removed: ReturnType<typeof pushedEvent<[string]>>
 
 beforeEach(() => {
   useToastStore.setState({ toasts: [] })
   useShownExtensionViews.setState({ shown: new Map() })
+  useNotificationStore.setState({ notifications: [], unreadCount: 0 })
   push = pushedEvent<[Pushed]>()
+  removed = pushedEvent<[string]>()
   installElectronApi({
-    notifications: { list: async () => [], onPush: push.addListener },
+    notifications: {
+      list: async () => [],
+      onPush: push.addListener,
+      onRemoved: removed.addListener,
+    },
   })
   renderHook(() => useNotificationFeed())
 })
@@ -52,5 +60,13 @@ describe('useNotificationFeed — who draws an extension toast', () => {
     push.deliver(pushedToast('terminator.foundry'))
     push.deliver(pushedToast(undefined))
     expect(toastTexts()).toHaveLength(2)
+  })
+})
+
+describe('useNotificationFeed — a notification main takes back', () => {
+  it('leaves the centre', () => {
+    push.deliver({ ...pushedToast(undefined), targets: ['center'] })
+    removed.deliver('n-1')
+    expect(useNotificationStore.getState().notifications).toEqual([])
   })
 })

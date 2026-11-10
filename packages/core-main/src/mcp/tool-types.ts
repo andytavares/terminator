@@ -5,6 +5,8 @@ export const McpCallerSchema = z.object({
   sessionId: z.string().nullable(),
   claudePid: z.number().int().positive(),
   projectDir: z.string(),
+  /** The Terminator terminal the session runs in; null outside one, or from an older relay. */
+  terminalId: z.string().nullable().default(null),
 })
 
 export type McpCaller = z.infer<typeof McpCallerSchema>

@@ -145,7 +145,7 @@ export function useNotificationFeed(): void {
     void window.electronAPI.notifications?.list().then((notifications) => {
       for (const n of notifications) if (n.targets?.includes('center')) addNotification(n)
     })
-    return window.electronAPI.notifications?.onPush((n) => {
+    const stopPush = window.electronAPI.notifications?.onPush((n) => {
       if (n.targets.includes('center')) addNotification(n)
       // An extension whose view is on screen draws its own: the core's would sit under the view.
       if (n.targets.includes('toast') && !isExtensionViewShown(n.source)) {
@@ -153,6 +153,13 @@ export function useNotificationFeed(): void {
         useToastStore.getState().addToast({ type: n.type, message })
       }
     })
+    const stopRemoved = window.electronAPI.notifications?.onRemoved?.((id) =>
+      useNotificationStore.getState().remove(id)
+    )
+    return () => {
+      stopPush?.()
+      stopRemoved?.()
+    }
   }, [])
 }
 
