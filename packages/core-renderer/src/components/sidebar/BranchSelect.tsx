@@ -70,7 +70,7 @@ function RefreshButton({
       disabled={refreshing}
       onClick={onRefresh}
     >
-      <RefreshCw />
+      <RefreshCw className={refreshing ? 'tmui-spin' : undefined} />
     </button>
   )
 }

@@ -1,0 +1,60 @@
+/* One agent tool call in the agent tab's timeline. Every colour is a --tm-* token. */
+
+.tmui-tool-card {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-card);
+  overflow: hidden;
+}
+
+.tmui-tool-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-2);
+  padding: var(--tm-space-2) var(--tm-space-3);
+}
+.tmui-tool-card__header > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.tmui-tool-card__title {
+  font-weight: 500;
+  flex: none;
+}
+
+.tmui-tool-card__detail {
+  font-family: var(--tm-font-mono);
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-secondary);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tmui-tool-card__body {
+  border-top: 1px solid var(--tm-border);
+  padding: var(--tm-space-2) var(--tm-space-3);
+  background: var(--tm-bg-input);
+  font-family: var(--tm-font-mono);
+  font-size: var(--tm-font-size-sm);
+  white-space: pre-wrap;
+}
+
+.tmui-tool-card__preview {
+  max-height: 320px;
+  overflow: auto;
+}
+/* The last collapsed line fades out, so the cut reads as "more below". */
+.tmui-tool-card__preview--collapsed {
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 50%, transparent);
+}
+
+.tmui-tool-card__toggle {
+  padding: 0 var(--tm-space-2) var(--tm-space-1);
+  background: var(--tm-bg-input);
+}

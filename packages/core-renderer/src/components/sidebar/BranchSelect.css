@@ -37,16 +37,6 @@
   height: 14px;
 }
 
-.branch-select__refresh--busy svg {
-  animation: bs-spin 0.8s linear infinite;
-}
-
-@keyframes bs-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .branch-select__trigger {
   display: flex;
   align-items: center;
