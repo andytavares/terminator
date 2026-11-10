@@ -1,0 +1,44 @@
+packages/core-renderer/src/components/home/use-desk-controller.ts
+  s_ebb345fc5d0962::t_536fcf930d8b14 92-94
+packages/core-renderer/tests/unit/renderer/agent/AgentView.spec.tsx
+  s_ebb345fc5d0962::t_a2113b45bf4459 258-280
+packages/extension-ui/src/ToolCard.tsx
+  s_ebb345fc5d0962::t_ae4c883f05b34f 50,57-59
+packages/core-renderer/src/components/home/YourMove.tsx
+  s_ebb345fc5d0962::t_608f4717e01f13 165
+packages/core-renderer/src/components/agent/AgentView.tsx
+  s_ebb345fc5d0962::t_ae4c883f05b34f 122-126
+packages/core-renderer/src/components/sidebar/MoveSessionDialog.tsx
+  s_ebb345fc5d0962::t_ae4c883f05b34f 108-110
+packages/extension-ui/tests/unit/tool-card.spec.tsx
+  s_ebb345fc5d0962::t_b092b7a1cf0189 26-28
+  s_ebb345fc5d0962::t_e3df3133ad3850 29-34,36-37
+  s_ebb345fc5d0962::t_a2113b45bf4459 35
+packages/core-renderer/tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_ebb345fc5d0962::t_a2113b45bf4459 233-234,237
+  s_ebb345fc5d0962::t_d5cbea57ff4d99 225-229,232,235-236
+  s_ebb345fc5d0962::t_b092b7a1cf0189 223
+packages/core-main/tests/unit/home/scheduled-alerts.spec.ts
+  s_ebb345fc5d0962::t_e3df3133ad3850 235-243
+packages/core-renderer/tests/unit/renderer/home/ask-on-home.spec.tsx
+  s_ebb345fc5d0962::t_f61d0bccaa9731 12,102
+  s_ebb345fc5d0962::t_a2113b45bf4459 179,186-203
+packages/core-main/src/home/scheduled-alerts.ts
+  s_ebb345fc5d0962::t_ae4c883f05b34f 70-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bf0ef995397e94728fa6d0ec955c3f322d0750c9",
+  "prompts": {},
+  "sessions": {
+    "s_ebb345fc5d0962": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a463caba-6243-4d50-8bc4-faa78182791a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
