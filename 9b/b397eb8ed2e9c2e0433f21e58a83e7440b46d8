@@ -1,0 +1,47 @@
+packages/core-renderer/src/home/core-asks.ts
+  s_ebb345fc5d0962::t_8c1557474913fb 31-32,36-44
+  s_ebb345fc5d0962::t_92f0ee49d66199 28-30
+  s_ebb345fc5d0962::t_dfaa1e868ef11a 33-35
+packages/core-renderer/tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_ebb345fc5d0962::t_0623b90137ac69 158-170
+  s_ebb345fc5d0962::t_5fd30049ff9201 144
+  s_ebb345fc5d0962::t_66958a4850565f 171-173
+packages/core-renderer/src/components/home/YourMove.tsx
+  s_ebb345fc5d0962::t_fc50a76070e046 5,189
+packages/core-renderer/src/components/home/useDeskModel.ts
+  s_ebb345fc5d0962::t_dfaa1e868ef11a 8-13
+  s_ebb345fc5d0962::t_8c1557474913fb 82
+packages/core-renderer/src/components/home/YourMove.css
+  s_ebb345fc5d0962::t_fc50a76070e046 59,103,120-122,124-127
+  s_ebb345fc5d0962::t_3f42c4f6c4d718 74-75,98-102
+packages/core-renderer/tests/unit/renderer/home/ask-on-home.spec.tsx
+  s_ebb345fc5d0962::t_dfaa1e868ef11a 164-170
+  s_ebb345fc5d0962::t_c9cfc3d62a3a1c 128,150,153-155,160-163,171-173,175,178-179,181-185
+  s_ebb345fc5d0962::t_d4a4193c6deb34 151-152
+  s_ebb345fc5d0962::t_769389a6a61fff 14,129-149,156-159,174,176-177,180,186
+packages/core-renderer/src/components/NotificationPanel.tsx
+  s_ebb345fc5d0962::t_5fd30049ff9201 4,142,144-145,149,195,197-198,200
+packages/core-renderer/src/components/home/desk-actions.ts
+  s_ebb345fc5d0962::t_dfaa1e868ef11a 8-13
+  s_ebb345fc5d0962::t_8c1557474913fb 97,99
+  s_ebb345fc5d0962::t_8c9e8f1d75e2df 77-81,84,100
+packages/core-renderer/tests/unit/renderer/home/desk-actions.spec.ts
+  s_ebb345fc5d0962::t_2fa38043d5e132 184-232,236-241
+  s_ebb345fc5d0962::t_dfaa1e868ef11a 18-22,233-235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9bb397eb8ed2e9c2e0433f21e58a83e7440b46d8",
+  "prompts": {},
+  "sessions": {
+    "s_ebb345fc5d0962": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a463caba-6243-4d50-8bc4-faa78182791a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
