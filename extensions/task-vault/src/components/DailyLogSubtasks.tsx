@@ -86,7 +86,7 @@ function SubtaskMarker(props: SubtaskRowProps & SubtaskEditProps): React.JSX.Ele
     <button
       className="daily-log__task-checkbox"
       onClick={() => void props.edit.complete()}
-      title="Complete subtask"
+      title="Mark subtask done"
     >
       <StatusIcon status={props.subtask.status} />
     </button>

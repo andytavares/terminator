@@ -320,7 +320,7 @@ function TaskMarker({ row }: RowProps): React.JSX.Element {
     <button
       className="daily-log__task-checkbox"
       onClick={() => void completeTask(row.props.onComplete, row.task.id)}
-      title="Complete task"
+      title="Mark done"
     >
       <StatusIcon status={row.task.status} />
     </button>

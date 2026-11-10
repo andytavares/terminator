@@ -188,7 +188,7 @@ async function navigationQuickActions(page: Page): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function linkIssueAttachesToBranch(page: Page): Promise<void> {
-  await runQuickActionFromPanel(page, 'Link issue to branch')
+  await runQuickActionFromPanel(page, 'Link ticket to branch')
   const dialog = page.getByRole('dialog', { name: 'Link an issue' })
   await dialog.getByPlaceholder('Search, or type an issue key').fill('login')
   await dialog.locator('.link-issue__row', { hasText: 'OPS-1' }).click()
@@ -207,7 +207,7 @@ async function viewOpensIssueDrawer(page: Page): Promise<void> {
 
 async function copyIssueKeyFillsClipboard({ page, app }: AppHandle): Promise<void> {
   await app.evaluate(({ clipboard }) => clipboard.writeText('nothing yet'))
-  await runQuickActionFromPanel(page, 'Copy issue key (OPS-1)')
+  await runQuickActionFromPanel(page, 'Copy ticket key (OPS-1)')
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('OPS-1')
 }
 
@@ -252,7 +252,7 @@ async function connectLinear(page: Page): Promise<void> {
 
 async function changeLinkedIssuePinsSession(page: Page): Promise<void> {
   // The session already resolves to its branch's issue, so the action offers a change.
-  await runQuickActionFromPanel(page, 'Change linked issue')
+  await runQuickActionFromPanel(page, 'Change linked ticket')
   const dialog = page.getByRole('dialog', { name: 'Link a work item' })
   await dialog.getByPlaceholder('Search, or type an issue key').fill('audit')
   await dialog.locator('.issue-picker__row', { hasText: 'OPS-2' }).click()
@@ -270,7 +270,7 @@ async function issueActions(handle: AppHandle): Promise<void> {
   await test.step('Link issue to branch attaches a searched issue to the branch', () =>
     linkIssueAttachesToBranch(page))
   await test.step('View opens the linked issue in the drawer', () => viewOpensIssueDrawer(page))
-  await test.step('Copy issue key puts the key on the clipboard', () =>
+  await test.step('Copy ticket key puts the key on the clipboard', () =>
     copyIssueKeyFillsClipboard(handle))
   await test.step('Open in Linear hands the issue URL to the browser', () =>
     openInLinearOpensBrowser(handle))

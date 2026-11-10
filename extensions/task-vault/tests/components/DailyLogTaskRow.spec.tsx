@@ -42,7 +42,7 @@ function completeUsageTests() {
   it('counts a completed task', async () => {
     const user = userEvent.setup()
     renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    await user.click(screen.getByTitle('Complete task'))
+    await user.click(screen.getByTitle('Mark done'))
     await eventually(() => expect(bridge.recordUsage).toHaveBeenCalledWith('task-complete'))
   })
 }
@@ -51,7 +51,7 @@ function selectTests() {
   it('completes an open task from its checkbox', async () => {
     const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    await user.click(screen.getByTitle('Complete task'))
+    await user.click(screen.getByTitle('Mark done'))
     expect(props.onTaskComplete).toHaveBeenCalledWith('t1')
   })
 
@@ -239,7 +239,7 @@ function blockedTests() {
     renderDailyLog(blockedTask(), { onSelectTask: vi.fn() })
     expect(screen.getByTitle('Check in: 2 days').textContent).toBe('⊘ waiting')
     expect(screen.getByRole('img', { name: 'blocked' })).toBeTruthy()
-    expect(screen.queryByTitle('Complete task')).toBeNull()
+    expect(screen.queryByTitle('Mark done')).toBeNull()
   })
 
   it('unblocks a blocked task with a notice', async () => {
