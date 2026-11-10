@@ -20,7 +20,7 @@ vi.mock('../../../../src/components/session/useSessionFacts', () => ({
   useSessionFacts: () => spies.facts,
 }))
 vi.mock('../../../../src/components/session/SessionLinkDialog', () => ({
-  SessionLinkDialog: () => <div role="dialog" aria-label="Link a work item" />,
+  SessionLinkDialog: () => <div role="dialog" aria-label="Link a ticket" />,
 }))
 const deskFilter = vi.hoisted(() => ({
   text: '',

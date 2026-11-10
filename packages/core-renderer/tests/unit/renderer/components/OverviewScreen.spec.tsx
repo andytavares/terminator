@@ -280,7 +280,7 @@ describe('OverviewScreen — the Monitor wall — opens the link dialog for a se
     const user = userEvent.setup()
     render(<OverviewScreen />)
     const host = tiles().find((t) => t.getAttribute('aria-label')?.endsWith('claude'))!
-    await user.click(within(host).getByRole('button', { name: 'Link a work item' }))
+    await user.click(within(host).getByRole('button', { name: 'Link a ticket' }))
     expect(screen.getByRole('dialog', { name: 'Link claude' })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Close link' }))
     expect(screen.queryByRole('dialog')).toBeNull()

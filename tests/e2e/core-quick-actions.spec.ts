@@ -253,7 +253,7 @@ async function connectLinear(page: Page): Promise<void> {
 async function changeLinkedIssuePinsSession(page: Page): Promise<void> {
   // The session already resolves to its branch's issue, so the action offers a change.
   await runQuickActionFromPanel(page, 'Change linked ticket')
-  const dialog = page.getByRole('dialog', { name: 'Link a work item' })
+  const dialog = page.getByRole('dialog', { name: 'Link a ticket' })
   await dialog.getByPlaceholder('Search, or type a ticket key').fill('audit')
   await dialog.locator('.issue-picker__row', { hasText: 'OPS-2' }).click()
   await dialog.getByRole('button', { name: 'Link OPS-2' }).click()

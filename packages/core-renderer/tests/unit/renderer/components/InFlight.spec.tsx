@@ -49,7 +49,7 @@ vi.mock('../../../../src/components/session/session-actions', () => ({
 const linkStub = vi.hoisted(() => {
   function FakeLinkDialog({ onClose }: { facts: unknown; onClose: () => void }): React.JSX.Element {
     return (
-      <div role="dialog" aria-label="Link a work item">
+      <div role="dialog" aria-label="Link a ticket">
         <button onClick={onClose}>Close link dialog</button>
       </div>
     )
@@ -500,7 +500,7 @@ describe('the row menu — Link ticket', () => {
     render(<InFlight />)
     await openScratchRow(user)
     await user.click(openMenuItem('Link ticket…'))
-    expect(screen.getByRole('dialog', { name: 'Link a work item' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Link a ticket' })).toBeTruthy()
   })
 })
 

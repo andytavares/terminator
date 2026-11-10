@@ -20,7 +20,7 @@ vi.mock('../../../../src/components/session/session-actions', () => ({
   SESSION_ACTIONS: { onOpen: spies.open, onResume: vi.fn(), onSaveDescription: vi.fn() },
 }))
 vi.mock('../../../../src/components/session/SessionLinkDialog', () => ({
-  SessionLinkDialog: () => <div role="dialog" aria-label="Link a work item" />,
+  SessionLinkDialog: () => <div role="dialog" aria-label="Link a ticket" />,
 }))
 
 const TASK_ID = '11111111-1111-4111-8111-111111111111'

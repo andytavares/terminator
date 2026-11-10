@@ -184,7 +184,7 @@ describe('WorkItemCell — nothing yet — offers a link only when linking is po
     const { rerender } = render(
       <WorkItemCell workItem={null} issue={undefined} description={null} onSaveDescription={noop} />
     )
-    expect(screen.queryByRole('button', { name: 'Link a work item' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Link a ticket' })).toBeNull()
     const link = vi.fn()
     rerender(
       <WorkItemCell
@@ -195,7 +195,7 @@ describe('WorkItemCell — nothing yet — offers a link only when linking is po
         onLink={link}
       />
     )
-    await user.click(screen.getByRole('button', { name: 'Link a work item' }))
+    await user.click(screen.getByRole('button', { name: 'Link a ticket' }))
     expect(link).toHaveBeenCalled()
   })
 })

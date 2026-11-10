@@ -71,12 +71,12 @@ async function descriptionNamesTheWork(page: Page): Promise<void> {
 async function openLinkDialog(page: Page): Promise<Locator> {
   await selectProject(page, 'Repo One', BRANCH)
   await tabMenuItem(page, 'Link ticket…')
-  return page.getByRole('dialog', { name: 'Link a work item' })
+  return page.getByRole('dialog', { name: 'Link a ticket' })
 }
 
 async function linkDialogNamesWhereToConnect(page: Page): Promise<void> {
   const dialog = await openLinkDialog(page)
-  await expectCentredInWindow(dialog, 'Link a work item')
+  await expectCentredInWindow(dialog, 'Link a ticket')
   await expect(dialog.getByRole('alert')).toHaveText(
     'No issue tracker is connected. Connect Linear in Settings → Integrations.'
   )
