@@ -9,6 +9,7 @@ import { useSessionStore } from '../../../../src/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/stores/workspace.store'
 import { useTaskStore } from '../../../../src/stores/task.store'
 import { useHomeFeedStore } from '../../../../src/stores/home-feed.store'
+import { useDismissalsStore } from '../../../../src/home/dismissals'
 import { useSettingsStore } from '../../../../src/stores/settings.store'
 import { defaultGlobalSettings } from '../../../../../core-shared/src/settings-defaults'
 import type { HomeAsk } from '../../../../../core-shared/src/schemas/home-feed.schema'
@@ -98,6 +99,7 @@ beforeEach(() => {
     attention: { measures: vi.fn().mockResolvedValue({ data: { waitedOnYouToday: 0 } }) } as never,
   })
   resetStore(useHomeFeedStore)
+  resetStore(useDismissalsStore)
   seedThreeLanes()
 })
 
@@ -174,13 +176,30 @@ describe('An alert a Claude terminal raised with a Reply button', () => {
 })
 
 describe('An alert with a long detail', () => {
-  it('shows its whole detail in the row', async () => {
+  it('names its whole detail on the row, for a detail cut to three lines', async () => {
     useLayout('tasks')
     const detail = `${'The migration touched forty tables. '.repeat(12)}Review before merging.`
     raiseAlert({ detail })
     render(<HomeScreen />)
 
     const needsYou = await screen.findByRole('region', { name: 'Needs you' })
-    expect(within(needsYou).getByText(detail)).toBeTruthy()
+    expect(within(needsYou).getByTitle(detail)).toBeTruthy()
+  })
+})
+
+describe('An alert button that dismisses', () => {
+  it('takes the alert off Needs you when pressed', async () => {
+    useLayout('tasks')
+    const user = userEvent.setup()
+    raiseAlert({
+      kind: 'finished',
+      detail: 'PR merged.',
+      actions: [{ id: 'action-0', label: 'Done', dismiss: true }],
+    })
+    render(<HomeScreen />)
+
+    const needsYou = await screen.findByRole('region', { name: 'Needs you' })
+    await user.click(within(needsYou).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByText('PR merged.')).toBeNull()
   })
 })

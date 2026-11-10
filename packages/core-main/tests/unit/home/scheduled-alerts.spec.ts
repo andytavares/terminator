@@ -232,3 +232,12 @@ describe('createAlerts, the notification an alert sent', () => {
     expect(asks()).toEqual([])
   })
 })
+
+describe('createAlerts, a Reply button beside a link', () => {
+  it('keeps the row on the terminal, so a reply reaches it', () => {
+    const { store, asks } = alerts()
+    const actions = [{ label: 'Reply', reply: true }]
+    store.receive({ title: 'PR ready', url: pr, actions }, 'Claude · shop', 'tab-1')
+    expect(asks()[0].open).toEqual({ command: 'core:reveal-session', args: { sessionId: 'tab-1' } })
+  })
+})

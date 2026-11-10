@@ -119,7 +119,11 @@ function OutputItems({ texts }: { texts: string[] }): React.JSX.Element {
 function toolOutput(tool: ToolEntry, cwd: string) {
   const texts = tool.output.flatMap((out) => (out.kind === 'text' ? [out.text] : []))
   const diffs = tool.output.filter((out) => out.kind === 'diff')
-  const asItems = texts.length > 1 && texts.every((text) => !text.trim().includes('\n'))
+  // A command's output is text, however short its lines.
+  const asItems =
+    tool.toolKind !== 'execute' &&
+    texts.length > 1 &&
+    texts.every((text) => !text.trim().includes('\n'))
   const preview = texts.length > 0 && !asItems ? texts.join('\n') : undefined
   if (!asItems && diffs.length === 0) return { preview }
   const children = (

@@ -105,7 +105,9 @@ function useMoveSession(sessionId: string, onClose: () => void, onMoved: Props['
 /** Deletes a branch nothing is open in any more; never the scratch one. */
 async function deleteIfEmpty(projectId: string): Promise<void> {
   if (projectId === SCRATCH_PROJECT_ID) return
-  if (useSessionStore.getState().getSessionsForProject(projectId).length > 0) return
+  // The sessions map, not the tab list: a hidden scheduled run still counts as open.
+  const sessions = [...useSessionStore.getState().sessions.values()]
+  if (sessions.some((session) => session.projectId === projectId)) return
   await useWorkspaceStore.getState().deleteProject(projectId)
 }
 

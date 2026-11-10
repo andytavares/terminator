@@ -255,6 +255,29 @@ describe('AgentView tool call with one-line outputs', () => {
   })
 })
 
+describe('AgentView command output', () => {
+  it('shows a command that printed several short lines as output text, not as items', async () => {
+    const printed = (line: string) => ({ type: 'content', content: { type: 'text', text: line } })
+    await mountView()
+    act(() =>
+      updates.deliver({
+        sessionId: 'agent-1',
+        update: {
+          sessionUpdate: 'tool_call',
+          toolCallId: 't1',
+          title: 'ls',
+          kind: 'execute',
+          status: 'completed',
+          content: [printed('a.ts'), printed('b.ts')],
+        },
+        position: 1,
+      })
+    )
+    expect(screen.queryByRole('list', { name: 'Output' })).toBeNull()
+    expect(screen.getByText(/a\.ts\s+b\.ts/)).toBeTruthy()
+  })
+})
+
 describe('AgentView turn timeline', () => {
   const toolCall = (id: string): AgentUpdate => ({
     sessionUpdate: 'tool_call',

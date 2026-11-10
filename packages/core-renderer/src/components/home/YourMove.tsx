@@ -162,7 +162,7 @@ function AskSummary({ ask, glyphs }: { ask: DeskAsk; glyphs?: boolean }): React.
         <b>{ask.title}</b>
         <small>{ask.where ?? workLabel(ask.workKey)}</small>
       </span>
-      <span className="mi__what">
+      <span className="mi__what" title={ask.detail || undefined}>
         {ask.detail} {ask.facts.length > 0 && <em>{ask.facts.join(' · ')}</em>}
         {guessed && ask.askSignal && <em> Inferred: {ASK_SIGNAL_REASONS[ask.askSignal]}</em>}
       </span>

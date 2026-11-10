@@ -23,6 +23,18 @@ describe('ToolCard preview', () => {
     await user.click(screen.getByRole('button', { name: 'Show less' }))
     expect(screen.queryByText(/line 9/)).toBeNull()
   })
+})
+
+describe('ToolCard preview length', () => {
+  it('does not count the newline that ends the output as a line', () => {
+    render(<ToolCard title="Ran" status="completed" preview={'one\ntwo\nthree\n'} />)
+    expect(screen.queryByRole('button', { name: /Show all/ })).toBeNull()
+  })
+
+  it("shows a failed call's whole output without a click", () => {
+    render(<ToolCard title="Ran" status="failed" preview={nineLines} />)
+    expect(screen.getByText(/line 9/)).toBeTruthy()
+  })
 
   it('shows a preview of 3 lines in full, with no button', () => {
     render(

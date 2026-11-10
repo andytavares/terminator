@@ -67,7 +67,9 @@ function askActions(alert: Alert): HomeAsk['actions'] {
 }
 
 function openAlert(alert: Alert, terminalId: string | null): HomeAsk['open'] {
-  if (alert.url) return { command: 'core:open-url', args: { url: alert.url } }
+  // A Reply needs the row to know its terminal; the link stays on its button.
+  const replies = alert.actions.some((action) => action.reply)
+  if (alert.url && !replies) return { command: 'core:open-url', args: { url: alert.url } }
   if (terminalId) return { command: 'core:reveal-session', args: { sessionId: terminalId } }
   // Home needs somewhere to go; with no session this does nothing.
   return { command: 'core:reveal-session' }

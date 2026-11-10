@@ -47,15 +47,16 @@ export function ToolCard({
         <span className="tmui-tool-card__detail">{detail}</span>
         <Chip icon={chip.icon}>{chip.text}</Chip>
       </div>
-      {preview !== undefined && <ToolCardPreview text={preview} />}
+      {preview !== undefined && <ToolCardPreview text={preview} open={status === 'failed'} />}
       {children !== undefined && <div className="tmui-tool-card__body">{children}</div>}
     </div>
   )
 }
 
 /** The output, cut to its first lines with a fade until the reader asks for all of it. */
-function ToolCardPreview({ text }: { text: string }): React.JSX.Element {
-  const [expanded, setExpanded] = useState(false)
+function ToolCardPreview(props: { text: string; open: boolean }): React.JSX.Element {
+  const [expanded, setExpanded] = useState(props.open)
+  const text = props.text.replace(/\n$/, '')
   const lines = text.split('\n')
   const long = lines.length > COLLAPSED_LINES
   const collapsed = long && !expanded
