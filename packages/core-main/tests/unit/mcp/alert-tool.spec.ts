@@ -142,8 +142,9 @@ describe('alertTool, buttons on the notification', () => {
 describe('alertTool, buttons on the notification that dismiss', () => {
   it('removes the Home alert when a dismissing button on the notification is pressed', async () => {
     const { feed, tool } = await load()
-    await tool.call({ title: 'PR ready', actions: [{ label: 'Done', dismiss: true }] }, caller)
-    notificationButton('Done').handler()
+    const actions = [{ label: 'Open and close', url: pr, dismiss: true }]
+    await tool.call({ title: 'PR ready', actions }, caller)
+    notificationButton('Open and close').handler()
     expect(feed.getMergedFeed().asks).toEqual([])
   })
 

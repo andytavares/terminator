@@ -19,6 +19,10 @@ const AlertActionSchema = z.object({
   reply: z.boolean().default(false),
 })
 
+// Home and the notification always add Dismiss, so a caller's button that only dismisses is a copy.
+const onlyDismisses = (action: z.infer<typeof AlertActionSchema>): boolean =>
+  action.dismiss && !action.url && !action.reply
+
 export const AlertSchema = z.object({
   title: z.string().trim().min(1),
   message: z.string().default(''),
@@ -32,7 +36,8 @@ export const AlertSchema = z.object({
     .default([])
     .refine((actions) => actions.filter((action) => action.reply).length <= 1, {
       error: 'Only one action can be a Reply.',
-    }),
+    })
+    .transform((actions) => actions.filter((action) => !onlyDismisses(action))),
 })
 
 export type Alert = z.infer<typeof AlertSchema>

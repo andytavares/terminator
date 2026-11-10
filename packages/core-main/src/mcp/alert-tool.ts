@@ -71,7 +71,7 @@ const alert: McpToolDef = {
     'An alert with the same title and source within a day replaces the earlier one. ' +
     '`url` is an http(s) link opened when the person clicks the alert. ' +
     '`actions` adds up to three buttons: `url` opens a link, `dismiss: true` removes the alert ' +
-    'after the press, and `reply: true` lets the person answer you (one Reply at most; only from ' +
+    'after the press (a button that only dismisses is dropped, as Dismiss is always there), and `reply: true` lets the person answer you (one Reply at most; only from ' +
     'a session in a Terminator terminal).',
   inputSchema: z.toJSONSchema(AlertSchema, { io: 'input' }) as Record<string, unknown>,
   ...toolMarks({ destructive: false, readOnly: false }),
