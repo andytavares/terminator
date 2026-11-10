@@ -162,6 +162,30 @@ export function relativeTo(cwd: string, path: string): string {
   return folder && file.startsWith(`${folder}/`) ? file.slice(folder.length + 1) : path
 }
 
+export type ToolStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled'
+
+const TOOL_STATUSES: readonly string[] = [
+  'pending',
+  'in_progress',
+  'completed',
+  'failed',
+  'cancelled',
+]
+
+/** An ACP tool status; a missing or unknown one reads as still waiting. */
+export function toolStatus(status: string | null): ToolStatus {
+  return status !== null && TOOL_STATUSES.includes(status) ? (status as ToolStatus) : 'pending'
+}
+
+/** A tool call's one-line label, so a command or path never prints twice. */
+export function toolLabel(tool: ToolEntry, cwd: string): { title: string; detail: string | null } {
+  const repeats = tool.detail === tool.title
+  // Claude Code sends a command as the title, and the command is the detail too.
+  if (repeats && tool.toolKind === 'execute') return { title: 'Ran', detail: tool.detail }
+  if (repeats || tool.detail === null) return { title: tool.title, detail: null }
+  return { title: tool.title, detail: relativeTo(cwd, tool.detail) }
+}
+
 interface ChangedFile {
   path: string
   added: number

@@ -174,10 +174,111 @@ describe('AgentView tool calls', () => {
       })
     })
     expect(screen.getByText('Edit file')).toBeTruthy()
-    expect(screen.getByText('src/a.ts', { selector: '.agent-tool__summary' })).toBeTruthy()
     const diff = screen.getByRole('group', { name: 'src/a.ts' }) as HTMLDetailsElement
+    expect(within(diff).getByText('src/a.ts')).toBeTruthy()
     expect(diff.open).toBe(true)
     expect(within(within(diff).getByRole('row', { name: /new line/ })).getByText('+')).toBeTruthy()
+  })
+})
+
+describe('AgentView tool call labels', () => {
+  it('shows a command the agent ran once, under the title "Ran"', async () => {
+    await mountView()
+    act(() =>
+      updates.deliver({
+        sessionId: 'agent-1',
+        update: {
+          sessionUpdate: 'tool_call',
+          toolCallId: 't1',
+          title: 'npm test',
+          kind: 'execute',
+          status: 'completed',
+          rawInput: { command: 'npm test' },
+        },
+        position: 1,
+      })
+    )
+    const card = screen.getByRole('group', { name: 'Ran npm test' })
+    expect(within(card).getByText('Ran')).toBeTruthy()
+    expect(screen.getAllByText('npm test')).toHaveLength(1)
+  })
+})
+
+describe('AgentView tool call output', () => {
+  it('shows a failed tool call’s output without a click', async () => {
+    await mountView()
+    act(() =>
+      updates.deliver({
+        sessionId: 'agent-1',
+        update: {
+          sessionUpdate: 'tool_call',
+          toolCallId: 't1',
+          title: 'npm test',
+          kind: 'execute',
+          status: 'failed',
+          rawInput: { command: 'npm test' },
+          content: [{ type: 'content', content: { type: 'text', text: 'Error: boom' } }],
+        },
+        position: 1,
+      })
+    )
+    const card = screen.getByRole('group', { name: 'Ran npm test' })
+    expect(within(card).getByText('Failed')).toBeTruthy()
+    expect(within(card).getByText('Error: boom')).toBeTruthy()
+    expect(within(card).queryByRole('group')).toBeNull()
+  })
+})
+
+describe('AgentView tool call with one-line outputs', () => {
+  it('shows several one-line outputs as a list of items', async () => {
+    const found = (name: string) => ({ type: 'content', content: { type: 'text', text: name } })
+    await mountView()
+    act(() =>
+      updates.deliver({
+        sessionId: 'agent-1',
+        update: {
+          sessionUpdate: 'tool_call',
+          toolCallId: 't1',
+          title: 'ToolSearch',
+          kind: 'search',
+          status: 'completed',
+          content: [found('Tool: mcp__a__open'), found('Tool: mcp__a__close')],
+        },
+        position: 1,
+      })
+    )
+    const items = within(screen.getByRole('list', { name: 'Output' })).getAllByRole('listitem')
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Tool: mcp__a__open',
+      'Tool: mcp__a__close',
+    ])
+  })
+})
+
+describe('AgentView turn timeline', () => {
+  const toolCall = (id: string): AgentUpdate => ({
+    sessionUpdate: 'tool_call',
+    toolCallId: id,
+    title: 'Read',
+    kind: 'read',
+    rawInput: { file_path: `/r/${id}.ts` },
+  })
+
+  it('starts each turn with its number and how many tool calls it made', async () => {
+    agents.history.mockResolvedValue({
+      data: [
+        text('user_message_chunk', 'Fix it'),
+        toolCall('a'),
+        toolCall('b'),
+        text('user_message_chunk', 'Thanks'),
+        toolCall('c'),
+        text('user_message_chunk', 'Bye'),
+      ],
+    })
+    await mountView()
+    expect(screen.getByText('Turn 1 · 2 tool calls')).toBeTruthy()
+    expect(screen.getByText('Turn 2 · 1 tool call')).toBeTruthy()
+    expect(screen.getByText('Turn 3')).toBeTruthy()
   })
 })
 
@@ -200,7 +301,7 @@ describe('AgentView changed in this turn', () => {
 })
 
 describe('AgentView usage', () => {
-  it('shows usage as a percentage with the cost', async () => {
+  it('shows usage as a percentage with the cost under the message box', async () => {
     await mountView()
     act(() =>
       updates.deliver({
@@ -214,8 +315,9 @@ describe('AgentView usage', () => {
         position: 1,
       })
     )
-    expect(screen.getByText(/25%/)).toBeTruthy()
-    expect(screen.getByText(/\$0\.50/)).toBeTruthy()
+    const composer = screen.getByRole('group', { name: 'Message composer' })
+    expect(within(composer).getByText('25% of context · $0.50')).toBeTruthy()
+    expect(screen.getAllByText(/25% of context/)).toHaveLength(1)
   })
 })
 

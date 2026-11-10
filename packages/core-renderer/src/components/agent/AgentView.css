@@ -11,14 +11,6 @@
   font-size: var(--tm-font-size-md);
 }
 
-.agent-view__usage {
-  flex-shrink: 0;
-  padding: var(--tm-space-1) var(--tm-space-4);
-  border-bottom: 1px solid var(--tm-border);
-  color: var(--tm-text-muted);
-  font-size: var(--tm-font-size-xs);
-}
-
 .agent-view__log {
   flex: 1;
   min-height: 0;
@@ -56,8 +48,7 @@
   min-width: 0;
 }
 
-.agent-ask__detail,
-.agent-tool__detail {
+.agent-ask__detail {
   font-family: var(--tm-font-mono);
   color: var(--tm-text-secondary);
   overflow-wrap: anywhere;
@@ -111,32 +102,92 @@
 }
 
 .agent-message--user {
-  align-self: flex-end;
-  max-width: 80%;
-  padding: var(--tm-space-2) var(--tm-space-3);
-  background: var(--tm-bg-elevated);
+  padding: var(--tm-space-3);
+  background: var(--tm-bg-card);
   border-radius: var(--tm-radius-md);
 }
 
-.agent-tool,
-.agent-tool__head {
+.agent-turn {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--tm-space-2);
+  flex-direction: column;
+  gap: var(--tm-space-3);
 }
 
-.agent-tool__status {
+/* "Turn 2 · 3 tool calls", then a hairline to the end of the line. */
+.agent-turn__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-3);
+  margin: var(--tm-space-2) 0 0;
   color: var(--tm-text-muted);
   font-size: var(--tm-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-.agent-tool__output pre {
-  margin: var(--tm-space-1) 0 0;
-  max-height: 240px;
-  overflow: auto;
+.agent-turn__divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--tm-border);
+}
+
+/* The rail: one line down the left, one node per step the agent took. */
+.agent-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-3);
+  margin-left: 12px;
+  padding-left: var(--tm-space-5);
+  border-left: 1px solid var(--tm-border-strong);
+}
+
+.agent-rail__step {
+  position: relative;
+  min-width: 0;
+}
+
+/* A node is centred on the line: half its width plus half the line left of the padding. */
+.agent-rail__node {
+  position: absolute;
+  top: 4px;
+  left: calc(-1 * var(--tm-space-5) - 12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 23px;
+  height: 23px;
+  box-sizing: border-box;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 50%;
+  background: var(--tm-bg-base);
+  color: var(--tm-text-secondary);
+}
+
+.agent-rail__node svg {
+  width: 13px;
+  height: 13px;
+}
+
+.agent-rail__node--dot {
+  top: var(--tm-space-2);
+  left: calc(-1 * var(--tm-space-5) - 4px);
+  width: 7px;
+  height: 7px;
+  border: none;
+  background: var(--tm-border-strong);
+}
+
+.agent-tool-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-tool-items .tmui-chip {
   font-family: var(--tm-font-mono);
-  font-size: var(--tm-font-size-sm);
 }
 
 .agent-plan {
@@ -159,7 +210,6 @@
   border-top: 1px solid var(--tm-border);
 }
 
-.agent-composer__input,
 .agent-comment__input,
 .agent-find__input {
   flex: 1;
@@ -176,7 +226,27 @@
   padding: var(--tm-space-2) var(--tm-space-3);
 }
 
-.agent-composer__input:focus-visible,
+/* The field holds the text, then a row with attach and, during a turn, Steer and Stop. */
+.agent-composer__field {
+  display: flex;
+  flex-direction: column;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-control);
+  border-radius: var(--tm-radius-md);
+}
+
+.agent-composer__input {
+  border: none;
+  background: none;
+  color: var(--tm-text-primary);
+  font: inherit;
+}
+
+.agent-composer__input:focus-visible {
+  outline: none;
+}
+
+.agent-composer__field:focus-within,
 .agent-comment__input:focus-visible {
   outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
@@ -243,8 +313,21 @@
 
 .agent-composer__row {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--tm-space-2);
+  padding: 0 var(--tm-space-2) var(--tm-space-2);
+}
+
+.agent-composer__footer {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tm-space-3);
+}
+
+.agent-composer__usage {
+  margin-left: auto;
+  font-size: var(--tm-font-size-xs);
+  color: var(--tm-text-muted);
 }
 
 .agent-composer__hint,
@@ -317,7 +400,7 @@
   color: var(--tm-danger);
 }
 
-.agent-tool__summary {
+.agent-diff__path {
   font-family: var(--tm-font-mono);
   font-size: var(--tm-font-size-sm);
 }
@@ -355,8 +438,6 @@
 .agent-message-context {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  align-self: flex-end;
   gap: var(--tm-space-2);
   margin: 0;
   padding: 0;

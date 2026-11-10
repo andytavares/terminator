@@ -1,5 +1,19 @@
 import React, { useEffect, useRef } from 'react'
-import { Button, DiffView } from '@terminator/extension-ui'
+import {
+  Brain,
+  FileText,
+  FolderInput,
+  Globe,
+  Pencil,
+  Search,
+  SquareTerminal,
+  ToggleLeft,
+  Trash2,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react'
+import { Button, Chip, DiffView, ToolCard } from '@terminator/extension-ui'
+import { plural } from '@terminator/extension-sdk/plain'
 import type { AgentPermissionAsk } from '@terminator/extension-sdk'
 import { useSessionStore } from '../../stores/session.store'
 import {
@@ -7,11 +21,12 @@ import {
   inputSummary,
   relativeTo,
   splitTurns,
+  toolLabel,
+  toolStatus,
   type TranscriptEntry,
   type Turn,
   type ToolEntry,
   type Transcript,
-  type Usage,
 } from './fold-updates'
 import { CitationChip, Composer, SessionChip } from './Composer'
 import { CiteLayer } from './cite'
@@ -30,15 +45,6 @@ import { useAgentTranscript } from './use-agent-transcript'
 import { AgentMarkdown } from './AgentMarkdown'
 import { recordUse } from '../../usage/record'
 import './AgentView.css'
-
-/** Context used as a percentage, and the cost when the agent reports one. */
-function contextLabel({ used, size, cost }: Usage): string {
-  const percent = size > 0 ? Math.round((used / size) * 100) : 0
-  const spent = cost
-    ? ` · ${cost.currency === 'USD' ? '$' : `${cost.currency} `}${cost.amount.toFixed(2)}`
-    : ''
-  return `${percent}% of context${spent}`
-}
 
 function AskBand({
   ask,
@@ -75,34 +81,84 @@ type DiffEntry = Extract<ToolEntry['output'][number], { kind: 'diff' }>
 function DiffOutput({ diff, cwd }: { diff: DiffEntry; cwd: string }): React.JSX.Element {
   const path = relativeTo(cwd, diff.path)
   return (
-    <details className="agent-tool__output" aria-label={path} open>
+    <details className="agent-diff" aria-label={path} open>
       <summary>
-        <span className="agent-tool__summary">{path}</span>
+        <span className="agent-diff__path">{path}</span>
       </summary>
       <DiffView hunks={[{ header: '', lines: diffLinesOf(diff) }]} />
     </details>
   )
 }
 
-function ToolCall({ tool, cwd }: { tool: ToolEntry; cwd: string }): React.JSX.Element {
+const KIND_ICON: Record<string, LucideIcon> = {
+  execute: SquareTerminal,
+  search: Search,
+  read: FileText,
+  edit: Pencil,
+  delete: Trash2,
+  move: FolderInput,
+  fetch: Globe,
+  think: Brain,
+  switch_mode: ToggleLeft,
+}
+
+/** Several one-line outputs, such as the tools a search found, read best as items. */
+function OutputItems({ texts }: { texts: string[] }): React.JSX.Element {
   return (
-    <div className="agent-tool">
-      <div className="agent-tool__head">
-        <span className="agent-tool__title">{tool.title}</span>
-        {tool.status && <span className="agent-tool__status">{tool.status.replace('_', ' ')}</span>}
-        {tool.detail && <code className="agent-tool__detail">{relativeTo(cwd, tool.detail)}</code>}
-      </div>
-      {tool.output.map((out, i) =>
-        out.kind === 'diff' ? (
-          <DiffOutput key={i} diff={out} cwd={cwd} />
-        ) : (
-          <details key={i} className="agent-tool__output">
-            <summary>Output</summary>
-            <pre>{out.text}</pre>
-          </details>
-        )
-      )}
+    <ul className="agent-tool-items" aria-label="Output">
+      {texts.map((text, i) => (
+        <li key={i}>
+          <Chip>{text}</Chip>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** A tool's text as a folding preview, or as items, and its diffs open under it. */
+function toolOutput(tool: ToolEntry, cwd: string) {
+  const texts = tool.output.flatMap((out) => (out.kind === 'text' ? [out.text] : []))
+  const diffs = tool.output.filter((out) => out.kind === 'diff')
+  const asItems = texts.length > 1 && texts.every((text) => !text.trim().includes('\n'))
+  const preview = texts.length > 0 && !asItems ? texts.join('\n') : undefined
+  if (!asItems && diffs.length === 0) return { preview }
+  const children = (
+    <>
+      {asItems && <OutputItems texts={texts} />}
+      {diffs.map((diff, i) => (
+        <DiffOutput key={i} diff={diff} cwd={cwd} />
+      ))}
+    </>
+  )
+  return { preview, children }
+}
+
+function RailStep(props: { node?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="agent-rail__step">
+      <span
+        className={`agent-rail__node${props.node ? '' : ' agent-rail__node--dot'}`}
+        aria-hidden="true"
+      >
+        {props.node}
+      </span>
+      {props.children}
     </div>
+  )
+}
+
+function ToolStep({ tool, cwd }: { tool: ToolEntry; cwd: string }): React.JSX.Element {
+  const Icon = KIND_ICON[tool.toolKind ?? ''] ?? Wrench
+  const { title, detail } = toolLabel(tool, cwd)
+  return (
+    <RailStep node={<Icon />}>
+      <ToolCard
+        title={title}
+        detail={detail}
+        status={toolStatus(tool.status)}
+        {...toolOutput(tool, cwd)}
+      />
+    </RailStep>
   )
 }
 
@@ -191,20 +247,79 @@ function Message({ entry, marks }: { entry: MessageEntry; marks: TranscriptMarks
   )
 }
 
-function TurnView(props: { turn: Turn; cwd: string; marks: TranscriptMarks }): React.JSX.Element {
+/** "Turn 2 · 3 tool calls": where a turn starts, and how much it did. */
+function TurnDivider({ turn, number }: { turn: Turn; number: number }): React.JSX.Element {
+  const toolCalls = turn.entries.filter((entry) => entry.kind === 'tool').length
+  const count = toolCalls > 0 ? ` · ${toolCalls} ${plural(toolCalls, 'tool call')}` : ''
+  return <p className="agent-turn__divider">{`Turn ${number}${count}`}</p>
+}
+
+const isPrompt = (entry: TranscriptEntry | undefined): entry is MessageEntry =>
+  entry?.kind === 'message' && entry.role === 'user'
+
+/** Everything the agent did in a turn, one step per node on the rail. */
+function TurnRail(props: {
+  turn: Turn
+  steps: TranscriptEntry[]
+  cwd: string
+  marks: TranscriptMarks
+}) {
   const { turn, cwd } = props
+  if (props.steps.length === 0 && turn.changes.length === 0) return null
   return (
-    <>
-      {turn.entries.map((entry, i) =>
+    <div className="agent-rail">
+      {props.steps.map((entry, i) =>
         entry.kind === 'tool' ? (
-          <ToolCall key={entry.toolCallId} tool={entry} cwd={cwd} />
+          <ToolStep key={entry.toolCallId} tool={entry} cwd={cwd} />
         ) : (
-          <Message key={i} entry={entry} marks={props.marks} />
+          <RailStep key={i}>
+            <Message entry={entry} marks={props.marks} />
+          </RailStep>
         )
       )}
-      {turn.changes.length > 0 && <ChangesCard turn={turn} cwd={cwd} />}
-    </>
+      {turn.changes.length > 0 && (
+        <RailStep>
+          <ChangesCard turn={turn} cwd={cwd} />
+        </RailStep>
+      )}
+    </div>
   )
+}
+
+/** A turn opens with its divider and the sent prompt; entries before any prompt have neither. */
+function TurnView(props: { turn: Turn; number: number; cwd: string; marks: TranscriptMarks }) {
+  const { turn } = props
+  const [first, ...rest] = turn.entries
+  const prompt = isPrompt(first) ? first : null
+  return (
+    <div className="agent-turn">
+      {prompt && <TurnDivider turn={turn} number={props.number} />}
+      {prompt && <Message entry={prompt} marks={props.marks} />}
+      <TurnRail
+        turn={turn}
+        steps={prompt ? rest : turn.entries}
+        cwd={props.cwd}
+        marks={props.marks}
+      />
+    </div>
+  )
+}
+
+/** The plan is the agent's, not one turn's, so it closes the log as a step of its own. */
+function PlanStep({ plan }: { plan: NonNullable<Transcript['plan']> }): React.JSX.Element {
+  return (
+    <div className="agent-rail">
+      <RailStep>
+        <PlanList plan={plan} />
+      </RailStep>
+    </div>
+  )
+}
+
+function useScrollToCurrentMatch(log: React.RefObject<HTMLDivElement | null>, find: FindState) {
+  useEffect(() => {
+    log.current?.querySelector('.agent-find__match--current')?.scrollIntoView?.({ block: 'center' })
+  }, [log, find])
 }
 
 function TranscriptLog(props: {
@@ -214,14 +329,14 @@ function TranscriptLog(props: {
   log: React.RefObject<HTMLDivElement | null>
 }): React.JSX.Element {
   const { transcript, cwd, log } = props
-  useEffect(() => {
-    log.current?.querySelector('.agent-find__match--current')?.scrollIntoView?.({ block: 'center' })
-  }, [log, props.marks.find])
+  useScrollToCurrentMatch(log, props.marks.find)
   const marks = {
     ...props.marks,
     firstMatch: firstMatches(transcript.entries, props.marks.find.query),
     entryIndex: new Map(transcript.entries.map((entry, i) => [entry, i])),
   }
+  // Entries before the first prompt are not a turn, so numbering starts after them.
+  const firstNumber = isPrompt(transcript.entries[0]) ? 1 : 0
   return (
     <div
       ref={log}
@@ -231,9 +346,9 @@ function TranscriptLog(props: {
       className="agent-view__log"
     >
       {splitTurns(transcript.entries).map((turn, i) => (
-        <TurnView key={i} turn={turn} cwd={cwd} marks={marks} />
+        <TurnView key={i} turn={turn} number={i + firstNumber} cwd={cwd} marks={marks} />
       ))}
-      {transcript.plan && <PlanList plan={transcript.plan} />}
+      {transcript.plan && <PlanStep plan={transcript.plan} />}
     </div>
   )
 }
@@ -278,13 +393,10 @@ export function AgentView({ sessionId }: { sessionId: string }): React.JSX.Eleme
       {asks.map((ask) => (
         <AskBand key={ask.requestId} ask={ask} onAnswer={(id) => answer(ask.requestId, id)} />
       ))}
-      {transcript.usage && (
-        <div className="agent-view__usage">{contextLabel(transcript.usage)}</div>
-      )}
       <TranscriptLog {...{ transcript, cwd, log, marks }} />
       <CiteLayer log={log} tabId={sessionId} />
       {exited && <p className="agent-view__exited">The agent exited.</p>}
-      <Composer {...composer} />
+      <Composer {...composer} usage={transcript.usage ?? undefined} />
     </section>
   )
 }

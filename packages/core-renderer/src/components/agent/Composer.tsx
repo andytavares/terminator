@@ -3,6 +3,7 @@ import { CornerDownLeft, MessagesSquare, Paperclip, Pencil, Quote, Square, X } f
 import { Button, Chip, IconButton } from '@terminator/extension-ui'
 import { useFollowUpQueue } from './use-agent-transcript'
 import { recordUse } from '../../usage/record'
+import type { Usage } from './fold-updates'
 import {
   hasAttachedContext,
   promptWithContext,
@@ -245,6 +246,27 @@ interface ComposerProps {
   running: boolean
   /** Finds a citation's quote in the transcript. */
   onShowSource: (quote: string) => void
+  usage?: Usage
+}
+
+/** Context used as a percentage, and the cost when the agent reports one. */
+function contextLabel({ used, size, cost }: Usage): string {
+  const percent = size > 0 ? Math.round((used / size) * 100) : 0
+  const spent = cost
+    ? ` · ${cost.currency === 'USD' ? '$' : `${cost.currency} `}${cost.amount.toFixed(2)}`
+    : ''
+  return `${percent}% of context${spent}`
+}
+
+/** Under the field: the keys while a turn runs, and how much context the agent has used. */
+function ComposerFooter({ running, usage }: { running: boolean; usage?: Usage }) {
+  if (!running && !usage) return null
+  return (
+    <div className="agent-composer__footer">
+      {running && <p className="agent-composer__hint">↵ queue · ⌘↵ steer now</p>}
+      {usage && <span className="agent-composer__usage">{contextLabel(usage)}</span>}
+    </div>
+  )
 }
 
 type AttachmentState = ReturnType<typeof useAttachments>
@@ -459,17 +481,19 @@ export function Composer(props: ComposerProps): React.JSX.Element {
       <Attachments attachments={attachments}>
         <ContextChips sessionId={sessionId} onShowSource={props.onShowSource} />
       </Attachments>
-      <div className="agent-composer__row">
+      <div className="agent-composer__field">
         <ComposerInput draft={draft} disabled={disabled} onSubmit={submit} onFiles={takeFiles} />
-        <AttachButton disabled={disabled} onFiles={takeFiles} />
-        {running && !disabled && (
-          <TurnButtons
-            onSteer={() => submit(true)}
-            onStop={() => void window.electronAPI.agents.cancel({ sessionId })}
-          />
-        )}
+        <div className="agent-composer__row">
+          <AttachButton disabled={disabled} onFiles={takeFiles} />
+          {running && !disabled && (
+            <TurnButtons
+              onSteer={() => submit(true)}
+              onStop={() => void window.electronAPI.agents.cancel({ sessionId })}
+            />
+          )}
+        </div>
       </div>
-      {running && <p className="agent-composer__hint">↵ queue · ⌘↵ steer now</p>}
+      <ComposerFooter running={running} usage={props.usage} />
     </ContextDropZone>
   )
 }
