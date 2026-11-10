@@ -90,6 +90,8 @@ describe('core renderer text', () => {
 describe('one word per action', () => {
   const COMPONENT = 'packages/core-renderer/src/components/Case.tsx'
   const EXTENSION = 'extensions/task-vault/src/components/Case.tsx'
+  const HOME_COMPONENT = 'packages/core-renderer/src/components/home/Case.tsx'
+  const SIDEBAR_COMPONENT = 'packages/core-renderer/src/components/sidebar/Case.tsx'
 
   it.each([
     ['visible text', 'export const A = () => <b>Done today: 3</b>\n', COMPONENT],
@@ -104,6 +106,29 @@ describe('one word per action', () => {
     ],
   ])('rejects a retired word in %s', async (_name, code, file) => {
     expect(await rulesHit(code, file)).toEqual(['terminator/restricted-syntax'])
+  })
+
+  it.each([
+    ['a Home row menu', "export const m = [{ label: 'Dismiss' }]\n", HOME_COMPONENT],
+    ['a Home footer', 'export const A = () => <b>Dismissed (2)</b>\n', HOME_COMPONENT],
+    [
+      'an Inbox card',
+      'export const A = () => <button aria-label="Dismiss" />\n',
+      SIDEBAR_COMPONENT,
+    ],
+    ['a ticket dialog', 'export const A = () => <dialog title="Link an issue" />\n', COMPONENT],
+    [
+      'a session link dialog',
+      'export const A = () => <dialog title="Link a work item" />\n',
+      COMPONENT,
+    ],
+  ])('rejects Dismiss or an old link name on work in %s', async (_name, code, file) => {
+    expect(await rulesHit(code, file)).toEqual(['terminator/restricted-syntax'])
+  })
+
+  it('allows Done that ends an edit on Home', async () => {
+    const code = "export const A = (e: boolean) => <b>{e ? 'Done' : 'Edit'}</b>\n"
+    expect(await rulesHit(code, HOME_COMPONENT)).toEqual([])
   })
 
   it.each([

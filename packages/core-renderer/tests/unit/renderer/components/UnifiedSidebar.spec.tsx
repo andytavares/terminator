@@ -254,6 +254,17 @@ describe('UnifiedSidebar — the Sidebar setting', () => {
     expect(branchNames()).toEqual(['main', 'Jobs', 'Web'])
   })
 
+  it('folds a card settled in the Inbox into its settled section', async () => {
+    const user = userEvent.setup()
+    mockUseSessionFacts.mockReturnValue([fact({ sessionId: 's1', name: 'api-shell', lastActivityAt: Date.now() })])
+    renderSidebar()
+    setSidebarMode('inbox')
+    const inbox = await screen.findByRole('list', { name: 'Inbox' })
+    const [first] = within(inbox).getAllByRole('listitem')
+    await user.click(within(first).getByRole('button', { name: 'Settle' }))
+    expect(screen.getByRole('button', { name: '1 settled' })).toBeTruthy()
+  })
+
   it('takes its width at once while settings load, and slides only after', () => {
     renderSidebar()
     expect(sidebar().classList.contains('unified-sidebar--animated')).toBe(false)

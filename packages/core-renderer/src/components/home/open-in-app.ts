@@ -11,7 +11,7 @@ export interface OpenInApp {
 }
 
 /** The extension's name as its workspace tab shows it; undefined when it has no tab. */
-export function extensionName(source: string): string | undefined {
+function extensionName(source: string): string | undefined {
   return useExtensionRegistry.getState().workspaceTabs.get(source)?.label
 }
 

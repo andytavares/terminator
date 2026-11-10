@@ -30,14 +30,18 @@ interface Repo {
 
 /** The Inbox sidebar: Home's work threads as cards, joined from the live stores. */
 export function InboxSidebar({ now }: { now?: number }): React.JSX.Element {
-  const { threads, allThreads } = useWorkThreads()
+  const { threads, settledThreads, allThreads } = useWorkThreads()
   const clock = useNow(MINUTE_MS)
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const repos = useMemo(
     () => workspaces.map((w) => ({ root: w.folderPath, name: w.name })),
     [workspaces]
   )
-  const shown = useMemo(() => threads.filter((t) => !t.archived), [threads])
+  // The Inbox draws its own settled section, so it takes the settled threads back.
+  const shown = useMemo(
+    () => [...threads, ...settledThreads].filter((t) => !t.archived),
+    [threads, settledThreads]
+  )
   useEffect(() => {
     useWorkMarks.getState().forgetGone(new Set(allThreads.map((t) => t.key)), Date.now())
   }, [allThreads])

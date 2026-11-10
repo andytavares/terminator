@@ -189,8 +189,8 @@ async function navigationQuickActions(page: Page): Promise<void> {
 
 async function linkIssueAttachesToBranch(page: Page): Promise<void> {
   await runQuickActionFromPanel(page, 'Link ticket to branch')
-  const dialog = page.getByRole('dialog', { name: 'Link an issue' })
-  await dialog.getByPlaceholder('Search, or type an issue key').fill('login')
+  const dialog = page.getByRole('dialog', { name: 'Link a ticket' })
+  await dialog.getByPlaceholder('Search, or type a ticket key').fill('login')
   await dialog.locator('.link-issue__row', { hasText: 'OPS-1' }).click()
   await dialog.getByRole('button', { name: 'Link OPS-1' }).click()
   await expect(dialog).toBeHidden()
@@ -254,7 +254,7 @@ async function changeLinkedIssuePinsSession(page: Page): Promise<void> {
   // The session already resolves to its branch's issue, so the action offers a change.
   await runQuickActionFromPanel(page, 'Change linked ticket')
   const dialog = page.getByRole('dialog', { name: 'Link a work item' })
-  await dialog.getByPlaceholder('Search, or type an issue key').fill('audit')
+  await dialog.getByPlaceholder('Search, or type a ticket key').fill('audit')
   await dialog.locator('.issue-picker__row', { hasText: 'OPS-2' }).click()
   await dialog.getByRole('button', { name: 'Link OPS-2' }).click()
   await expect(dialog).toBeHidden()

@@ -125,7 +125,7 @@ function IssueSearchBox({ term, onFocus, onChange }: SearchBoxProps): React.JSX.
       <input
         className="issue-picker__input"
         value={term}
-        placeholder="Search, or type an issue key"
+        placeholder="Search, or type a ticket key"
         onFocus={onFocus}
         onChange={(e) => onChange(e.target.value)}
       />

@@ -30,7 +30,7 @@ export function LinkIssueDialog(props: LinkIssueDialogProps): JSX.Element {
 
   return (
     <Dialog
-      title="Link an issue"
+      title="Link a ticket"
       onDismiss={props.onClose}
       actions={linkActions(link, props.onClose)}
     >
@@ -127,7 +127,7 @@ function IssueChoice({ term, setTerm, link, projectName, currentKey }: IssueChoi
           className="link-issue__input"
           autoFocus
           value={term}
-          placeholder="Search, or type an issue key"
+          placeholder="Search, or type a ticket key"
           onChange={(e) => setTerm(e.target.value)}
         />
       </div>

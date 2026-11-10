@@ -567,6 +567,20 @@
       }
     },
     {
+      "files": [
+        "packages/core-renderer/src/components/home/**/*.tsx",
+        "packages/core-renderer/src/components/sidebar/**/*.tsx"
+      ],
+      "rules": {
+        "terminator/restricted-syntax": [
+          "error",
+          "branch-not-project",
+          "work-vocabulary",
+          "settle-not-dismiss"
+        ]
+      }
+    },
+    {
       "files": ["extensions/*/src/**/*.tsx", "packages/extension-ui/src/**/*.tsx"],
       "rules": {
         "terminator/restricted-syntax": ["error", "extension-ui", "work-vocabulary"]

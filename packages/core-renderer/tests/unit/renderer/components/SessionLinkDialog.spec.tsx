@@ -59,7 +59,7 @@ describe('SessionLinkDialog', () => {
     const user = userEvent.setup()
     const facts = fact({ name: 'claude' })
     render(<SessionLinkDialog facts={facts} onClose={onClose} />)
-    expect(screen.getByRole('dialog', { name: 'Link a work item' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Link a ticket' })).toBeTruthy()
     const link = screen.getByRole('button', { name: 'Link ticket' }) as HTMLButtonElement
     expect(link.disabled).toBe(true)
     await user.click(screen.getByRole('button', { name: 'pick NW-88' }))

@@ -99,7 +99,7 @@ const BRANCH_NOT_PROJECT = [
 
 // One word per action, on every screen (ADR 157): Settle, Restore, Mark done, Archive, Link ticket.
 const RETIRED_WORDS =
-  '/\\b(?:Done today|Undo done|Restore to open|Unarchive|Complete|Link issue|Change linked issue)\\b/'
+  '/\\b(?:Done today|Undo done|Restore to open|Unarchive|Complete|Link issue|Change linked issue|Link an issue|Link a work item)\\b/'
 const RETIRED_WORDS_MESSAGE =
   'Each action has one word on every screen (ADR 157): Settle takes work off the list until it moves, Restore brings it back, Mark done finishes a task, Archive puts one away, Link ticket links a ticket. Dismiss stays only for notifications, toasts, alerts and findings that go for good.'
 
@@ -109,6 +109,18 @@ const WORK_VOCABULARY = [
   `JSXAttribute[name.name=/^(placeholder|title|aria-label|label)$/] > Literal[value=${RETIRED_WORDS}]`,
   `JSXExpressionContainer > ConditionalExpression > Literal[value=${RETIRED_WORDS}]`,
 ].map((selector) => ({ selector, message: RETIRED_WORDS_MESSAGE }))
+
+// Home and the Inbox settle work; Dismiss there is the retired name for it (ADR 157).
+const DISMISS_ON_WORK = '/^Dismiss/'
+const DISMISS_ON_WORK_MESSAGE =
+  'Home and the Inbox sidebar take work off the list with Settle, and Settled (N) lists it (ADR 157). Dismiss is for notifications, toasts, alerts and findings that go for good.'
+
+const SETTLE_NOT_DISMISS = [
+  `JSXText[value=${DISMISS_ON_WORK}]`,
+  `Property[key.name='label'] > Literal[value=${DISMISS_ON_WORK}]`,
+  `JSXAttribute[name.name=/^(placeholder|title|aria-label|label)$/] > Literal[value=${DISMISS_ON_WORK}]`,
+  `TemplateLiteral > TemplateElement[value.raw=${DISMISS_ON_WORK}]`,
+].map((selector) => ({ selector, message: DISMISS_ON_WORK_MESSAGE }))
 
 const VOCABULARY = '/\\b(?:vault|[Aa]rtifacts?|[Ss]talls?|ngrok)\\b/'
 const VOCABULARY_MESSAGE =
@@ -151,6 +163,7 @@ const GROUPS = {
   'spec-signals': SPEC_SIGNALS,
   'branch-not-project': BRANCH_NOT_PROJECT,
   'work-vocabulary': WORK_VOCABULARY,
+  'settle-not-dismiss': SETTLE_NOT_DISMISS,
   'extension-ui': EXTENSION_UI,
 }
 

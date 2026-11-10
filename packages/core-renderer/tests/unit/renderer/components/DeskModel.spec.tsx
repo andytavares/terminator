@@ -6,6 +6,7 @@ import {
   useOrderedThreadKeys,
 } from '../../../../src/components/home/desk-selection'
 import { useParkedThreads } from '../../../../src/components/home/parked-threads'
+import { useWorkMarks } from '../../../../src/home/work-marks'
 import {
   ageInWords,
   compactAge,
@@ -38,6 +39,7 @@ beforeEach(() => {
   seedDesk()
   useDeskSelection.setState({ expandedGroupIds: [], groupBy: 'move' })
   useParkedThreads.setState({ keys: [] })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
 })
 
 const workThreadOf = (key: string): WorkThread => {
@@ -137,6 +139,27 @@ describe('thread-format', () => {
     expect(pr).toMatchObject({ number: 275, isDraft: false })
     expect(pr?.checks.map((c) => c.state)).toEqual(['failed', 'passed'])
     expect(pullRequestOf(workThreadOf('linear:TAV-31'))).toBeNull()
+  })
+})
+
+describe('useWorkThreads — settle', () => {
+  const KEY = 'linear:TAV-20'
+  const withBuilding = (state: string): unknown[] =>
+    FACTS.map((f) => ((f as { sessionId: string }).sessionId === 'building' ? { ...f, state } : f))
+
+  it('lists a settled thread in settledThreads, not threads', () => {
+    act(() => useWorkMarks.getState().settle(KEY, NOW))
+    const { result } = renderHook(() => useWorkThreads())
+    expect(result.current.threads.map((t) => t.key)).not.toContain(KEY)
+    expect(result.current.settledThreads.map((t) => t.key)).toContain(KEY)
+  })
+
+  it('wakes a thread settled while its agent ran once the turn ends', () => {
+    act(() => useWorkMarks.getState().settle(KEY, NOW))
+    const { rerender } = renderHook(() => useWorkThreads())
+    world.facts = withBuilding('idle')
+    rerender()
+    expect(useWorkMarks.getState().settled[KEY]).toBeUndefined()
   })
 })
 

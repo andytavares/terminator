@@ -295,7 +295,7 @@ function ArchiveTabs({ data }: { data: ArchiveData }): React.JSX.Element {
 function ArchiveHeader(props: { days: number; onChange: (days: number) => void }) {
   return (
     <div className="archive-view__header">
-      <h2>History</h2>
+      <h2>Archive</h2>
       <SegmentedControl
         label="Show the last"
         size="sm"

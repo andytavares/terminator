@@ -115,7 +115,7 @@ describe('IssuePicker — choosing — says nothing about a tracker that was sim
 
 async function openList(user: ReturnType<typeof userEvent.setup>) {
   const view = open()
-  await user.click(screen.getByPlaceholderText('Search, or type an issue key'))
+  await user.click(screen.getByPlaceholderText('Search, or type a ticket key'))
   await screen.findByText('TAV-42')
   return view
 }
@@ -126,7 +126,7 @@ describe('IssuePicker — dismissing the list', () => {
     const behind = vi.fn()
     render(<div onKeyDown={behind} />)
     await openList(user)
-    expect(screen.getByPlaceholderText('Search, or type an issue key').matches(':focus')).toBe(true)
+    expect(screen.getByPlaceholderText('Search, or type a ticket key').matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     expect(screen.queryByText('TAV-42')).toBeNull()
     expect(behind).not.toHaveBeenCalled()
@@ -137,7 +137,7 @@ describe('IssuePicker — dismissing the list', () => {
     const behind = vi.fn()
     const { container } = render(<div onKeyDown={behind} />)
     await openList(user)
-    expect(screen.getByPlaceholderText('Search, or type an issue key').matches(':focus')).toBe(true)
+    expect(screen.getByPlaceholderText('Search, or type a ticket key').matches(':focus')).toBe(true)
     await user.keyboard('{Escape}')
     container.firstChild?.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
@@ -166,7 +166,7 @@ describe('IssuePicker — dismissing the list — stays open when the pointer go
     await openList(user)
     await user.click(document.body)
     expect(screen.queryByText('TAV-42')).toBeNull()
-    await user.click(screen.getByPlaceholderText('Search, or type an issue key'))
+    await user.click(screen.getByPlaceholderText('Search, or type a ticket key'))
     await screen.findByText('TAV-42')
   })
 })

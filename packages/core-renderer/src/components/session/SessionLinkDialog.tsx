@@ -33,7 +33,7 @@ export function SessionLinkDialog({ facts, onClose }: Props): JSX.Element {
       }}
     >
       <Dialog
-        title="Link a work item"
+        title="Link a ticket"
         onDismiss={onClose}
         actions={linkActions({ own: own !== null, selected, busy, write }, onClose)}
       >

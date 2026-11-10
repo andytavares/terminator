@@ -43,6 +43,12 @@ function open(props: Partial<React.ComponentProps<typeof LinkIssueDialog>> = {})
 }
 
 describe('LinkIssueDialog — opening', () => {
+  it('names the thing it links a ticket', async () => {
+    open()
+    expect(await screen.findByRole('dialog', { name: 'Link a ticket' })).toBeTruthy()
+    expect(screen.getByPlaceholderText('Search, or type a ticket key')).toBeTruthy()
+  })
+
   it('lists assigned issues immediately, with no search typed', async () => {
     open()
     await waitFor(() => expect(listMine).toHaveBeenCalled())

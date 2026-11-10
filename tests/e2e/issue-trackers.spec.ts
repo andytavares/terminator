@@ -113,7 +113,7 @@ async function linearConnects(): Promise<void> {
   await escapeSettings()
 }
 
-const linkDialog = (page: Page) => page.getByRole('dialog', { name: 'Link an issue' })
+const linkDialog = (page: Page) => page.getByRole('dialog', { name: 'Link a ticket' })
 const issueRows = (page: Page) => page.locator('.link-issue__row .link-issue__key')
 
 async function openIssueLinkDialog(): Promise<Page> {
@@ -126,9 +126,9 @@ async function openIssueLinkDialog(): Promise<Page> {
 
 async function linkListsMineAndSearchLinks(): Promise<void> {
   const page = await openIssueLinkDialog()
-  await expectCentredInWindow(linkDialog(page), 'Link an issue')
+  await expectCentredInWindow(linkDialog(page), 'Link a ticket')
   await expect(issueRows(page)).toHaveText(['ENG-12'], { useInnerText: true })
-  await page.getByPlaceholder('Search, or type an issue key').fill('crash')
+  await page.getByPlaceholder('Search, or type a ticket key').fill('crash')
   await expect(issueRows(page)).toHaveText(['ENG-12'])
   await expect(page.locator('.link-issue__failures')).toHaveCount(0)
   await page.locator('.link-issue__row').filter({ hasText: 'ENG-12' }).click()

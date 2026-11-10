@@ -152,7 +152,7 @@ export function useWorkThreads(): WorkThreads {
       allThreads: parkedByHand(allWorkThreads(input), parkedKeys),
     }
   }, [input, parkedKeys, settled, pinned, snoozed])
-  useWakeOnActivity(result.threads)
+  useWakeOnActivity(result.allThreads)
   useEffect(() => {
     const live = new Set(result.allThreads.map((t) => t.key))
     useParkedThreads.getState().forgetGone(live, Date.now())
