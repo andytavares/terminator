@@ -8,10 +8,12 @@ import { revealSession } from './navigate-to-session'
 // Shows a branch as a click on its sidebar row does: the terminal waiting on you, else the one
 // last open there. A branch with none is selected, and the app opens its first.
 export function revealBranch(projectId: string): void {
-  const sessions = [...useSessionStore.getState().sessions.values()].map((s) => ({
-    ...s,
-    agentState: agentStateOf(s),
-  }))
+  const sessions = [...useSessionStore.getState().sessions.values()]
+    .filter((s) => !s.hidden)
+    .map((s) => ({
+      ...s,
+      agentState: agentStateOf(s),
+    }))
   const terminal = terminalToFocus(sessions, projectId)
   if (terminal !== undefined) {
     revealSession(terminal)

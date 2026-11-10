@@ -2,6 +2,7 @@ import React from 'react'
 import {
   CircleCheck,
   CircleX,
+  ExternalLink,
   Eye,
   Flag,
   ListTodo,
@@ -161,7 +162,7 @@ function AskSummary({ ask, glyphs }: { ask: DeskAsk; glyphs?: boolean }): React.
         <b>{ask.title}</b>
         <small>{ask.where ?? workLabel(ask.workKey)}</small>
       </span>
-      <span className="mi__what">
+      <span className="mi__what" title={ask.detail || undefined}>
         {ask.detail} {ask.facts.length > 0 && <em>{ask.facts.join(' · ')}</em>}
         {guessed && ask.askSignal && <em> Inferred: {ASK_SIGNAL_REASONS[ask.askSignal]}</em>}
       </span>
@@ -185,6 +186,7 @@ function AskRowActions({
             key={action.id}
             size="sm"
             variant={quiet ? 'ghost' : 'secondary'}
+            icon={action.url ? ExternalLink : undefined}
             onClick={() => handlers.act(ask, action.id)}
           >
             {choice && <Kbd>{choice[1]}</Kbd>}

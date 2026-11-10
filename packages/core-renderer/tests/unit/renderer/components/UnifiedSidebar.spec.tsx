@@ -546,6 +546,19 @@ describe('UnifiedSidebar — scratch is the one place a terminal is still a row'
     // The head reads "Scratch", the New button's "+", then the count.
     expect(scratchSection().textContent).toMatch(/^Scratch\+1/)
   })
+  it("leaves out a scheduled run's hidden scratch terminal", () => {
+    sessions.set(
+      'sc2',
+      sidebarSession('sc2', '00000000-0000-0000-0000-000000000000', {
+        tabTitle: 'nightly',
+        hidden: true,
+      })
+    )
+    setSessions(sessions)
+    renderSidebar()
+    expect(scratchSection().textContent).toMatch(/^Scratch\+1/)
+    expect(scratchSection().textContent).not.toContain('nightly')
+  })
 })
 
 describe("UnifiedSidebar — scratch is the one place a terminal is still a row — shows a scratch terminal's own ticket, and one its split pane carries, on its row", () => {

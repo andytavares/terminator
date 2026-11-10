@@ -107,3 +107,16 @@ describe('revealSession — a terminal in its own window', () => {
     useBreakoutStore.getState().remove('s1')
   })
 })
+
+describe("revealSession — a scheduled run's hidden session", () => {
+  it('lists it in its project and shows it', () => {
+    seedSessions(terminalSessionOf({ id: 's1', projectId: 'p1', hidden: true }))
+    revealSession('s1')
+    expect(
+      sessionState()
+        .getSessionsForProject('p1')
+        .map((s) => s.id)
+    ).toEqual(['s1'])
+    expect(sessionState().getActiveSessionForProject('p1')).toBe('s1')
+  })
+})

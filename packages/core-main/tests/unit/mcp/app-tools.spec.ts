@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { appTools } from '../../../src/mcp/app-tools'
 import type { QuietUpdateCheck } from '../../../src/app-updater'
 
-const caller = { sessionId: 's1', claudePid: 1, projectDir: '/repo' }
+const caller = { sessionId: 's1', claudePid: 1, projectDir: '/repo', terminalId: null }
 
 let deps: {
   checkForUpdate: ReturnType<typeof vi.fn<() => Promise<QuietUpdateCheck>>>

@@ -17,6 +17,7 @@ import { SCRATCH_PROJECT_ID } from '../../../core-shared/src/types/index'
 export function revealSession(sessionId: string): void {
   const session = useSessionStore.getState().sessions.get(sessionId)
   if (session === undefined) return
+  useSessionStore.getState().showSession(sessionId)
   const breakoutWindow = useBreakoutStore.getState().windows.get(sessionId)
   if (breakoutWindow) return breakoutWindow.focus()
 

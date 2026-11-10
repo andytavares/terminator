@@ -13,12 +13,15 @@ export interface AgentTabRequest {
   agentMeta?: Record<string, unknown>
   /** The permission mode to start in; skipped when the agent does not offer it. */
   mode?: string
+  /** A scheduled run's tab, kept out of the lists until someone views it. */
+  hidden?: boolean
 }
 
 /** Starts an agent as a tab of the project; null when the agent did not start. */
 export async function startAgentTab(request: AgentTabRequest): Promise<AgentStarted | null> {
-  const { projectId, title, ...rest } = request
-  const reply = await window.electronAPI.agents.start({ ...rest, tab: { projectId, title } })
+  const { projectId, title, hidden, ...rest } = request
+  const tab = { projectId, title, ...(hidden === true ? { hidden } : {}) }
+  const reply = await window.electronAPI.agents.start({ ...rest, tab })
   const started = 'data' in reply ? reply.data : null
   recordAgentStart(rest.agentId, started === null)
   return started

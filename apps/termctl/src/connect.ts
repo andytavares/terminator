@@ -15,6 +15,7 @@ export async function connectToTerminator(socketPath: string): Promise<ToolClien
       sessionId: null,
       claudePid: process.ppid,
       projectDir: process.cwd(),
+      terminalId: process.env.TERMINATOR_SESSION_ID ?? null,
     })
   )
   return {

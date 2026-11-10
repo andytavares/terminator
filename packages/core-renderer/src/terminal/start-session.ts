@@ -128,6 +128,7 @@ export function agentCommand(prompt: string | null, unattended?: UnattendedLaunc
  * auto itself. */
 const unattendedAgentStart = ({ settingsPath, systemPrompt }: UnattendedLaunch) => ({
   mode: 'auto',
+  hidden: true,
   agentMeta: {
     systemPrompt: { append: systemPrompt },
     claudeCode: { options: { settings: settingsPath } },

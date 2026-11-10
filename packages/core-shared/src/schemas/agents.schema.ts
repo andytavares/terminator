@@ -8,7 +8,9 @@ export const AgentStartInputSchema = z.object({
   resume: SessionId.optional(),
   agentMeta: z.record(z.string(), z.unknown()).optional(),
   mode: z.string().min(1).optional(),
-  tab: z.object({ projectId: z.string().min(1), title: z.string() }).optional(),
+  tab: z
+    .object({ projectId: z.string().min(1), title: z.string(), hidden: z.boolean().optional() })
+    .optional(),
 })
 
 export const AgentSessionInputSchema = z.object({ sessionId: SessionId })

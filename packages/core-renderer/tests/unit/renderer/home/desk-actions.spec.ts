@@ -15,7 +15,11 @@ import {
   snoozeChoices,
   untilLabel,
 } from '../../../../src/components/home/desk-actions'
-import { REVEAL_SESSION_COMMAND, type DeskAsk } from '../../../../src/home/core-asks'
+import {
+  OPEN_URL_COMMAND,
+  REVEAL_SESSION_COMMAND,
+  type DeskAsk,
+} from '../../../../src/home/core-asks'
 import { useHomeFeedStore } from '../../../../src/stores/home-feed.store'
 import { useToastStore } from '../../../../src/stores/toast.store'
 import { useSessionStore } from '../../../../src/stores/session.store'
@@ -175,5 +179,63 @@ describe('openAsk — nothing to run it', () => {
     expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
       'Could not open this: the extension that sent it is not running.'
     )
+  })
+})
+
+describe('openAsk — an alert with a link', () => {
+  it('opens the link in a new window, which main hands to the browser', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    await openAsk(
+      ask({
+        source: 'claude-alerts',
+        sessionId: undefined,
+        open: { command: OPEN_URL_COMMAND, args: { url: 'https://github.com/pr/12' } },
+      })
+    )
+    expect(open).toHaveBeenCalledWith('https://github.com/pr/12', '_blank')
+  })
+
+  it('does not open a link that is not http or https', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    await openAsk(
+      ask({
+        source: 'claude-alerts',
+        sessionId: undefined,
+        open: { command: OPEN_URL_COMMAND, args: { url: 'file:///etc/passwd' } },
+      })
+    )
+    expect(open).not.toHaveBeenCalled()
+  })
+})
+
+describe('openAsk — an alert from a terminal', () => {
+  it('reveals the terminal named in its open args', async () => {
+    await openAsk(
+      ask({
+        source: 'claude-alerts',
+        sessionId: undefined,
+        open: { command: REVEAL_SESSION_COMMAND, args: { sessionId: 'term-7' } },
+      })
+    )
+    expect(reveal).toHaveBeenCalledWith('term-7')
+  })
+})
+
+describe('runAskAction — a button with a link', () => {
+  it('opens the link and still hands the press to main, which removes a dismissing alert', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const runAction = vi.fn().mockResolvedValue({ ok: true })
+    useHomeFeedStore.setState({ runAction })
+    const alert = ask({
+      source: 'claude-alerts',
+      id: 'alert-1',
+      sessionId: undefined,
+      actions: [
+        { id: 'action-0', label: 'Open PR', url: 'https://github.com/pr/12', dismiss: true },
+      ],
+    })
+    await runAskAction(alert, 'action-0')
+    expect(open).toHaveBeenCalledWith('https://github.com/pr/12', '_blank')
+    expect(runAction).toHaveBeenCalledWith('claude-alerts', 'alert-1', 'action-0')
   })
 })

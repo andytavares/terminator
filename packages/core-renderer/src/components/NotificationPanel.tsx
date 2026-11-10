@@ -1,7 +1,7 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
-import { RelativeTime } from '@terminator/extension-ui'
+import { Button, RelativeTime } from '@terminator/extension-ui'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
 import { recordUse } from '../usage/record'
@@ -139,13 +139,14 @@ function NotificationActions({
   return (
     <div className="notif-item__actions">
       {actions.map((action) => (
-        <button
+        <Button
           key={action.id}
-          className="notif-item__action-btn"
+          size="sm"
+          variant="secondary"
           onClick={(e) => void onAction(e, action.id)}
         >
           {action.label}
-        </button>
+        </Button>
       ))}
     </div>
   )
@@ -191,12 +192,12 @@ function ListActions({
 }) {
   return (
     <>
-      <button className="notif-panel__action-btn" onClick={onMarkAllRead}>
+      <Button size="sm" variant="ghost" onClick={onMarkAllRead}>
         Mark all read
-      </button>
-      <button className="notif-panel__action-btn" onClick={onClearAll}>
+      </Button>
+      <Button size="sm" variant="ghost" onClick={onClearAll}>
         Clear all
-      </button>
+      </Button>
     </>
   )
 }

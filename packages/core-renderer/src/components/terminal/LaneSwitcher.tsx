@@ -17,7 +17,7 @@ function useAskingBranches(): Set<string> {
     () =>
       new Set(
         [...sessions.values()]
-          .filter((s) => agentStateOf(s) === 'awaiting-input')
+          .filter((s) => !s.hidden && agentStateOf(s) === 'awaiting-input')
           .map((s) => s.projectId)
       ),
     [sessions]

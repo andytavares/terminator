@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
 type Module = typeof import('../../../src/mcp/renderer-tools')
 let mod: Module
 
-const caller = { sessionId: 's1', claudePid: 1, projectDir: '/repo' }
+const caller = { sessionId: 's1', claudePid: 1, projectDir: '/repo', terminalId: null }
 
 /** A main window whose renderer reports each `mcp:call` it is sent. */
 function fakeWindow(options: { loading?: boolean } = {}) {

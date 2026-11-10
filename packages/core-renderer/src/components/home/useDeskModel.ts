@@ -5,7 +5,12 @@ import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { useWorkThreads } from './useWorkThreads'
 import { useDismissalsStore } from '../../home/dismissals'
-import { coreAsksFrom, finishedFacts, type DeskAsk } from '../../home/core-asks'
+import {
+  coreAsksFrom,
+  finishedFacts,
+  withSessionFromOpen,
+  type DeskAsk,
+} from '../../home/core-asks'
 import { orderAsks, type Dismissals } from '../../home/desk-order'
 import { deskCounts, type DeskCounts } from '../../home/desk-summary'
 import type { WorkThread } from '../../home/work-threads'
@@ -74,7 +79,7 @@ export function useDeskModel(): DeskState {
   return useMemo(() => {
     const all: DeskAsk[] = [
       ...coreAsks.map((ask) => withFinishedFacts(ask, facts, changeStats)),
-      ...feedAsks,
+      ...feedAsks.map(withSessionFromOpen),
     ]
     const asks = orderAsks(all, entries, now)
     const hidden = all.filter((ask) => !asks.includes(ask))

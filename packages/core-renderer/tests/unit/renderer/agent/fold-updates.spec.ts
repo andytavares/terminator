@@ -5,6 +5,9 @@ import {
   inputSummary,
   relativeTo,
   splitTurns,
+  toolLabel,
+  toolStatus,
+  type ToolEntry,
 } from '../../../../src/components/agent/fold-updates'
 import type { AgentUpdate } from '@terminator/extension-sdk'
 
@@ -189,5 +192,52 @@ describe('relativeTo', () => {
     expect(relativeTo('/r', '/r/src/a.ts')).toBe('src/a.ts')
     expect(relativeTo('/r', '/rx/a.ts')).toBe('/rx/a.ts')
     expect(relativeTo('', '/r/a.ts')).toBe('/r/a.ts')
+  })
+})
+
+const tool = (fields: Partial<ToolEntry>): ToolEntry => ({
+  kind: 'tool',
+  toolCallId: 't1',
+  title: '',
+  toolKind: null,
+  status: null,
+  detail: null,
+  output: [],
+  ...fields,
+})
+
+describe('toolLabel', () => {
+  it('names a command the agent sent as its title "Ran", with the command once', () => {
+    const ran = tool({ toolKind: 'execute', title: 'npm test', detail: 'npm test' })
+    expect(toolLabel(ran, '/r')).toEqual({ title: 'Ran', detail: 'npm test' })
+  })
+
+  it('keeps the title of a read and shows its path relative to the session folder', () => {
+    const read = tool({ toolKind: 'read', title: 'Read', detail: '/r/src/a.ts' })
+    expect(toolLabel(read, '/r')).toEqual({ title: 'Read', detail: 'src/a.ts' })
+  })
+
+  it('shows no detail when the tool names no command or path', () => {
+    const search = tool({ toolKind: 'search', title: 'Find tools' })
+    expect(toolLabel(search, '/r')).toEqual({ title: 'Find tools', detail: null })
+  })
+
+  it('drops a detail that repeats the title of a tool that is not a command', () => {
+    const fetch = tool({ toolKind: 'fetch', title: 'https://a.dev', detail: 'https://a.dev' })
+    expect(toolLabel(fetch, '/r')).toEqual({ title: 'https://a.dev', detail: null })
+  })
+})
+
+describe('toolStatus', () => {
+  it.each([
+    ['pending', 'pending'],
+    ['in_progress', 'in_progress'],
+    ['completed', 'completed'],
+    ['failed', 'failed'],
+    ['cancelled', 'cancelled'],
+    [null, 'pending'],
+    ['paused', 'pending'],
+  ] as const)('reads %j as %j', (status, expected) => {
+    expect(toolStatus(status)).toBe(expected)
   })
 })

@@ -1,16 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const notified = vi.hoisted(() => vi.fn())
+const unnotified = vi.hoisted(() => vi.fn())
+const openedExternally = vi.hoisted(() => vi.fn())
+const revealedTerminal = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../src/notifications/notification-manager', () => ({
-  notificationManager: { create: notified },
+  notificationManager: { create: notified, withdraw: unnotified },
 }))
+vi.mock('../../../src/open-externally', () => ({ openExternally: openedExternally }))
+vi.mock('../../../src/ipc/notification.ipc', () => ({ revealSessionOnClick: revealedTerminal }))
 vi.mock('../../../src/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn() },
   makeLogger: () => ({ error: vi.fn(), warn: vi.fn() }),
 }))
 
-const caller = { sessionId: 's1', claudePid: 1, projectDir: '/Users/me/repos/shop' }
+const caller = {
+  sessionId: 's1',
+  claudePid: 1,
+  projectDir: '/Users/me/repos/shop',
+  terminalId: null,
+}
+const fromTab = { ...caller, terminalId: 'tab-1' }
+const pr = 'https://github.com/acme/shop/pull/7'
+
+interface SentNotification {
+  actions: { id: string; label: string; handler: () => void }[]
+  onClick?: () => void
+}
+const sentNotification = () => notified.mock.calls[0][0] as SentNotification
+const notificationButton = (label: string) =>
+  sentNotification().actions.find((action) => action.label === label)!
 
 async function load() {
   const feed = await import('../../../src/home/home-feed')
@@ -22,6 +42,9 @@ async function load() {
 beforeEach(() => {
   vi.resetModules()
   notified.mockReset()
+  unnotified.mockReset()
+  openedExternally.mockReset()
+  revealedTerminal.mockReset()
 })
 
 describe('alertTool', () => {
@@ -91,5 +114,86 @@ describe('alertTool, home and notify', () => {
     await expect(tool.call({ message: 'no title' }, caller)).rejects.toThrow(/title/)
     expect(feed.getMergedFeed().asks).toEqual([])
     expect(notified).not.toHaveBeenCalled()
+  })
+})
+
+describe('alertTool, buttons on the notification', () => {
+  it('gives the notification the Home buttons, with Dismiss', async () => {
+    const { feed, tool } = await load()
+    const actions = [
+      { label: 'Open PR', url: pr },
+      { label: 'Answer', reply: true },
+    ]
+    await tool.call({ title: 'PR ready', actions }, fromTab)
+    const labels = ['Open PR', 'Answer', 'Dismiss']
+    expect(feed.getMergedFeed().asks[0].actions.map((a) => a.label)).toEqual(labels)
+    expect(sentNotification().actions.map((a) => a.label)).toEqual(labels)
+  })
+
+  it('opens a link button in the browser and keeps the alert on Home', async () => {
+    const { feed, tool } = await load()
+    await tool.call({ title: 'PR ready', actions: [{ label: 'Open PR', url: pr }] }, caller)
+    notificationButton('Open PR').handler()
+    expect(openedExternally).toHaveBeenCalledWith(pr)
+    expect(feed.getMergedFeed().asks).toHaveLength(1)
+  })
+})
+
+describe('alertTool, buttons on the notification that dismiss', () => {
+  it('removes the Home alert when a dismissing button on the notification is pressed', async () => {
+    const { feed, tool } = await load()
+    await tool.call({ title: 'PR ready', actions: [{ label: 'Done', dismiss: true }] }, caller)
+    notificationButton('Done').handler()
+    expect(feed.getMergedFeed().asks).toEqual([])
+  })
+
+  it('removes the Home alert when Dismiss on the notification is pressed', async () => {
+    const { feed, tool } = await load()
+    await tool.call({ title: 'PR ready' }, caller)
+    notificationButton('Dismiss').handler()
+    expect(feed.getMergedFeed().asks).toEqual([])
+  })
+})
+
+describe('alertTool, Reply on the notification', () => {
+  it('reveals the calling terminal when the Reply button is pressed', async () => {
+    const { tool } = await load()
+    await tool.call({ title: 'Which DB?', actions: [{ label: 'Answer', reply: true }] }, fromTab)
+    notificationButton('Answer').handler()
+    expect(revealedTerminal).toHaveBeenCalledWith('tab-1')
+  })
+})
+
+describe('alertTool, clicking the notification', () => {
+  it('opens the alert link', async () => {
+    const { tool } = await load()
+    await tool.call({ title: 'PR ready', url: pr }, fromTab)
+    sentNotification().onClick?.()
+    expect(openedExternally).toHaveBeenCalledWith(pr)
+    expect(revealedTerminal).not.toHaveBeenCalled()
+  })
+
+  it('reveals the calling terminal when the alert has no link', async () => {
+    const { tool } = await load()
+    await tool.call({ title: 'Tests pass' }, fromTab)
+    sentNotification().onClick?.()
+    expect(revealedTerminal).toHaveBeenCalledWith('tab-1')
+  })
+})
+
+describe('alertTool, dismissing on Home', () => {
+  it('dismisses the alert notification too', async () => {
+    const { feed, tool } = await load()
+    notified.mockReturnValue('notification-1')
+    await tool.call({ title: 'PR ready' }, caller)
+    await feed.runAction('claude-alerts', feed.getMergedFeed().asks[0].id, 'dismiss')
+    expect(unnotified).toHaveBeenCalledWith('notification-1')
+  })
+
+  it('refuses a Reply button from a shell outside Terminator, in words', async () => {
+    const { feed, tool } = await load()
+    const args = { title: 'Which DB?', actions: [{ label: 'Answer', reply: true }] }
+    await expect(tool.call(args, caller)).rejects.toThrow(/Terminator terminal/)
+    expect(feed.getMergedFeed().asks).toEqual([])
   })
 })

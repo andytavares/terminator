@@ -5,7 +5,12 @@ import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { registeredCommandKey } from '../../stores/extension-commands.store'
 import { useToastStore } from '../../stores/toast.store'
 import { useSessionStore } from '../../stores/session.store'
-import { REVEAL_SESSION_COMMAND, type DeskAsk } from '../../home/core-asks'
+import {
+  OPEN_URL_COMMAND,
+  REVEAL_SESSION_COMMAND,
+  openArg,
+  type DeskAsk,
+} from '../../home/core-asks'
 
 // What the Desk does when the operator acts on an ask, apart from how it is drawn.
 
@@ -69,8 +74,14 @@ export function terminalExcerpt(sessionId: string | undefined): string[] {
   return rows.slice(Math.max(0, end - EXCERPT_LINES), end)
 }
 
+/** Opens an http(s) link; main's window-open handler hands it to the browser. */
+function openLink(url: unknown): void {
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) window.open(url, '_blank')
+}
+
 /** Runs one of the ask's actions: core answers or opens its own session, an extension runs the rest. */
 export async function runAskAction(ask: DeskAsk, actionId: string): Promise<void> {
+  openLink(ask.actions.find((action) => action.id === actionId)?.url)
   if (ask.source !== 'core') {
     await runFeedAction(ask.source, ask.id, actionId)
     return
@@ -83,8 +94,10 @@ export async function runAskAction(ask: DeskAsk, actionId: string): Promise<void
 /** Brings the place the ask came from forward: its session, or the extension's own view. */
 export async function openAsk(ask: DeskAsk): Promise<void> {
   const { command, args } = ask.open
+  if (command === OPEN_URL_COMMAND) return openLink(openArg(args, 'url'))
   if (command === REVEAL_SESSION_COMMAND) {
-    if (ask.sessionId) revealSession(ask.sessionId)
+    const sessionId = ask.sessionId ?? openArg(args, 'sessionId')
+    if (typeof sessionId === 'string') revealSession(sessionId)
     return
   }
   const key = await registeredCommandKey(ask.source, command)

@@ -11,6 +11,7 @@ export interface Hello {
   sessionId: string | null
   claudePid: number
   projectDir: string
+  terminalId: string | null
 }
 
 /** MCP over a connected Unix socket, as the relay speaks it: a hello line, then JSON-RPC lines. */

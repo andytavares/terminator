@@ -430,9 +430,20 @@ dialog.tmui-modal:not(.tmui-drawer) {
   white-space: pre-line;
 }
 
+/* The one spinner animation: a busy icon turns in place. */
+.tmui-spin {
+  animation: tmui-spin 0.8s linear infinite;
+}
+@keyframes tmui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tmui-dialog__panel,
-  .tmui-toast {
+  .tmui-toast,
+  .tmui-spin {
     animation: none !important;
     transition: none !important;
   }

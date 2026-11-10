@@ -65,7 +65,11 @@ async function connectClient(): Promise<Client> {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [relayPath, socketPath],
-    env: { ...process.env, CLAUDE_CODE_SESSION_ID: 's1' } as Record<string, string>,
+    env: {
+      ...process.env,
+      CLAUDE_CODE_SESSION_ID: 's1',
+      TERMINATOR_SESSION_ID: 'tab-1',
+    } as Record<string, string>,
   })
   client = new Client({ name: 'test', version: '1.0.0' })
   await client.connect(transport)
@@ -90,9 +94,15 @@ describe('startMcpServer — through the real relay', () => {
     expect(result.content).toEqual([{ type: 'text', text: JSON.stringify({ echoed: 'hi' }) }])
     expect(calls).toHaveLength(1)
     expect(calls[0].args).toEqual({ text: 'hi' })
-    expect(calls[0].caller).toMatchObject({ sessionId: 's1', claudePid: process.pid })
+    expect(calls[0].caller).toMatchObject({
+      sessionId: 's1',
+      claudePid: process.pid,
+      terminalId: 'tab-1',
+    })
   })
+})
 
+describe('startMcpServer — tool errors through the real relay', () => {
   it('turns an error envelope into an error result with its message', async () => {
     const result = await (await connectClient()).callTool({ name: 'remove_thing', arguments: {} })
     expect(result.isError).toBe(true)

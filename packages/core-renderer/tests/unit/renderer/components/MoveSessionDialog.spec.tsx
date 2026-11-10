@@ -220,11 +220,21 @@ describe('MoveSessionDialog — branches it has to load or keep', () => {
     expect(projectApi.list).toHaveBeenCalledWith('ws-2')
     expect(projectApi.list).not.toHaveBeenCalledWith('ws-1')
   })
+})
 
-  it('keeps the branch it left while another terminal is open there', async () => {
+describe('MoveSessionDialog — a branch something is still open in', () => {
+  it.each([
+    { what: 'another terminal', hidden: false },
+    { what: 'a hidden scheduled run', hidden: true },
+  ])('keeps the branch it left while $what is open there', async ({ hidden }) => {
     const user = userEvent.setup()
     setupMocks('proj-1')
-    const other = terminalSessionOf({ id: 'sess-2', projectId: 'proj-1', tabTitle: 'Other' })
+    const other = terminalSessionOf({
+      id: 'sess-2',
+      projectId: 'proj-1',
+      tabTitle: 'Other',
+      hidden,
+    })
     const sessions = new Map(useSessionStore.getState().sessions).set('sess-2', other)
     useSessionStore.setState({ sessions })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)

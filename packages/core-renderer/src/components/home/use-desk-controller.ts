@@ -89,7 +89,9 @@ function useAskHandlers(asks: readonly DeskAsk[], setCursor: SetCursor): AskHand
         return setCursor((c) => ({ ...c, selectedId: ask.id, expandedId: ask.id, replying: true }))
       }
       void runAskAction(ask, actionId)
-      if (actionId.startsWith('choice-')) leave(ask)
+      if (ask.actions.some((action) => action.id === actionId && action.dismiss))
+        leaving.markAskDone(ask)
+      else if (actionId.startsWith('choice-')) leave(ask)
     },
     ...useMenuHandlers(setCursor),
   }

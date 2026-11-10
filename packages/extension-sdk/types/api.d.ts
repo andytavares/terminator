@@ -449,7 +449,15 @@ export interface HomeAsk {
   since: string
   /** An action with the id `SEND_TO_AGENT_ACTION` (exported from the SDK) also appears as Send
    * to agent on the failing checks of the work this ask is about. */
-  actions: { id: string; label: string; primary?: boolean }[]
+  actions: {
+    id: string
+    label: string
+    primary?: boolean
+    /** Opens in the default browser. */
+    url?: string
+    /** Removes the item after the action. */
+    dismiss?: boolean
+  }[]
   open: { command: string; args?: unknown }
 }
 

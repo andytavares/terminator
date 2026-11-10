@@ -1423,6 +1423,13 @@ export const ELECTRON_API_MANIFEST = [
     toHandlerArgs: (args) => [args[0]],
     extensionView: 'shared',
   }),
+  method({
+    path: 'notifications.onRemoved',
+    kind: 'event',
+    channel: 'notifications:removed',
+    signature: signature<(handler: (id: string) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [args[0]],
+  }),
 
   // ── db ────────────────────────────────────────────────────────────────────
   method({

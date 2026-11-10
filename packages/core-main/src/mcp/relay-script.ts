@@ -15,6 +15,7 @@ socket.on('connect', () => {
     sessionId: process.env.CLAUDE_CODE_SESSION_ID ?? null,
     claudePid: process.ppid,
     projectDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
+    terminalId: process.env.TERMINATOR_SESSION_ID ?? null,
   }
   socket.write(JSON.stringify(hello) + '\\n')
   process.stdin.pipe(socket)

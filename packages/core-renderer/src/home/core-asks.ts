@@ -25,6 +25,23 @@ export const ASK_SIGNAL_REASONS: Record<NonNullable<DeskAsk['askSignal']>, strin
 /** The command the Desk runs to bring a session forward; core handles it, no extension does. */
 export const REVEAL_SESSION_COMMAND = 'core:reveal-session'
 
+/** The command an alert with a link opens; core handles it, no extension does. */
+export const OPEN_URL_COMMAND = 'core:open-url'
+
+/** One field of an open command's args; args cross IPC untyped. */
+export function openArg(args: unknown, name: string): unknown {
+  return typeof args === 'object' && args !== null
+    ? (args as Record<string, unknown>)[name]
+    : undefined
+}
+
+/** A feed ask that opens a terminal is about that terminal, so Reply types into it. */
+export function withSessionFromOpen(ask: DeskAsk): DeskAsk {
+  const sessionId = openArg(ask.open.args, 'sessionId')
+  if (ask.sessionId || ask.open.command !== REVEAL_SESSION_COMMAND) return ask
+  return typeof sessionId === 'string' ? { ...ask, sessionId } : ask
+}
+
 const SEPARATOR = ' · '
 
 /** The repo, then the ticket and its title, else the branch. The repo is the workspace (ADR 032). */
