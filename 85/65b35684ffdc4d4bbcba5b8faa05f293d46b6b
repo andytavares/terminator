@@ -1,0 +1,27 @@
+packages/core-main/tests/unit/home/scheduled-alerts.spec.ts
+  s_fbbae36a36a3d6::t_42a9ece95820b8 197-209
+  s_fbbae36a36a3d6::t_5cce0c14d56ccb 117,126,214
+packages/core-main/src/home/scheduled-alerts.ts
+  s_fbbae36a36a3d6::t_b944ec9e24a0ec 22-25
+  s_fbbae36a36a3d6::t_1aebb8f6b0e0d9 39-40
+packages/core-main/tests/unit/mcp/alert-tool.spec.ts
+  s_fbbae36a36a3d6::t_5cce0c14d56ccb 145-147
+packages/core-main/src/mcp/alert-tool.ts
+  s_fbbae36a36a3d6::t_dab545c640a305 74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8565b35684ffdc4d4bbcba5b8faa05f293d46b6b",
+  "prompts": {},
+  "sessions": {
+    "s_fbbae36a36a3d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2091ac6e-9af7-4c47-902f-0a99aa5db36c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
