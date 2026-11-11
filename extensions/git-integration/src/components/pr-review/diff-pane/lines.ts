@@ -1,7 +1,7 @@
 import type { DiffHunk, DiffLine } from '../../../schemas/git.schema'
 import type { LineSelection } from '../../../stores/review-ui.store'
 import type { FileDiff } from '../../../schemas/git.schema'
-import type { Side } from './types'
+import type { ComposerAnchor, Side } from './types'
 import { pairReplacedLines, wordSpans, type Span } from './word-diff'
 
 /** The line's number on `side`: the old file's on the left, the new file's on the right. */
@@ -38,9 +38,20 @@ export function unifiedSide(line: DiffLine): Side {
 }
 
 /** The start line of a range comment, or null for a single line. */
-export function rangeStart(sel: { startLine: number; endLine: number }): number | null {
+function rangeStart(sel: { startLine: number; endLine: number }): number | null {
   if (sel.startLine === sel.endLine) return null
   return sel.startLine
+}
+
+/** An empty composer on the selection's lines. */
+export function commentAnchor(sel: LineSelection): ComposerAnchor {
+  return {
+    line: sel.endLine,
+    startLine: rangeStart(sel),
+    side: sel.side,
+    initialBody: '',
+    fromFindingId: null,
+  }
 }
 
 const wordSpansByDiff = new WeakMap<FileDiff, Map<DiffLine, Span[]>>()

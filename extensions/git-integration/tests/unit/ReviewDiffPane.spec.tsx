@@ -77,9 +77,14 @@ vi.mock('../../src/components/pr-review/InlineCommentThread', () => ({
   InlineCommentThread: () => <div data-testid="thread" />,
 }))
 vi.mock('../../src/components/pr-review/CommentComposer', () => ({
-  CommentComposer: ({ onCancel }: { onCancel?: () => void }) => (
-    <div data-testid="composer">
-      <button onClick={onCancel}>Cancel</button>
+  CommentComposer: (props: { onCancel?: () => void; startLine?: number; line?: number }) => (
+    <div
+      className="comment-composer"
+      data-testid="composer"
+      data-start-line={props.startLine}
+      data-line={props.line}
+    >
+      <button onClick={props.onCancel}>Cancel</button>
     </div>
   ),
 }))
@@ -538,14 +543,13 @@ describe('ReviewDiffPane — section viewed toggle', () => {
   })
 })
 
-describe('ReviewDiffPane — a gutter press selects the line and opens no composer', () => {
-  it('a gutter press selects the line and opens no composer', async () => {
+describe("ReviewDiffPane — a click on a line's + opens the composer on that line", () => {
+  it("a click on a line's + selects the line and opens the composer on it", async () => {
     const user = userEvent.setup()
     const uiStore = await useRealUiStore()
     await renderDiffPane(oneLineDiff())
 
-    const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
-    await user.pointer([{ keys: '[MouseLeft>]', target: btn }, { keys: '[/MouseLeft]' }])
+    await user.click(screen.getAllByRole('button', { name: 'Add comment' })[0])
 
     expect(uiStore.getState().selection).toEqual({
       path: 'src/foo.ts',
@@ -553,12 +557,16 @@ describe('ReviewDiffPane — a gutter press selects the line and opens no compos
       startLine: 1,
       endLine: 1,
     })
-    expect(screen.queryByTestId('composer')).toBeNull()
+    expect(await screen.findByTestId('composer')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Ask agent' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByRole('button', { name: 'Ask agent' })).toBeTruthy()
   })
 })
 
-describe('ReviewDiffPane — a gutter drag across rows keeps the multi-line selection after the trailing click', () => {
-  it('a gutter drag across rows keeps the multi-line selection after the trailing click', async () => {
+describe('ReviewDiffPane — a gutter drag across rows opens the composer on the dragged lines', () => {
+  it('a gutter drag across rows opens the composer on the dragged lines and keeps them selected', async () => {
     const user = userEvent.setup()
     const uiStore = await useRealUiStore()
     const diff = oneHunk(
@@ -577,13 +585,36 @@ describe('ReviewDiffPane — a gutter drag across rows keeps the multi-line sele
     ])
 
     await waitFor(() => expect(selectedRows()).toHaveLength(3))
-    expect(screen.getByRole('button', { name: /^Comment/ })).toBeTruthy()
+    const composer = await screen.findByTestId('composer')
+    expect([composer.dataset.startLine, composer.dataset.line]).toEqual(['1', '3'])
     expect(uiStore.getState().selection).toEqual({
       path: 'src/foo.ts',
       side: 'RIGHT',
       startLine: 1,
       endLine: 3,
     })
+  })
+})
+
+describe('ReviewDiffPane — a gutter drag marks only its first row', () => {
+  it('marks only the first dragged row as the start of the selection', async () => {
+    const user = userEvent.setup()
+    await useRealUiStore()
+    const diff = oneHunk(
+      '@@ -1,3 +1,3 @@',
+      [1, 2, 3].map((n) => ctxLine(n))
+    )
+    await renderDiffPane(diff)
+
+    const rows = codeRows()
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: gutterButton(rows[2]) },
+      { target: rows[1] },
+      { target: rows[0] },
+    ])
+
+    const starts = codeRows().filter((row) => row.classList.contains('diff-line--selection-start'))
+    expect(starts.map((row) => row.getAttribute('data-new-line'))).toEqual(['1'])
   })
 })
 
@@ -1212,11 +1243,11 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
     expect(screen.queryByTestId('composer')).toBeNull()
   })
 
-  it('still offers Comment for a selection inside the diff', async () => {
+  it('opens the composer for a selection inside the diff', async () => {
     await useRealUiStore()
     await renderLoaded()
     await userEvent.setup().click(gutterButton(rowOfLine(11)))
-    await screen.findByRole('button', { name: /Comment/ })
+    await screen.findByTestId('composer')
   })
 })
 
