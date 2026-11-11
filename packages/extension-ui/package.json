@@ -41,7 +41,7 @@
     "remark-gfm": "4.0.1"
   },
   "peerDependencies": {
-    "lucide-react": "1.61.0",
+    "lucide-react": "1.62.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zustand": "5.0.16"
