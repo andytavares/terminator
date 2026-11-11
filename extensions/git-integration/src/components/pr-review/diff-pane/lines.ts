@@ -16,32 +16,6 @@ export function inSelection(line: DiffLine, sel: Omit<LineSelection, 'path'>): b
   return n != null && n >= sel.startLine && n <= sel.endLine
 }
 
-/** The selected lines' text, for finding the tests that cover it. */
-export function selectionCode(hunks: DiffHunk[], sel: Omit<LineSelection, 'path'>): string {
-  return hunks
-    .flatMap((h) => h.lines)
-    .filter((l) => inSelection(l, sel))
-    .map((l) => l.content)
-    .join('\n')
-}
-
-/** A hunk's code as it reads after the change. */
-export function hunkCode(lines: Array<{ type: string; content: string }>): string {
-  return lines
-    .filter((l) => l.type !== 'remove')
-    .map((l) => l.content)
-    .join('\n')
-}
-
-/** The first hunk's line range, which the agent reads when nothing is selected. */
-export function hunkNearTop(hunks: DiffHunk[]): { startLine: number; endLine: number } | null {
-  for (const hunk of hunks) {
-    const lines = hunk.lines.map((l) => l.newLineNumber ?? l.oldLineNumber ?? 0).filter(Boolean)
-    if (lines.length > 0) return { startLine: Math.min(...lines), endLine: Math.max(...lines) }
-  }
-  return null
-}
-
 /** The widest line number the diff (and the revealed file text) can show. */
 export function maxLineNumber(hunks: DiffHunk[], fileLineCount: number): number {
   let max = fileLineCount

@@ -3,7 +3,6 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { runGit } from '../../shell/run-git.js'
-import { findTestLocations, symbolsForBlock } from '../../review/test-locations.js'
 import { RepoRoot } from '../repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope } from '../register.js'
 import { mergeStackChannels } from './merge-stack.js'
@@ -27,14 +26,6 @@ const ComparePayload = z.object({
   repoRoot: RepoRoot,
   fromSha: z.string().min(1),
   toSha: z.string().min(1),
-})
-
-const TestsForBlockPayload = z.object({
-  repoRoot: RepoRoot,
-  headSHA: z.string().min(1),
-  path: z.string().min(1),
-  code: z.string(),
-  hunkHeader: z.string().optional(),
 })
 
 /** What changed between two heads of a PR (S1). */
@@ -164,20 +155,6 @@ function compareChannel(ctx: GithubContext): ChannelSpec {
   })
 }
 
-function testsForBlockChannel(): ChannelSpec {
-  return defineChannel({
-    channel: 'github:tests-for-block',
-    schema: TestsForBlockPayload,
-    invalid: VALIDATION_ERROR,
-    run: async (block) => {
-      const symbols = await symbolsForBlock(block.path, block.code, block.hunkHeader)
-      const { repoRoot, headSHA } = block
-      const locations = await findTestLocations({ repoRoot, headSHA }, symbols, runGit)
-      return { symbols, locations }
-    },
-  })
-}
-
 function cloneRepoChannel(ctx: GithubContext): ChannelSpec {
   return defineChannel({
     channel: 'github:clone-repo',
@@ -189,12 +166,7 @@ function cloneRepoChannel(ctx: GithubContext): ChannelSpec {
 }
 
 function lookupChannels(ctx: GithubContext): ChannelSpec[] {
-  return [
-    currentUserChannel(ctx),
-    compareChannel(ctx),
-    testsForBlockChannel(),
-    cloneRepoChannel(ctx),
-  ]
+  return [currentUserChannel(ctx), compareChannel(ctx), cloneRepoChannel(ctx)]
 }
 
 export function prActionChannels(ctx: GithubContext): ChannelSpec[] {

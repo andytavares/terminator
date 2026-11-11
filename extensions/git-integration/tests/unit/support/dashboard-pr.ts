@@ -18,8 +18,6 @@ export function dashboardPrFixture(overrides: Partial<DashboardPR> = {}): Dashbo
     additions: 120,
     deletions: 30,
     fileCount: 6,
-    riskLevel: 'medium',
-    estimatedMinutes: 3,
     ciStatus: 'passing',
     reviewDecision: 'review-required',
     unresolvedThreads: 0,

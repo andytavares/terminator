@@ -1,9 +1,7 @@
 import type { GithubAPI, GithubTarget } from '@terminator/extension-sdk'
-import { runGit } from '../shell/run-git.js'
 
-// The PR-review surface's gh knowledge (ADR-009): auth-error detection, the
-// repository a checkout belongs to, and the git log co-change signal. The core
-// runs gh itself, through api.github.
+// The PR-review surface's gh knowledge (ADR-009): auth-error detection and the
+// repository a checkout belongs to. The core runs gh itself, through api.github.
 
 /** The core's GitHub verbs, and the token this extension's settings may hold. */
 export interface GithubAccess {
@@ -62,46 +60,4 @@ export function stateForSearch(query: string): { state: SearchState; text: strin
     .replace(/\s+/g, ' ')
     .trim()
   return { state, text }
-}
-
-// ─── Co-change affinity (language-agnostic Signal 3) ─────────────────────────
-
-/** The files each commit in `git log --name-only --format=%H` output touched. */
-function filesPerCommit(log: string): string[][] {
-  const commits: string[][] = [[]]
-  for (const line of log.split('\n').map((l) => l.trim())) {
-    if (/^[0-9a-f]{40}$/.test(line)) commits.push([])
-    else if (line) commits[commits.length - 1].push(line)
-  }
-  return commits
-}
-
-/** Records that every pair of `files` changed together. */
-function addPairs(affinity: Map<string, string[]>, files: string[]): void {
-  if (files.length < 2) return
-  for (const a of files) {
-    for (const b of files) {
-      if (a !== b) affinity.set(a, [...(affinity.get(a) ?? []), b])
-    }
-  }
-}
-
-export async function computeCoChangeAffinityFromGit(
-  repoRoot: string,
-  files: string[]
-): Promise<Map<string, string[]>> {
-  const affinity = new Map<string, string[]>()
-  if (files.length < 2) return affinity
-  try {
-    const raw = await runGit(repoRoot, ['log', '--name-only', '--format=%H', '--since=90 days ago'])
-    const fileSet = new Set(files)
-    for (const commit of filesPerCommit(raw))
-      addPairs(
-        affinity,
-        commit.filter((f) => fileSet.has(f))
-      )
-  } catch {
-    // co-change is best-effort — failures degrade gracefully to Signal 1+2 only
-  }
-  return affinity
 }

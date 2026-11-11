@@ -308,7 +308,7 @@ function HeaderTitle({ pr }: { pr: PrReviewDetail }) {
 }
 
 function HeaderMeta({ pr }: { pr: PrReviewDetail }) {
-  const { fileCount, additions, deletions, minutes } = overviewTotals(pr)
+  const { fileCount, additions, deletions } = overviewTotals(pr)
   return (
     <div className="pr-overview-meta" role="group" aria-label="Pull request summary">
       <strong>{pr.author}</strong>
@@ -326,7 +326,6 @@ function HeaderMeta({ pr }: { pr: PrReviewDetail }) {
         <b className="pr-overview-added">+{additions}</b>{' '}
         <b className="pr-overview-removed">−{deletions}</b>
       </span>
-      <span>about {minutes} min</span>
     </div>
   )
 }

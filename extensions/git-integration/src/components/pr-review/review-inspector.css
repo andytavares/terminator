@@ -13,10 +13,14 @@
   border-bottom: 1px solid var(--tm-border);
 }
 
-/* The header draws the line under the tabs, so the list does not draw its own. */
-.ri-header .ri-tablist {
-  align-self: stretch;
-  border-bottom: 0;
+.ri-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-1);
+  margin: 0;
+  padding: 0 var(--tm-space-3);
+  font-size: var(--tm-font-size-sm);
+  font-weight: 600;
 }
 
 .ri-tab-badge {
@@ -39,7 +43,7 @@
   overflow-y: auto;
 }
 
-/* The inspector's tab strip already names the Agent tab and closes it. */
+/* The inspector's header already names the agent and closes it. */
 .ri-panel .ap-header {
   display: none;
 }

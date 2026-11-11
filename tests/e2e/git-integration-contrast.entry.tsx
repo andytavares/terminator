@@ -5,7 +5,6 @@
  */
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { FullFileList } from '../../extensions/git-integration/src/components/pr-review/FullFileList'
 import { ChapterNav } from '../../extensions/git-integration/src/components/pr-review/ChapterNav'
 import { ReviewDashboard } from '../../extensions/git-integration/src/components/pr-review/ReviewDashboard'
 import { ReviewFooter } from '../../extensions/git-integration/src/components/pr-review/ReviewFooter'
@@ -21,46 +20,21 @@ const DAY = 86400000
 const ago = (days: number): string => new Date(Date.now() - days * DAY).toISOString()
 const REPO = '/work/terminator'
 
-type Level = 'low' | 'medium' | 'high'
-
-/** A file's risk score at `level`, driven by its change size. */
-function riskScore(level: Level) {
-  return {
-    level,
-    composite: level === 'high' ? 80 : level === 'medium' ? 50 : 10,
-    metrics: {
-      changeSize: null,
-      churn90d: null,
-      blastRadius: null,
-      testFilePresent: null,
-      complexityDelta: null,
-      patchCoverage: null,
-    },
-    dominantDriver: 'change size',
-    topImporters: [],
-    importerCount: 0,
-  }
-}
-
-/** How a file changed: its risk, its tier and its line counts. */
+/** How a file changed: its line counts. */
 interface FileChange {
-  level: Level
-  tier: 0 | 1 | 2 | 3
   additions: number
   deletions: number
 }
 
-function contrastFile(path: string, { level, tier, additions, deletions }: FileChange) {
+function contrastFile(path: string, { additions, deletions }: FileChange) {
   return {
     path,
     changeType: 'modified' as const,
     additions,
     deletions,
     isBinary: false,
-    tier,
     whyHere: 'Changed in this pull request',
-    riskScore: riskScore(level),
-    estimatedMinutes: 4,
+    churn90d: 4,
   }
 }
 
@@ -68,24 +42,17 @@ const chapters = [
   {
     id: 'ch-1',
     name: 'Session records',
-    estimatedMinutes: 12,
     status: 'in-progress' as const,
     files: [
       contrastFile('packages/core-main/src/session/session-store.ts', {
-        level: 'high',
-        tier: 0,
         additions: 120,
         deletions: 14,
       }),
       contrastFile('packages/core-main/src/session/session-records.ts', {
-        level: 'medium',
-        tier: 1,
         additions: 44,
         deletions: 6,
       }),
       contrastFile('packages/core-main/src/session/session-types.ts', {
-        level: 'low',
-        tier: 2,
         additions: 12,
         deletions: 0,
       }),
@@ -94,18 +61,13 @@ const chapters = [
   {
     id: 'ch-2',
     name: 'Home ledger',
-    estimatedMinutes: 9,
     status: 'not-started' as const,
     files: [
       contrastFile('packages/core-renderer/src/home/Ledger.tsx', {
-        level: 'medium',
-        tier: 1,
         additions: 80,
         deletions: 22,
       }),
       contrastFile('packages/core-renderer/src/home/Logbook.tsx', {
-        level: 'low',
-        tier: 2,
         additions: 31,
         deletions: 3,
       }),
@@ -114,28 +76,10 @@ const chapters = [
   {
     id: 'ch-3',
     name: 'Generated and lockfiles',
-    estimatedMinutes: 1,
     status: 'complete' as const,
-    files: [
-      contrastFile('package-lock.json', { level: 'low', tier: 3, additions: 400, deletions: 380 }),
-    ],
+    files: [contrastFile('package-lock.json', { additions: 400, deletions: 380 })],
   },
 ]
-
-const prDetail = {
-  number: 182,
-  title: 'Session Home and Monitor Wall',
-  chapters,
-  readingOrder: [
-    {
-      step: 1,
-      path: 'packages/core-main/src/session/session-store.ts',
-      symbol: 'SessionStore',
-      reason: 'Defines the record every later file reads',
-      uses: [],
-    },
-  ],
-}
 
 const gitStatus = {
   branch: 'feat/git-speed-contrast-keys',
@@ -193,11 +137,7 @@ const diff = {
   ],
 }
 
-function dashboardPr(
-  number: number,
-  section: string,
-  { riskLevel, ...extra }: { riskLevel: Level } & Record<string, unknown>
-) {
+function dashboardPr(number: number, section: string, extra: Record<string, unknown> = {}) {
   return {
     repo: 'andytavares/terminator',
     localRepoRoot: number % 2 === 0 ? REPO : null,
@@ -212,8 +152,6 @@ function dashboardPr(
     additions: 120 + number,
     deletions: 40,
     fileCount: 9,
-    riskLevel,
-    estimatedMinutes: 18,
     ciStatus: 'passing',
     reviewDecision: 'review-required',
     unresolvedThreads: 0,
@@ -224,18 +162,17 @@ function dashboardPr(
 }
 
 const dashboardPrs = [
-  dashboardPr(201, 'requested', { riskLevel: 'high', ciStatus: 'failing' }),
-  dashboardPr(202, 'requested', { riskLevel: 'medium' }),
-  dashboardPr(203, 're-review', { riskLevel: 'low', commitsSinceMyReview: 3 }),
-  dashboardPr(204, 'team', { riskLevel: 'medium', ciStatus: 'pending' }),
+  dashboardPr(201, 'requested', { ciStatus: 'failing' }),
+  dashboardPr(202, 'requested'),
+  dashboardPr(203, 're-review', { commitsSinceMyReview: 3 }),
+  dashboardPr(204, 'team', { ciStatus: 'pending' }),
   dashboardPr(205, 'mine', {
-    riskLevel: 'low',
     reviewDecision: 'changes-requested',
     unresolvedThreads: 2,
   }),
-  dashboardPr(206, 'mine', { riskLevel: 'medium', reviewDecision: 'approved' }),
-  dashboardPr(207, 'mine', { riskLevel: 'high', ciStatus: 'failing' }),
-  dashboardPr(208, 'involved', { riskLevel: 'low' }),
+  dashboardPr(206, 'mine', { reviewDecision: 'approved' }),
+  dashboardPr(207, 'mine', { ciStatus: 'failing' }),
+  dashboardPr(208, 'involved'),
 ]
 
 function author(name: string) {
@@ -351,27 +288,18 @@ window.electronAPI = electronApiOf({
 })
 
 function PrRail(): React.JSX.Element {
-  usePrReviewStore.setState({
-    viewedFiles: new Set(['packages/core-main/src/session/session-types.ts', 'package-lock.json']),
-    currentChapterId: 'ch-1',
-    currentFilePath: 'packages/core-main/src/session/session-records.ts',
-  })
   return (
     <div className="pr-review-view" style={{ height: 640, width: 280 }}>
       <div className="pr-review-panels">
-        <aside className="pr-review-panel pr-review-panel--left">
+        <aside aria-label="Chapters" className="pr-review-panel pr-review-panel--left">
           <div className="pr-review-panel-header">
-            <span className="pr-review-chapter-name">Files</span>
+            <span className="pr-review-chapter-name">Chapters</span>
           </div>
-          <div className="pr-rail-chapters">
-            <ChapterNav chapters={chapters as never} />
-          </div>
-          <FullFileList
-            pr={prDetail as never}
-            repoRoot={REPO}
-            headSHA="abc1234"
-            currentFilePath="packages/core-main/src/session/session-records.ts"
-            onSelectFile={() => {}}
+          <ChapterNav
+            chapters={chapters as never}
+            progress={{ 'ch-1': { read: 2, total: 5 }, 'ch-2': { read: 0, total: 3 } }}
+            activeId="ch-1"
+            onSelectChapter={() => {}}
           />
         </aside>
       </div>
@@ -406,9 +334,7 @@ function pausedPr(): never {
     fileCount: 9,
     additions: 120,
     deletions: 40,
-    estimatedMinutes: 18,
-    riskLevel: 'medium',
-    signalDots: {},
+
     sessionStatus: 'paused',
     viewedFileCount: 3,
     approvalCount: 0,
@@ -435,19 +361,7 @@ function PausedQueue(): React.JSX.Element {
 
 const surfaces: Record<string, () => React.JSX.Element> = {
   'review-footer': () => (
-    <ReviewFooter
-      previousFileName="math.ts"
-      nextFileName={null}
-      isLastFile
-      isLastChapter
-      position="file 2 of 2"
-      isViewed={false}
-      onToggleViewed={() => {}}
-      onPrevFile={() => {}}
-      onMarkViewed={() => {}}
-      onFinishChapter={() => {}}
-      onOpenShortcuts={() => {}}
-    />
+    <ReviewFooter position="Chapter 1 of 3 · 40% read" onOpenShortcuts={() => {}} />
   ),
   'review-queue': PausedQueue,
   'pr-rail': PrRail,

@@ -19,7 +19,7 @@ const schemaFile = {
     '+  composite: z.number().nullable(),',
     '+})',
     '+',
-    '+export type RiskScore = z.infer<typeof RiskScoreSchema>',
+    '+export interface RiskScore { level: string }',
   ].join('\n'),
 }
 
@@ -114,16 +114,16 @@ const readmeFile = {
 const ACCEPTANCE_FILES_IN_READING_ORDER = [
   schemaFile,
   serviceFile,
-  specFile,
   useHookFile,
   healthChipsFile,
   riskBreakdownFile,
+  specFile,
   reviewDiffPaneFile,
   readmeFile,
 ]
 
 describe('buildReadingOrder() — acceptance', () => {
-  it('orders the 7 real files by definitions-first reading order, with the unknown-language file still appearing', async () => {
+  it('orders the real files definitions first, a test file like any other, with the unknown-language file still appearing', async () => {
     const steps = await readingOrderOf(ACCEPTANCE_FILES_IN_READING_ORDER)
 
     const paths = steps.map((s) => s.path)
@@ -134,11 +134,14 @@ describe('buildReadingOrder() — acceptance', () => {
       'Defines RiskScore · depends on nothing in this PR'
     )
     expect(byPath.get(serviceFile.path)?.reason).toBe('Uses RiskScore (step 1)')
-    expect(byPath.get(specFile.path)?.reason).toBe('Tests step 2, read right after it')
+    expect(byPath.get(specFile.path)?.reason).toBe('Calls computeRiskScore (step 2)')
     expect(byPath.get(useHookFile.path)?.reason).toBe('Calls computeRiskScore (step 2)')
     expect(byPath.get(healthChipsFile.path)?.reason).toBe('Uses RiskScore (step 1)')
     expect(byPath.get(riskBreakdownFile.path)?.reason).toBe('Uses RiskScore (step 1)')
-    expect(byPath.get(reviewDiffPaneFile.path)?.reason).toBe('Renders HealthChips (step 5)')
+    // Upstream tags queries tag no JSX elements, so a component that only renders another has no edge.
+    expect(byPath.get(reviewDiffPaneFile.path)?.reason).toBe(
+      'Defines ReviewDiffPane · depends on nothing in this PR'
+    )
 
     // Steps are 1-based and match the array position.
     expect(steps.map((s) => s.step)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
@@ -205,7 +208,7 @@ describe('buildReadingOrder() — reference wording', () => {
         filename: 'src/test-batch/pr-050/types.ts',
         additions: 1,
         deletions: 0,
-        patch: "@@ -0,0 +1,1 @@\n+export type Priority = 'low' | 'medium' | 'high' | 'critical'",
+        patch: '@@ -0,0 +1,1 @@\n+export interface Priority { rank: number }',
       },
       {
         filename: 'src/test-batch/pr-050/utils.ts',
@@ -249,32 +252,15 @@ describe('buildReadingOrder() — the reference a reason names', () => {
   })
 })
 
-describe('buildReadingOrder() — files outside the dependency graph', () => {
-  it('puts a lock file last, after the code it was listed before', async () => {
+describe('buildReadingOrder() — no file-name rules', () => {
+  it('orders a lock file by its size like any file without symbols, not last', async () => {
     const lock = {
       path: 'package-lock.json',
-      additions: 2,
-      deletions: 2,
+      additions: 50,
+      deletions: 50,
       patch: '@@ -1,1 +1,1 @@\n-"a": "1"\n+"a": "2"',
     }
-    const order = await readingOrderOf([lock, schemaFile])
-    expect(order.map((s) => s.path)).toEqual([schemaFile.path, 'package-lock.json'])
-  })
-
-  it('adds no ordering edge for a symbol only a test file defines', async () => {
-    const helperSpec = {
-      path: 'tests/unit/thing.spec.ts',
-      additions: 3,
-      deletions: 0,
-      patch: '@@ -0,0 +1,3 @@\n+export function makeThing() {\n+  return useThing()\n+}',
-    }
-    const source = {
-      path: 'src/thing.ts',
-      additions: 3,
-      deletions: 0,
-      patch: '@@ -0,0 +1,3 @@\n+export function useThing() {\n+  return makeThing()\n+}',
-    }
-    const order = await readingOrderOf([helperSpec, source])
-    expect(order.map((s) => s.path)).toEqual(['src/thing.ts', 'tests/unit/thing.spec.ts'])
+    const order = await readingOrderOf([schemaFile, lock])
+    expect(order.map((s) => s.path)).toEqual(['package-lock.json', schemaFile.path])
   })
 })

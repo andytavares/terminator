@@ -5,7 +5,6 @@ import {
   ReviewSessionSchema,
   ThreadSchema,
   type PrReviewDetail,
-  type RiskScore,
 } from '../../src/schemas/pr-review.schema'
 import { reviewQueuePr } from './support/review-queue-pr'
 
@@ -37,27 +36,9 @@ const DETAIL_INPUT = {
           additions: 10,
           deletions: 5,
           isBinary: false,
-          tier: 1,
           whyHere: 'core logic',
-          riskScore: {
-            level: 'medium',
-            composite: 50,
-            metrics: {
-              changeSize: 100,
-              churn90d: null,
-              blastRadius: null,
-              testFilePresent: true,
-              complexityDelta: null,
-              patchCoverage: null,
-            },
-            dominantDriver: 'changeSize',
-            topImporters: [],
-            importerCount: 0,
-          },
-          estimatedMinutes: 5,
         },
       ],
-      estimatedMinutes: 5,
       status: 'not-started',
     },
   ],
@@ -211,69 +192,24 @@ describe('usePrReviewStore — replacing threads', () => {
   })
 })
 
-describe('usePrReviewStore — updateFileRiskScore', () => {
+describe('usePrReviewStore — updateFileChurn', () => {
   useFreshPrReviewStore()
 
-  it('updates risk score for file in specified chapter', () => {
+  it('sets the 90-day commit count of each file it names', () => {
     usePrReviewStore.setState({ activePr: makeDetail() })
-    const newRisk: RiskScore = {
-      level: 'high',
-      composite: 90,
-      metrics: {
-        changeSize: 200,
-        churn90d: 10,
-        blastRadius: 5,
-        testFilePresent: false,
-        complexityDelta: 20,
-        patchCoverage: 60,
-      },
-      dominantDriver: 'changeSize',
-      topImporters: [],
-      importerCount: 0,
-    }
-    usePrReviewStore.getState().updateFileRiskScore('ch-1', 'src/app.ts', newRisk)
-    const file = usePrReviewStore.getState().activePr?.chapters[0].files[0]
-    expect(file?.riskScore.level).toBe('high')
-    expect(file?.riskScore.composite).toBe(90)
+    usePrReviewStore.getState().updateFileChurn({ 'src/app.ts': 12 })
+    expect(usePrReviewStore.getState().activePr?.chapters[0].files[0].churn90d).toBe(12)
+  })
+
+  it('leaves a file it does not name unmeasured', () => {
+    usePrReviewStore.setState({ activePr: makeDetail() })
+    usePrReviewStore.getState().updateFileChurn({ 'src/other.ts': 3 })
+    expect(usePrReviewStore.getState().activePr?.chapters[0].files[0].churn90d).toBeNull()
   })
 
   it('is a no-op when activePr is null', () => {
-    const risk = makeDetail().chapters[0].files[0].riskScore
-    usePrReviewStore.getState().updateFileRiskScore('ch-1', 'src/app.ts', risk)
+    usePrReviewStore.getState().updateFileChurn({ 'src/app.ts': 12 })
     expect(usePrReviewStore.getState().activePr).toBeNull()
-  })
-})
-
-describe('usePrReviewStore — updateQueuePrRisk', () => {
-  useFreshPrReviewStore()
-
-  it('updates risk level and signal dots for matching PR', () => {
-    usePrReviewStore.setState({ prQueue: [makePR(42)] })
-    const dots = {
-      tests: 'fail' as const,
-      coverage: 'warn' as const,
-      ci: 'pass' as const,
-      lint: 'pass' as const,
-      churn: 'pass' as const,
-      blast: 'pass' as const,
-    }
-    usePrReviewStore.getState().updateQueuePrRisk(42, 'high', dots)
-    expect(usePrReviewStore.getState().prQueue[0].riskLevel).toBe('high')
-    expect(usePrReviewStore.getState().prQueue[0].signalDots.tests).toBe('fail')
-  })
-
-  it('does not affect other PRs in the queue', () => {
-    usePrReviewStore.setState({ prQueue: [makePR(1), makePR(2)] })
-    const dots = {
-      tests: 'fail' as const,
-      coverage: 'fail' as const,
-      ci: 'fail' as const,
-      lint: 'fail' as const,
-      churn: 'fail' as const,
-      blast: 'fail' as const,
-    }
-    usePrReviewStore.getState().updateQueuePrRisk(1, 'high', dots)
-    expect(usePrReviewStore.getState().prQueue[1].riskLevel).toBe('low')
   })
 })
 
@@ -335,35 +271,25 @@ describe('usePrReviewStore — reset', () => {
   })
 })
 
-describe('usePrReviewStore — patchFileComplexity', () => {
+describe('usePrReviewStore — updateFileBlastRadius', () => {
   useFreshPrReviewStore()
 
-  it('updates complexity delta and adjusts composite score', () => {
+  it('sets the blast radius of each file it names', () => {
     usePrReviewStore.setState({ activePr: makeDetail() })
-    usePrReviewStore.getState().patchFileComplexity('ch-1', 'src/app.ts', 10)
-    const file = usePrReviewStore.getState().activePr?.chapters[0].files[0]
-    expect(file?.riskScore.metrics.complexityDelta).toBe(10)
-    // 50, plus 10/15 of complexity's 8 points, rounded.
-    expect(file?.riskScore).toMatchObject({ composite: 55, level: 'medium' })
-  })
-
-  it('is a no-op when activePr is null', () => {
-    usePrReviewStore.getState().patchFileComplexity('ch-1', 'src/app.ts', 5)
-    expect(usePrReviewStore.getState().activePr).toBeNull()
-  })
-
-  it('does not modify files in other chapters', () => {
-    const detail = makeDetail()
-    detail.chapters.push({
-      id: 'ch-2',
-      name: 'Other',
-      files: [{ ...detail.chapters[0].files[0], path: 'src/other.ts' }],
-      estimatedMinutes: 3,
-      status: 'not-started',
+    usePrReviewStore
+      .getState()
+      .updateFileBlastRadius({ 'src/app.ts': { usedIn: 14, alsoDefinedIn: 2 } })
+    expect(usePrReviewStore.getState().activePr?.chapters[0].files[0].blastRadius).toEqual({
+      usedIn: 14,
+      alsoDefinedIn: 2,
     })
-    usePrReviewStore.setState({ activePr: detail })
-    usePrReviewStore.getState().patchFileComplexity('ch-1', 'src/app.ts', 10)
-    const otherChapter = usePrReviewStore.getState().activePr?.chapters[1]
-    expect(otherChapter?.files[0].riskScore.metrics.complexityDelta).toBeNull()
+  })
+
+  it('leaves a file it does not name unmeasured', () => {
+    usePrReviewStore.setState({ activePr: makeDetail() })
+    usePrReviewStore
+      .getState()
+      .updateFileBlastRadius({ 'src/other.ts': { usedIn: 3, alsoDefinedIn: 0 } })
+    expect(usePrReviewStore.getState().activePr?.chapters[0].files[0].blastRadius).toBeNull()
   })
 })

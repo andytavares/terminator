@@ -15,9 +15,7 @@ const insightsOf = (files: unknown[], opts: ComputeInsightsOptions) =>
 const baseOpts: ComputeInsightsOptions = {
   readingOrder: [],
   chapters: [],
-  statusChecks: [],
   dryViolations: [],
-  localCoverage: null,
 }
 
 /** A changed file as GitHub lists it, with its patch given line by line. */
@@ -183,79 +181,6 @@ describe('measureDiffComplexity()', () => {
   })
 })
 
-const ADD_ONE_FILE = changedFileWithPatch(
-  'src/util.ts',
-  [
-    '@@ -0,0 +1,3 @@ export function addOne',
-    '+export function addOne(n: number) {',
-    '+  return n + 1',
-    '+}',
-  ],
-  { additions: 3, deletions: 0 }
-)
-
-const ADD_ONE_SPEC_FILE = changedFileWithPatch(
-  'tests/unit/util.spec.ts',
-  ['@@ -0,0 +1,2 @@ describe', '+const result = addOne(1)', '+expect(result).toBe(2)'],
-  { additions: 2, deletions: 0 }
-)
-
-const SUBTRACT_ONE_FILE = changedFileWithPatch(
-  'src/util.ts',
-  [
-    '@@ -0,0 +1,3 @@ export function subtractOne',
-    '+export function subtractOne(n: number) {',
-    '+  return n - 1',
-    '+}',
-  ],
-  { additions: 3, deletions: 0 }
-)
-
-const ONE_CONSTANT_FILE = changedFileWithPatch('src/util.ts', [
-  '@@ -0,0 +1,1 @@',
-  '+export const x = 1',
-])
-
-describe('computeInsights() — coverage of changed functions', () => {
-  it('marks a changed function tested when a PR test file references it', async () => {
-    const insights = await insightsOf([ADD_ONE_FILE, ADD_ONE_SPEC_FILE], baseOpts)
-    expect(insights.coverage.changedFunctions).toBe(1)
-    expect(insights.coverage.testedFunctions).toBe(1)
-    expect(insights.coverage.untestedFunctions).toEqual([])
-    expect(insights.coverage.source).toBe('test files referencing each changed function')
-  })
-
-  it('falls back to findTestReferences (repo grep) when no PR test file covers a function', async () => {
-    const withoutRepoTests = await insightsOf([SUBTRACT_ONE_FILE], baseOpts)
-    expect(withoutRepoTests.coverage.untestedFunctions).toContain('subtractOne')
-
-    const withRepoTests = await insightsOf([SUBTRACT_ONE_FILE], {
-      ...baseOpts,
-      findTestReferences: async (symbols) => new Set(symbols.filter((s) => s === 'subtractOne')),
-    })
-    expect(withRepoTests.coverage.testedFunctions).toBe(1)
-    expect(withRepoTests.coverage.untestedFunctions).toEqual([])
-  })
-})
-
-describe('computeInsights() — patch coverage percentage', () => {
-  it('parses a patch-coverage percentage from a matching status check description', async () => {
-    const insights = await insightsOf([ONE_CONSTANT_FILE], {
-      ...baseOpts,
-      statusChecks: [{ name: 'codecov/patch', state: 'pass', description: '84.21% of diff hit' }],
-    })
-    expect(insights.coverage.patchPercent).toBe(84)
-  })
-
-  it('falls back to localCoverage, then to null, when no CI check reports it', async () => {
-    const withLocal = await insightsOf([ONE_CONSTANT_FILE], { ...baseOpts, localCoverage: 72.6 })
-    expect(withLocal.coverage.patchPercent).toBe(73)
-
-    const withNeither = await insightsOf([ONE_CONSTANT_FILE], baseOpts)
-    expect(withNeither.coverage.patchPercent).toBeNull()
-  })
-})
-
 const FREED_FILE = changedFileWithPatch(
   'src/freed.ts',
   [
@@ -302,63 +227,11 @@ const MARKERS_FILE = changedFileWithPatch(
   { additions: 4, deletions: 0 }
 )
 
-const DEEPLY_NESTED_LINES = [
-  '+export function deep(a: number) {',
-  '+  if (a) {',
-  '+    if (a) {',
-  '+      if (a) {',
-  '+        if (a) {',
-  '+          if (a) { return 1 }',
-  '+        }',
-  '+      }',
-  '+    }',
-  '+  }',
-  '+  return 0',
-  '+}',
-]
-
-/** A file adding one long function, one deeply nested one and one with six parameters. */
-function oversizedFunctionFiles() {
-  const bodyLines = Array.from({ length: 82 }, (_, i) => `  const v${i} = ${i}`)
-  const longFn = ['+export function longFn() {', ...bodyLines.map((l) => `+${l}`), '+}']
-  const manyParams = [
-    '+export function manyParams(a: number, b: number, c: number, d: number, e: number, f: number) {',
-    '+  return a',
-    '+}',
-  ]
-  return [
-    changedFileWithPatch('src/long.ts', ['@@ -0,0 +1,84 @@', ...longFn], {
-      additions: 84,
-      deletions: 0,
-    }),
-    changedFileWithPatch('src/deep.ts', ['@@ -0,0 +1,12 @@', ...DEEPLY_NESTED_LINES], {
-      additions: 12,
-      deletions: 0,
-    }),
-    changedFileWithPatch('src/params.ts', ['@@ -0,0 +1,3 @@', ...manyParams], {
-      additions: 3,
-      deletions: 0,
-    }),
-  ]
-}
-
 describe('computeInsights() — health flags', () => {
-  it('flags TODO, eslint-disable, @ts-ignore and new any in added lines', async () => {
+  it('flags a new TODO and no language-specific marker in added lines', async () => {
     const insights = await insightsOf([MARKERS_FILE], baseOpts)
-    const kinds = insights.health.flags.map((f) => f.kind)
-    expect(kinds).toContain('todo')
-    expect(kinds).toContain('eslint-disable')
-    expect(kinds).toContain('ts-ignore')
-    expect(kinds).toContain('any')
+    expect(insights.health.flags.map((f) => f.kind)).toEqual(['todo'])
     expect(insights.health.source).toBe('tree-sitter · detectDryViolations')
-  })
-
-  it('flags a function over 80 lines, deep nesting and too many parameters', async () => {
-    const insights = await insightsOf(oversizedFunctionFiles(), baseOpts)
-    const kinds = insights.health.flags.map((f) => f.kind)
-    expect(kinds).toContain('long-function')
-    expect(kinds).toContain('deep-nesting')
-    expect(kinds).toContain('many-params')
   })
 
   it('adds one flag per DRY violation group', async () => {
@@ -368,19 +241,99 @@ describe('computeInsights() — health flags', () => {
   })
 })
 
+/** A file whose patch adds `lines` as a new file. */
+function addedFile(path: string, lines: string[]) {
+  const patch = [`@@ -0,0 +1,${lines.length} @@`, ...lines.map((line) => `+${line}`)]
+  return changedFileWithPatch(path, patch, { additions: lines.length, deletions: 0 })
+}
+
+const eightyAssignments = (prefix: string) =>
+  Array.from({ length: 80 }, (_, i) => `${prefix}v${i} = ${i}`)
+
+/** 92 lines, five nested ifs, six parameters. */
+const OVERSIZED_TS_FILE = addedFile('src/oversized.ts', [
+  'export function oversized(a: number, b: number, c: number, d: number, e: number, f: number) {',
+  '  if (a) {',
+  '    if (b) {',
+  '      if (c) {',
+  '        if (d) {',
+  '          if (e) { return f }',
+  '        }',
+  '      }',
+  '    }',
+  '  }',
+  ...eightyAssignments('  const '),
+  '  return 0',
+  '}',
+])
+
+/** 88 lines, five nested ifs, six parameters. */
+const OVERSIZED_PY_FILE = addedFile('oversized.py', [
+  'def oversized(a, b, c, d, e, f):',
+  '    if a:',
+  '        if b:',
+  '            if c:',
+  '                if d:',
+  '                    if e:',
+  '                        return f',
+  ...eightyAssignments('    '),
+  '    return 0',
+])
+
+const SMALL_GO_FILE = addedFile('small.go', [
+  'package small',
+  '',
+  'func Larger(a int, b int) int {',
+  '\tif a > b {',
+  '\t\treturn a',
+  '\t}',
+  '\treturn b',
+  '}',
+])
+
+const CHAINED_CONDITION_FILE = addedFile('src/ready.ts', [
+  'export function ready(a: boolean, b: boolean, c: boolean) {',
+  '  if (a && b && c && a && b && c) return true',
+  '  return false',
+  '}',
+])
+
+describe('computeInsights() — conditions are not nesting', () => {
+  it('flags no nesting for one if whose condition chains six operands', async () => {
+    const insights = await insightsOf([CHAINED_CONDITION_FILE], baseOpts)
+    expect(insights.health.flags).toEqual([])
+  })
+})
+
+describe('computeInsights() — function health flags in any grammar', () => {
+  it('flags a TypeScript function over 80 lines, nested five deep, with six parameters', async () => {
+    const insights = await insightsOf([OVERSIZED_TS_FILE], baseOpts)
+    expect(insights.health.flags).toEqual([
+      { kind: 'long-function', label: 'Function over 80 lines (92)', path: 'src/oversized.ts' },
+      { kind: 'deep-nesting', label: 'Nesting depth 5', path: 'src/oversized.ts' },
+      { kind: 'many-params', label: '6 parameters', path: 'src/oversized.ts' },
+    ])
+  })
+
+  it('flags a Python function over 80 lines, nested five deep, with six parameters', async () => {
+    const insights = await insightsOf([OVERSIZED_PY_FILE], baseOpts)
+    expect(insights.health.flags).toEqual([
+      { kind: 'long-function', label: 'Function over 80 lines (88)', path: 'oversized.py' },
+      { kind: 'deep-nesting', label: 'Nesting depth 5', path: 'oversized.py' },
+      { kind: 'many-params', label: '6 parameters', path: 'oversized.py' },
+    ])
+  })
+
+  it('flags nothing for a short, shallow Go function with two parameters', async () => {
+    const insights = await insightsOf([SMALL_GO_FILE], baseOpts)
+    expect(insights.health.flags).toEqual([])
+  })
+})
+
 const FEATURE_FILE = changedFileWithPatch(
   'src/feature.ts',
   ['@@ -0,0 +1,3 @@ export function feature', '+export function feature() {', '+  return 1', '+}'],
   { additions: 3, deletions: 0 }
-)
-
-const LOCK_FILE = changedFileWithPatch(
-  'package-lock.json',
-  ['@@ -0,0 +1,1 @@', '-"a": "1"', '+"a": "2"'],
-  {
-    additions: 500,
-    deletions: 500,
-  }
 )
 
 /** A reading order where each step uses the symbol the step before it defines. */
@@ -399,15 +352,13 @@ function chapterOfPaths(id: string, paths: string[]): Chapter {
     id,
     name: `Chapter ${id}`,
     files: paths.map((path) => ({ path }) as never),
-    estimatedMinutes: 1,
     status: 'not-started',
   }
 }
 
 describe('computeInsights() — understandability', () => {
-  it('counts semantic lines-to-read, excludes tier-3 files, and rates level', async () => {
-    const insights = await insightsOf([FEATURE_FILE, LOCK_FILE], baseOpts)
-    // Only src/feature.ts's semantic hunk counts; the lock file is tier 3.
+  it('counts semantic lines-to-read and rates level', async () => {
+    const insights = await insightsOf([FEATURE_FILE], baseOpts)
     expect(insights.understandability.linesToRead).toBe(3)
     expect(insights.understandability.newExports).toBeGreaterThan(0)
     expect(insights.understandability.level).toBe('easy')

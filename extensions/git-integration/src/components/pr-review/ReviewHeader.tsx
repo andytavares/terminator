@@ -1,10 +1,8 @@
 import React, { useState } from 'react'
-import { ArrowLeft, Sparkles, TriangleAlert, MoreHorizontal, X } from 'lucide-react'
+import { ArrowLeft, Sparkles, MoreHorizontal, X } from 'lucide-react'
 import { Button, IconButton, Menu, Popover } from '@terminator/extension-ui'
 import { StatusChecksBar } from './StatusChecksBar'
-import { ViewMenu } from './ViewMenu'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
-import { plural } from '@terminator/extension-sdk'
 import './review-header.css'
 import './review-layout.css'
 
@@ -23,18 +21,7 @@ export interface ReviewHeaderProps {
   viewedCount: number
   totalFiles: number
   chapters: ChapterProgress[]
-  minutesLeft: number
-  draftCount: number
-  onSubmit: () => void
   onPause: () => void
-  largePr: { loc: number; minutes: number } | null
-  onDismissLargePr: () => void
-  focusMode: boolean
-  onToggleFocusMode: () => void
-  /** Changed files the viewer owns; the filter has nothing to show when it is 0. */
-  ownedCount: number
-  ownedOnly: boolean
-  onToggleOwnedOnly: () => void
   onAskAgent: () => void
   onShowOverview?: () => void
   onPopOut?: () => void
@@ -114,27 +101,6 @@ function ChecksPill({ checks }: { checks: StatusCheck[] }) {
   )
 }
 
-function LargePrPill(props: { largePr: { loc: number; minutes: number }; onDismiss: () => void }) {
-  const { loc, minutes } = props.largePr
-  const pill = (
-    <>
-      <TriangleAlert aria-hidden="true" className="rh-icon" />
-      {loc.toLocaleString()} LOC · ~{minutes} min
-    </>
-  )
-  return (
-    <PillPopover pillClass="rh-pill rh-pill--warning" pill={pill} label="Large PR warning">
-      <p className="rh-large-pr-text">
-        Large PR — {loc.toLocaleString()} LOC, estimated {minutes} min to review. Consider
-        requesting it be split.
-      </p>
-      <Button size="sm" onClick={props.onDismiss}>
-        Dismiss
-      </Button>
-    </PillPopover>
-  )
-}
-
 function filledPercent(chapter: ChapterProgress): number {
   if (chapter.fileCount <= 0) return 0
   return (chapter.viewedCount / chapter.fileCount) * 100
@@ -171,11 +137,6 @@ function ChapterSegments(props: {
   )
 }
 
-function progressText(viewedCount: number, totalFiles: number, minutesLeft: number): string {
-  const viewed = `${viewedCount} of ${totalFiles} viewed`
-  return minutesLeft > 0 ? `${viewed} · ${minutesLeft} min left` : viewed
-}
-
 function ReviewProgress(props: ReviewHeaderProps) {
   const { viewedCount, totalFiles } = props
   return (
@@ -186,7 +147,7 @@ function ReviewProgress(props: ReviewHeaderProps) {
         totalFiles={totalFiles}
       />
       <span className="rh-progress-text">
-        {progressText(viewedCount, totalFiles, props.minutesLeft)}
+        {viewedCount} of {totalFiles} viewed
       </span>
     </div>
   )
@@ -194,7 +155,6 @@ function ReviewProgress(props: ReviewHeaderProps) {
 
 interface MenuItemProps {
   label: string
-  hint?: React.ReactNode
   disabled?: boolean
   onSelect: () => void
 }
@@ -212,20 +172,18 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
       }}
     >
       <span>{props.label}</span>
-      {props.hint && <span className="rh-menu-hint">{props.hint}</span>}
     </button>
   )
 }
 
-/** The "more" menu's actions, in order; settings live in the View menu. An action whose handler
- *  is absent is left out. */
+/** The "more" menu's actions, in order. An action whose handler is absent is left out. */
 function menuItems(props: ReviewHeaderProps): MenuItemProps[] {
   const items: (MenuItemProps | false)[] = [
-    !!props.onShowOverview && { label: 'Overview', hint: 'i', onSelect: props.onShowOverview },
+    !!props.onShowOverview && { label: 'Overview', onSelect: props.onShowOverview },
     { label: 'Pause review', onSelect: props.onPause },
     { label: 'Refresh pull request', disabled: props.refreshing, onSelect: props.onRefresh },
     !!props.onPopOut && { label: 'Pop out', onSelect: props.onPopOut },
-    { label: 'Keyboard shortcuts', hint: '?', onSelect: props.onOpenKeyboardHelp },
+    { label: 'Keyboard shortcuts', onSelect: props.onOpenKeyboardHelp },
   ]
   return items.filter((item): item is MenuItemProps => item !== false)
 }
@@ -258,43 +216,8 @@ function MoreMenu({ header }: { header: ReviewHeaderProps }) {
   )
 }
 
-/** A pill showing a filter that is on; clicking it turns the filter off. */
-function FilterPill({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button aria-pressed={true} type="button" className="rh-pill rh-pill--focus" onClick={onClick}>
-      {label}
-    </button>
-  )
-}
-
-function HeaderPills({ header }: { header: ReviewHeaderProps }) {
-  const { checks, largePr, focusMode } = header
-  return (
-    <>
-      {checks.length > 0 && <ChecksPill checks={checks} />}
-      {largePr && <LargePrPill largePr={largePr} onDismiss={header.onDismissLargePr} />}
-      {focusMode && <FilterPill label="Focus mode" onClick={header.onToggleFocusMode} />}
-      {header.ownedOnly && <FilterPill label="My files" onClick={header.onToggleOwnedOnly} />}
-    </>
-  )
-}
-
-function SubmitButton(props: { draftCount: number; onSubmit: () => void }) {
-  return (
-    <Button variant="primary" onClick={props.onSubmit}>
-      Submit review
-      {props.draftCount > 0 && (
-        <span className="rh-count">
-          {props.draftCount}
-          <span className="pr-visually-hidden"> {plural(props.draftCount, 'pending comment')}</span>
-        </span>
-      )}
-    </Button>
-  )
-}
-
 /** One 44px row holding everything that is not the diff, in place of the old top bar, checks band,
- *  progress track and large-PR banner (design: docs/research/review-screen-declutter.md). */
+ *  and progress track (design: docs/research/review-screen-declutter.md). */
 export function ReviewHeader(props: ReviewHeaderProps): React.JSX.Element {
   return (
     <div className="rh-row">
@@ -304,10 +227,9 @@ export function ReviewHeader(props: ReviewHeaderProps): React.JSX.Element {
       <span className="rh-title">{props.title}</span>
       <span className="rh-num">#{props.prNumber}</span>
       {props.isDraft && <span className="rh-draft-badge">Draft</span>}
-      <HeaderPills header={props} />
+      {props.checks.length > 0 && <ChecksPill checks={props.checks} />}
       <div className="rh-spacer" />
       <ReviewProgress {...props} />
-      <ViewMenu filters={props} />
       <div className="rh-actions">
         <Button
           aria-label="Ask agent about this PR"
@@ -317,7 +239,6 @@ export function ReviewHeader(props: ReviewHeaderProps): React.JSX.Element {
         >
           <span className="rh-ask-label">Ask agent</span>
         </Button>
-        <SubmitButton draftCount={props.draftCount} onSubmit={props.onSubmit} />
       </div>
       <MoreMenu header={props} />
       <IconButton icon={X} label="Close review" onClick={props.onClose} />

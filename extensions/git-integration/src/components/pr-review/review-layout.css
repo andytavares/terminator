@@ -1,6 +1,6 @@
 /*
- * The review view is the `pr-review` container: the file tree (file-tree.css) and the left panel
- * both fold to a 44px rail when the view is narrower than 1100px.
+ * The review view is the `pr-review` container: the chapter rail folds to a 44px strip when the
+ * view is narrower than 1100px.
  */
 
 .pr-review-view {

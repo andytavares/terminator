@@ -102,13 +102,6 @@ function repoRootFor(pr: DashboardPR): string {
   return pr.localRepoRoot ?? `gh:${pr.repo}`
 }
 
-function formatMinutes(total: number): string {
-  const h = Math.floor(total / 60)
-  const m = total % 60
-  if (h > 0) return `${h} h ${m} min`
-  return `${m} min`
-}
-
 function dashboardCiLabel(pr: DashboardPR): string {
   if (pr.ciStatus === 'none') return 'no checks'
   return `CI ${pr.ciStatus}`
@@ -125,11 +118,6 @@ function ciPart(pr: DashboardPR): MetaPart | null {
 function reviewerPart(pr: DashboardPR): MetaPart | null {
   if (pr.reviewerCount <= 1) return null
   return { text: `you are 1 of ${pr.reviewerCount} reviewers` }
-}
-
-function riskPart(pr: DashboardPR): MetaPart | null {
-  if (pr.riskLevel !== 'high') return null
-  return { text: 'High risk', tone: 'danger' }
 }
 
 /** Where the review stands, in words; only the non-neutral ones are coloured. */
@@ -256,7 +244,7 @@ function toNeedsRow(pr: DashboardPR): RowConfig {
   const since = { text: `${pr.commitsSinceMyReview} commits since your review` }
   return {
     pr,
-    parts: [choose(isReReview, since, null), reviewerPart(pr), riskPart(pr), ciPart(pr)],
+    parts: [choose(isReReview, since, null), reviewerPart(pr), ciPart(pr)],
     buttonLabel: choose(isReReview, 'Re-review', 'Review'),
     primary: isReReview,
   }
@@ -278,7 +266,7 @@ function toMineRow(pr: DashboardPR): RowConfig {
 }
 
 function toInvolvedRow(pr: DashboardPR) {
-  return { pr, parts: [riskPart(pr), ciPart(pr)], buttonLabel: 'Open', primary: false }
+  return { pr, parts: [ciPart(pr)], buttonLabel: 'Open', primary: false }
 }
 
 type Section = DashboardPR['section']
@@ -485,14 +473,10 @@ function needsSpecs(groups: Groups): SectionSpec[] {
 
 function NeedsPanel({ groups, ctx, capped }: PanelProps) {
   const { needsYou } = groups
-  const highRiskCount = needsYou.filter((p) => p.riskLevel === 'high').length
-  const totalMinutes = needsYou.reduce((s, p) => s + p.estimatedMinutes, 0)
   return (
     <TabPanel id="needs">
       <div className="rd-band">
         <b>{sectionCount(capped, needsYou, NEEDS_SECTIONS)} need you</b>
-        <span>{highRiskCount} high risk</span>
-        <span>About {formatMinutes(totalMinutes)} of reading</span>
       </div>
       {needsYou.length === 0 && <div className="rd-empty">Nothing needs you</div>}
       {needsSpecs(groups).map((spec) => (

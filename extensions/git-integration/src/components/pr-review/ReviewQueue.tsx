@@ -66,23 +66,13 @@ type QueueRefresh = ReturnType<typeof useQueueRefresh>
  *  the grouping below. Why: README.md, "Why the review screen works as it does". */
 function TriageBand({ store, refresh }: { store: QueueStore; refresh: QueueRefresh }) {
   const { prQueue, totalPrCount } = store
-  // Reading time is only knowable for the PRs actually loaded, so it is
-  // stated as a floor rather than passed off as the total when more remain.
-  const totalMinutes = prQueue.reduce((s, p) => s + p.estimatedMinutes, 0)
-  const minutesArePartial = totalPrCount !== null && totalPrCount > prQueue.length
-  const highRiskCount = prQueue.filter((p) => p.riskLevel === 'high').length
   const inProgressCount = prQueue.filter((p) => p.sessionStatus !== 'not-started').length
   return (
     <div className="rd-band">
       <span>
         <b>{totalPrCount ?? prQueue.length}</b> waiting on you
       </span>
-      {highRiskCount > 0 && <span className="rd-warn">{highRiskCount} high risk</span>}
       {inProgressCount > 0 && <span>{inProgressCount} already started</span>}
-      <span>
-        {choose(minutesArePartial, 'At least ', 'About ')}
-        <b>{totalMinutes} min</b> of reading
-      </span>
       <span className="rd-sp" />
       <IconButton
         icon={RefreshCw}
@@ -242,7 +232,6 @@ function rowMetaParts(pr: ReviewQueuePR, mine: boolean): (MetaPart | null | fals
       text: `${pr.approvalCount} approved`,
       title: `Approved by: ${pr.approvedBy.join(', ')}`,
     },
-    pr.riskLevel === 'high' && { text: 'High risk', tone: 'danger' },
     pr.ciStatus === 'failing' && { text: 'CI failing', tone: 'danger' },
     mine && { text: 'Your review requested' },
     pr.sessionStatus !== 'not-started' && {

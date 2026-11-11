@@ -23,14 +23,18 @@ vi.mock('@terminator/extension-ui', () => ({
 }))
 
 describe('KeyboardHelp', () => {
-  it('renders the Keyboard title and every binding row', () => {
+  it('lists the six review shortcuts and nothing else', () => {
     render(<KeyboardHelp onClose={vi.fn()} />)
     expect(screen.getByText('Keyboard')).toBeTruthy()
-    expect(screen.getByText('Next / previous hunk')).toBeTruthy()
-    expect(screen.getByText('Next / previous file')).toBeTruthy()
-    expect(screen.getByText('Next / previous chapter')).toBeTruthy()
-    expect(screen.getByText('Submit review')).toBeTruthy()
-    expect(screen.getByText('Peek definition')).toBeTruthy()
+    const rows = screen.getAllByRole('listitem').map((row) => row.textContent)
+    expect(rows).toEqual([
+      'kNext hunk',
+      'jPrevious hunk',
+      'SpaceMark hunk read, next hunk',
+      'cComment on line',
+      'lLater: revisit after the last hunk',
+      '⌘↵Go to the verdict bar, then submit',
+    ])
   })
 
   it('calls onClose when dismissed', async () => {

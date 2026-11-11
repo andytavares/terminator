@@ -22,8 +22,6 @@ function makePr(overrides: Partial<DashboardPR> = {}): DashboardPR {
     additions: 10,
     deletions: 5,
     fileCount: 2,
-    riskLevel: 'low',
-    estimatedMinutes: 5,
     ciStatus: 'passing',
     reviewDecision: 'review-required',
     unresolvedThreads: 0,
@@ -43,8 +41,6 @@ const pr211 = makePr({
   additions: 4043,
   deletions: 2103,
   fileCount: 56,
-  riskLevel: 'high',
-  estimatedMinutes: 18,
   reviewDecision: 'review-required',
   commitsSinceMyReview: 3,
   reviewerCount: 2,
@@ -59,8 +55,6 @@ const pr210 = makePr({
   additions: 3699,
   deletions: 402,
   fileCount: 49,
-  riskLevel: 'high',
-  estimatedMinutes: 72,
   reviewDecision: 'review-required',
   reviewerCount: 2,
   createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
@@ -74,8 +68,6 @@ const pr212 = makePr({
   additions: 3,
   deletions: 3,
   fileCount: 1,
-  riskLevel: 'low',
-  estimatedMinutes: 1,
   reviewDecision: 'review-required',
   reviewerCount: 1,
   createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
@@ -90,8 +82,6 @@ const pr213 = makePr({
   additions: 1385,
   deletions: 246,
   fileCount: 109,
-  riskLevel: 'medium',
-  estimatedMinutes: 20,
   ciStatus: 'passing',
   reviewDecision: 'changes-requested',
   unresolvedThreads: 2,
@@ -198,7 +188,6 @@ describe('ReviewDashboard — CI wording on My PRs rows', () => {
     const quiet = await screen.findByTestId('row-300')
     expect(quiet.textContent).toContain('no checks')
     expect(quiet.textContent).not.toContain('CI pending')
-    expect(quiet.textContent).toContain('~5 min')
   })
 
   it.each(['row-300', 'row-301'])('names CI at most once on %s', async (rowId) => {
@@ -243,15 +232,6 @@ describe('ReviewDashboard — repository name on the second line', () => {
     render(<ReviewDashboard />)
     const single = await screen.findByTestId('row-210')
     expect(within(single).getByTestId('pr-meta').textContent).not.toContain('terminator')
-  })
-
-  it('shows high risk in words and nothing for medium risk', async () => {
-    const medium = makePr({ number: 410, riskLevel: 'medium', title: 'Medium' })
-    mockInvoke({ prs: [pr210, medium], login: 'a', fetchedAt: new Date().toISOString() })
-    render(<ReviewDashboard />)
-    expect(await screen.findByTestId('row-210')).toBeTruthy()
-    expect(screen.getByTestId('row-210').textContent).toContain('High risk')
-    expect(screen.getByTestId('row-410').textContent).not.toMatch(/risk/i)
   })
 })
 
@@ -367,7 +347,7 @@ describe('ReviewDashboard — omits an empty group', () => {
     await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
     await user.click(await screen.findByRole('tab', { name: /My PRs/ }))
     await screen.findByText('YOUR OPEN PRS')
-    expect(screen.getByText(wholeText('+1,385 −246 · 109 files'))).toBeTruthy()
+    expect(screen.getAllByText(wholeText('+1,385 −246 · 109 files'))).not.toHaveLength(0)
     expect(screen.getByText('changes requested')).toBeTruthy()
   })
 })

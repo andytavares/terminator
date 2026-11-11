@@ -1,0 +1,54 @@
+/*
+ * VerdictBar: draft count, summary and the three verdicts, docked under ReviewFooter.
+ * Class prefix `vb-`.
+ */
+
+.vb-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--tm-bg-elevated);
+  border-top: 1px solid var(--tm-border);
+  font-size: var(--tm-font-size-sm);
+}
+
+.vb-drafts {
+  align-self: center;
+  color: var(--tm-text-muted);
+  white-space: nowrap;
+}
+
+.vb-summary {
+  flex: 1;
+  min-width: 160px;
+  height: 32px;
+  resize: none;
+  padding: 6px 10px;
+  border-radius: var(--tm-radius-md);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
+  font: inherit;
+  transition: height 120ms ease;
+}
+
+.vb-summary:focus {
+  height: 96px;
+  outline: none;
+  border-color: var(--tm-accent);
+}
+
+.vb-notice {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.vb-notice--error {
+  color: var(--tm-danger);
+}
+
+.vb-notice--done {
+  color: var(--tm-success);
+}

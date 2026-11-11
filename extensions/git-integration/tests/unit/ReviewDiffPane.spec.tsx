@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { ReviewDiffPane } from '../../src/components/pr-review/ReviewDiffPane'
 import { PrReviewDetailSchema, type PrChangedFile } from '../../src/schemas/pr-review.schema'
 import { measureDiffComplexity } from '../../src/review/insights'
+import type { ReviewBand } from '../../src/review/review-layout'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
 const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
@@ -52,7 +53,6 @@ vi.mock('../../src/components/pr-review/DiffLineRows', async (importOriginal) =>
   return {
     ...actual,
     UnifiedLineRow: counted(actual.UnifiedLineRow),
-    SplitLineRow: counted(actual.SplitLineRow),
   }
 })
 vi.mock('../../src/components/pr-review/UsesPopover', () => ({
@@ -87,9 +87,6 @@ vi.mock('../../src/review/insights', () => ({
   measureDiffComplexity: vi.fn(),
 }))
 
-const mockPatchFileComplexity = vi.fn()
-const mockAddNote = vi.fn()
-const mockRemoveNote = vi.fn()
 const mockAddDraft = vi.fn()
 const mockUpdateDraft = vi.fn()
 const mockRemoveDraft = vi.fn()
@@ -97,10 +94,7 @@ const mockSetCurrentChapter = vi.fn()
 const mockSetCurrentFile = vi.fn()
 const mockMarkFileViewed = vi.fn()
 const mockUnmarkFileViewed = vi.fn()
-const mockSetHideFormattingHunks = vi.fn()
 const mockSetSelection = vi.fn()
-const mockSetCommentVisibility = vi.fn()
-const mockSetAgentNotesOn = vi.fn()
 const mockRequestComposer = vi.fn()
 const mockOpenAgentPanel = vi.fn()
 const mockPrFileDiff = vi.fn()
@@ -112,15 +106,11 @@ function basePrReviewStoreState() {
   return {
     viewedFiles: new Set<string>(),
     threads: {},
-    patchFileComplexity: mockPatchFileComplexity,
     changedSince: new Set<string>(),
     viewedAt: {},
     viewedHunks: {},
     historyRewritten: false,
-    notes: [],
     drafts: [],
-    addNote: mockAddNote,
-    removeNote: mockRemoveNote,
     addDraft: mockAddDraft,
     updateDraft: mockUpdateDraft,
     removeDraft: mockRemoveDraft,
@@ -133,13 +123,6 @@ function basePrReviewStoreState() {
 
 function baseReviewUiStoreState() {
   return {
-    commentVisibility: 'all' as const,
-    setCommentVisibility: mockSetCommentVisibility,
-    agentNotesOn: true,
-    setAgentNotesOn: mockSetAgentNotesOn,
-    diffViewMode: 'unified' as const,
-    hideFormattingHunks: true,
-    setHideFormattingHunks: mockSetHideFormattingHunks,
     diffRange: 'whole' as const,
     selection: null,
     setSelection: mockSetSelection,
@@ -147,6 +130,7 @@ function baseReviewUiStoreState() {
     requestComposer: mockRequestComposer,
     agentRuns: [],
     openAgentPanel: mockOpenAgentPanel,
+    setFileHunks: vi.fn(),
   }
 }
 
@@ -156,24 +140,10 @@ const mockFile: PrChangedFile = {
   additions: 5,
   deletions: 2,
   isBinary: false,
-  tier: 1 as const,
   whyHere: 'changed',
-  estimatedMinutes: 3,
-  riskScore: {
-    level: 'low' as const,
-    composite: 5,
-    dominantDriver: 'changeSize',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {
-      changeSize: 5,
-      churn90d: null,
-      blastRadius: null,
-      testFilePresent: null,
-      complexityDelta: null,
-      patchCoverage: null,
-    },
-  },
+  churn90d: null,
+  blastRadius: null,
+  hunkCount: 1,
 }
 
 // Parsed as the review channel's answer is, so the schema's defaults are filled in.
@@ -189,12 +159,10 @@ const mockPr = PrReviewDetailSchema.parse({
   headSHA: 'abc',
   ciStatus: 'passing' as const,
   lintStatus: 'pass' as const,
-  coverageStatus: 'pass' as const,
   chapters: [
     {
       id: 'ch-1',
       name: 'Ch',
-      estimatedMinutes: 5,
       status: 'not-started' as const,
       files: [mockFile],
     },
@@ -208,10 +176,10 @@ const defaultProps = {
   repoRoot: '/repo',
   pr: mockPr,
   file: mockFile,
-  onMarkViewed: vi.fn(),
+  band: 'stream' as ReviewBand,
+  active: true,
   onPrevFile: vi.fn(),
   onNextFile: vi.fn(),
-  onShowRisk: vi.fn(),
 }
 
 // jsdom has no layout. The diff list is virtualised, so give the scroll container a
@@ -273,8 +241,18 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
+/** The pane inside the review stream's scroll element, as the stream renders each file. */
+function PaneInScroller(props: typeof defaultProps) {
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  return (
+    <div className="review-diff-scroll" data-testid="review-diff-scroll" ref={scrollRef}>
+      <ReviewDiffPane {...props} scrollRef={scrollRef} />
+    </div>
+  )
+}
+
 async function renderPane(props: Partial<typeof defaultProps> = {}) {
-  return render(<ReviewDiffPane {...defaultProps} {...props} />)
+  return render(<PaneInScroller {...defaultProps} {...props} />)
 }
 
 const ctxLine = (n: number, content = `line ${n}`) => ({
@@ -332,10 +310,6 @@ const codeCell = (row: HTMLElement) => within(row).getAllByRole('cell').at(-1)!
 
 /** The code rows the reviewer has selected. */
 const selectedRows = () => screen.queryAllByRole('row', { selected: true })
-
-/** Whether the pane draws the split view's side tables. */
-const drawsSplit = () =>
-  screen.getAllByRole('table').some((table) => table.classList.contains('diff-table--split'))
 
 /** Line 1 of src/foo.ts, right side, as the reviewer's selection. */
 function selectLineOne() {
@@ -469,25 +443,13 @@ function prWithMove(toPath: string, toLine: number) {
 /** Matches an element whose whole text is `text`. */
 const wholeText = (text: string) => (_: string, node: Element | null) => node?.textContent === text
 
-/** PR insights: `functions` changed, `untested` of them without tests. */
-function insightsFor(
-  functions: Array<{ name: string; line: number; branchDelta: number }>,
-  untested: string[]
-) {
+/** PR insights: `functions` changed, each with its branch gain. */
+function insightsFor(functions: Array<{ name: string; line: number; branchDelta: number }>) {
   return {
     complexity: {
       branchDelta: Math.max(...functions.map((f) => f.branchDelta)),
       functions: functions.map((f) => ({ path: 'src/foo.ts', ...f })),
       source: 'tree-sitter',
-    },
-    coverage: {
-      changedFunctions: functions.length,
-      testedFunctions: functions.length - untested.length,
-      untestedFunctions: untested,
-      patchPercent: null,
-      source: 'test files',
-      changedSourceFiles: 1,
-      changedSourceFilesWithTests: untested.length === 0 ? 1 : 0,
     },
     health: { flags: [], source: 'tree-sitter' },
     understandability: {
@@ -541,18 +503,9 @@ describe('ReviewDiffPane', () => {
     expect(screen.getByTitle('src/foo.ts').textContent).toBe('src/foo.ts')
   })
 
-  it.each([
-    { level: 'low' as const, label: /Low risk/ },
-    { level: 'medium' as const, label: /Medium risk/ },
-  ])('shows no risk label for a $level risk file', async ({ level, label }) => {
-    await renderPane({ file: { ...mockFile, riskScore: { ...mockFile.riskScore, level } } })
-    expect(screen.queryByText(label)).toBeNull()
-  })
-
-  it('shows high-risk label for high risk file', async () => {
-    const highFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'high' as const } }
-    await renderPane({ file: highFile })
-    expect(screen.getByText(/High risk/)).toBeTruthy()
+  it('shows no risk label', async () => {
+    await renderPane()
+    expect(screen.queryByText(/risk/i)).toBeNull()
   })
 
   it('shows binary message for binary files', async () => {
@@ -582,27 +535,6 @@ describe('ReviewDiffPane — section viewed toggle', () => {
     const boxes = await findFirstHunk()
     expect(screen.getAllByText('Section viewed')).toHaveLength(boxes.length)
     expect(screen.queryByText('Viewed')).toBeNull()
-  })
-})
-
-describe('ReviewDiffPane — risk', () => {
-  it('calls onShowRisk when the Why? button is clicked', async () => {
-    const user = userEvent.setup()
-    const onShowRisk = vi.fn()
-    const highFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'high' as const } }
-    await renderPane({ onShowRisk, file: highFile })
-    await user.click(screen.getByRole('button', { name: 'High risk' }))
-    expect(onShowRisk).toHaveBeenCalled()
-  })
-})
-
-describe('ReviewDiffPane — switches to split view mode when Split button is clicked', () => {
-  it('switches to split view mode when Split button is clicked', async () => {
-    const diff = oneHunk('@@ -1,3 +1,3 @@', [ctxLine(1, 'x'), addLine(2, 'y'), removeLine(2, 'z')])
-    uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
-    await renderDiffPane(diff)
-
-    await waitFor(() => expect(drawsSplit()).toBe(true))
   })
 })
 
@@ -730,62 +662,11 @@ describe('ReviewDiffPane — renders inline comment threads on matching lines', 
   })
 })
 
-describe('ReviewDiffPane — fires keyboard navigation events for prev-file and mark-viewed-next', () => {
-  it('fires keyboard navigation events for prev-file and mark-viewed-next', async () => {
-    const onPrevFile = vi.fn()
-    const onMarkViewed = vi.fn()
-    await renderPane({ onPrevFile, onMarkViewed })
-
-    window.dispatchEvent(new CustomEvent('pr-review:prev-file'))
-    window.dispatchEvent(new CustomEvent('pr-review:mark-viewed-next'))
-
-    expect(onPrevFile).toHaveBeenCalled()
-    expect(onMarkViewed).toHaveBeenCalled()
-  })
-})
-
-describe('ReviewDiffPane — comment visibility (R2)', () => {
-  const openThread = threadOnLineOne('thread-open')
-  const resolvedThread = threadOnLineOne('thread-resolved', true)
-
-  /** Shows the one-line diff with `threads`, comments set to `visibility`. */
-  async function renderThreads(threads: unknown[], visibility: string) {
-    storeThreads(threads)
-    uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), commentVisibility: visibility })
+describe('ReviewDiffPane — comments', () => {
+  it('shows every thread on the line, resolved ones too', async () => {
+    storeThreads([threadOnLineOne('thread-open'), threadOnLineOne('thread-resolved', true)])
     await renderDiffPane(oneLineDiff())
-  }
-
-  it('Hidden removes thread rendering and shows a gutter pip with the count', async () => {
-    await renderThreads([openThread, resolvedThread], 'hidden')
-
-    expect(screen.queryByTestId('thread')).toBeNull()
-    expect(screen.getByText('2')).toBeTruthy()
-  })
-
-  it('Unresolved hides a resolved thread but keeps an open one', async () => {
-    await renderThreads([openThread, resolvedThread], 'unresolved')
-
-    expect(screen.getAllByTestId('thread')).toHaveLength(1)
-  })
-
-  it('All shows every thread, including resolved ones', async () => {
-    await renderThreads([openThread, resolvedThread], 'all')
-
     expect(screen.getAllByTestId('thread')).toHaveLength(2)
-  })
-})
-
-describe('ReviewDiffPane — comment visibility (R2) — the hidden pip', () => {
-  it('clicking a hidden pip sets visibility back to all and shows the thread', async () => {
-    const user = userEvent.setup()
-    const uiStore = await useRealUiStore()
-    uiStore.setState({ commentVisibility: 'hidden', diffRange: 'whole' })
-    storeThreads([threadOnLineOne('thread-open')])
-    await renderDiffPane(oneLineDiff())
-
-    await user.click(screen.getByRole('button', { name: '1 hidden comments' }))
-    expect(uiStore.getState().commentVisibility).toBe('all')
-    expect(await screen.findByTestId('thread')).toBeTruthy()
   })
 })
 
@@ -798,28 +679,37 @@ describe('ReviewDiffPane — agent notes (R5)', () => {
     body: 'usePrReview.ts:317 calls computeRiskScore again.',
   })
 
-  /** Shows the one-line diff with the agent's run, agent notes on unless `agentNotesOn`. */
-  async function renderWithRun(agentNotesOn = true) {
-    uiStoreMock.mockReturnValue({
-      ...baseReviewUiStoreState(),
-      agentRuns: [agentRun],
-      agentNotesOn,
-    })
+  it('renders the agent note text after the finding line', async () => {
+    uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), agentRuns: [agentRun] })
     mockPrFileDiff.mockResolvedValue({ diff: singleLineDiff })
     await renderPane()
-  }
-
-  it('renders the agent note text after the finding line when agent notes are on', async () => {
-    await renderWithRun()
     await screen.findByText(/calls computeRiskScore again/)
     expect(screen.getByText(/Agent note ·/)).toBeTruthy()
   })
+})
 
-  it('shows an agent pip instead of the note when agent notes are off', async () => {
-    await renderWithRun(false)
-    await screen.findByText('x')
-    expect(screen.queryByText(/Agent note ·/)).toBeNull()
-    expect(screen.getByText('1')).toBeTruthy()
+/** A semantic hunk at line 1 and a whitespace-only hunk at line 20. */
+const formattingDiff = {
+  path: 'src/foo.ts',
+  isBinary: false,
+  hunks: [
+    { header: '@@ -1,1 +1,1 @@', lines: [removeLine(1, 'a'), addLine(1, 'b')] },
+    {
+      header: '@@ -20,1 +20,1 @@',
+      lines: [removeLine(20, '  spaced()'), addLine(20, 'spaced()')],
+    },
+  ],
+}
+
+describe('ReviewDiffPane — formatting-only hunks', () => {
+  it('hides formatting-only hunks behind a notice that reveals them', async () => {
+    const user = userEvent.setup()
+    await renderDiffPane(formattingDiff)
+    expect(screen.getByText(/1 formatting-only hunk hidden/)).toBeTruthy()
+    expect(screen.getAllByRole('checkbox', { name: 'Section viewed' })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'show all' }))
+    expect(screen.getAllByRole('checkbox', { name: 'Section viewed' })).toHaveLength(2)
+    expect(screen.queryByText(/formatting-only/)).toBeNull()
   })
 })
 
@@ -847,85 +737,69 @@ describe('ReviewDiffPane — moved code (S4) — collapses a moved-away (removed
   })
 })
 
-const splitDiff = oneHunk('@@ -85,3 +88,3 @@', [addLine(88, 'a'), addLine(89, 'b')])
-
-async function renderSplit(overrides: Partial<typeof defaultProps> = {}) {
-  mockPrFileDiff.mockResolvedValue({ diff: splitDiff })
-  const state = uiStoreMock.getMockImplementation()?.() ?? baseReviewUiStoreState()
-  uiStoreMock.mockReturnValue({
-    ...(state as object),
-    diffViewMode: 'split',
-  })
-  const view = await renderPane(overrides)
-  await findFirstHunk()
-  await waitFor(() => expect(drawsSplit()).toBe(true))
-  return view
+/** A PR whose src/foo.ts hunk repeats the retries change of src/api/client.ts:10. */
+const prWithSameShape = {
+  ...mockPr,
+  sameShape: [
+    {
+      first: { path: 'src/api/client.ts', hunkIndex: 0, line: 10, maskedValues: ['3', '5'] },
+      rest: [{ path: 'src/foo.ts', hunkIndex: 0, line: 10, maskedValues: ['2', '4'] }],
+    },
+  ],
 }
+const foldRow = () => screen.getByRole('group', { name: 'Folded hunk' })
+const retriesDiff = oneHunk('@@ -10,1 +10,1 @@', [
+  removeLine(10, '  retries: 2,'),
+  addLine(10, '  retries: 4,'),
+])
 
-describe('ReviewDiffPane — split view parity', () => {
-  it('renders the agent note text and pip in the split view', async () => {
-    const agentRun = doneAgentRun([88, 89], {
-      severity: 'nit' as const,
-      startLine: 89,
-      endLine: 89,
-      body: 'split-view agent note body',
-    })
-    uiStoreMock.mockReturnValue({
-      ...baseReviewUiStoreState(),
-      agentRuns: [agentRun],
-    })
-    const first = await renderSplit()
-    expect(screen.getByText(/split-view agent note body/)).toBeTruthy()
-    first.unmount()
+describe('ReviewDiffPane — same-shape folds in the chapters band', () => {
+  it('folds a repeated hunk into a row naming the first hunk, and Show expands it', async () => {
+    const user = userEvent.setup()
+    await renderDiffPane(retriesDiff, { pr: prWithSameShape, band: 'chapters' })
+    expect(foldRow().textContent).toBe('Same change as src/api/client.ts:10 · Show')
+    expect(codeRows()).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Show' }))
+    expect(codeRows()).toHaveLength(2)
+  })
 
-    uiStoreMock.mockReturnValue({
-      ...baseReviewUiStoreState(),
-      agentRuns: [agentRun],
-      agentNotesOn: false,
-    })
-    await renderSplit()
-    expect(screen.queryByText(/split-view agent note body/)).toBeNull()
-    expect(screen.getByText('1')).toBeTruthy()
+  it("lists the literals of this hunk next to the first hunk's from Show differences", async () => {
+    const user = userEvent.setup()
+    await renderDiffPane(retriesDiff, { pr: prWithSameShape, band: 'chapters' })
+    await user.click(screen.getByRole('button', { name: 'Show' }))
+    await user.click(screen.getByRole('button', { name: 'Show differences' }))
+    expect(screen.getByText('2 → 4')).toBeTruthy()
+    expect(screen.getByText('3 → 5')).toBeTruthy()
+  })
+
+  it("opens the first hunk's file from its name", async () => {
+    const user = userEvent.setup()
+    await renderDiffPane(retriesDiff, { pr: prWithSameShape, band: 'chapters' })
+    await user.click(screen.getByRole('button', { name: 'src/api/client.ts:10' }))
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('src/api/client.ts')
   })
 })
 
-describe('ReviewDiffPane — split view parity — collapses moved blocks (both directions) in the split view', () => {
-  it('collapses moved blocks (both directions) in the split view', async () => {
-    await renderSplit({ pr: prWithMove('src/foo.ts', 88) })
-    expect(screen.getByText('Moved')).toBeTruthy()
-    const row = 'UnionFind · 28 lines, unchanged, from github/pr-review-service.ts:360'
-    expect(screen.getByText(wholeText(row))).toBeTruthy()
+describe('ReviewDiffPane — same-shape folds in the stream band', () => {
+  it('shows a repeated hunk in full', async () => {
+    await renderDiffPane(retriesDiff, { pr: prWithSameShape })
+    expect(screen.queryByText(/Same change as/)).toBeNull()
+    expect(codeRows()).toHaveLength(2)
   })
 })
 
-describe('ReviewDiffPane — split view parity — shows the R4 gutter insight chips in the split view', () => {
-  it('shows the R4 gutter insight chips in the split view', async () => {
-    const insights = insightsFor([{ name: 'shardByDuration', line: 88, branchDelta: 6 }], [])
-    await renderSplit({ pr: { ...mockPr, insights } })
-    expect(screen.getByText('+6')).toBeTruthy()
+describe('ReviewDiffPane — deleted-only folds in the chapters band', () => {
+  it('folds a hunk of only removed lines into a count, and Show expands it', async () => {
+    const user = userEvent.setup()
+    const removed = [20, 21, 22].map((n) => removeLine(n, `legacyRetry(${n})`))
+    await renderDiffPane(oneHunk('@@ -20,3 +19,0 @@', removed), { band: 'chapters' })
+    expect(foldRow().textContent).toBe('3 lines deleted · Show')
+    await user.click(screen.getByRole('button', { name: 'Show' }))
+    expect(codeRows()).toHaveLength(3)
   })
 })
 
-describe('ReviewDiffPane — private notes side (S2)', () => {
-  it('renders a LEFT-side note under the removed line', async () => {
-    mockPrFileDiff.mockResolvedValue({ diff: oneHunk('@@ -5,1 +5,0 @@', [removeLine(5, 'x')]) })
-    prStoreMock.mockReturnValue({
-      ...basePrReviewStoreState(),
-      notes: [
-        {
-          id: 'n1',
-          path: 'src/foo.ts',
-          line: 5,
-          side: 'LEFT' as const,
-          body: 'left side note',
-          createdAt: '',
-        },
-      ],
-    })
-    await renderPane()
-    await screen.findByText('left side note')
-  })
-})
+const chipDiff = oneHunk('@@ -85,3 +88,3 @@', [addLine(88, 'a'), addLine(89, 'b')])
 
 describe('ReviewDiffPane — pending drafts (S5)', () => {
   it('shows a draft under its line, marked pending, with its markdown rendered', async () => {
@@ -951,77 +825,6 @@ describe('ReviewDiffPane — pending drafts (S5)', () => {
   })
 })
 
-/** Answers tests-for-block with `locations` of symbol foo, and the open file's diff as usual. */
-function answerTestsForBlock(locations: unknown[]) {
-  mockInvoke.mockImplementation((channel: string, payload: unknown) => {
-    if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
-    if (channel === 'github:tests-for-block')
-      return Promise.resolve({ symbols: ['foo'], locations })
-    return Promise.resolve({})
-  })
-}
-
-/** Renders the pane on the block diff and asks for the tests of its block. */
-async function jumpToTests(user: ReturnType<typeof userEvent.setup>) {
-  mockPrFileDiff.mockResolvedValue({ diff: blockDiff })
-  await renderPane()
-  await user.click(await screen.findByRole('button', { name: 'Jump to the tests for this block' }))
-}
-
-/** A block of foo() whose old() became next(). */
-const blockDiff = oneHunk('@@ -1,2 +1,2 @@ export function foo(', [
-  removeLine(1, 'old()'),
-  addLine(1, 'next()'),
-  ctxLine(2, 'done()'),
-])
-
-describe('ReviewDiffPane — jump to the tests for a block', () => {
-  useOneRowViewport()
-
-  it('searches the tests with the hunk as it reads after the change', async () => {
-    answerTestsForBlock([])
-    await jumpToTests(userEvent.setup())
-    await waitFor(() =>
-      expect(mockInvoke).toHaveBeenCalledWith('github:tests-for-block', {
-        repoRoot: '/repo',
-        headSHA: mockPr.headSHA,
-        path: 'src/foo.ts',
-        code: 'next()\ndone()',
-        hunkHeader: '@@ -1,2 +1,2 @@ export function foo(',
-      })
-    )
-    expect(await screen.findByText('No test mentions foo.')).toBeTruthy()
-  })
-})
-
-/** The virtual list entry that holds new-side line `line`. */
-const entryOfLine = (line: number) =>
-  screen.getAllByTestId('diff-entry').find((entry) =>
-    within(entry)
-      .queryAllByRole('row')
-      .some((row) => row.getAttribute('data-new-line') === String(line))
-  )!
-
-describe('ReviewDiffPane — jump to the tests for a block — opening one', () => {
-  useOneRowViewport()
-
-  it('opens a test in the PR at its line', async () => {
-    const user = userEvent.setup()
-    const prStore = await useRealPrStore()
-    answerTestsForBlock([{ path: 'src/foo.ts', line: 2, symbol: 'foo', text: 'done()' }])
-    await jumpToTests(user)
-    await user.click(await screen.findByRole('button', { name: /src\/foo\.ts:2/ }))
-    expect(prStore.getState().currentFilePath).toBe('src/foo.ts')
-    const entry = entryOfLine(2)
-    const scroller = screen.getByTestId('review-diff-scroll')
-    await waitFor(() =>
-      expect(scroller.scrollTo).toHaveBeenCalledWith(
-        expect.objectContaining({ top: Number(entry.dataset.index) * ROW_PX })
-      )
-    )
-  })
-})
-
 /** Hunks at lines 1 and 10 of src/foo.ts. */
 const keyTwoHunkDiff = {
   path: 'src/foo.ts',
@@ -1042,16 +845,6 @@ const topOfHunk = (hunkIndex: number) => {
     .getAllByTestId('diff-entry')
     .filter((entry) => within(entry).queryByRole('checkbox', { name: 'Section viewed' }))
   return Number(hunkEntries[hunkIndex].dataset.index) * ROW_PX
-}
-
-/** The hunk at line 1, the scope the agent keys act on without a selection. */
-const firstHunkScope = {
-  kind: 'hunk',
-  path: 'src/foo.ts',
-  startLine: 1,
-  endLine: 1,
-  side: 'RIGHT',
-  chapter: null,
 }
 
 describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
@@ -1081,29 +874,51 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
   })
 })
 
-describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — agent keys', () => {
+const FIRST_HUNK = '@@ -1,1 +1,1 @@'
+const SECOND_HUNK = '@@ -10,1 +10,1 @@'
+
+describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — Space and later', () => {
   useOneRowViewport()
 
-  it('askAgent with no selection opens the agent panel scoped to the nearest hunk', async () => {
-    const uiStore = await useRealUiStore()
+  it('markHunkRead marks the current hunk read and scrolls to the next one', async () => {
+    const prStore = await useRealPrStore()
     await renderTwoHunks()
-    window.dispatchEvent(new CustomEvent('review:ask-agent'))
-    expect(uiStore.getState()).toMatchObject({
-      agentPanelScope: firstHunkScope,
-      agentPanelRequest: 'review',
-      agentPanelAutoStart: false,
-    })
+    const scroller = screen.getByTestId('review-diff-scroll')
+    window.dispatchEvent(new CustomEvent('review:mark-hunk-read'))
+    expect(prStore.getState().viewedHunks['src/foo.ts']).toEqual([FIRST_HUNK])
+    await waitFor(() =>
+      expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+        expect.objectContaining({ top: topOfHunk(1) })
+      )
+    )
   })
 
-  it('explain requests explain with autoStart', async () => {
+  it('later keeps the current hunk for the end of the review and scrolls to the next one', async () => {
     const uiStore = await useRealUiStore()
     await renderTwoHunks()
-    window.dispatchEvent(new CustomEvent('review:explain'))
-    expect(uiStore.getState()).toMatchObject({
-      agentPanelScope: firstHunkScope,
-      agentPanelRequest: 'explain',
-      agentPanelAutoStart: true,
-    })
+    const scroller = screen.getByTestId('review-diff-scroll')
+    window.dispatchEvent(new CustomEvent('review:later-hunk'))
+    expect(uiStore.getState().laterHunks['/repo#1']).toEqual([
+      { path: 'src/foo.ts', header: FIRST_HUNK },
+    ])
+    expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: topOfHunk(1) })
+    )
+  })
+})
+
+describe('ReviewDiffPane — coming back to a later hunk', () => {
+  useOneRowViewport()
+
+  it('scrolls to a later hunk the review comes back to, then clears the request', async () => {
+    const uiStore = await useRealUiStore()
+    uiStore.setState({ revisitHunk: { path: 'src/foo.ts', header: SECOND_HUNK } })
+    await renderTwoHunks()
+    const scroller = screen.getByTestId('review-diff-scroll')
+    await waitFor(() => expect(uiStore.getState().revisitHunk).toBeNull())
+    expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: topOfHunk(1) })
+    )
   })
 })
 
@@ -1116,13 +931,6 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — composer ke
     expect(screen.queryByTestId('composer')).toBeNull()
     window.dispatchEvent(new CustomEvent('review:comment'))
     await screen.findByTestId('composer')
-  })
-
-  it('note opens the note composer on the selection', async () => {
-    selectLineOne()
-    await renderTwoHunks()
-    window.dispatchEvent(new CustomEvent('review:note'))
-    await screen.findByPlaceholderText('Private note…')
   })
 })
 
@@ -1137,15 +945,19 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — leaving the
     window.dispatchEvent(new CustomEvent('review:next-hunk'))
     expect(onNextFile).toHaveBeenCalled()
   })
+})
 
-  it('peekDefinition selects the definition file', async () => {
-    const prStore = await useRealPrStore()
-    await renderTwoHunks({ pr: prWithReadingOrder() })
-    window.dispatchEvent(new CustomEvent('review:peek-definition'))
-    expect(prStore.getState()).toMatchObject({
-      currentChapterId: 'ch-2',
-      currentFilePath: 'src/other.ts',
+describe('ReviewDiffPane — only the active file section handles the review keys', () => {
+  useOneRowViewport()
+
+  it('ignores nextHunk while another section is active', async () => {
+    const onNextFile = vi.fn()
+    await renderDiffPane(oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'a')]), {
+      onNextFile,
+      active: false,
     })
+    window.dispatchEvent(new CustomEvent('review:next-hunk'))
+    expect(onNextFile).not.toHaveBeenCalled()
   })
 })
 
@@ -1216,19 +1028,19 @@ describe('ReviewDiffPane — since-my-review diff (S1)', () => {
 })
 
 describe('ReviewDiffPane — insight gutter chips (R4)', () => {
-  it('shows a warning "+N" chip and a danger "untested" chip', async () => {
+  it('shows a warning "+N" chip for each function that gained branches', async () => {
     const functions = [
       { name: 'shardByDuration', line: 88, branchDelta: 6 },
       { name: 'readBurnIn', line: 89, branchDelta: 3 },
     ]
-    const insights = insightsFor(functions, ['readBurnIn'])
-    await renderDiffPane(splitDiff, { pr: { ...mockPr, insights } })
+    const insights = insightsFor(functions)
+    await renderDiffPane(chipDiff, { pr: { ...mockPr, insights } })
     expect(screen.getByText('+6')).toBeTruthy()
-    expect(screen.getByText('untested')).toBeTruthy()
-    // The gutter column is sized to its widest chip ("untested"), so it never overlaps code.
-    const gut = screen.getAllByRole('cell').find((cell) => within(cell).queryByText('untested'))!
+    expect(screen.queryByText('untested')).toBeNull()
+    // The gutter column is sized to its widest chip, so it never overlaps code.
+    const gut = screen.getAllByRole('cell').find((cell) => within(cell).queryByText('+3'))!
     expect(gut.className).toBe('rs-gut')
-    expect(gut.style.width).toBe('78px')
+    expect(gut.style.width).toBe('36px')
   })
 })
 
@@ -1379,28 +1191,6 @@ describe('ReviewDiffPane expandable context — Show all removes that expander a
   })
 })
 
-describe('ReviewDiffPane expandable context — renders revealed rows in split view', () => {
-  useFileContent()
-
-  it('renders revealed rows in split view', async () => {
-    uiStoreMock.mockReturnValue({
-      ...baseReviewUiStoreState(),
-      diffViewMode: 'split' as const,
-    })
-    mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
-    await renderPane()
-    await findFirstHunk()
-    await clickGap(1, 'Show 20 lines below')
-    await waitFor(() => expect(expandedRows().length).toBe(40))
-    // A split row names only its own side's line, so line 13 shows once on each side.
-    const lineThirteen = (side: string) =>
-      expandedRows().filter((row) => row.getAttribute(`data-${side}-line`) === '13')
-    expect(lineThirteen('old').length).toBe(1)
-    expect(lineThirteen('new').length).toBe(1)
-    expect(unifiedHunkHeaders().length).toBe(0)
-  })
-})
-
 describe('ReviewDiffPane expandable context — hides Comment but keeps the other actions when the selection includes a revealed line', () => {
   useFileContent()
 
@@ -1413,9 +1203,9 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
     await userEvent.setup().click(gutterButton(rowOfLine(13)))
     await screen.findByRole('button', { name: /Ask agent/ })
     expect(screen.queryByRole('button', { name: /Comment/ })).toBeNull()
-    expect(screen.getByRole('button', { name: /Add note/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Explain' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Tests' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Add note/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Tests' })).toBeNull()
     expect(screen.queryByTestId('composer')).toBeNull()
 
     window.dispatchEvent(new Event('review:comment'))
@@ -1464,7 +1254,7 @@ describe('ReviewDiffPane expandable context — resets expansions when another f
 
     const other = { ...mockFile, path: 'src/bar.ts' }
     mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
-    rerender(<ReviewDiffPane {...defaultProps} file={other} />)
+    rerender(<PaneInScroller {...defaultProps} file={other} />)
     await screen.findByTitle('src/bar.ts')
     await waitFor(() => expect(gaps().length).toBe(3))
     expect(expandedRows().length).toBe(0)
@@ -1549,8 +1339,7 @@ describe('ReviewDiffPane — fetch and render cost', () => {
       viewedFiles: new Set(['src/foo.ts']),
       viewedAt: { 'src/foo.ts': 'abc' },
     })
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
-    view.rerender(<ReviewDiffPane {...defaultProps} />)
+    view.rerender(<PaneInScroller {...defaultProps} />)
     expect(mockPrFileDiff).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('Loading diff…')).toBeNull()
     expect(screen.getByText(codeLine('const viewedMark = 1'))).toBeTruthy()
@@ -1564,10 +1353,9 @@ describe('ReviewDiffPane — fetch and render cost — shows a diff it already h
     )
     const view = await renderPane()
     await screen.findByText(codeLine('const in_foo = 1'))
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
-    view.rerender(<ReviewDiffPane {...defaultProps} file={otherFile} />)
+    view.rerender(<PaneInScroller {...defaultProps} file={otherFile} />)
     await screen.findByText(codeLine('const in_bar = 1'))
-    view.rerender(<ReviewDiffPane {...defaultProps} />)
+    view.rerender(<PaneInScroller {...defaultProps} />)
     expect(screen.getByText(codeLine('const in_foo = 1'))).toBeTruthy()
     expect(screen.queryByText('Loading diff…')).toBeNull()
     expect(mockPrFileDiff).toHaveBeenCalledTimes(2)
@@ -1577,8 +1365,7 @@ describe('ReviewDiffPane — fetch and render cost — shows a diff it already h
     mockPrFileDiff.mockResolvedValue({ diff: diffOf('src/foo.ts', 'const headMoves = 1') })
     const view = await renderPane()
     await screen.findByText(codeLine('const headMoves = 1'))
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
-    view.rerender(<ReviewDiffPane {...defaultProps} pr={{ ...mockPr, headSHA: 'def' }} />)
+    view.rerender(<PaneInScroller {...defaultProps} pr={{ ...mockPr, headSHA: 'def' }} />)
     await waitFor(() => expect(mockPrFileDiff).toHaveBeenCalledTimes(2))
   })
 })
@@ -1592,9 +1379,8 @@ describe('ReviewDiffPane — fetch and render cost — highlights each distinct 
       String(c[0]).includes('highlightOnce')
     ).length
     expect(seen).toBe(2)
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
-    view.rerender(<ReviewDiffPane {...defaultProps} onMarkViewed={vi.fn()} />)
-    view.rerender(<ReviewDiffPane {...defaultProps} onMarkViewed={vi.fn()} />)
+    view.rerender(<PaneInScroller {...defaultProps} onNextFile={vi.fn()} />)
+    view.rerender(<PaneInScroller {...defaultProps} onNextFile={vi.fn()} />)
     const after = highlightSpy.mock.calls.filter((c) =>
       String(c[0]).includes('highlightOnce')
     ).length
@@ -1615,36 +1401,6 @@ describe('ReviewDiffPane — fetch and render cost — a drag over the diff re-r
     await user.pointer([{ target: rows[1] }, { target: rows[2] }])
 
     expect(rowRenderSpy.mock.calls.map(([line]) => line)).toEqual([2, 3])
-  })
-})
-
-describe('ReviewDiffPane — fetch and render cost — dragging the split divider re-renders no row', () => {
-  it('dragging the split divider re-renders no row', async () => {
-    const user = userEvent.setup()
-    uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
-    mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
-    await renderPane()
-    await findFirstHunk()
-    vi.spyOn(screen.getByTestId('review-diff-scroll'), 'getBoundingClientRect').mockReturnValue({
-      width: 400,
-    } as DOMRect)
-    rowRenderSpy.mockClear()
-
-    await user.pointer([
-      {
-        keys: '[MouseLeft>]',
-        target: screen.getAllByRole('separator', { name: 'Resize split' })[0],
-        coords: { clientX: 100 },
-      },
-      { coords: { clientX: 140 } },
-      { keys: '[/MouseLeft]' },
-    ])
-
-    const left = screen
-      .getAllByRole('table')
-      .find((table) => table.classList.contains('diff-table--left'))!
-    expect(left.style.width).toBe('60%')
-    expect(rowRenderSpy).not.toHaveBeenCalled()
   })
 })
 

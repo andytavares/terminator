@@ -6,11 +6,11 @@ import { ReviewPlan } from '../../src/components/pr-review/ReviewPlan'
 import { makeFile } from './overview-fixtures'
 import type { Chapter, PrChangedFile } from '../../src/schemas/pr-review.schema'
 
-function file(path: string, level: 'low' | 'medium' | 'high' = 'low'): PrChangedFile {
-  return makeFile(path, { level, composite: null, dominantDriver: '' }, 1)
+function file(path: string): PrChangedFile {
+  return makeFile(path)
 }
 
-type ChapterFields = Pick<Chapter, 'id' | 'name' | 'files' | 'estimatedMinutes' | 'summary'>
+type ChapterFields = Pick<Chapter, 'id' | 'name' | 'files' | 'summary'>
 
 function chapter(fields: ChapterFields): Chapter {
   return { ...fields, status: 'not-started' }
@@ -20,25 +20,23 @@ const chapters: Chapter[] = [
   chapter({
     id: 'c1',
     name: 'Settings store and debounce',
-    summary: 'Changes markViewed and viewAll · 1 test file',
-    files: [file('src/a/store.ts', 'high')],
-    estimatedMinutes: 12,
+    summary: 'Changes markViewed and viewAll',
+    files: [file('src/a/store.ts')],
   }),
   chapter({
     id: 'c2',
     name: 'Panel layout',
     files: ['one', 'two', 'three', 'four', 'five'].map((n) => file(`src/${n}.tsx`)),
-    estimatedMinutes: 8,
   }),
 ]
 
 describe('ReviewPlan', () => {
-  it('renders a row per chapter with name, minutes and the highest risk', () => {
+  it('renders a row per chapter with its name and changed lines, and no risk or minutes', () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
     const row = screen.getByRole('button', { name: /Start here: Settings store and debounce/ })
-    expect(row.textContent).toContain('12 min')
-    expect(row.textContent).toContain('High risk')
+    expect(row.textContent).toContain('+10 −5')
     expect(row.textContent).toContain('store.ts')
+    expect(row.textContent).not.toMatch(/risk|min$/i)
   })
 
   it('shows the first three file names and the rest as a count', () => {
@@ -59,11 +57,11 @@ describe('ReviewPlan', () => {
 })
 
 describe('ReviewPlan rows and headings', () => {
-  it('describes each row by its risk, file count and minutes', () => {
+  it('describes each row by its file count and changed lines', () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
     const row = screen.getByRole('button', {
       name: /Start here: Panel layout/,
-      description: 'Low risk, 5 files, 8 min',
+      description: '5 files, +50 −25 lines',
     })
     expect(row).toBeTruthy()
   })
@@ -78,9 +76,9 @@ describe('ReviewPlan rows and headings', () => {
     expect(container.innerHTML).toBe('')
   })
 
-  it('totals the minutes across chapters in the heading line', () => {
+  it('counts the chapters in the heading line', () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
-    expect(screen.getByText('2 chapters · about 20 min')).toBeTruthy()
+    expect(screen.getByText('2 chapters')).toBeTruthy()
   })
 })
 
@@ -88,7 +86,7 @@ describe('ReviewPlan chapter summary', () => {
   it("shows a chapter's summary line under its name", () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
     const row = screen.getByRole('button', { name: /Start here: Settings store and debounce/ })
-    expect(within(row).getByText('Changes markViewed and viewAll · 1 test file')).toBeTruthy()
+    expect(within(row).getByText('Changes markViewed and viewAll')).toBeTruthy()
   })
 
   it('shows no summary line for a chapter without one', () => {

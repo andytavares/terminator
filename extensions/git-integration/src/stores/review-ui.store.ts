@@ -4,10 +4,7 @@ import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
 
 type AgentRequest = 'review' | 'explain' | 'ask'
 
-export type CommentVisibility = 'all' | 'unresolved' | 'hidden'
 type DiffRange = 'since' | 'whole'
-export type DiffViewMode = 'unified' | 'split'
-type GroupBy = 'chapters' | 'all'
 
 /** A line range the reviewer has selected in the diff, for the float bar and the agent. */
 export interface LineSelection {
@@ -27,40 +24,37 @@ export interface ComposerRequest {
   fromFindingId: string | null
 }
 
+/** A hunk the reviewer put off with `l`, to come back to after the last hunk. */
+export interface LaterHunk {
+  path: string
+  header: string
+}
+
+/** The key laterHunks keeps a pull request's later hunks under. */
+export function laterKey(repoRoot: string, prNumber: number): string {
+  return `${repoRoot}#${prNumber}`
+}
+
 // Keyboard actions the surface-level key handler (useReviewKeys) raises and the
 // diff pane performs, because only the pane knows its hunks and selection.
 export const REVIEW_KEY_EVENTS = {
   nextHunk: 'review:next-hunk',
   prevHunk: 'review:prev-hunk',
-  askAgent: 'review:ask-agent',
-  explain: 'review:explain',
+  markHunkRead: 'review:mark-hunk-read',
+  later: 'review:later-hunk',
   comment: 'review:comment',
-  note: 'review:note',
-  peekDefinition: 'review:peek-definition',
 } as const
 
 const PREFS_KEY = 'git-integration.review-ui.prefs'
 
 interface Prefs {
-  commentVisibility: CommentVisibility
-  agentNotesOn: boolean
   diffRange: DiffRange
-  fileListHidden: boolean
-  diffViewMode: DiffViewMode
-  hideFormattingHunks: boolean
-  groupBy: GroupBy
   queueSort: SortMode
   dashboardSort: SortMode
 }
 
 const DEFAULT_PREFS: Prefs = {
-  commentVisibility: 'all',
-  agentNotesOn: true,
   diffRange: 'since',
-  fileListHidden: false,
-  diffViewMode: 'unified',
-  hideFormattingHunks: true,
-  groupBy: 'all',
   queueSort: 'newest',
   dashboardSort: 'newest',
 }
@@ -77,15 +71,14 @@ interface ReviewUiStore extends Prefs {
   agentPanelAutoStart: boolean
   keyboardHelpOpen: boolean
   insightsOpen: boolean
+  /** Later hunks per pull request (laterKey), in the order they were put off. Kept in memory only. */
+  laterHunks: Record<string, LaterHunk[]>
+  /** A later hunk the review came back to; the diff pane scrolls to it, then clears it. */
+  revisitHunk: LaterHunk | null
+  /** The hunk headers of each file whose diff has loaded, for chapter progress. Memory only. */
+  fileHunks: Record<string, string[]>
 
-  setCommentVisibility(v: CommentVisibility): void
-  cycleCommentVisibility(): void
-  setAgentNotesOn(on: boolean): void
   setDiffRange(r: DiffRange): void
-  toggleFileList(): void
-  setDiffViewMode(mode: DiffViewMode): void
-  setHideFormattingHunks(on: boolean): void
-  setGroupBy(groupBy: GroupBy): void
   setQueueSort(mode: SortMode): void
   setDashboardSort(mode: SortMode): void
   setSelection(s: LineSelection | null): void
@@ -95,6 +88,10 @@ interface ReviewUiStore extends Prefs {
   openAgentPanel(scope: AgentScope | null, request?: AgentRequest, autoStart?: boolean): void
   setKeyboardHelpOpen(open: boolean): void
   setInsightsOpen(open: boolean): void
+  deferHunk(key: string, hunk: LaterHunk): void
+  takeLaterHunk(key: string): LaterHunk | null
+  clearRevisitHunk(): void
+  setFileHunks(path: string, headers: string[]): void
   resetForPr(): void
 }
 
@@ -122,21 +119,13 @@ function savePrefs(prefs: Prefs): void {
   }
 }
 
-const CYCLE: CommentVisibility[] = ['all', 'unresolved', 'hidden']
-
 type SetState = StoreApi<ReviewUiStore>['setState']
 type GetState = StoreApi<ReviewUiStore>['getState']
 
 /** The preference fields of the store, as savePrefs keeps them. */
 function prefsOf(state: ReviewUiStore): Prefs {
   return {
-    commentVisibility: state.commentVisibility,
-    agentNotesOn: state.agentNotesOn,
     diffRange: state.diffRange,
-    fileListHidden: state.fileListHidden,
-    diffViewMode: state.diffViewMode,
-    hideFormattingHunks: state.hideFormattingHunks,
-    groupBy: state.groupBy,
     queueSort: state.queueSort,
     dashboardSort: state.dashboardSort,
   }
@@ -149,17 +138,7 @@ function prefActions(set: SetState, get: GetState) {
     savePrefs(prefsOf(get()))
   }
   return {
-    setCommentVisibility: (v: CommentVisibility) => persist({ commentVisibility: v }),
-    cycleCommentVisibility: () => {
-      const i = CYCLE.indexOf(get().commentVisibility)
-      persist({ commentVisibility: CYCLE[(i + 1) % CYCLE.length] })
-    },
-    setAgentNotesOn: (on: boolean) => persist({ agentNotesOn: on }),
     setDiffRange: (r: DiffRange) => persist({ diffRange: r }),
-    toggleFileList: () => persist({ fileListHidden: !get().fileListHidden }),
-    setDiffViewMode: (mode: DiffViewMode) => persist({ diffViewMode: mode }),
-    setHideFormattingHunks: (on: boolean) => persist({ hideFormattingHunks: on }),
-    setGroupBy: (groupBy: GroupBy) => persist({ groupBy }),
     setQueueSort: (mode: SortMode) => persist({ queueSort: mode }),
     setDashboardSort: (mode: SortMode) => persist({ dashboardSort: mode }),
   }
@@ -173,6 +152,29 @@ const NO_PR_STATE = {
   agentPanelScope: null,
   keyboardHelpOpen: false,
   insightsOpen: false,
+  revisitHunk: null,
+  fileHunks: {},
+}
+
+const isSameHunk = (a: LaterHunk, b: LaterHunk) => a.path === b.path && a.header === b.header
+
+/** Putting hunks off with `l` and coming back to them after the last hunk. */
+function laterActions(set: SetState, get: GetState) {
+  const listFor = (key: string) => get().laterHunks[key] ?? []
+  const setList = (key: string, list: LaterHunk[]) =>
+    set((state) => ({ laterHunks: { ...state.laterHunks, [key]: list } }))
+  return {
+    deferHunk: (key: string, hunk: LaterHunk) =>
+      setList(key, [...listFor(key).filter((h) => !isSameHunk(h, hunk)), hunk]),
+    takeLaterHunk: (key: string) => {
+      const [first, ...rest] = listFor(key)
+      if (!first) return null
+      setList(key, rest)
+      set({ revisitHunk: first })
+      return first
+    },
+    clearRevisitHunk: () => set({ revisitHunk: null }),
+  }
 }
 
 function uiSessionActions(set: SetState) {
@@ -190,6 +192,8 @@ function uiSessionActions(set: SetState) {
       set({ agentPanelScope: scope, agentPanelRequest: request, agentPanelAutoStart: autoStart }),
     setKeyboardHelpOpen: (open: boolean) => set({ keyboardHelpOpen: open }),
     setInsightsOpen: (open: boolean) => set({ insightsOpen: open }),
+    setFileHunks: (path: string, headers: string[]) =>
+      set((state) => ({ fileHunks: { ...state.fileHunks, [path]: headers } })),
     resetForPr: () => set(NO_PR_STATE),
   }
 }
@@ -197,8 +201,10 @@ function uiSessionActions(set: SetState) {
 export const useReviewUiStore = create<ReviewUiStore>((set, get) => ({
   ...loadPrefs(),
   ...NO_PR_STATE,
+  laterHunks: {},
   agentPanelRequest: 'review',
   agentPanelAutoStart: false,
   ...prefActions(set, get),
   ...uiSessionActions(set),
+  ...laterActions(set, get),
 }))

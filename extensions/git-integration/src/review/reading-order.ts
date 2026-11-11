@@ -1,4 +1,3 @@
-import { classifyTier } from '../github/pr-review-service'
 import { analyseLines } from './symbols'
 import { symbolFromHunkHeader } from './hunk-header'
 import type { ReadingStep, SymbolUse } from '../schemas/pr-review.schema'
@@ -10,8 +9,6 @@ type ReferenceKind = 'call' | 'render' | 'use'
 interface FileNode {
   path: string
   size: number
-  tier: 0 | 1 | 2 | 3
-  isTest: boolean
   hasGrammar: boolean
   definitions: Set<string>
   /** symbol -> how it first appears in the added lines */
@@ -63,7 +60,6 @@ function referencesOutside(
 
 async function buildFileNode(file: ParsedPrFile): Promise<FileNode> {
   const { path, additions, deletions, diff } = file
-  const tier = classifyTier(path)
   const headLines = diff.hunks.flatMap((h) => h.lines.filter((l) => l.type !== 'remove'))
   const addedLines = diff.hunks.flatMap((h) => h.lines.filter((l) => l.type === 'add'))
   const defAnalysis = await analyseLines(path, headLines)
@@ -73,8 +69,6 @@ async function buildFileNode(file: ParsedPrFile): Promise<FileNode> {
   return {
     path,
     size: additions + deletions,
-    tier,
-    isTest: tier === 2,
     hasGrammar: defAnalysis !== null || refAnalysis !== null,
     definitions,
     references: referencesOutside(refAnalysis?.references ?? [], definitions, addedText),
@@ -158,7 +152,6 @@ function dependencyEdges(
     for (const symbol of node.references.keys()) {
       const definer = definerOf.get(symbol)
       if (!definer || definer === node.path) continue
-      // A definer outside the graph (a test or tier-3 file) adds no ordering edge.
       edges.get(definer)?.add(node.path)
     }
   }
@@ -203,37 +196,6 @@ function orderByDependency(
     for (const to of successors.get(next) ?? []) indegree.set(to, indegree.get(to)! - 1)
   }
   return ordered
-}
-
-function lastReferencedPosition(
-  test: FileNode,
-  definerOf: Map<string, string>,
-  ordered: string[]
-): number {
-  let last = -1
-  for (const symbol of test.references.keys()) {
-    const definer = definerOf.get(symbol)
-    if (definer) last = Math.max(last, ordered.indexOf(definer))
-  }
-  return last
-}
-
-/** Places each test file right after the last file (by final position) it references. */
-function withTestsAttached(
-  ordered: string[],
-  testNodes: FileNode[],
-  definerOf: Map<string, string>
-): string[] {
-  const result = [...ordered]
-  for (const test of testNodes) {
-    const insertAfter = lastReferencedPosition(test, definerOf, result)
-    if (insertAfter === -1) {
-      result.push(test.path) // fallback: no in-PR reference found
-    } else {
-      result.splice(insertAfter + 1, 0, test.path)
-    }
-  }
-  return result
 }
 
 // ─── Steps ──────────────────────────────────────────────────────────────────────
@@ -284,10 +246,6 @@ function primaryReference(node: FileNode, ctx: StepContext): Candidate | undefin
 }
 
 function stepReason(node: FileNode, primary: Candidate | undefined, mainSymbol: string | null) {
-  if (node.isTest && primary !== undefined) {
-    return `Tests step ${primary.step}, read right after it`
-  }
-  if (node.isTest) return 'Tests nothing in this PR, read wherever'
   if (primary !== undefined)
     return `${KIND_VERB[primary.kind]} ${primary.symbol} (step ${primary.step})`
   if (mainSymbol !== null) return `Defines ${mainSymbol} · depends on nothing in this PR`
@@ -307,24 +265,18 @@ function readingStepFor(path: string, ctx: StepContext): ReadingStep {
   }
 }
 
-/** Orders `files` for reading: symbols defined before they're used, test files right after
- * the last file they exercise, cycles kept adjacent, tier-3 last. */
+/** Orders `files` for reading: symbols defined before they're used, cycles kept adjacent. */
 export async function buildReadingOrder(files: ParsedPrFile[]): Promise<ReadingStep[]> {
   const nodes = await Promise.all(files.map(buildFileNode))
   if (nodes.length === 0) return []
   const definerOf = firstDefiners(nodes)
   const byPath = new Map(nodes.map((n) => [n.path, n]))
-  const graphNodes = nodes.filter((n) => n.tier !== 3 && !n.isTest)
-  const edges = dependencyEdges(graphNodes, definerOf)
+  const edges = dependencyEdges(nodes, definerOf)
   const components = stronglyConnectedComponents(
-    graphNodes.map((n) => n.path),
+    nodes.map((n) => n.path),
     edges
   )
-  const testNodes = nodes.filter((n) => n.tier !== 3 && n.isTest)
-  const finalOrder = [
-    ...withTestsAttached(orderByDependency(components, edges, byPath), testNodes, definerOf),
-    ...nodes.filter((n) => n.tier === 3).map((n) => n.path),
-  ]
+  const finalOrder = orderByDependency(components, edges, byPath)
   const stepOf = new Map(finalOrder.map((p, i) => [p, i + 1]))
   const ctx: StepContext = { byPath, definerOf, stepOf, usageCount: referenceCounts(nodes) }
   return finalOrder.map((path) => readingStepFor(path, ctx))

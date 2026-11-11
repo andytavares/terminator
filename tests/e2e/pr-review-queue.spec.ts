@@ -193,10 +193,8 @@ async function anApprovalFromThePopOutReachesGitHub(): Promise<void> {
   const popout = await popoutPage(handle, 'view=pr-review')
   await queueRow(popout, 'Add subtract').click()
   await popout.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
-  await popout.getByRole('button', { name: /^Submit review/ }).click()
-  const dialog = popout.getByRole('dialog', { name: 'Submit review' })
-  await dialog.getByLabel('Approve').check()
-  await dialog.getByRole('button', { name: 'Submit approval' }).click()
+  const verdictBar = popout.getByRole('region', { name: 'Review verdict' })
+  await verdictBar.getByRole('button', { name: 'Approve' }).click()
 
   await popout.waitForEvent('close')
   expect(stub.pullRequest(1).reviews.at(-1)?.state).toBe('APPROVED')

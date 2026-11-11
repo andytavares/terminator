@@ -44,7 +44,7 @@
   flex-shrink: 0;
 }
 
-/* Level 1: the title, with Submit review the only other emphasised control. */
+/* Level 1: the title. */
 .rh-title {
   font-size: var(--tm-font-size-lg);
   font-weight: 600;
@@ -86,16 +86,9 @@
   border-color: color-mix(in srgb, var(--tm-danger) 40%, transparent);
 }
 
-.rh-pill--pending,
-.rh-pill--warning {
+.rh-pill--pending {
   color: var(--tm-warning);
   border-color: color-mix(in srgb, var(--tm-warning) 40%, transparent);
-}
-
-.rh-pill--focus[aria-pressed='true'] {
-  background: var(--tm-accent-dim);
-  color: var(--tm-accent-text);
-  border-color: var(--tm-accent);
 }
 
 .rh-spacer {
@@ -136,12 +129,6 @@
   white-space: nowrap;
 }
 
-.rh-icon {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 auto;
-}
-
 .rh-popover {
   min-width: 220px;
   max-width: 340px;
@@ -150,13 +137,6 @@
   border-radius: 8px;
   box-shadow: 0 8px 24px var(--tm-scrim);
   padding: 6px;
-}
-
-.rh-large-pr-text {
-  font-size: var(--tm-font-size-sm);
-  color: var(--tm-text-secondary);
-  line-height: 1.4;
-  margin: 4px 6px 8px;
 }
 
 .rh-menu {
@@ -194,11 +174,6 @@
   background: none;
 }
 
-.rh-menu-hint {
-  font-size: var(--tm-font-size-xs);
-  color: var(--tm-text-muted);
-}
-
 @container rh-bar (max-width: 1200px) {
   .rh-progress-text {
     display: none;
@@ -216,19 +191,9 @@
 }
 
 @container rh-bar (max-width: 760px) {
-  .rh-progress,
-  .rh-pill--focus {
+  .rh-progress {
     display: none;
   }
-}
-
-.rh-count {
-  font-size: var(--tm-font-size-xs);
-  font-variant-numeric: tabular-nums;
-  background: color-mix(in srgb, var(--tm-on-accent) 22%, transparent);
-  padding: 0 6px;
-  border-radius: 999px;
-  line-height: 17px;
 }
 
 /* Passing checks are level 3: a dot and muted text, until a check fails or is pending. */

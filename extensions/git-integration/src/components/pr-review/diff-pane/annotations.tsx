@@ -4,11 +4,10 @@ import { RichContent } from '../RichContent'
 import { CommentComposer } from '../CommentComposer'
 import { AgentNote } from '../AgentNote'
 import { SelectionBar } from '../SelectionBar'
-import { TestsPopover } from '../TestsPopover'
-import type { DraftComment, ReviewNote, Thread } from '../../../schemas/pr-review.schema'
+import type { DraftComment, Thread } from '../../../schemas/pr-review.schema'
 import type { LineSelection } from '../../../stores/review-ui.store'
 import type { PaneContext, Side } from './types'
-import { rangeStart, selectionCode } from './lines'
+import { rangeStart } from './lines'
 
 interface LineRef {
   ctx: PaneContext
@@ -22,22 +21,14 @@ function composerOpenAt(props: LineRef): boolean {
   return anchor?.line === lineNum && anchor.side === side
 }
 
-/** The agent findings the line shows: none while agent notes are off. */
-function shownFindings(props: LineRef) {
-  const { ctx, lineNum, side } = props
-  if (!ctx.actions.agentNotesOn) return []
-  return ctx.lookups.findingsForLine(lineNum, side)
-}
-
-/** True when the line has a composer, a visible thread, a shown finding, a note or a draft. */
-export function hasAnnotations(at: LineRef): boolean {
+/** True when the line has a composer, a thread, an agent finding or a draft. */
+function hasAnnotations(at: LineRef): boolean {
   const { lookups } = at.ctx
   const { lineNum, side } = at
   return (
     composerOpenAt(at) ||
-    lookups.visibleThreadsForLine(lineNum, side).length > 0 ||
-    shownFindings(at).length > 0 ||
-    lookups.notesForLine(lineNum, side).length > 0 ||
+    lookups.threadsForLine(lineNum, side).length > 0 ||
+    lookups.findingsForLine(lineNum, side).length > 0 ||
     lookups.draftsForLine(lineNum, side).length > 0
   )
 }
@@ -90,25 +81,6 @@ function ThreadWithReply(props: { ctx: PaneContext; thread: Thread }) {
   )
 }
 
-function PrivateNote(props: { ctx: PaneContext; note: ReviewNote }) {
-  const { ctx, note } = props
-  return (
-    <div className="rs-thread">
-      <div className="rs-thread-th">Private note</div>
-      <div className="rs-thread-bd">{note.body}</div>
-      <div className="rs-thread-actions">
-        <button
-          type="button"
-          className="rs-btn"
-          onClick={() => ctx.actions.removeNote(ctx.head, note.id)}
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function editDraftComment(ctx: PaneContext, draft: DraftComment): void {
   const next = prompt('Edit draft', draft.body)
   if (next != null) ctx.actions.updateDraft(ctx.head, draft.id, next)
@@ -138,22 +110,18 @@ function PendingDraft(props: { ctx: PaneContext; draft: DraftComment }) {
   )
 }
 
-/** The annotations for one line and side: composer, threads, agent and private notes, drafts.
- *  Unwrapped so it can sit in a <tr><td> (unified) or a plain <div> (split). */
-export function AnnotationContent(at: LineRef) {
+/** The annotations for one line and side: composer, threads, agent notes, drafts. */
+function AnnotationContent(at: LineRef) {
   const { ctx, lineNum, side } = at
   const { lookups } = ctx
   return (
     <>
       {composerOpenAt(at) && <OpenComposer ctx={ctx} />}
-      {lookups.visibleThreadsForLine(lineNum, side).map((thread) => (
+      {lookups.threadsForLine(lineNum, side).map((thread) => (
         <ThreadWithReply key={thread.id} ctx={ctx} thread={thread} />
       ))}
-      {shownFindings(at).map((f) => (
+      {lookups.findingsForLine(lineNum, side).map((f) => (
         <AgentNote key={f.id} severity={f.severity} body={f.body} />
-      ))}
-      {lookups.notesForLine(lineNum, side).map((n) => (
-        <PrivateNote key={n.id} ctx={ctx} note={n} />
       ))}
       {lookups.draftsForLine(lineNum, side).map((d) => (
         <PendingDraft key={d.id} ctx={ctx} draft={d} />
@@ -174,21 +142,6 @@ export function LineAnnotations(at: LineRef) {
   )
 }
 
-/** The tests popover, when it is open for `anchor`. */
-export function OpenTests(props: { ctx: PaneContext; anchor: string }) {
-  const { ctx, anchor } = props
-  const { tests } = ctx
-  if (tests.testsFor?.anchor !== anchor) return null
-  return (
-    <TestsPopover
-      block={tests.testsFor.block}
-      prPaths={tests.prPaths}
-      onOpenInReview={tests.openTestInReview}
-      onClose={tests.closeTests}
-    />
-  )
-}
-
 function linesScope(ctx: PaneContext, sel: LineSelection) {
   const { startLine, endLine, side } = sel
   return { kind: 'lines' as const, path: ctx.file.path, startLine, endLine, side, chapter: null }
@@ -201,10 +154,8 @@ function FloatBar(props: { ctx: PaneContext; sel: LineSelection }) {
   return (
     <SelectionBar
       canComment={!ctx.gaps.selectionTouchesRevealed(sel)}
-      onTests={() => ctx.tests.openTests('selection', selectionCode(ctx.diff?.hunks ?? [], sel))}
       onAskAgent={() => actions.openAgentPanel(linesScope(ctx, sel), 'review')}
       onExplain={() => actions.openAgentPanel(linesScope(ctx, sel), 'explain', true)}
-      onAddNote={() => annot.setNoteAnchor({ line: sel.endLine, side: sel.side })}
       onComment={() =>
         annot.setComposerAnchor({ ...comment, initialBody: '', fromFindingId: null })
       }
@@ -221,49 +172,15 @@ function barAt(props: LineRef): LineSelection | null {
   return sel
 }
 
-function NoteComposer(props: { ctx: PaneContext }) {
-  const { ctx } = props
-  const { annot } = ctx
+/** Under a line: the float bar for a selection ending there. */
+export function SelectionExtras(at: LineRef) {
+  const sel = barAt(at)
+  if (!sel) return null
   return (
     <tr>
-      <td colSpan={5}>
-        <div className="rs-note-composer">
-          <textarea
-            value={annot.noteDraft}
-            onChange={(e) => annot.setNoteDraft(e.target.value)}
-            rows={3}
-            placeholder="Private note…"
-          />
-          <div className="rs-note-composer-actions">
-            <button type="button" className="rs-btn rs-btn--pri" onClick={annot.saveNote}>
-              Save
-            </button>
-            <button type="button" className="rs-btn" onClick={annot.cancelNote}>
-              Cancel
-            </button>
-          </div>
-        </div>
+      <td colSpan={5} className="rs-hunk-anchor">
+        <FloatBar ctx={at.ctx} sel={sel} />
       </td>
     </tr>
-  )
-}
-
-/** Under a line: the float bar for a selection ending there, and the note box opened there. */
-export function SelectionExtras(at: LineRef) {
-  const { ctx, lineNum, side } = at
-  const sel = barAt(at)
-  const note = ctx.annot.noteAnchor
-  return (
-    <>
-      {sel && (
-        <tr>
-          <td colSpan={5} className="rs-hunk-anchor">
-            <FloatBar ctx={ctx} sel={sel} />
-            <OpenTests ctx={ctx} anchor="selection" />
-          </td>
-        </tr>
-      )}
-      {note && note.line === lineNum && note.side === side && <NoteComposer ctx={ctx} />}
-    </>
   )
 }

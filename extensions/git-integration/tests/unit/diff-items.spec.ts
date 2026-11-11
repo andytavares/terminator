@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { buildDiffItems, type DiffItemSource, type MovedMark } from '../../src/review/diff-items'
-import { buildSplitRows } from '../../src/components/FileDiffView'
 import type { DiffHunk, DiffLine } from '../../src/schemas/git.schema'
 
 const contextLine = (n: number): DiffLine => ({
@@ -16,14 +15,15 @@ function diffItemSource(
   overrides: Partial<DiffItemSource> = {}
 ): DiffItemSource {
   return {
-    mode: 'unified',
     hunkCount: hunks.length,
     visibleHunks: hunks.map((hunk, index) => ({ hunk, index })),
-    splitRows: hunks.map((h) => buildSplitRows(h.lines)),
     gapViews: new Map(),
     hotspots: [],
     movedMark: () => null,
     viewedHunks: new Set(),
+    band: 'stream',
+    sameShape: new Map(),
+    expandedFolds: new Set(),
     ...overrides,
   }
 }
@@ -99,22 +99,12 @@ describe('buildDiffItems() — moved blocks', () => {
       movedMark: (n) => collapsedMark(n === 1),
     })
     expect(keysOf(source)).toEqual(['0-header', '0-0'])
-    expect(keysOf({ ...source, mode: 'split' })).toEqual(['0-header', '0-row-0'])
   })
 
   it('reads a removed unified line on the left, by its old line number', () => {
     const hunks = [hunkOf('@@ a', [contextLine(5), removedAt7, addedAt8])]
     const source = diffItemSource(hunks, { movedMark: hidingOnly('LEFT', 7) })
     expect(keysOf(source)).toEqual(['0-header', '0-0', '0-2'])
-  })
-
-  it('hides a split row by either side, each read by its own line number', () => {
-    const hunks = [hunkOf('@@ a', [contextLine(5), removedAt7, addedAt8])]
-    const visibleSplitKeys = (movedMark: DiffItemSource['movedMark']) =>
-      keysOf(diffItemSource(hunks, { mode: 'split', movedMark }))
-    expect(visibleSplitKeys(hidingOnly('LEFT', 7))).toEqual(['0-header', '0-row-0'])
-    expect(visibleSplitKeys(hidingOnly('RIGHT', 8))).toEqual(['0-header', '0-row-0'])
-    expect(visibleSplitKeys(hidingOnly('LEFT', 5))).toEqual(['0-header', '0-row-1'])
   })
 })
 
@@ -135,5 +125,70 @@ describe('buildDiffItems() — viewed hunks', () => {
     const hotspots = [{ hunkIndex: 0, message: 'complex' }]
     const viewedHunks = new Set([hunks[0].header])
     expect(keysOf(diffItemSource(hunks, { hotspots, viewedHunks }))).not.toContain('0-hotspot')
+  })
+})
+
+const removedLines = (count: number): DiffLine[] =>
+  Array.from({ length: count }, (_, i) => ({
+    type: 'remove',
+    content: `legacyRetry(${i})`,
+    oldLineNumber: 20 + i,
+    newLineNumber: null,
+  }))
+
+/** Hunk 1 repeats src/api/client.ts:10's change with other literals. */
+const retriesFold = {
+  kind: 'same-shape' as const,
+  first: { path: 'src/api/client.ts', hunkIndex: 0, line: 10, maskedValues: ['3', '5'] },
+  maskedValues: ['2', '4'],
+}
+const retriesHunks = [
+  hunkOf('@@ -1,1 +1,1 @@', [contextLine(1)]),
+  hunkOf('@@ -10,2 +10,2 @@', [removedAt7, addedAt8]),
+]
+
+describe('buildDiffItems() — same-shape folds', () => {
+  it('folds a repeated hunk to its header and one fold row in the chapters band', () => {
+    const sameShape = new Map([[1, retriesFold]])
+    const items = buildDiffItems(diffItemSource(retriesHunks, { band: 'chapters', sameShape }))
+    expect(items.map((item) => item.key)).toEqual(['0-header', '0-0', '1-header', '1-fold'])
+    expect(items[3]).toEqual({
+      kind: 'fold',
+      key: '1-fold',
+      hunkIndex: 1,
+      fold: retriesFold,
+      expanded: false,
+    })
+  })
+
+  it('keeps the fold row above the lines of an expanded fold', () => {
+    const source = diffItemSource(retriesHunks, {
+      band: 'chapters',
+      sameShape: new Map([[1, retriesFold]]),
+      expandedFolds: new Set([1]),
+    })
+    expect(keysOf(source)).toEqual(['0-header', '0-0', '1-header', '1-fold', '1-0', '1-1'])
+  })
+})
+
+describe('buildDiffItems() — deleted-only folds', () => {
+  it('folds a hunk of three removed lines and no added line in the chapters band', () => {
+    const hunks = [hunkOf('@@ -20,3 +19,0 @@', removedLines(3))]
+    const items = buildDiffItems(diffItemSource(hunks, { band: 'chapters' }))
+    expect(items.map((item) => item.key)).toEqual(['0-header', '0-fold'])
+    expect(items[1]).toMatchObject({ fold: { kind: 'deleted', lineCount: 3 } })
+  })
+
+  it('shows a hunk of two removed lines in full', () => {
+    const hunks = [hunkOf('@@ -20,2 +19,0 @@', removedLines(2))]
+    expect(keysOf(diffItemSource(hunks, { band: 'chapters' }))).toEqual(['0-header', '0-0', '0-1'])
+  })
+})
+
+describe('buildDiffItems() — folds outside the chapters band', () => {
+  it('folds nothing in the stream band', () => {
+    const hunks = [...retriesHunks, hunkOf('@@ -20,3 +19,0 @@', removedLines(3))]
+    const source = diffItemSource(hunks, { sameShape: new Map([[1, retriesFold]]) })
+    expect(buildDiffItems(source).some((item) => item.kind === 'fold')).toBe(false)
   })
 })

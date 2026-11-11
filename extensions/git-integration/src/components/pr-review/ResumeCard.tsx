@@ -1,8 +1,7 @@
 import React from 'react'
 import { Button, formatRelativeTime } from '@terminator/extension-ui'
 import { ArrowRight } from 'lucide-react'
-import { useReviewUiStore } from '../../stores/review-ui.store'
-import type { PrReviewDetail, ReviewNote, DraftComment } from '../../schemas/pr-review.schema'
+import type { PrReviewDetail, DraftComment } from '../../schemas/pr-review.schema'
 import type { AgentRun } from '../../schemas/review-agent.schema'
 import { plural } from '@terminator/extension-sdk'
 
@@ -14,12 +13,11 @@ interface Props {
   currentChapterId: string | null
   currentFilePath: string | null
   lastLine: number | null
-  notes: ReviewNote[]
   drafts: DraftComment[]
   agentRuns: AgentRun[]
   changedSinceCount: number
   onContinue: () => void
-  /** Opens the drafts not yet submitted, in the submit dialog. */
+  /** Moves to the verdict bar, which submits the drafts not yet submitted. */
   onReviewDrafts: () => void
 }
 
@@ -58,19 +56,9 @@ function highestSeverity(findings: Finding[]): string | null {
   return top
 }
 
-/** A note holding "??" is one the reviewer meant as a question. */
-function questionNoteOf(notes: ReviewNote[]): ReviewNote | undefined {
-  return notes.find((n) => n.body.includes('??'))
-}
-
 function lineSuffix(lastLine: number | null): string {
   if (lastLine == null) return ''
   return ` line ${lastLine}`
-}
-
-function questionSuffix(note: ReviewNote | undefined): string {
-  if (!note) return ''
-  return `, 1 is a question: "${note.body}"`
 }
 
 function ResumeHead({ card: props }: { card: Props }) {
@@ -101,38 +89,6 @@ function PositionItem({ card: props }: { card: Props }) {
         {lineSuffix(props.lastLine)}
       </span>
       <span className="rc-note">last position</span>
-    </li>
-  )
-}
-
-/** The agent scope for a note: its line, on the new side. */
-function noteScope(note: ReviewNote) {
-  return {
-    kind: 'lines' as const,
-    path: note.path,
-    startLine: note.line,
-    endLine: note.line,
-    side: 'RIGHT' as const,
-    chapter: null,
-  }
-}
-
-function NotesItem({ notes }: { notes: ReviewNote[] }) {
-  const openAgentPanel = useReviewUiStore((s) => s.openAgentPanel)
-  const questionNote = questionNoteOf(notes)
-  const askAgentAboutNote = (note: ReviewNote) => openAgentPanel(noteScope(note), 'ask')
-  return (
-    <li>
-      <span className="rc-pip">{notes.length}</span>
-      <span>
-        {notes.length} {plural(notes.length, 'note')}
-        {questionSuffix(questionNote)}
-      </span>
-      {questionNote && (
-        <Button size="sm" onClick={() => askAgentAboutNote(questionNote)}>
-          Ask agent
-        </Button>
-      )}
     </li>
   )
 }
@@ -175,13 +131,12 @@ function ChangedSinceItem({ count }: { count: number }) {
  *  the reviewer sees where they left off before anything else renders. */
 export function ResumeCard(props: Props) {
   const findings = unopenedFindingsOf(props.agentRuns)
-  const { notes, drafts, changedSinceCount } = props
+  const { drafts, changedSinceCount } = props
   return (
     <div className="rc-resume">
       <ResumeHead card={props} />
       <ul>
         {props.currentFilePath && <PositionItem card={props} />}
-        {notes.length > 0 && <NotesItem notes={notes} />}
         {findings.length > 0 && <FindingsItem findings={findings} />}
         {drafts.length > 0 && (
           <DraftsItem count={drafts.length} onReviewDrafts={props.onReviewDrafts} />

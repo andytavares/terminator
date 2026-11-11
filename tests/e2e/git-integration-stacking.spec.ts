@@ -132,8 +132,7 @@ function unifiedReviewTables(): string {
     `<table class="diff-table diff-table--review diff-table--row">${cols}<tbody>${row}</tbody></table>`
   return `<div class="review-diff-scroll" style="width:1000px">
     ${table(`<tr><td colspan="5" class="diff-hunk-header rs-hunk-anchor"><div class="rs-hunk-bar">
-      <span class="rs-hunk-bar__text">@@ -55,5 +55,5 @@ def load_settings()</span>
-      <button class="rs-hunk-tests">Tests</button></div></td></tr>`)}
+      <span class="rs-hunk-bar__text">@@ -55,5 +55,5 @@ def load_settings()</span></div></td></tr>`)}
     ${table(`<tr class="diff-line diff-line--add"><td class="diff-line__old-num">58</td>
       <td class="diff-line__new-num">58</td><td class="rs-gut"></td><td class="diff-line__prefix">+</td>
       <td class="diff-line__content"><pre>audio_device=env.get("EFFECTS_AUDIO_DEVICE", "auto"),</pre></td></tr>`)}
