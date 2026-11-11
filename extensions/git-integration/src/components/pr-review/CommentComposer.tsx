@@ -136,6 +136,7 @@ function ComposerActions({ composer, state }: { composer: Props; state: Composer
   const { submitting } = state
   return (
     <div className="comment-composer-actions">
+      {!isReply(composer) && <span className="rs-note">Sent when you submit your review</span>}
       <Button size="sm" onClick={composer.onCancel} disabled={submitting}>
         Cancel
       </Button>
@@ -147,15 +148,19 @@ function ComposerActions({ composer, state }: { composer: Props; state: Composer
       >
         {submitLabel(composer, submitting)}
       </Button>
-      {!isReply(composer) && <span className="rs-note">Sent when you submit your review</span>}
     </div>
   )
+}
+
+function linesLabel(props: NewCommentProps): string {
+  if (props.startLine === undefined) return `line ${props.line}`
+  return `lines ${props.startLine}–${props.line}`
 }
 
 function NewCommentHeading({ props }: { props: NewCommentProps }) {
   return (
     <div className="rs-thread-th">
-      <span className="rs-av">A</span>New comment · line {props.line}
+      <span className="rs-av">A</span>New comment · {linesLabel(props)}
       {props.fromFindingId && ' · edited from agent finding'}
     </div>
   )
