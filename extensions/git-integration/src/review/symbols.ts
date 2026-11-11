@@ -148,7 +148,7 @@ function isShortCircuit(node: Node): boolean {
   return !!operator && !operator.isNamed && SHORT_CIRCUIT_OPERATORS.has(operator.type)
 }
 
-function isBranchNode(node: Node): boolean {
+export function isBranchNode(node: Node): boolean {
   if (!node.isNamed) return false
   return node.type.split('_').some((part) => BRANCH_WORDS.has(part)) || isShortCircuit(node)
 }
@@ -220,7 +220,7 @@ const parserCache = new Map<Language, Parser>()
 
 /** Parses `code` as `path`'s language, hands the root to `read`, then frees the tree:
  *  web-tree-sitter trees live in WASM memory the JS GC never reclaims. Null with no grammar. */
-export async function withSyntaxTree<T>(
+async function withSyntaxTree<T>(
   path: string,
   code: string,
   read: (root: Node) => T
@@ -253,6 +253,16 @@ async function withTags<T>(
   const query = await tagsQueryFor(path)
   if (!query) return null
   return withSyntaxTree(path, code, (root) => read(root, tagsIn(root, query)))
+}
+
+/** Parses `code` as `path`'s language and hands its tagged function and method nodes to `read`.
+ *  Null when `path`'s grammar is missing or ships no tags query. */
+export function withFunctionNodes<T>(
+  path: string,
+  code: string,
+  read: (functions: Node[]) => T
+): Promise<T | null> {
+  return withTags(path, code, (_root, tags) => read(functionTagsOf(tags).map((tag) => tag.node)))
 }
 
 /** Parses `code` as `path`'s language and extracts definitions, references and branch counts.

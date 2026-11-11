@@ -20,6 +20,7 @@ import {
 const mockListOpenPrsAPI = vi.fn()
 const mockPrReviewDetailAPI = vi.fn()
 const mockFilesMetricsAPI = vi.fn()
+const mockBlastRadiusAPI = vi.fn()
 const mockPrInlineCommentsAPI = vi.fn()
 const mockSessionsForRepoAPI = vi.fn()
 const mockActiveReviewsForRepoAPI = vi.fn()
@@ -34,6 +35,7 @@ vi.mock('../../src/api/github', () => ({
     listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
     prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
     filesMetrics: (...args: unknown[]) => mockFilesMetricsAPI(...args),
+    blastRadius: (...args: unknown[]) => mockBlastRadiusAPI(...args),
     prInlineComments: (...args: unknown[]) => mockPrInlineCommentsAPI(...args),
     prIssueComments: (...args: unknown[]) => mockPrIssueCommentsAPI(...args),
     sessionsForRepo: (...args: unknown[]) => mockSessionsForRepoAPI(...args),
@@ -79,6 +81,7 @@ function file(path: string): PrChangedFile {
     isBinary: false,
     whyHere: 'changed',
     churn90d: null,
+    blastRadius: null,
   }
 }
 
@@ -189,6 +192,7 @@ function threadOf(comment: ReturnType<typeof reviewComment>) {
 }
 
 beforeEach(() => {
+  mockBlastRadiusAPI.mockResolvedValue({ radius: {} })
   mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
   mockActiveReviewsForRepoAPI.mockResolvedValue({ error: 'NOT_FOUND' })
   mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [] })
@@ -723,5 +727,34 @@ describe('comment loaders — stable across activePr patches — does not fetch 
     rerender()
     await settled()
     expect(mockPrIssueCommentsAPI).toHaveBeenCalledTimes(1)
+  })
+})
+
+/** The blast radius each of `paths` holds in the open PR. */
+function blastRadiusOf(...paths: string[]) {
+  const files = store().activePr?.chapters.flatMap((c) => c.files) ?? []
+  return paths.map((path) => files.find((f) => f.path === path)?.blastRadius)
+}
+
+describe('useFetchFileMetrics — blast radius', () => {
+  it("asks for the PR head's blast radius and sets each file's", async () => {
+    withActivePr(prWithFiles([file('src/a.ts'), file('README.md')]))
+    mockFilesMetricsAPI.mockResolvedValue({ metrics: {} })
+    mockBlastRadiusAPI.mockResolvedValue({
+      radius: { 'src/a.ts': { usedIn: 14, alsoDefinedIn: 2 }, 'README.md': null },
+    })
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await load(result.current)
+    expect(mockBlastRadiusAPI).toHaveBeenCalledWith('/repo', 42, 'abc123')
+    expect(blastRadiusOf('src/a.ts', 'README.md')).toEqual([{ usedIn: 14, alsoDefinedIn: 2 }, null])
+  })
+
+  it('leaves every file unmeasured when the channel answers an error', async () => {
+    withActivePr(prWithFiles([file('src/a.ts')]))
+    mockFilesMetricsAPI.mockResolvedValue({ metrics: {} })
+    mockBlastRadiusAPI.mockResolvedValue({ error: 'VALIDATION_ERROR' })
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await load(result.current)
+    expect(blastRadiusOf('src/a.ts')).toEqual([null])
   })
 })

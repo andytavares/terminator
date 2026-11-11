@@ -20,6 +20,7 @@ const file: PrChangedFile = {
   isBinary: false,
   whyHere: 'changed',
   churn90d: null,
+  blastRadius: null,
 }
 
 const pr = PrReviewDetailSchema.parse({

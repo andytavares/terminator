@@ -1,7 +1,7 @@
 // Bridge module so extension components don't access window.electronAPI.github directly.
 // All calls go through extensionBridge.invoke which routes via registered IPC handlers.
 
-import type { IssueComment } from '../schemas/pr-review.schema'
+import type { IssueComment, PrChangedFile } from '../schemas/pr-review.schema'
 import type { ContributionsReply } from '../schemas/contributions.schema'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import type { BridgeResult } from './bridge'
@@ -101,6 +101,13 @@ export const githubAPI = {
       repoRoot,
       paths,
     }),
+
+  /** Per changed file of the PR at `headSHA`: how many files use and also define what it changes. */
+  blastRadius: (repoRoot: string, prNumber: number, headSHA: string) =>
+    invoke<BridgeResult<{ radius: Record<string, PrChangedFile['blastRadius']> }>>(
+      'github:blast-radius',
+      { repoRoot, prNumber, headSHA }
+    ),
 
   prInlineComments: (repoRoot: string, prNumber: number) =>
     invoke<BridgeResult<{ comments: unknown[]; resolvedCommentIds?: number[] }>>(

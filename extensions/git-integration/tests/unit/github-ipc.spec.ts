@@ -2850,3 +2850,93 @@ describe('github:dashboard-search sessions and cap — reports sections whose se
     expect(result.capped).toEqual(['mine'])
   })
 })
+
+const RADIUS_HEAD = 'b1a5700'
+const SCORE_FILE = {
+  filename: 'src/score.ts',
+  additions: 3,
+  deletions: 0,
+  patch: '@@ -0,0 +1,3 @@\n+export function score(n: number) {\n+  return n\n+}',
+}
+const SCORE_SOURCE = 'export function score(n: number) {\n  return n\n}\n'
+const USE_SOURCE = "import { score } from './score'\nexport const total = score(2)\n"
+
+/** The detail fetch of PR 6 at RADIUS_HEAD changing src/score.ts, which src/use.ts calls. */
+function radiusGhRoute(a: string[]): string | null {
+  if (isGhRepoView(a)) return JSON.stringify(REPO_VIEW)
+  if (isGhPrView(a)) return JSON.stringify({ ...PR_META, number: 6, headRefOid: RADIUS_HEAD })
+  if (a.some((arg) => arg.endsWith('/pulls/6/files'))) return JSON.stringify([SCORE_FILE])
+  if (a.some((arg) => arg.endsWith('/requested_reviewers'))) return '{"users":[],"teams":[]}'
+  if (a.some((arg) => arg.endsWith('/reviews'))) return '[]'
+  return null
+}
+
+function radiusGitRoute(a: string[]): string {
+  if (a.includes('grep')) return `${RADIUS_HEAD}:src/use.ts\n`
+  if (a.includes(`${RADIUS_HEAD}:src/score.ts`)) return SCORE_SOURCE
+  if (a.includes(`${RADIUS_HEAD}:src/use.ts`)) return USE_SOURCE
+  return ''
+}
+
+const radiusRoute = (a: string[]) => radiusGhRoute(a) ?? radiusGitRoute(a)
+
+describe('github:blast-radius', () => {
+  it('answers, per changed file, how many files use and also define what it changes', async () => {
+    const handlers = captureHandlers()
+    routeExec(radiusRoute)
+    await handlers['github:pr-review-detail']({ repoRoot: '/repo', prNumber: 6 })
+
+    const result = await handlers['github:blast-radius']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      headSHA: RADIUS_HEAD,
+    })
+
+    expect(result).toEqual({ radius: { 'src/score.ts': { usedIn: 1, alsoDefinedIn: 0 } } })
+  })
+
+  it('fetches the PR head first when the checkout does not have it', async () => {
+    const handlers = captureHandlers()
+    routeExec(radiusRoute)
+    await handlers['github:pr-review-detail']({ repoRoot: '/repo', prNumber: 6 })
+    const spawns = routeExec((a) => (a[0] === 'cat-file' ? new Error('missing') : radiusRoute(a)))
+
+    await handlers['github:blast-radius']({ repoRoot: '/repo', prNumber: 6, headSHA: RADIUS_HEAD })
+
+    expect(spawns.map((s) => s.args.join(' '))).toContain(
+      'fetch --force origin pull/6/head:refs/remotes/pull/6/head'
+    )
+  })
+})
+
+describe('github:blast-radius — nothing to measure', () => {
+  it('answers no files for a repository with no checkout, without running git', async () => {
+    const handlers = captureHandlers()
+    routeExec(radiusRoute)
+    await handlers['github:pr-review-detail']({ repoRoot: 'gh:acme/widgets', prNumber: 6 })
+    const spawns = routeExec(radiusRoute)
+
+    const result = await handlers['github:blast-radius']({
+      repoRoot: 'gh:acme/widgets',
+      prNumber: 6,
+      headSHA: RADIUS_HEAD,
+    })
+
+    expect(result).toEqual({ radius: {} })
+    expect(spawns).toEqual([])
+  })
+
+  it('answers no files for a head the last detail fetch did not return', async () => {
+    const handlers = captureHandlers()
+    routeExec(radiusRoute)
+    await handlers['github:pr-review-detail']({ repoRoot: '/repo', prNumber: 6 })
+
+    const result = await handlers['github:blast-radius']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      headSHA: 'newer11',
+    })
+
+    expect(result).toEqual({ radius: {} })
+  })
+})

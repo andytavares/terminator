@@ -48,9 +48,30 @@ function ChurnFact({ churn }: { churn: number }) {
   )
 }
 
-/** The reading-order reason and the 90-day change count; only the count when there is no reason. */
+type BlastRadius = NonNullable<PrChangedFile['blastRadius']>
+
+function BlastRadiusFact({ radius }: { radius: BlastRadius }) {
+  const { usedIn, alsoDefinedIn } = radius
+  const alsoDefined =
+    alsoDefinedIn > 0
+      ? ` · name also defined in ${alsoDefinedIn} ${plural(alsoDefinedIn, 'file')}`
+      : ''
+  return (
+    <span>
+      Used in {usedIn} {plural(usedIn, 'file')}
+      {alsoDefined}
+    </span>
+  )
+}
+
+function shownRadius(radius: PrChangedFile['blastRadius']): BlastRadius | null {
+  return radius && (radius.usedIn > 0 || radius.alsoDefinedIn > 0) ? radius : null
+}
+
+/** The reading-order reason, the 90-day change count and the blast radius, each when known. */
 function WhyHere(props: { file: PrChangedFile; children: React.ReactNode }) {
   const { whyHere, churn90d } = props.file
+  const radius = shownRadius(props.file.blastRadius)
   return (
     <div className="fh-why">
       {whyHere && (
@@ -61,6 +82,8 @@ function WhyHere(props: { file: PrChangedFile; children: React.ReactNode }) {
       {props.children}
       {whyHere && churn90d != null && <span className="fh-sep">·</span>}
       {churn90d != null && <ChurnFact churn={churn90d} />}
+      {radius && (whyHere || churn90d != null) && <span className="fh-sep">·</span>}
+      {radius && <BlastRadiusFact radius={radius} />}
     </div>
   )
 }

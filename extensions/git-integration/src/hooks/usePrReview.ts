@@ -225,15 +225,29 @@ async function loadChurn(
   store.updateFileChurn(Object.fromEntries(paths.map((p) => [p, metrics[p]?.churn90d ?? 0])))
 }
 
+/** Fetches what each changed file's definitions reach at the PR head into the open PR. */
+async function loadBlastRadius(
+  repoRoot: string,
+  pr: PrReviewDetail,
+  store: Pick<Store, 'updateFileBlastRadius'>
+) {
+  const response = await githubAPI.blastRadius(repoRoot, pr.number, pr.headSHA)
+  if ('error' in response) return
+  store.updateFileBlastRadius(response.radius)
+}
+
 export function useFetchFileMetrics(repoRoot: string | null) {
-  const { activePr, updateFileChurn } = usePrReviewStore()
+  const { activePr, updateFileChurn, updateFileBlastRadius } = usePrReviewStore()
   return useCallback(
     async (prDetail?: PrReviewDetail) => {
       const pr = prDetail ?? activePr
       if (!repoRoot || !pr) return
-      await loadChurn(repoRoot, pr, { updateFileChurn })
+      await Promise.all([
+        loadChurn(repoRoot, pr, { updateFileChurn }),
+        loadBlastRadius(repoRoot, pr, { updateFileBlastRadius }),
+      ])
     },
-    [repoRoot, activePr, updateFileChurn]
+    [repoRoot, activePr, updateFileChurn, updateFileBlastRadius]
   )
 }
 

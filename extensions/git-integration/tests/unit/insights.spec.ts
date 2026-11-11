@@ -227,46 +227,6 @@ const MARKERS_FILE = changedFileWithPatch(
   { additions: 4, deletions: 0 }
 )
 
-const DEEPLY_NESTED_LINES = [
-  '+export function deep(a: number) {',
-  '+  if (a) {',
-  '+    if (a) {',
-  '+      if (a) {',
-  '+        if (a) {',
-  '+          if (a) { return 1 }',
-  '+        }',
-  '+      }',
-  '+    }',
-  '+  }',
-  '+  return 0',
-  '+}',
-]
-
-/** A file adding one long function, one deeply nested one and one with six parameters. */
-function oversizedFunctionFiles() {
-  const bodyLines = Array.from({ length: 82 }, (_, i) => `  const v${i} = ${i}`)
-  const longFn = ['+export function longFn() {', ...bodyLines.map((l) => `+${l}`), '+}']
-  const manyParams = [
-    '+export function manyParams(a: number, b: number, c: number, d: number, e: number, f: number) {',
-    '+  return a',
-    '+}',
-  ]
-  return [
-    changedFileWithPatch('src/long.ts', ['@@ -0,0 +1,84 @@', ...longFn], {
-      additions: 84,
-      deletions: 0,
-    }),
-    changedFileWithPatch('src/deep.ts', ['@@ -0,0 +1,12 @@', ...DEEPLY_NESTED_LINES], {
-      additions: 12,
-      deletions: 0,
-    }),
-    changedFileWithPatch('src/params.ts', ['@@ -0,0 +1,3 @@', ...manyParams], {
-      additions: 3,
-      deletions: 0,
-    }),
-  ]
-}
-
 describe('computeInsights() — health flags', () => {
   it('flags a new TODO and no language-specific marker in added lines', async () => {
     const insights = await insightsOf([MARKERS_FILE], baseOpts)
@@ -274,18 +234,85 @@ describe('computeInsights() — health flags', () => {
     expect(insights.health.source).toBe('tree-sitter · detectDryViolations')
   })
 
-  it('flags a function over 80 lines, deep nesting and too many parameters', async () => {
-    const insights = await insightsOf(oversizedFunctionFiles(), baseOpts)
-    const kinds = insights.health.flags.map((f) => f.kind)
-    expect(kinds).toContain('long-function')
-    expect(kinds).toContain('deep-nesting')
-    expect(kinds).toContain('many-params')
-  })
-
   it('adds one flag per DRY violation group', async () => {
     const violation: DryViolation = { files: ['a.ts', 'b.ts'], fingerprint: 'x', lineCount: 5 }
     const insights = await insightsOf([], { ...baseOpts, dryViolations: [violation] })
     expect(insights.health.flags.filter((f) => f.kind === 'duplicate-block')).toHaveLength(1)
+  })
+})
+
+/** A file whose patch adds `lines` as a new file. */
+function addedFile(path: string, lines: string[]) {
+  const patch = [`@@ -0,0 +1,${lines.length} @@`, ...lines.map((line) => `+${line}`)]
+  return changedFileWithPatch(path, patch, { additions: lines.length, deletions: 0 })
+}
+
+const eightyAssignments = (prefix: string) =>
+  Array.from({ length: 80 }, (_, i) => `${prefix}v${i} = ${i}`)
+
+/** 92 lines, five nested ifs, six parameters. */
+const OVERSIZED_TS_FILE = addedFile('src/oversized.ts', [
+  'export function oversized(a: number, b: number, c: number, d: number, e: number, f: number) {',
+  '  if (a) {',
+  '    if (b) {',
+  '      if (c) {',
+  '        if (d) {',
+  '          if (e) { return f }',
+  '        }',
+  '      }',
+  '    }',
+  '  }',
+  ...eightyAssignments('  const '),
+  '  return 0',
+  '}',
+])
+
+/** 88 lines, five nested ifs, six parameters. */
+const OVERSIZED_PY_FILE = addedFile('oversized.py', [
+  'def oversized(a, b, c, d, e, f):',
+  '    if a:',
+  '        if b:',
+  '            if c:',
+  '                if d:',
+  '                    if e:',
+  '                        return f',
+  ...eightyAssignments('    '),
+  '    return 0',
+])
+
+const SMALL_GO_FILE = addedFile('small.go', [
+  'package small',
+  '',
+  'func Larger(a int, b int) int {',
+  '\tif a > b {',
+  '\t\treturn a',
+  '\t}',
+  '\treturn b',
+  '}',
+])
+
+describe('computeInsights() — function health flags in any grammar', () => {
+  it('flags a TypeScript function over 80 lines, nested five deep, with six parameters', async () => {
+    const insights = await insightsOf([OVERSIZED_TS_FILE], baseOpts)
+    expect(insights.health.flags).toEqual([
+      { kind: 'long-function', label: 'Function over 80 lines (92)', path: 'src/oversized.ts' },
+      { kind: 'deep-nesting', label: 'Nesting depth 5', path: 'src/oversized.ts' },
+      { kind: 'many-params', label: '6 parameters', path: 'src/oversized.ts' },
+    ])
+  })
+
+  it('flags a Python function over 80 lines, nested five deep, with six parameters', async () => {
+    const insights = await insightsOf([OVERSIZED_PY_FILE], baseOpts)
+    expect(insights.health.flags).toEqual([
+      { kind: 'long-function', label: 'Function over 80 lines (88)', path: 'oversized.py' },
+      { kind: 'deep-nesting', label: 'Nesting depth 5', path: 'oversized.py' },
+      { kind: 'many-params', label: '6 parameters', path: 'oversized.py' },
+    ])
+  })
+
+  it('flags nothing for a short, shallow Go function with two parameters', async () => {
+    const insights = await insightsOf([SMALL_GO_FILE], baseOpts)
+    expect(insights.health.flags).toEqual([])
   })
 })
 

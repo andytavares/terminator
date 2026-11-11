@@ -4,7 +4,8 @@ import type { ComplexityHotspot } from '../github/pr-review-service'
 import {
   analyseLines,
   analyseSnippet,
-  withSyntaxTree,
+  isBranchNode,
+  withFunctionNodes,
   type SnippetAnalysis,
   type SnippetFunction,
 } from './symbols'
@@ -129,33 +130,31 @@ async function analyseAddedText(file: ParsedPrFile): Promise<SnippetAnalysis | n
 
 // ─── Health flags ───────────────────────────────────────────────────────────────
 
-const FUNCTION_NODE_TYPES = new Set([
-  'function_declaration',
-  'function_expression',
-  'arrow_function',
-  'method_definition',
-])
-
+/** Deepest chain of branch nodes under `node`; an `if` that is an `else`'s body stays at its depth. */
 function maxNestingDepth(node: Node): number {
   let max = 0
   function visit(n: Node, depth: number): void {
-    const nextDepth = n.type === 'statement_block' ? depth + 1 : depth
+    const elseBranch = n.parent?.type.split('_').includes('else') ?? false
+    const nextDepth = isBranchNode(n) && !elseBranch ? depth + 1 : depth
     if (nextDepth > max) max = nextDepth
-    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!, nextDepth)
+    for (const child of n.children) visit(child, nextDepth)
   }
   visit(node, 0)
   return max
 }
 
-function countParams(node: Node): number {
-  const params = node.childForFieldName('parameters')
-  if (!params) return 0
-  let count = 0
-  for (let i = 0; i < params.childCount; i++) {
-    const child = params.child(i)!
-    if (child.type !== '(' && child.type !== ')' && child.type !== ',') count++
+/** The `parameters` field of the function node or of its value (a function assigned to a name). */
+function parameterListOf(node: Node): Node | null {
+  const candidates = [node, ...node.namedChildren]
+  for (const candidate of candidates) {
+    const list = candidate.childForFieldName('parameters')
+    if (list?.type.includes('parameter')) return list
   }
-  return count
+  return null
+}
+
+function countParams(node: Node): number {
+  return parameterListOf(node)?.namedChildCount ?? 0
 }
 
 interface HealthFlag {
@@ -177,14 +176,8 @@ function flagsForFunction(node: Node, path: string): HealthFlag[] {
   return flags
 }
 
-function collectFunctionFlags(root: Node, path: string): HealthFlag[] {
-  const flags: HealthFlag[] = []
-  const visit = (n: Node): void => {
-    if (FUNCTION_NODE_TYPES.has(n.type)) flags.push(...flagsForFunction(n, path))
-    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
-  }
-  visit(root)
-  return flags
+function collectFunctionFlags(functions: Node[], path: string): HealthFlag[] {
+  return functions.flatMap((node) => flagsForFunction(node, path))
 }
 
 interface AddedTextMarker {
@@ -221,8 +214,8 @@ async function computeHealthFlags(
     const addedText = file.patch ? addedTextOf(file) : ''
     if (!addedText) continue
     flags.push(...addedTextFlags(path, addedText))
-    const functionFlags = await withSyntaxTree(path, addedText, (root) =>
-      collectFunctionFlags(root, path)
+    const functionFlags = await withFunctionNodes(path, addedText, (functions) =>
+      collectFunctionFlags(functions, path)
     )
     if (functionFlags) flags.push(...functionFlags)
   }

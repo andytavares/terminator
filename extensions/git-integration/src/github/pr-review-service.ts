@@ -126,6 +126,7 @@ function changedFileFrom(f: RawFile): PrChangedFile {
     isBinary: false,
     whyHere: '',
     churn90d: null,
+    blastRadius: null,
   }
 }
 

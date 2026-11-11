@@ -11,6 +11,7 @@ function file(path: string): PrChangedFile {
     isBinary: false,
     whyHere: 'Source file — implementation',
     churn90d: null,
+    blastRadius: null,
   }
 }
 

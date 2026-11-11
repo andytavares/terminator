@@ -270,3 +270,26 @@ describe('usePrReviewStore — reset', () => {
     expect(usePrReviewStore.getState().prQueue).toHaveLength(1)
   })
 })
+
+describe('usePrReviewStore — updateFileBlastRadius', () => {
+  useFreshPrReviewStore()
+
+  it('sets the blast radius of each file it names', () => {
+    usePrReviewStore.setState({ activePr: makeDetail() })
+    usePrReviewStore
+      .getState()
+      .updateFileBlastRadius({ 'src/app.ts': { usedIn: 14, alsoDefinedIn: 2 } })
+    expect(usePrReviewStore.getState().activePr?.chapters[0].files[0].blastRadius).toEqual({
+      usedIn: 14,
+      alsoDefinedIn: 2,
+    })
+  })
+
+  it('leaves a file it does not name unmeasured', () => {
+    usePrReviewStore.setState({ activePr: makeDetail() })
+    usePrReviewStore
+      .getState()
+      .updateFileBlastRadius({ 'src/other.ts': { usedIn: 3, alsoDefinedIn: 0 } })
+    expect(usePrReviewStore.getState().activePr?.chapters[0].files[0].blastRadius).toBeNull()
+  })
+})

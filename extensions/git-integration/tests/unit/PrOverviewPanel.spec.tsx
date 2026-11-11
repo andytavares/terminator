@@ -80,6 +80,7 @@ const makeFile = (path: string, size: { additions: number; deletions: number }) 
   isBinary: false,
   whyHere: 'test',
   churn90d: 5,
+  blastRadius: null,
 })
 
 const basePr: PrReviewDetail = {

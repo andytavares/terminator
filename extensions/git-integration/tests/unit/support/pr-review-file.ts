@@ -10,6 +10,7 @@ export function changedFile(path: string, overrides: Partial<PrChangedFile> = {}
     isBinary: false,
     whyHere: '',
     churn90d: null,
+    blastRadius: null,
     ...overrides,
   }
 }

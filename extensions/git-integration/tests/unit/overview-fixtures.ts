@@ -9,6 +9,7 @@ export const makeFile = (path: string) => ({
   isBinary: false,
   whyHere: 'test',
   churn90d: 5,
+  blastRadius: null,
 })
 
 export const baseInsights: PrInsights = {

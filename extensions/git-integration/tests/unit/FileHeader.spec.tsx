@@ -95,3 +95,27 @@ describe('FileHeader second row — the two facts', () => {
     expect(screen.getByText('Showing 9f0c76eb… head')).toBeTruthy()
   })
 })
+
+function changedFileWithRadius(blastRadius: PrChangedFile['blastRadius']) {
+  return partialFake<PrChangedFile>({ ...changedFileAt(null), blastRadius })
+}
+
+describe('FileHeader second row — blast radius', () => {
+  it('says how many files use what the file changes', () => {
+    renderFileHeader(changedFileWithRadius({ usedIn: 14, alsoDefinedIn: 0 }))
+    expect(screen.getByText('Used in 14 files')).toBeTruthy()
+  })
+
+  it('adds how many other files define the same name, in the singular too', () => {
+    renderFileHeader(changedFileWithRadius({ usedIn: 1, alsoDefinedIn: 2 }))
+    expect(screen.getByText('Used in 1 file · name also defined in 2 files')).toBeTruthy()
+  })
+
+  it.each([
+    ['unmeasured', null],
+    ['used nowhere and defined nowhere else', { usedIn: 0, alsoDefinedIn: 0 }],
+  ])('shows no blast radius when the file is %s', (_case, blastRadius) => {
+    renderFileHeader(changedFileWithRadius(blastRadius))
+    expect(screen.queryByText(/Used in/)).toBeNull()
+  })
+})

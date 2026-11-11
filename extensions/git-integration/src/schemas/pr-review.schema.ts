@@ -17,6 +17,9 @@ const PrChangedFileSchema = z.object({
   whyHere: z.string(),
   /** Commits touching the file in the last 90 days; null until measured. */
   churn90d: z.number().nullable().default(null),
+  /** Files that use, and files that also define, the widest definition the PR changes here; null
+   *  until measured or when the PR changes no definition here. */
+  blastRadius: z.object({ usedIn: z.number(), alsoDefinedIn: z.number() }).nullable().default(null),
 })
 
 // ─── Chapter ──────────────────────────────────────────────────────────────────

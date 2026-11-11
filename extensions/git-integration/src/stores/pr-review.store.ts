@@ -89,6 +89,8 @@ export interface PrReviewStore {
 
   /** Sets each file's 90-day commit count, rebuilding the chapters once. */
   updateFileChurn(churnByPath: Record<string, number>): void
+  /** Sets each file's blast radius, rebuilding the chapters once. */
+  updateFileBlastRadius(radiusByPath: Record<string, PrChangedFile['blastRadius']>): void
 
   setRateLimitState(state: RateLimitState | null): void
   setCurrentUserLogin(login: string | null): void
@@ -346,6 +348,13 @@ function churnActions(set: SetState) {
         const matches = (_chapterId: string, path: string) => churnByPath[path] !== undefined
         const withChurn = (f: PrChangedFile) => ({ ...f, churn90d: churnByPath[f.path] })
         return { activePr: withFiles(state.activePr, matches, withChurn) }
+      }),
+    updateFileBlastRadius: (radiusByPath: Record<string, PrChangedFile['blastRadius']>) =>
+      set((state) => {
+        if (!state.activePr) return {}
+        const matches = (_chapterId: string, path: string) => radiusByPath[path] !== undefined
+        const withRadius = (f: PrChangedFile) => ({ ...f, blastRadius: radiusByPath[f.path] })
+        return { activePr: withFiles(state.activePr, matches, withRadius) }
       }),
   }
 }
