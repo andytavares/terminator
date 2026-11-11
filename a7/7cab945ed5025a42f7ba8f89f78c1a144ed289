@@ -1,0 +1,86 @@
+extensions/git-integration/tests/unit/overview-fixtures.ts
+  s_6c2c30985200c2::t_ee62b713e8c738 13
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_6c2c30985200c2::t_b5d3eaa9750e94 55
+extensions/git-integration/src/review/review-layout.ts
+  s_6c2c30985200c2::t_7306a3bed9dc55 28-29,33,36-39,42-55
+  s_6c2c30985200c2::t_66219d68336dd5 72-86
+  s_6c2c30985200c2::t_29b4ff63e51d4a 56-57,65,87-88
+extensions/git-integration/tests/unit/useReviewKeys.spec.tsx
+  s_6c2c30985200c2::t_85befa79509e26 13,120-123
+  s_6c2c30985200c2::t_728a86d1044c97 124-127
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_6c2c30985200c2::t_ee62b713e8c738 84
+extensions/git-integration/tests/unit/KeyboardHelp.spec.tsx
+  s_6c2c30985200c2::t_6770c9b63a723d 36
+extensions/git-integration/tests/unit/review-wiring.spec.ts
+  s_6c2c30985200c2::t_ee62b713e8c738 15
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_6c2c30985200c2::t_ee62b713e8c738 85
+extensions/git-integration/tests/unit/chapter-builder.spec.ts
+  s_6c2c30985200c2::t_a762d1affe4f8a 85-92
+  s_6c2c30985200c2::t_f70412a75be301 75-84
+  s_6c2c30985200c2::t_39ab0916127866 66
+extensions/git-integration/src/review/insights.ts
+  s_6c2c30985200c2::t_348fe1a6f74aa7 7,138
+extensions/git-integration/src/review/blast-radius.ts
+  s_6c2c30985200c2::t_90b19b04b352cc 93-96,100-112,136
+extensions/git-integration/src/github/pr-review-service.ts
+  s_6c2c30985200c2::t_f70412a75be301 147
+  s_6c2c30985200c2::t_a762d1affe4f8a 28,113,115,119,123-126,137
+extensions/git-integration/tests/unit/ReviewDiffPane.reply.spec.tsx
+  s_6c2c30985200c2::t_ee62b713e8c738 25
+extensions/git-integration/src/components/pr-review/KeyboardHelp.tsx
+  s_6c2c30985200c2::t_6770c9b63a723d 14
+extensions/git-integration/src/components/pr-review/review-surface.css
+  s_6c2c30985200c2::t_3a45fe9fb134ad 259-286
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_6c2c30985200c2::t_a762d1affe4f8a 23-24
+extensions/git-integration/tests/unit/insights.spec.ts
+  s_6c2c30985200c2::t_74a72f1d6f964d 294,297-301,303-307
+  s_6c2c30985200c2::t_c353b5b6be216d 295-296,302
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_6c2c30985200c2::t_81fae0b558cecf 5
+  s_6c2c30985200c2::t_7e993c6fa8fc33 146-147,159
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_6c2c30985200c2::t_7e993c6fa8fc33 213-217,476
+  s_6c2c30985200c2::t_81fae0b558cecf 475
+extensions/git-integration/tests/unit/review-layout.spec.ts
+  s_6c2c30985200c2::t_7306a3bed9dc55 26-27,36,43,47,49-58,65
+  s_6c2c30985200c2::t_513fe9cfae5888 2,70-91,93
+  s_6c2c30985200c2::t_b5d3eaa9750e94 7,23,40,42
+  s_6c2c30985200c2::t_ec09862f339413 92
+extensions/git-integration/src/hooks/useReviewKeys.ts
+  s_6c2c30985200c2::t_dd32a0cbb04b0e 16-22
+  s_6c2c30985200c2::t_58c2100957004e 23,52
+extensions/git-integration/src/components/pr-review/SelectionBar.tsx
+  s_6c2c30985200c2::t_dd32a0cbb04b0e 19,23
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_6c2c30985200c2::t_ee62b713e8c738 146
+extensions/git-integration/tests/unit/support/pr-review-file.ts
+  s_6c2c30985200c2::t_abc8cfc7ab5d86 14
+extensions/git-integration/src/review/symbols.ts
+  s_6c2c30985200c2::t_348fe1a6f74aa7 151-155,157
+  s_6c2c30985200c2::t_90b19b04b352cc 156
+extensions/git-integration/src/components/pr-review/ReviewStream.tsx
+  s_6c2c30985200c2::t_b14534dcb0c69a 3,22-23
+  s_6c2c30985200c2::t_66219d68336dd5 79-83,95
+  s_6c2c30985200c2::t_fa657e9daf3985 77-78,84-88,92-94,101-103,105,109
+  s_6c2c30985200c2::t_9f4d3c60810ab3 96,112,117,119,203-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a77cab945ed5025a42f7ba8f89f78c1a144ed289",
+  "prompts": {},
+  "sessions": {
+    "s_6c2c30985200c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0fcc256-8205-49ce-a757-893d4406f77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
