@@ -1,0 +1,66 @@
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_6c2c30985200c2::t_dbd3db22fff59d 20-22
+extensions/git-integration/tests/unit/overview-fixtures.ts
+  s_6c2c30985200c2::t_0ded405f1ab153 12
+extensions/git-integration/src/stores/pr-review.store.ts
+  s_6c2c30985200c2::t_dbd3db22fff59d 92-93,352-357
+  s_6c2c30985200c2::t_b73194f75501c1 358
+extensions/git-integration/tests/unit/insights.spec.ts
+  s_6c2c30985200c2::t_ff057d8b43d913 244-316
+  s_6c2c30985200c2::t_0236daa549172a 317-318
+extensions/git-integration/src/ipc/github/pr-files.ts
+  s_6c2c30985200c2::t_055e2ccca2aab2 148-161,188
+  s_6c2c30985200c2::t_c829441dd7e285 10-11,120-143,145-147
+  s_6c2c30985200c2::t_f435e3c18618e5 144
+extensions/git-integration/tests/unit/FileHeader.spec.tsx
+  s_6c2c30985200c2::t_60c28265b89004 98-121
+extensions/git-integration/src/github/pr-review-service.ts
+  s_6c2c30985200c2::t_dbd3db22fff59d 129
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_6c2c30985200c2::t_dbd3db22fff59d 228-238,240,245-248,250
+extensions/git-integration/src/review/insights.ts
+  s_6c2c30985200c2::t_ea1d2ef82a7f79 7-8,133,137-138,140,146-151,153-157,179-180,217-218
+extensions/git-integration/tests/unit/review-wiring.spec.ts
+  s_6c2c30985200c2::t_0ded405f1ab153 14
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_6c2c30985200c2::t_0ded405f1ab153 83
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_6c2c30985200c2::t_6d1f8237d68b9c 2853-2942
+extensions/git-integration/src/components/pr-review/diff-pane/FileHeader.tsx
+  s_6c2c30985200c2::t_dbd3db22fff59d 51-55,59-71,74,85-86
+  s_6c2c30985200c2::t_9eaae5ad2b060f 56-58
+extensions/git-integration/src/review/symbols.ts
+  s_6c2c30985200c2::t_ea1d2ef82a7f79 151,258-265
+  s_6c2c30985200c2::t_e4bb48f5395894 223
+  s_6c2c30985200c2::t_31e632384cb136 266-267
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_6c2c30985200c2::t_8eadab5de3e5d7 23,38,195,732-759
+  s_6c2c30985200c2::t_9b919a921b48af 84
+  s_6c2c30985200c2::t_a8683c5679ee76 760
+extensions/git-integration/tests/unit/pr-review.store.actions.spec.ts
+  s_6c2c30985200c2::t_9eaae5ad2b060f 279-281,290-292
+  s_6c2c30985200c2::t_60c28265b89004 273-278,282-289,293-295
+extensions/git-integration/tests/unit/support/pr-review-file.ts
+  s_6c2c30985200c2::t_0ded405f1ab153 13
+extensions/git-integration/src/api/github.ts
+  s_6c2c30985200c2::t_dbd3db22fff59d 4,105-110
+  s_6c2c30985200c2::t_25f14cbcf39be1 111
+extensions/git-integration/tests/unit/ReviewDiffPane.reply.spec.tsx
+  s_6c2c30985200c2::t_0ded405f1ab153 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d21de12337ed361c7544f2422f45d8b797dfc9df",
+  "prompts": {},
+  "sessions": {
+    "s_6c2c30985200c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0fcc256-8205-49ce-a757-893d4406f77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
