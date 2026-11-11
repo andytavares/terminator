@@ -69,3 +69,20 @@ test('a terminal opened on a dismissed branch shows in the Inbox', { tag: '@mac'
   await expect(inboxCards(page)).toHaveCount(1)
   await expect(inboxCards(page)).toContainText('main')
 })
+
+test('an Inbox card dragged onto an agent tab attaches its terminal as context', async () => {
+  const { page } = handle
+  await createWorkspace(page, 'quicknote', gitFolder())
+  await projectGroup(page, 'main').click()
+  await expect(terminalTabs(page)).toHaveCount(1)
+  await openHome(page)
+  await page.locator('.task-row__name', { hasText: 'main' }).first().click()
+  await page.getByRole('button', { name: 'New agent on this branch' }).click()
+  await expect(page.locator('.agent-composer')).toBeVisible()
+  await showInbox(page)
+  await inboxCards(page)
+    .first()
+    .locator('.inbox-card__open')
+    .dragTo(page.locator('.agent-composer'))
+  await expect(page.locator('.agent-context-chip')).toContainText('terminal output')
+})

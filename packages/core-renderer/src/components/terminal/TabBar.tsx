@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Play, Circle, Pause, CircleX } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
 import { useBreakoutStore } from '../../stores/breakout.store'
@@ -29,6 +29,7 @@ import { moved } from '../../hooks/useDragReorder'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { TerminalSession } from '../../../../core-shared/src/types/index'
 import { recordUse } from '../../usage/record'
+import { SESSION_DRAG_TYPE } from '../agent/session-drag'
 
 /**
  * Past this many terminals the row scrolls, and it says so. Overflow being
@@ -321,14 +322,47 @@ function useSessionTabClass(sessionId: string, isActive: boolean): string {
   return `tab-bar__tab tab-bar__tab--session${isActive ? ' tab-bar__tab--active' : ''}${dragged ? ' tab-bar__tab--dragging' : ''}${landing ? ' tab-bar__tab--dnd-over' : ''}`
 }
 
+const SPRING_LOAD_MS = 600
+
+function showSessionOf(projectId: string, sessionId: string): void {
+  useSessionStore.getState().setActiveSessionForProject(projectId, sessionId)
+  useSessionStore.getState().requestFocus(sessionId)
+}
+
+/** A session dragged from elsewhere and held over the tab shows the tab, so the agent tab that
+ * takes the drop can be reached. It never takes the drop, so tab drag and break-out still work. */
+function useSpringLoad(show: () => void) {
+  const [held, setHeld] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const release = (): void => {
+    clearTimeout(timer.current)
+    setHeld(false)
+  }
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const handlers = {
+    onDragEnter: (e: React.DragEvent) => {
+      if (held || !e.dataTransfer.types.includes(SESSION_DRAG_TYPE)) return
+      setHeld(true)
+      timer.current = setTimeout(() => {
+        setHeld(false)
+        show()
+      }, SPRING_LOAD_MS)
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) release()
+    },
+    onDrop: release,
+    onDragEnd: release,
+  }
+  return { held, handlers }
+}
+
 function SessionTab(props: SessionTabProps): React.JSX.Element {
   const { projectId, session, editing } = props
   const isActive = session.id === props.tabs.activeId
   const isRenaming = editing.rename.id === session.id
-  const showSession = (): void => {
-    useSessionStore.getState().setActiveSessionForProject(projectId, session.id)
-    useSessionStore.getState().requestFocus(session.id)
-  }
+  const showSession = (): void => showSessionOf(projectId, session.id)
+  const springLoad = useSpringLoad(showSession)
   return (
     <div
       role="tab"
@@ -336,8 +370,9 @@ function SessionTab(props: SessionTabProps): React.JSX.Element {
       aria-label={session.tabTitle}
       data-session-tab={session.id}
       onPointerDown={(e) => !isRenaming && beginTabDrag(e, session.id, props.onDrop)}
-      className={useSessionTabClass(session.id, isActive)}
+      className={`${useSessionTabClass(session.id, isActive)}${springLoad.held ? ' tab-bar__tab--spring' : ''}`}
       onClick={showSession}
+      {...springLoad.handlers}
       onContextMenu={(e) => props.onContextMenu(e, session.id)}
       onDoubleClick={(e) => {
         e.stopPropagation()

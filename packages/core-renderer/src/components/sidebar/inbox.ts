@@ -1,3 +1,4 @@
+import { create } from 'zustand'
 import { focusFirst, type WorkThread } from '../../home/work-threads'
 import { isSettled, type WorkMarks } from '../../home/settle'
 import { threadMatches } from '../home/desk-search'
@@ -43,3 +44,28 @@ export function filterInbox(threads: readonly WorkThread[], filter: InboxFilter)
       (filter.repoRoot === null || t.lanes.some((lane) => lane.repoRoot === filter.repoRoot))
   )
 }
+
+export interface HiddenAsks {
+  count: number
+  /** Each repo the hidden asks sit in, once. */
+  repoNames: string[]
+}
+
+/** The asks that match the search text but sit outside the chosen repo. */
+export function asksHiddenByRepo(threads: readonly WorkThread[], filter: InboxFilter): HiddenAsks {
+  const shown = new Set(filterInbox(threads, filter))
+  const hidden = threads.filter(
+    (t) => t.state === 'needs-you' && !shown.has(t) && threadMatches(t, filter.text)
+  )
+  const repoNames = new Set(hidden.flatMap((t) => t.lanes.map((lane) => lane.repoName)))
+  return { count: hidden.length, repoNames: [...repoNames] }
+}
+
+/** The Inbox's search and repo filter, kept while the sidebar shows another mode. */
+export const useInboxFilter = create<{
+  filter: InboxFilter
+  setFilter: (filter: InboxFilter) => void
+}>((set) => ({
+  filter: { text: '', repoRoot: null },
+  setFilter: (filter) => set({ filter }),
+}))

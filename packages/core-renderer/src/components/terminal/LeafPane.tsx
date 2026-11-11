@@ -5,17 +5,19 @@ import './LeafPane.css'
 import { droppedPaths } from './dropped-paths'
 import { useMountedTerminal } from './use-mounted-terminal'
 import { LazyAgentView } from '../agent/LazyAgentView'
+import { allowSessionDrop, dropSessions } from './session-paste'
 
 interface Props {
   sessionId: string
   projectId: string
 }
 
-function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+function handleDragOver(e: React.DragEvent<HTMLDivElement>, sessionId: string): void {
+  if (allowSessionDrop(e, sessionId)) return
   if (e.dataTransfer.types.includes('Files')) e.preventDefault()
 }
 
-/** Focusing the pane, closing it, and pasting the paths of files dropped on it. */
+/** Focusing the pane, closing it, and pasting what is dropped on it: file paths, or session context. */
 function usePaneHandlers({ sessionId, projectId }: Props) {
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -48,6 +50,7 @@ function usePaneHandlers({ sessionId, projectId }: Props) {
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault()
+    if (dropSessions(e, sessionId)) return
     const instance = useSessionStore.getState().getTerminalInstance(sessionId)
     if (!instance) return
     const paths = droppedPaths(e.dataTransfer.files)
@@ -103,7 +106,7 @@ export function LeafPane({ sessionId, projectId }: Props): React.JSX.Element {
       aria-label={tabTitle}
       aria-current={isFocused || undefined}
       onMouseDown={handleMouseDown}
-      onDragOver={handleDragOver}
+      onDragOver={(e) => handleDragOver(e, sessionId)}
       onDrop={handleDrop}
     >
       <PaneTitleBar tabTitle={tabTitle} onClose={handleClose} />

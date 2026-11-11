@@ -190,6 +190,10 @@
 .tab-bar__tab--dnd-over {
   border-left: 2px solid var(--ws-color, var(--tm-accent));
 }
+.tab-bar__tab--spring {
+  outline: 1px dashed var(--tm-accent);
+  outline-offset: -1px;
+}
 
 /* ── Inline rename input ─────────────────────────────────────── */
 .tab-bar__rename-input {

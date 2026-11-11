@@ -114,11 +114,12 @@ The sidebar has a second mode, **Inbox**. It lists your work as cards in place o
 - **Order:** Work that needs you is first, then pinned work, then the rest, newest first. A card shows the title, repo and branch, the state glyph (the same five as Home), how long since it last did something, and the question when an agent asks one.
 - **Open:** Click a card or press `Enter` to show its most recent terminal. Work with no open terminal opens the view that owns it, such as its Foundry order, or else its task drawer on Home.
 - **Open in Foundry:** A card whose work is a Foundry order has a Foundry button. It opens that order in Foundry. The same item is on the row menu on Home, in the task drawer and on the branch's menu in the tree.
-- **Settle:** Hover a card and click **Settle** when you are done with it. It moves into **N settled** at the bottom, which starts folded. A settled card comes back to the top when its agent ends a turn or asks something.
-- **Snooze:** Click the alarm clock and choose **1 hour**, **This afternoon** or **Tomorrow**. The card is settled until then.
+- **Settle:** Hover a card and click **Settle** when you are done with it. The toast has **Undo**. The card moves into **N settled** at the bottom, which starts folded. A settled card comes back to the top when its agent ends a turn or asks something. Hover a card you settled or snoozed and click **Restore** to bring it back now.
+- **Snooze:** Click the alarm clock and choose **1 hour**, **This afternoon** or **Tomorrow**. The card is settled until then, and shows the time it comes back in place of its age.
+- **Attach to an agent:** Drag a card onto an agent tab's text box to attach the card's sessions as context (see [Attach sessions and cite replies](#attach-sessions-and-cite-replies)). When an agent tab is on screen, the card also has **Attach to ‹tab›**.
 - **Pin:** Click the pin. A pinned card stays at the top, under the work that needs you, and never settles on its own.
 - **Auto-settle:** Work with no activity for 24 hours settles on its own. An unanswered question never does.
-- **Search and repo filter:** The search field matches title, ticket, repo and branch. **All repos** narrows the list to one repo.
+- **Search and repo filter:** The search field matches title, ticket, repo and branch. While you search, **N settled matches** opens, so settled work is found too. **All repos** narrows the list to one repo. When it hides work that needs you in another repo, a line says so, and **Show** shows every repo again. The search and the repo stay set when you switch to the tree and back.
 - **Keyboard:** From the search field, `↓` moves onto the first card. `↑` and `↓` move between cards.
 
 Home and the Inbox share one list of settled, pinned and snoozed work. Settle work in one and it is settled in the other. Terminator keeps the list for each profile on this machine. It forgets an entry 30 days after its work is gone.
@@ -576,13 +577,15 @@ Each edit shows as a diff, open, with the path relative to the worktree. A **Cha
 
 #### Attach sessions and cite replies
 
-Drag a session onto the agent's text box to give the agent that session as context. You can drag a session row in the sidebar, a tab, a task row on Home, or a running Scheduled run. The box says **Drop to attach this session as context**, and the session shows as a chip above the box. What the agent gets depends on the session:
+Drag a session onto the agent's text box to give the agent that session as context. You can drag a session row in the sidebar, a tab, a task row on Home, a card in the Inbox, or a running Scheduled run. The box says **Drop to attach this session as context**; for a task row or an Inbox card it names the work and lists its sessions. Each session shows as a chip above the box, with its branch. To reach an agent tab that is not on screen, hold the drag over its tab for a moment and the tab opens. What the agent gets depends on the session:
 
 - A Claude Code session: the path of its transcript file, which the agent reads when it needs it.
 - Another agent tab: the text of its conversation.
 - A shell: the output on its screen and in its scrollback.
 
-A session with nothing to send shows the toast **This session has no conversation to attach.**
+A session with nothing to send is named in a toast, for example **Attached 1 of 2 sessions. Terminal 2 had no conversation or output.**
+
+You can also drop a session on a terminal where Claude Code or another agent runs. Terminator pastes the same context into the agent's input, without pressing Enter, so you can add your message first. A plain shell does not take the drop.
 
 To cite part of a reply, select the text in the agent's reply and choose **Cite**. Type a comment and press **Enter** to save it, or **Cmd+Enter** to save it and send at once. The citation shows as a chip above the box; the pencil edits its comment and **×** removes it.
 

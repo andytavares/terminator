@@ -68,7 +68,7 @@ function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): Conte
 }
 
 /** Settles the row, as the Inbox does, and offers Undo in a toast. */
-function settleWithUndo(thread: WorkThread): void {
+export function settleWithUndo(thread: WorkThread): void {
   useWorkMarks.getState().settle(thread.key, Date.now())
   useToastStore.getState().addToast({
     type: 'info',
