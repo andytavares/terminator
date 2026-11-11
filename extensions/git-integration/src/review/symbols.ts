@@ -1,5 +1,15 @@
-import { Parser, Language, type Node } from 'web-tree-sitter'
+import { Parser, Language, Query, type Node, type QueryMatch } from 'web-tree-sitter'
 import type { DiffLine } from '../schemas/git.schema'
+import cSharpTags from './tags/c-sharp.scm?raw'
+import cppTags from './tags/cpp.scm?raw'
+import goTags from './tags/go.scm?raw'
+import javaTags from './tags/java.scm?raw'
+import javascriptTags from './tags/javascript.scm?raw'
+import phpTags from './tags/php.scm?raw'
+import pythonTags from './tags/python.scm?raw'
+import rubyTags from './tags/ruby.scm?raw'
+import rustTags from './tags/rust.scm?raw'
+import typescriptTags from './tags/typescript.scm?raw'
 
 // ─── Grammar loading ───────────────────────────────────────────────────────────
 
@@ -58,11 +68,108 @@ export function loadLanguageFor(path: string): Promise<Language | null> {
   return cached
 }
 
+// ─── Tags queries ───────────────────────────────────────────────────────────────
+
+/** Each grammar's upstream tags query (`tags` in its tree-sitter.json); typescript and tsx
+ *  compose the javascript one after their own. Grammars with no upstream tags query are absent. */
+const TAGS_BY_GRAMMAR: Record<string, string> = {
+  typescript: typescriptTags + javascriptTags,
+  tsx: typescriptTags + javascriptTags,
+  javascript: javascriptTags,
+  python: pythonTags,
+  go: goTags,
+  rust: rustTags,
+  java: javaTags,
+  'c-sharp': cSharpTags,
+  ruby: rubyTags,
+  php: phpTags,
+  cpp: cppTags,
+}
+
+const queryCache = new Map<string, Query | null>()
+
+async function tagsQueryFor(path: string): Promise<Query | null> {
+  const grammar = grammarNameFor(path)
+  const tags = grammar ? TAGS_BY_GRAMMAR[grammar] : undefined
+  if (!grammar || !tags) return null
+  let query = queryCache.get(grammar)
+  if (query === undefined) {
+    const language = await loadLanguageFor(path)
+    query = language ? new Query(language, tags) : null
+    queryCache.set(grammar, query)
+  }
+  return query
+}
+
+interface Tag {
+  role: 'definition' | 'reference'
+  kind: string
+  name: Node
+  node: Node
+}
+
+/** The tag a match stands for: its `@name` node and its `@definition.*` / `@reference.*` node. */
+function tagOf(match: QueryMatch): Tag | null {
+  const name = match.captures.find((c) => c.name === 'name')?.node
+  const tagged = match.captures.find(
+    (c) => c.name.startsWith('definition.') || c.name.startsWith('reference.')
+  )
+  if (!name || !tagged) return null
+  const [role, kind] = tagged.name.split('.') as [Tag['role'], string]
+  return { role, kind, name, node: tagged.node }
+}
+
+function tagsIn(root: Node, query: Query): Tag[] {
+  return query.matches(root).flatMap((match) => tagOf(match) ?? [])
+}
+
+// ─── Branches ───────────────────────────────────────────────────────────────────
+
+/** Words that mark a control-flow node in any grammar's node type, matched per `_`-separated part. */
+const BRANCH_WORDS = new Set([
+  'if',
+  'elif',
+  'elsif',
+  'case',
+  'for',
+  'foreach',
+  'while',
+  'catch',
+  'except',
+  'rescue',
+  'conditional',
+  'ternary',
+])
+
+const SHORT_CIRCUIT_OPERATORS = new Set(['&&', '||', '??'])
+
+function isShortCircuit(node: Node): boolean {
+  const operator = node.childCount === 3 ? node.child(1) : null
+  return !!operator && !operator.isNamed && SHORT_CIRCUIT_OPERATORS.has(operator.type)
+}
+
+function isBranchNode(node: Node): boolean {
+  if (!node.isNamed) return false
+  return node.type.split('_').some((part) => BRANCH_WORDS.has(part)) || isShortCircuit(node)
+}
+
+/** Branches under `node`, not descending into `nested` (other functions count their own). */
+function countBranches(node: Node, nested: Set<number>): number {
+  let count = 0
+  function visit(n: Node): void {
+    if (isBranchNode(n)) count++
+    for (const child of n.children) if (!nested.has(child.id)) visit(child)
+  }
+  visit(node)
+  return count
+}
+
 // ─── AST analysis ───────────────────────────────────────────────────────────────
 
 export interface SnippetFunction {
   name: string
   line: number
+  endLine: number
   branches: number
 }
 
@@ -73,253 +180,40 @@ export interface SnippetAnalysis {
   functions: SnippetFunction[]
 }
 
-const KEYWORDS = new Set([
-  'if',
-  'else',
-  'for',
-  'while',
-  'do',
-  'switch',
-  'case',
-  'default',
-  'catch',
-  'try',
-  'finally',
-  'throw',
-  'return',
-  'break',
-  'continue',
-  'function',
-  'class',
-  'interface',
-  'type',
-  'enum',
-  'const',
-  'let',
-  'var',
-  'export',
-  'import',
-  'from',
-  'of',
-  'in',
-  'new',
-  'this',
-  'super',
-  'typeof',
-  'instanceof',
-  'void',
-  'delete',
-  'extends',
-  'implements',
-  'public',
-  'private',
-  'protected',
-  'static',
-  'readonly',
-  'async',
-  'await',
-  'yield',
-  'null',
-  'undefined',
-  'true',
-  'false',
-  'get',
-  'set',
-  'as',
-  'is',
-  'keyof',
-  'namespace',
-  'declare',
-  'abstract',
-  'module',
-  'def',
-  'pass',
-  'and',
-  'or',
-  'not',
-  'None',
-  'True',
-  'False',
-  'elif',
-  'except',
-  'lambda',
-  'self',
-])
+function isFunctionTag(tag: Tag): boolean {
+  return tag.role === 'definition' && (tag.kind === 'function' || tag.kind === 'method')
+}
 
-const DEFINITION_TYPES = new Set([
-  'function_declaration',
-  'generator_function_declaration',
-  'class_declaration',
-  'interface_declaration',
-  'type_alias_declaration',
-  'enum_declaration',
-])
+/** One function per definition node: a grammar can tag one node as both method and function. */
+function functionTagsOf(tags: Tag[]): Tag[] {
+  const byNode = new Map<number, Tag>()
+  for (const tag of tags)
+    if (isFunctionTag(tag) && !byNode.has(tag.node.id)) byNode.set(tag.node.id, tag)
+  return [...byNode.values()].sort((a, b) => a.node.startIndex - b.node.startIndex)
+}
 
-const FUNCTION_TYPES = new Set([
-  'function_declaration',
-  'generator_function_declaration',
-  'function_expression',
-  'arrow_function',
-  'method_definition',
-])
+function functionsOf(tags: Tag[]): SnippetFunction[] {
+  const functionTags = functionTagsOf(tags)
+  const nested = new Set(functionTags.map((tag) => tag.node.id))
+  return functionTags.map((tag) => ({
+    name: tag.name.text,
+    line: tag.node.startPosition.row + 1,
+    endLine: tag.node.endPosition.row + 1,
+    branches: countBranches(tag.node, nested),
+  }))
+}
 
-const BRANCH_TYPES = new Set([
-  'if_statement',
-  'for_statement',
-  'for_in_statement',
-  'while_statement',
-  'do_statement',
-  'switch_case',
-  'catch_clause',
-  'ternary_expression',
-  'conditional_expression',
-  'except_clause',
-])
-
-const BINARY_BRANCH_OPERATORS = new Set(['&&', '||', '??'])
-
-function isBranchNode(node: Node): boolean {
-  if (BRANCH_TYPES.has(node.type)) return true
-  if (node.type === 'binary_expression') {
-    const op = node.childCount > 1 ? node.child(1)?.text : undefined
-    return !!op && BINARY_BRANCH_OPERATORS.has(op)
+function analyseTags(root: Node, tags: Tag[]): SnippetAnalysis {
+  const definitions = new Set(tags.filter((t) => t.role === 'definition').map((t) => t.name.text))
+  const references = tags
+    .filter((t) => t.role === 'reference' && !definitions.has(t.name.text))
+    .map((t) => t.name.text)
+  return {
+    definitions: [...definitions],
+    references: [...new Set(references)],
+    branches: countBranches(root, new Set()),
+    functions: functionsOf(tags),
   }
-  return false
-}
-
-function countBranches(node: Node): number {
-  let count = 0
-  function visit(n: Node, isRoot: boolean): void {
-    if (!isRoot && FUNCTION_TYPES.has(n.type)) return // nested function's branches counted on its own
-    if (isBranchNode(n)) count++
-    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!, false)
-  }
-  visit(node, true)
-  return count
-}
-
-function isExported(node: Node): boolean {
-  let cur: Node | null = node.parent
-  while (cur) {
-    if (cur.type === 'export_statement') return true
-    cur = cur.parent
-  }
-  return false
-}
-
-const DECLARED_FUNCTION_TYPES = new Set([
-  'method_definition',
-  'function_declaration',
-  'generator_function_declaration',
-])
-
-const EXPRESSION_FUNCTION_TYPES = new Set(['function_expression', 'arrow_function'])
-
-function declaratorName(node: Node | null): string | null {
-  if (node?.type !== 'variable_declarator') return null
-  return node.childForFieldName('name')?.text ?? null
-}
-
-function functionName(node: Node): string | null {
-  const ownName = node.childForFieldName('name')?.text ?? null
-  if (DECLARED_FUNCTION_TYPES.has(node.type)) return ownName
-  if (!EXPRESSION_FUNCTION_TYPES.has(node.type)) return null
-  if (ownName) return ownName
-  // export const foo = () => {} — take the enclosing variable_declarator's name
-  return declaratorName(node.parent)
-}
-
-function addIdentifierBinding(node: Node | null, into: Set<string>): void {
-  if (!node) return
-  if (node.type === 'identifier' || node.type === 'shorthand_property_identifier_pattern') {
-    into.add(node.text)
-    return
-  }
-  // Destructuring patterns (object/array, possibly nested): pull every bound
-  // identifier out, skipping object-key `property_identifier` leaves.
-  for (let i = 0; i < node.childCount; i++) addIdentifierBinding(node.child(i)!, into)
-}
-
-/** The field holding the names a node binds, for node types that bind through one field. */
-const BINDING_FIELD_BY_TYPE = new Map([
-  ['variable_declarator', 'name'],
-  ['required_parameter', 'pattern'],
-  ['optional_parameter', 'pattern'],
-  ['catch_clause', 'parameter'],
-  ['for_in_statement', 'left'],
-])
-
-function addBindingsOf(node: Node, bound: Set<string>): void {
-  const field = BINDING_FIELD_BY_TYPE.get(node.type)
-  if (field) {
-    addIdentifierBinding(node.childForFieldName(field), bound)
-    return
-  }
-  if (node.type !== 'formal_parameters') return
-  for (let i = 0; i < node.childCount; i++) {
-    const child = node.child(i)!
-    if (child.type === 'identifier') bound.add(child.text)
-  }
-}
-
-function collectBoundNames(root: Node, definitions: Set<string>): Set<string> {
-  const bound = new Set<string>(definitions)
-  function visit(node: Node): void {
-    addBindingsOf(node, bound)
-    for (let i = 0; i < node.childCount; i++) visit(node.child(i)!)
-  }
-  visit(root)
-  return bound
-}
-
-function definesName(node: Node): boolean {
-  if (DEFINITION_TYPES.has(node.type) || node.type === 'method_definition') return true
-  return node.type === 'variable_declarator' && isExported(node)
-}
-
-function collectDefinitions(root: Node): Set<string> {
-  const definitions = new Set<string>()
-  function visit(node: Node): void {
-    const name = definesName(node) ? node.childForFieldName('name')?.text : undefined
-    if (name) definitions.add(name)
-    for (let i = 0; i < node.childCount; i++) visit(node.child(i)!)
-  }
-  visit(root)
-  return definitions
-}
-
-function collectReferences(root: Node, boundNames: Set<string>): Set<string> {
-  const references = new Set<string>()
-
-  function visit(node: Node): void {
-    if (node.type === 'identifier' || node.type === 'type_identifier') {
-      const text = node.text
-      if (!KEYWORDS.has(text) && !boundNames.has(text)) references.add(text)
-    }
-    for (let i = 0; i < node.childCount; i++) visit(node.child(i)!)
-  }
-  visit(root)
-  return references
-}
-
-function collectFunctions(root: Node): SnippetFunction[] {
-  const functions: SnippetFunction[] = []
-
-  function visit(node: Node): void {
-    if (FUNCTION_TYPES.has(node.type)) {
-      const name = functionName(node)
-      if (name) {
-        functions.push({
-          name,
-          line: node.startPosition.row + 1,
-          branches: countBranches(node),
-        })
-      }
-    }
-    for (let i = 0; i < node.childCount; i++) visit(node.child(i)!)
-  }
-  visit(root)
-  return functions
 }
 
 const parserCache = new Map<Language, Parser>()
@@ -350,35 +244,53 @@ export async function withSyntaxTree<T>(
   }
 }
 
-function analyseRoot(root: Node): SnippetAnalysis {
-  const definitions = collectDefinitions(root)
-  const boundNames = collectBoundNames(root, definitions)
-  return {
-    definitions: [...definitions],
-    references: [...collectReferences(root, boundNames)],
-    branches: countBranchesInWholeTree(root),
-    functions: collectFunctions(root),
-  }
+/** Parses `code` as `path`'s language and reads its tags query. Null with no grammar or tags query. */
+async function withTags<T>(
+  path: string,
+  code: string,
+  read: (root: Node, tags: Tag[]) => T
+): Promise<T | null> {
+  const query = await tagsQueryFor(path)
+  if (!query) return null
+  return withSyntaxTree(path, code, (root) => read(root, tagsIn(root, query)))
 }
 
-/** Parses `code` as `path`'s language and extracts definitions, references and branch counts. Null when there is no grammar for `path`. */
+/** Parses `code` as `path`'s language and extracts definitions, references and branch counts.
+ *  Null when `path`'s grammar is missing or ships no tags query. */
 export function analyseSnippet(path: string, code: string): Promise<SnippetAnalysis | null> {
-  return withSyntaxTree(path, code, analyseRoot)
+  return withTags(path, code, analyseTags)
 }
 
-/** Analyses diff lines as one snippet. Null when they hold no text or `path` has no grammar. */
+/** Analyses diff lines as one snippet. Null when they hold no text or `path` has no tags query. */
 export function analyseLines(path: string, lines: DiffLine[]): Promise<SnippetAnalysis | null> {
   const text = lines.map((l) => l.content).join('\n')
   if (!text) return Promise.resolve(null)
   return analyseSnippet(path, text)
 }
 
-function countBranchesInWholeTree(node: Node): number {
-  let count = 0
-  function visit(n: Node): void {
-    if (isBranchNode(n)) count++
-    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
+export interface SnippetTags {
+  definitions: Array<{ name: string; kind: string; startLine: number; endLine: number }>
+  references: Array<{ name: string; line: number }>
+}
+
+function listTags(_root: Node, tags: Tag[]): SnippetTags {
+  return {
+    definitions: tags
+      .filter((t) => t.role === 'definition')
+      .map((t) => ({
+        name: t.name.text,
+        kind: t.kind,
+        startLine: t.node.startPosition.row + 1,
+        endLine: t.node.endPosition.row + 1,
+      })),
+    references: tags
+      .filter((t) => t.role === 'reference')
+      .map((t) => ({ name: t.name.text, line: t.name.startPosition.row + 1 })),
   }
-  visit(node)
-  return count
+}
+
+/** Every tagged definition and reference in `code`, in match order. Null when `path`'s grammar is
+ *  missing or ships no tags query. */
+export function tagsOf(path: string, code: string): Promise<SnippetTags | null> {
+  return withTags(path, code, listTags)
 }
