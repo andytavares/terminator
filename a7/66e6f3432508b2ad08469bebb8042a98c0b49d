@@ -1,0 +1,37 @@
+packages/core-renderer/src/components/terminal/session-paste.ts
+  s_6c2c30985200c2::t_74d3a48bfd9440 1-52
+packages/core-renderer/src/components/terminal/TerminalPane.tsx
+  s_6c2c30985200c2::t_b58c0939c2ec51 16,221,228-232,235
+packages/core-renderer/src/components/terminal/LeafPane.tsx
+  s_6c2c30985200c2::t_b58c0939c2ec51 8,20,53
+  s_6c2c30985200c2::t_3d673f4b0e6f6d 15-16,109
+packages/core-shared/src/usage/core-features.ts
+  s_6c2c30985200c2::t_ebc76b260b38d4 94-98
+  s_6c2c30985200c2::t_6276b39adeb2c4 93
+packages/core-renderer/tests/unit/renderer/terminal/session-paste.spec.ts
+  s_6c2c30985200c2::t_d0ce7c76c5bd81 1-85
+packages/core-renderer/tests/unit/renderer/components/LeafPane.spec.tsx
+  s_6c2c30985200c2::t_3d673f4b0e6f6d 272-276,291
+  s_6c2c30985200c2::t_6c61518cfcc00b 14-16,223-234,241-247,251-271,277-290
+  s_6c2c30985200c2::t_ce8aabbad53550 235-240,248-250
+packages/core-renderer/tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_6c2c30985200c2::t_ce8aabbad53550 485-489,499-501,510-522,530-532
+  s_6c2c30985200c2::t_dbf1ef7d58e789 14-17,479-484,490-498,502-509,523-529,533
+  s_6c2c30985200c2::t_85f817e10f545f 534
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a766e6f3432508b2ad08469bebb8042a98c0b49d",
+  "prompts": {},
+  "sessions": {
+    "s_6c2c30985200c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0fcc256-8205-49ce-a757-893d4406f77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
