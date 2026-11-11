@@ -14,6 +14,21 @@ let stub: GithubStub
 let repo: string
 let bare: string
 
+/** 15 new files of 61 lines in 5 folders: 915 changed lines, the chapters band. Every file is the
+ *  same settings object with other numbers, so all but the first fold as the same change. */
+function largePrFiles(): Record<string, string> {
+  const files: Record<string, string> = {}
+  for (let pkg = 1; pkg <= 5; pkg++) {
+    for (let n = 1; n <= 3; n++) {
+      const keys = Array.from({ length: 59 }, (_, i) => `  key${i}: ${pkg * 100 + n * 10 + i},`)
+      files[`pkg${pkg}/settings${n}.ts`] = ['export const settings = {', ...keys, '}', ''].join(
+        '\n'
+      )
+    }
+  }
+  return files
+}
+
 test.beforeAll(async () => {
   ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-review'))
   pushBranchToOrigin(repo, 'feat/subtract', {
@@ -21,6 +36,8 @@ test.beforeAll(async () => {
   })
   stub = await startGithubStub({ bareRepo: bare })
   stub.openPullRequest({ title: 'Add subtract', headRefName: 'feat/subtract' })
+  pushBranchToOrigin(repo, 'feat/settings', largePrFiles())
+  stub.openPullRequest({ title: 'Add settings', headRefName: 'feat/settings' })
   handle = await launchApp(undefined, stub.env)
   await openRepo(handle, 'Review Diff', repo)
 })
@@ -39,4 +56,16 @@ test("a pull request's diff is drawn on the review screen with its controls line
   await expect(view.locator('[data-review-path="src/math.ts"]')).toContainText('return a - b')
   await expect(view.getByRole('navigation', { name: 'PR chapters' })).toHaveCount(0)
   await expect.poll(() => misalignedOn(view, 'Review screen')).toEqual([])
+})
+
+test('a pull request over 800 lines shows one chapter at a time and folds repeated changes', async () => {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await view.locator('.rd-row').filter({ hasText: 'Add settings' }).click()
+  await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
+  const rail = view.getByRole('navigation', { name: 'PR chapters' })
+  await expect(rail.getByRole('button')).toHaveCount(5)
+  await expect(view.getByRole('group', { name: 'Folded hunk' }).first()).toContainText(
+    'Same change as'
+  )
+  await expect(view.getByRole('button', { name: 'Done, next chapter' })).toBeVisible()
 })

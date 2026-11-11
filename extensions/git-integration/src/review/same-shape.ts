@@ -74,16 +74,3 @@ export function groupSameShapeHunks(files: ParsedPrFile[]): SameShapeGroup[] {
   }
   return [...byKey.values()].filter((members) => members.length > 1).map(toGroup)
 }
-
-/** Each folded (non-first) hunk, keyed by `hunkRefKey`, with its group and the hunk it folds under. */
-export function foldedHunks(
-  groups: SameShapeGroup[]
-): Map<string, { groupKey: string; firstOf: HunkRef }> {
-  return new Map(
-    groups.flatMap((group) =>
-      group.rest.map(
-        (ref) => [hunkRefKey(ref), { groupKey: group.key, firstOf: group.first }] as const
-      )
-    )
-  )
-}

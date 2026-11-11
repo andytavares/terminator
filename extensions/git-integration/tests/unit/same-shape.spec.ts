@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { foldedHunks, groupSameShapeHunks } from '../../src/review/same-shape'
+import { groupSameShapeHunks } from '../../src/review/same-shape'
 import { parsePrFiles } from '../../src/review/parsed-file'
 
 const groupsOf = (files: unknown[]) => groupSameShapeHunks(parsePrFiles(files))
@@ -107,22 +107,5 @@ describe('groupSameShapeHunks() — what is ignored', () => {
     ])
 
     expect(groups).toHaveLength(1)
-  })
-})
-
-describe('foldedHunks()', () => {
-  it('maps each folded hunk to its group and first hunk, leaving the first unfolded', () => {
-    const groups = groupsOf([
-      changing('src/api/client.ts', ['-  retries: 3,', '+  retries: 5,']),
-      changing('src/api/upload.ts', ['-  retries: 2,', '+  retries: 4,']),
-    ])
-
-    const folded = foldedHunks(groups)
-
-    expect([...folded.keys()]).toEqual(['src/api/upload.ts#0'])
-    expect(folded.get('src/api/upload.ts#0')).toEqual({
-      groupKey: groups[0].key,
-      firstOf: { path: 'src/api/client.ts', hunkIndex: 0 },
-    })
   })
 })
