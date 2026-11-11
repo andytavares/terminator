@@ -13,6 +13,7 @@ import { leafIds } from '../../utils/pane-tree'
 import './TerminalPane.css'
 import { droppedPaths } from './dropped-paths'
 import { LazyAgentView } from '../agent/LazyAgentView'
+import { allowSessionDrop, dropSessions } from './session-paste'
 
 interface Props {
   projectId: string
@@ -194,10 +195,6 @@ function EmptyTerminalPane({ projectId }: Props): React.JSX.Element {
   )
 }
 
-function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
-  if (e.dataTransfer.types.includes('Files')) e.preventDefault()
-}
-
 interface SingleTerminalProps {
   containerRef: React.RefObject<HTMLDivElement | null>
   activeSessionId: string | null
@@ -221,15 +218,21 @@ function SingleTab({
   )
 }
 
-/** One terminal alone: a click focuses it, and files dropped on it paste their paths. */
+/** One terminal alone: a click focuses it; dropped files paste their paths, dropped sessions their context. */
 function SingleTerminal({ containerRef, activeSessionId, refocusActive }: SingleTerminalProps) {
   function handleMouseDown(e: React.MouseEvent): void {
     if (e.button !== 0) return
     refocusActive()
   }
 
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+    if (allowSessionDrop(e, activeSessionId)) return
+    if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+  }
+
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault()
+    if (activeSessionId && dropSessions(e, activeSessionId)) return
     const instance = activeSessionId ? instanceOf(activeSessionId) : undefined
     if (!instance) return
     const paths = droppedPaths(e.dataTransfer.files)

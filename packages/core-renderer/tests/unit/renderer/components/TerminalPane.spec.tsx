@@ -11,6 +11,10 @@ import type { PaneNode } from '../../../../../core-shared/src/types/index'
 import type { TerminalInstance } from '../../../../src/components/terminal/TerminalSession'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
 import { partialFake } from '../../../../../test-support/src/fakes'
+import { eventually } from '../../../../../test-support/src/eventually'
+import { useSessionRecordsStore } from '../../../../src/stores/session-records.store'
+import { SESSION_DRAG_TYPE } from '../../../../src/components/agent/session-drag'
+import type { SessionRecordListing } from '../../../../../core-shared/src/types/index'
 
 vi.mock('../../../../src/components/terminal/LeafPane', () => ({
   LeafPane: ({ sessionId }: { sessionId: string }) => (
@@ -470,5 +474,61 @@ describe('TerminalPane — split mode (layout present) — dragging the divider'
       { keys: '[/MouseLeft]' },
     ])
     expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({ ratio: 0.75 })
+  })
+})
+
+/** ses-1 shown alone: a terminal running Claude Code when `runsClaude`, and `login` with a transcript. */
+function showSes1({ runsClaude }: { runsClaude: boolean }): ReturnType<typeof vi.fn> {
+  const paste = vi.fn()
+  mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+  mockGetActive.mockReturnValue('ses-1')
+  mockGetInstance.mockReturnValue({
+    terminal: { paste, focus: vi.fn() },
+    mount: vi.fn(),
+    unmount: vi.fn(),
+  })
+  const session = terminalSessionOf({ id: 'ses-1', projectId: 'proj-1' })
+  useSessionStore.setState({
+    sessions: new Map([['ses-1', runsClaude ? { ...session, agentTurn: false } : session]]),
+  })
+  const agent = partialFake<NonNullable<SessionRecordListing['agent']>>({
+    agentId: 'claude',
+    transcriptPath: '/t/login.jsonl',
+  })
+  useSessionRecordsStore.setState({
+    records: new Map([
+      ['login', partialFake<SessionRecordListing>({ tabTitle: 'Login', branch: null, agent })],
+    ]),
+  })
+  return paste
+}
+
+describe('TerminalPane — a session dropped on a terminal that runs an agent', () => {
+  it.each([
+    { runsClaude: true, accepted: true, dropEffect: 'copy' },
+    { runsClaude: false, accepted: false, dropEffect: 'none' },
+  ])(
+    'runs an agent: $runsClaude, takes the session drag: $accepted',
+    ({ runsClaude, accepted, dropEffect }) => {
+      showSes1({ runsClaude })
+      render(<TerminalPane projectId="proj-1" />)
+      const event = new Event('dragover', { bubbles: true, cancelable: true })
+      const dataTransfer = { types: [SESSION_DRAG_TYPE], dropEffect: 'none' }
+      Object.defineProperty(event, 'dataTransfer', { value: dataTransfer })
+      screen.getByTestId('terminal-pane').dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(accepted)
+      expect(dataTransfer.dropEffect).toBe(dropEffect)
+    }
+  )
+
+  it("pastes the dropped session's context into the active terminal", async () => {
+    const paste = showSes1({ runsClaude: true })
+    render(<TerminalPane projectId="proj-1" />)
+    fireEvent.drop(screen.getByTestId('terminal-pane'), {
+      dataTransfer: { types: [SESSION_DRAG_TYPE], files: [], getData: () => 'login' },
+    })
+    await eventually(() =>
+      expect(paste).toHaveBeenCalledWith(expect.stringContaining('/t/login.jsonl'))
+    )
   })
 })

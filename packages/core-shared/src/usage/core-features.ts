@@ -91,6 +91,12 @@ export const CORE_FEATURES: FeatureDeclaration[] = [
     source: 'core',
   },
   {
+    id: 'core.terminal.paste-session-context',
+    label: 'Paste a session as context into an agent terminal',
+    kind: 'control',
+    source: 'core',
+  },
+  {
     id: 'core.settings.agents.add-known',
     label: 'Add a known agent',
     kind: 'control',
