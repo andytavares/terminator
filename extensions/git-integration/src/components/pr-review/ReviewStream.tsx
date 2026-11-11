@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { Chapter, PrChangedFile, PrReviewDetail } from '../../schemas/pr-review.schema'
-import type { HunkProgress } from '../../review/review-layout'
+import type { HunkProgress, ReviewBand } from '../../review/review-layout'
 import { ReviewDiffPane } from './ReviewDiffPane'
 import { ESTIMATED_ITEM_PX } from './VirtualDiffList'
 import './review-stream.css'
@@ -24,6 +24,7 @@ interface Props {
   repoRoot: string
   pr: PrReviewDetail
   chapters: StreamChapter[]
+  band: ReviewBand
   showChapterHeaders: boolean
   activePath: string | null
   /** The file to scroll to; a new object scrolls again. */
@@ -103,7 +104,10 @@ function useScrollToTarget(scrollRef: ScrollRef, target: Props['scrollTarget']) 
 }
 
 /** What every file section needs from the stream, apart from its scroll element. */
-type SectionContext = Pick<Props, 'repoRoot' | 'pr' | 'activePath' | 'onPrevFile' | 'onNextFile'>
+type SectionContext = Pick<
+  Props,
+  'repoRoot' | 'pr' | 'band' | 'activePath' | 'onPrevFile' | 'onNextFile'
+>
 
 interface SectionProps {
   context: SectionContext
@@ -128,6 +132,7 @@ function FileSection({ context, scrollRef, file, chapterId }: SectionProps) {
           repoRoot={context.repoRoot}
           pr={context.pr}
           file={file}
+          band={context.band}
           scrollRef={scrollRef}
           active={file.path === context.activePath}
           onPrevFile={context.onPrevFile}
@@ -177,8 +182,8 @@ function ChapterGroup({ context, scrollRef, group, showHeader }: GroupProps) {
 /** The review's files one after another in one scroll element, grouped by chapter. */
 export function ReviewStream(props: Props) {
   const { scrollRef, chapters, showChapterHeaders, end } = props
-  const { repoRoot, pr, activePath, onPrevFile, onNextFile } = props
-  const context = { repoRoot, pr, activePath, onPrevFile, onNextFile }
+  const { repoRoot, pr, band, activePath, onPrevFile, onNextFile } = props
+  const context = { repoRoot, pr, band, activePath, onPrevFile, onNextFile }
   useActiveSection(scrollRef, props.onActivate)
   useScrollToTarget(scrollRef, props.scrollTarget)
   return (

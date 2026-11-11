@@ -84,3 +84,33 @@ describe('analysePr() — a pass that fails', () => {
     expect(warnSpy).toHaveBeenCalled()
   })
 })
+
+/** A file whose one hunk at line 10 changes the retry count from `from` to `to`. */
+function retriesChange(path: string, from: number, to: number) {
+  return {
+    path,
+    patch: ['@@ -10,1 +10,1 @@', `-  retries: ${from},`, `+  retries: ${to},`].join('\n'),
+  }
+}
+
+describe('analysePr() — same-shape hunks', () => {
+  it('groups hunks of three files that differ only in literals, with their lines and masked values', async () => {
+    const files = [
+      retriesChange('src/api/client.ts', 3, 5),
+      retriesChange('src/api/upload.ts', 2, 4),
+      retriesChange('src/api/download.ts', 1, 7),
+    ]
+
+    const result = await analysePr(files, baseOpts)
+
+    expect(result.sameShape).toEqual([
+      {
+        first: { path: 'src/api/client.ts', hunkIndex: 0, line: 10, maskedValues: ['3', '5'] },
+        rest: [
+          { path: 'src/api/upload.ts', hunkIndex: 0, line: 10, maskedValues: ['2', '4'] },
+          { path: 'src/api/download.ts', hunkIndex: 0, line: 10, maskedValues: ['1', '7'] },
+        ],
+      },
+    ])
+  })
+})

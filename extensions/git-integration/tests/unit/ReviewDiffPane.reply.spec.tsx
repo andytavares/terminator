@@ -180,6 +180,7 @@ function PaneInScroller(props: { pr: PrReviewDetail; file: PrChangedFile }) {
       <ReviewDiffPane
         repoRoot="/repo"
         {...props}
+        band="stream"
         scrollRef={scrollRef}
         active
         onPrevFile={vi.fn()}

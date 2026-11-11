@@ -41,6 +41,7 @@ function makePr(overrides: Partial<PrReviewDetail> = {}): PrReviewDetail {
     dryViolations: [],
     readingOrder: [],
     movedBlocks: [],
+    sameShape: [],
     insights: null,
     ownedPaths: [],
     ...overrides,

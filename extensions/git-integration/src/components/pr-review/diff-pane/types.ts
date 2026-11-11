@@ -52,6 +52,7 @@ interface PaneActions {
   updateDraft: (head: PrHead, id: string, body: string) => void
   removeDraft: (head: PrHead, id: string) => void
   toggleMoved: (key: string) => void
+  toggleFold: (hunkIndex: number) => void
   toggleHunkViewed: (head: PrHead, path: string, hunkHeader: string) => void
   goToPath: (path: string) => void
 }

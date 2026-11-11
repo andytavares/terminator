@@ -4,8 +4,14 @@ import { usePrReviewStore } from '../../../stores/pr-review.store'
 import { useReviewUiStore } from '../../../stores/review-ui.store'
 import { classifyHunk, type ComplexityHotspot } from '../../../github/pr-review-service'
 import { measureDiffComplexity } from '../../../review/insights'
-import { buildDiffItems, type GapView, type MovedMark } from '../../../review/diff-items'
-import type { Chapter, MovedBlock } from '../../../schemas/pr-review.schema'
+import {
+  buildDiffItems,
+  type GapView,
+  type MovedMark,
+  type SameShapeFold,
+} from '../../../review/diff-items'
+import type { ReviewBand } from '../../../review/review-layout'
+import type { Chapter, MovedBlock, SameShapeGroup } from '../../../schemas/pr-review.schema'
 import type { DiffItem } from '../../../review/diff-items'
 import type { FileDiff } from '../../../schemas/git.schema'
 import type { Annotating, ComposerAnchor, ReplyTarget, Side } from './types'
@@ -17,6 +23,9 @@ interface ItemSource {
   gapViews: Map<string, GapView>
   movedMark: (lineNum: number, side: Side) => MovedMark | null
   viewedHunks: Set<string>
+  band: ReviewBand
+  sameShape: Map<number, SameShapeFold>
+  expandedFolds: Set<number>
 }
 
 export function usePaneReviewStore() {
@@ -110,6 +119,36 @@ export function useMovedMarks(movedBlocks: MovedBlock[], path: string) {
   return { movedMark, toggleMoved }
 }
 
+/** This file's hunks that repeat an earlier hunk, by hunk index, with the hunk each repeats. */
+export function useSameShapeFolds(groups: SameShapeGroup[], path: string) {
+  return useMemo(
+    () =>
+      new Map(
+        groups.flatMap((group) =>
+          group.rest
+            .filter((hunk) => hunk.path === path)
+            .map((hunk): [number, SameShapeFold] => [
+              hunk.hunkIndex,
+              { kind: 'same-shape', first: group.first, maskedValues: hunk.maskedValues },
+            ])
+        )
+      ),
+    [groups, path]
+  )
+}
+
+/** The folded hunks the reviewer opened, and opening or closing one. */
+export function useFoldToggles() {
+  const [expandedFolds, setExpandedFolds] = useState<Set<number>>(new Set())
+  const toggleFold = (hunkIndex: number) =>
+    setExpandedFolds((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(hunkIndex)) next.add(hunkIndex)
+      return next
+    })
+  return { expandedFolds, toggleFold }
+}
+
 function visibleHunksOf(diff: FileDiff | null, hideFormatting: boolean) {
   const all = (diff?.hunks ?? []).map((hunk, index) => ({ hunk, index }))
   if (!hideFormatting) return all
@@ -124,6 +163,7 @@ export function useViewedHunks(headers: string[] | undefined): Set<string> {
 /** The virtual list's entries for the diff as shown. */
 export function useDiffItems(source: ItemSource): DiffItem[] {
   const { diff, hideFormattingHunks, gapViews, movedMark, viewedHunks, hotspots } = source
+  const { band, sameShape, expandedFolds } = source
   const visibleHunks = useMemo(
     () => visibleHunksOf(diff, hideFormattingHunks),
     [diff, hideFormattingHunks]
@@ -131,8 +171,19 @@ export function useDiffItems(source: ItemSource): DiffItem[] {
   return useMemo(() => {
     if (!diff) return []
     const parts = { visibleHunks, gapViews, hotspots, movedMark, viewedHunks }
-    return buildDiffItems({ hunkCount: diff.hunks.length, ...parts })
-  }, [diff, visibleHunks, gapViews, hotspots, movedMark, viewedHunks])
+    const folds = { band, sameShape, expandedFolds }
+    return buildDiffItems({ hunkCount: diff.hunks.length, ...parts, ...folds })
+  }, [
+    diff,
+    visibleHunks,
+    gapViews,
+    hotspots,
+    movedMark,
+    viewedHunks,
+    band,
+    sameShape,
+    expandedFolds,
+  ])
 }
 
 /** Measures the diff once; its hotspot hunks go to the list. */

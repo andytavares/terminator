@@ -27,7 +27,7 @@ interface HunkShape {
   maskedValues: string[]
 }
 
-function hunkRefKey(ref: HunkRef): string {
+export function hunkRefKey(ref: HunkRef): string {
   return `${ref.path}#${ref.hunkIndex}`
 }
 

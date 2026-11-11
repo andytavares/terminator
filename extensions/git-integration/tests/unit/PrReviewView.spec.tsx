@@ -17,16 +17,23 @@ vi.mock('../../src/hooks/usePrReview', () => ({ useLoadInlineComments: vi.fn(() 
 vi.mock('../../src/components/pr-review/ReviewDiffPane', () => ({
   ReviewDiffPane: ({
     file,
+    band,
     active,
     onPrevFile,
     onNextFile,
   }: {
     file: { path: string }
+    band: string
     active: boolean
     onPrevFile: () => void
     onNextFile: () => void
   }) => (
-    <div data-testid="review-diff-pane" data-path={file.path} data-active={String(active)}>
+    <div
+      data-testid="review-diff-pane"
+      data-path={file.path}
+      data-band={band}
+      data-active={String(active)}
+    >
       {active && <button onClick={onPrevFile}>PrevFile</button>}
       {active && <button onClick={onNextFile}>NextFile</button>}
     </div>
@@ -179,6 +186,7 @@ describe('PrReviewView — a medium pull request', () => {
     })
     await renderView({ chapters: mediumChapters }, { viewedHunks: { 'store.ts': ['@@ -9 +9 @@'] } })
     expect(sectionPaths()).toEqual(['store.ts', 'api.ts', 'view.tsx', 'list.tsx'])
+    expect(screen.getAllByTestId('review-diff-pane')[0].dataset.band).toBe('stream')
     const store = screen.getByRole('heading', { level: 2, name: /Store/ })
     expect(store.textContent).toContain('1 of 3 hunks read')
     expect(screen.getByRole('heading', { level: 2, name: /View/ })).toBeTruthy()
@@ -225,6 +233,14 @@ describe('PrReviewView — a large pull request', () => {
     await user.click(within(rail).getByRole('button', { name: /Docs/ }))
     expect(sectionPaths()).toEqual(['guide.md'])
     expect(screen.getByText('Chapter 3 of 3 · 0% read')).toBeTruthy()
+  })
+})
+
+describe('PrReviewView — a large pull request folds hunks', () => {
+  it('lays each file out in the chapters band, so its diff folds repeated and deleted hunks', async () => {
+    await renderView({ chapters: largeChapters })
+    const bands = screen.getAllByTestId('review-diff-pane').map((pane) => pane.dataset.band)
+    expect(bands).toEqual(['chapters', 'chapters'])
   })
 })
 

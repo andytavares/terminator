@@ -1,6 +1,7 @@
 import React from 'react'
 import { ChevronDown, ChevronUp, TriangleAlert, UnfoldVertical } from 'lucide-react'
 import { MovedRow } from '../MovedRow'
+import { FoldRow } from '../FoldRow'
 import { UnifiedLineRow } from '../DiffLineRows'
 import { EXPAND_STEP } from '../../../review/expand-gaps'
 import type { DiffItem, MovedMark } from '../../../review/diff-items'
@@ -367,6 +368,14 @@ const ITEM_RENDERERS: ItemRenderers = {
     <GapExpander ctx={ctx} gapKey={item.gapKey} hidden={item.hidden} />
   ),
   hotspot: (_ctx, item) => <Hotspot message={item.message} />,
+  fold: (ctx, item) => (
+    <FoldRow
+      fold={item.fold}
+      expanded={item.expanded}
+      onToggleShow={() => ctx.actions.toggleFold(item.hunkIndex)}
+      onGoToFirst={ctx.actions.goToPath}
+    />
+  ),
 }
 
 /** One entry of the virtual list. */

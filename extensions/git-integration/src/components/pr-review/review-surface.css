@@ -141,6 +141,26 @@
   color: var(--tm-text-secondary);
 }
 
+.rs-fold svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.rs-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tm-accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.rs-fold-diff {
+  display: flex;
+  gap: 16px;
+}
+
 .rs-gut {
   width: 1%;
   min-width: 18px;

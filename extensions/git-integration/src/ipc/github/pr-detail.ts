@@ -210,6 +210,7 @@ async function prDetail(ctx: GithubContext, at: PrAt): Promise<{ pr: PrReviewDet
     dryViolations,
     readingOrder: analysis.readingOrder,
     movedBlocks: analysis.movedBlocks,
+    sameShape: analysis.sameShape,
     insights: analysis.insights,
     ownedPaths: await ownedFilesOf(ctx, ownerLookupOf(at, repoPath, sources)),
   }

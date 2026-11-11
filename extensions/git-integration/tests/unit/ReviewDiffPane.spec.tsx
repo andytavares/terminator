@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { ReviewDiffPane } from '../../src/components/pr-review/ReviewDiffPane'
 import { PrReviewDetailSchema, type PrChangedFile } from '../../src/schemas/pr-review.schema'
 import { measureDiffComplexity } from '../../src/review/insights'
+import type { ReviewBand } from '../../src/review/review-layout'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
 const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
@@ -174,6 +175,7 @@ const defaultProps = {
   repoRoot: '/repo',
   pr: mockPr,
   file: mockFile,
+  band: 'stream' as ReviewBand,
   active: true,
   onPrevFile: vi.fn(),
   onNextFile: vi.fn(),
@@ -731,6 +733,68 @@ describe('ReviewDiffPane — moved code (S4) — collapses a moved-away (removed
     const row = 'UnionFind · 28 lines, unchanged, moved to review/reading-order.ts:41'
     await screen.findByText(wholeText(row))
     expect(screen.getByText('Moved')).toBeTruthy()
+  })
+})
+
+/** A PR whose src/foo.ts hunk repeats the retries change of src/api/client.ts:10. */
+const prWithSameShape = {
+  ...mockPr,
+  sameShape: [
+    {
+      first: { path: 'src/api/client.ts', hunkIndex: 0, line: 10, maskedValues: ['3', '5'] },
+      rest: [{ path: 'src/foo.ts', hunkIndex: 0, line: 10, maskedValues: ['2', '4'] }],
+    },
+  ],
+}
+const foldRow = () => screen.getByRole('group', { name: 'Folded hunk' })
+const retriesDiff = oneHunk('@@ -10,1 +10,1 @@', [
+  removeLine(10, '  retries: 2,'),
+  addLine(10, '  retries: 4,'),
+])
+
+describe('ReviewDiffPane — same-shape folds in the chapters band', () => {
+  it('folds a repeated hunk into a row naming the first hunk, and Show expands it', async () => {
+    const user = userEvent.setup()
+    await renderDiffPane(retriesDiff, { pr: prWithSameShape, band: 'chapters' })
+    expect(foldRow().textContent).toBe('Same change as src/api/client.ts:10 · Show')
+    expect(codeRows()).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Show' }))
+    expect(codeRows()).toHaveLength(2)
+  })
+
+  it("lists the literals of this hunk next to the first hunk's from Show differences", async () => {
+    const user = userEvent.setup()
+    await renderDiffPane(retriesDiff, { pr: prWithSameShape, band: 'chapters' })
+    await user.click(screen.getByRole('button', { name: 'Show' }))
+    await user.click(screen.getByRole('button', { name: 'Show differences' }))
+    expect(screen.getByText('2 → 4')).toBeTruthy()
+    expect(screen.getByText('3 → 5')).toBeTruthy()
+  })
+
+  it("opens the first hunk's file from its name", async () => {
+    const user = userEvent.setup()
+    await renderDiffPane(retriesDiff, { pr: prWithSameShape, band: 'chapters' })
+    await user.click(screen.getByRole('button', { name: 'src/api/client.ts:10' }))
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('src/api/client.ts')
+  })
+})
+
+describe('ReviewDiffPane — same-shape folds in the stream band', () => {
+  it('shows a repeated hunk in full', async () => {
+    await renderDiffPane(retriesDiff, { pr: prWithSameShape })
+    expect(screen.queryByText(/Same change as/)).toBeNull()
+    expect(codeRows()).toHaveLength(2)
+  })
+})
+
+describe('ReviewDiffPane — deleted-only folds in the chapters band', () => {
+  it('folds a hunk of only removed lines into a count, and Show expands it', async () => {
+    const user = userEvent.setup()
+    const removed = [20, 21, 22].map((n) => removeLine(n, `legacyRetry(${n})`))
+    await renderDiffPane(oneHunk('@@ -20,3 +19,0 @@', removed), { band: 'chapters' })
+    expect(foldRow().textContent).toBe('3 lines deleted · Show')
+    await user.click(screen.getByRole('button', { name: 'Show' }))
+    expect(codeRows()).toHaveLength(3)
   })
 })
 

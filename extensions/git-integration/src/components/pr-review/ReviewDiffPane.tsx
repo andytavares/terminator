@@ -6,6 +6,7 @@ import { useLoadInlineComments } from '../../hooks/usePrReview'
 import type { PrChangedFile, PrReviewDetail, PrHead } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
 import type { DiffItem } from '../../review/diff-items'
+import type { ReviewBand } from '../../review/review-layout'
 import { REWRITTEN_NOTE, useDiffLoad } from './diff-pane/useDiffLoad'
 import { useGaps } from './diff-pane/useFileText'
 import { useLineLookups } from './diff-pane/line-lookups'
@@ -21,9 +22,11 @@ import {
   useAnnotating,
   useComplexityHotspots,
   useDiffItems,
+  useFoldToggles,
   useMovedMarks,
   usePaneReviewStore,
   usePaneUiStore,
+  useSameShapeFolds,
   useViewedHunks,
 } from './diff-pane/usePaneState'
 import { maxLineNumber, numColWidthFor } from './diff-pane/lines'
@@ -36,6 +39,8 @@ interface Props {
   repoRoot: string
   pr: PrReviewDetail
   file: PrChangedFile
+  /** Only the chapters band folds repeated and deleted-only hunks. */
+  band: ReviewBand
   /** The review's one scroll element, which every file section of the stream shares. */
   scrollRef: React.RefObject<HTMLDivElement | null>
   /** Only the active section, the one at the top of the viewport, handles the review keys. */
@@ -155,6 +160,17 @@ function useRegisterFileHunks(
   }, [path, isBinary, diff, setFileHunks])
 }
 
+const NO_GROUPS: PrReviewDetail['sameShape'] = []
+
+/** The fold inputs of the list. Same-shape hunk indexes count hunks of the whole diff, so a
+ *  since-range diff folds none. */
+function useFolds(props: Props, sinceSha: string | undefined) {
+  const toggles = useFoldToggles()
+  const groups = sinceSha ? NO_GROUPS : props.pr.sameShape
+  const sameShape = useSameShapeFolds(groups, props.file.path)
+  return { band: props.band, sameShape, ...toggles }
+}
+
 /** The diff, its gaps and the list's entries for the file shown. */
 function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   const { pr, file } = props
@@ -171,6 +187,7 @@ function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   }
   const gaps = useGaps({ target, diff, isBinary: file.isBinary, diffKey: request.diffKey })
   const moved = useMovedMarks(pr.movedBlocks, file.path)
+  const folds = useFolds(props, request.sinceSha)
   const items = useDiffItems({
     diff,
     hotspots,
@@ -178,9 +195,12 @@ function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
     gapViews: gaps.gapViews,
     movedMark: moved.movedMark,
     viewedHunks: useViewedHunks(store.viewedHunks[file.path]),
+    band: folds.band,
+    sameShape: folds.sameShape,
+    expandedFolds: folds.expandedFolds,
   })
   useRegisterFileHunks(file, loaded.diff, ui.setFileHunks)
-  return { request, loaded, gaps, moved, items, formatting }
+  return { request, loaded, gaps, moved, folds, items, formatting }
 }
 
 /** The line lookups, drag selection and composers for the file shown. */
@@ -272,6 +292,7 @@ function paneActions(w: Wiring, extra: ActionExtras) {
     updateDraft: store.updateDraft,
     removeDraft: store.removeDraft,
     toggleMoved: w.view.moved.toggleMoved,
+    toggleFold: w.view.folds.toggleFold,
     toggleHunkViewed: store.toggleHunkViewed,
   }
 }

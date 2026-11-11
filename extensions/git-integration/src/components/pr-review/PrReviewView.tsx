@@ -432,6 +432,7 @@ function Stream({ r, h }: { r: ReviewState; h: Handlers }) {
       repoRoot={r.props.repoRoot}
       pr={r.props.pr}
       chapters={streamChapters(r)}
+      band={r.band}
       showChapterHeaders={r.band === 'stream'}
       activePath={r.position.activeEntry?.path ?? null}
       scrollTarget={r.view.scrollTarget}

@@ -119,6 +119,7 @@ const basePr: PrReviewDetail = {
   ],
   readingOrder: [],
   movedBlocks: [],
+  sameShape: [],
   insights: null,
 }
 

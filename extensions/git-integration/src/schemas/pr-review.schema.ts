@@ -105,6 +105,20 @@ const MovedBlockSchema = z.object({
   symbol: z.string().nullable(),
 })
 
+/** A hunk of a same-shape group: where it is, the new line it starts at, and its literals. */
+const SameShapeHunkSchema = z.object({
+  path: z.string(),
+  hunkIndex: z.number(),
+  line: z.number(),
+  maskedValues: z.array(z.string()),
+})
+
+/** Hunks whose changes match once literals are masked; each of `rest` folds under `first`. */
+const SameShapeGroupSchema = z.object({
+  first: SameShapeHunkSchema,
+  rest: z.array(SameShapeHunkSchema),
+})
+
 // ─── Insights (R4) ────────────────────────────────────────────────────────────
 
 const InsightSourceSchema = z.string()
@@ -166,6 +180,7 @@ export const PrReviewDetailSchema = z.object({
   dryViolations: z.array(DryViolationSchema).default([]),
   readingOrder: z.array(ReadingStepSchema).default([]),
   movedBlocks: z.array(MovedBlockSchema).default([]),
+  sameShape: z.array(SameShapeGroupSchema).default([]),
   insights: PrInsightsSchema.nullable().default(null),
   /** Changed files the viewer owns, by base-branch CODEOWNERS, directly or through a team. */
   ownedPaths: z.array(z.string()).default([]),
@@ -351,6 +366,8 @@ export type DryViolation = z.infer<typeof DryViolationSchema>
 export type SymbolUse = z.infer<typeof SymbolUseSchema>
 export type ReadingStep = z.infer<typeof ReadingStepSchema>
 export type MovedBlock = z.infer<typeof MovedBlockSchema>
+export type SameShapeHunk = z.infer<typeof SameShapeHunkSchema>
+export type SameShapeGroup = z.infer<typeof SameShapeGroupSchema>
 export type FunctionComplexity = z.infer<typeof FunctionComplexitySchema>
 export type PrInsights = z.infer<typeof PrInsightsSchema>
 export type DashboardSection = z.infer<typeof DashboardSectionSchema>
