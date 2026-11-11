@@ -32,7 +32,7 @@ const GREP_NAMES_PER_RUN = 200
 const SHOW_MAX_BUFFER = 20 * 1024 * 1024
 const cache = new Map<string, BlastRadius[]>()
 
-function addedLines(file: ParsedPrFile): number[] {
+function addedLineNumbers(file: ParsedPrFile): number[] {
   return file.diff.hunks
     .flatMap((hunk) => hunk.lines)
     .filter((line) => line.type === 'add' && line.newLineNumber !== null)
@@ -45,7 +45,7 @@ function fileAt(at: Revision, path: string): Promise<string> {
 }
 
 async function changedDefinitions(at: Revision, file: ParsedPrFile): Promise<ChangedDefinition[]> {
-  const added = addedLines(file)
+  const added = addedLineNumbers(file)
   if (added.length === 0) return []
   const tags = await tagsOf(file.path, await fileAt(at, file.path))
   const names = new Set(
