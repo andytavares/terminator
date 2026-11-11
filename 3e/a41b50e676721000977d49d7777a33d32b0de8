@@ -1,0 +1,19 @@
+extensions/git-integration/src/review/blast-radius.ts
+  s_6c2c30985200c2::t_de3879d87b4217 35,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3ea41b50e676721000977d49d7777a33d32b0de8",
+  "prompts": {},
+  "sessions": {
+    "s_6c2c30985200c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0fcc256-8205-49ce-a757-893d4406f77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
