@@ -1,0 +1,27 @@
+packages/core-renderer/tests/unit/renderer/components/TabBar.spec.tsx
+  s_6c2c30985200c2::t_91b4c4734d5419 917-922,924-926,928,930,939,949
+  s_6c2c30985200c2::t_86119bb0ec41a8 11,908,923,927,929,931-932,934-938,940,942,944-948,950,952-954
+  s_6c2c30985200c2::t_bd7307c8641ac1 909-916,933,941,943,951
+  s_6c2c30985200c2::t_fc1d263bac658b 955
+packages/core-renderer/src/components/terminal/TabBar.css
+  s_6c2c30985200c2::t_f03a4e7632c7db 193-196
+packages/core-renderer/src/components/terminal/TabBar.tsx
+  s_6c2c30985200c2::t_f03a4e7632c7db 2,32,325-354
+  s_6c2c30985200c2::t_7fa0d758c2c84c 355-359,364-365,373,375
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5346f14f51ea22ad207568933d2e94ebf562acb5",
+  "prompts": {},
+  "sessions": {
+    "s_6c2c30985200c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0fcc256-8205-49ce-a757-893d4406f77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
