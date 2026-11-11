@@ -1,5 +1,5 @@
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
-import type { Chapter, PrReviewDetail } from '../../schemas/pr-review.schema.js'
+import type { PrReviewDetail } from '../../schemas/pr-review.schema.js'
 import {
   buildChapters,
   extractIssueRefs,
@@ -9,15 +9,11 @@ import {
   mapCiStatus,
   mapCheckStatus,
   LINT_CHECK_NAMES,
-  COVERAGE_CHECK_NAMES,
   mapStatusChecks,
   mapApprovals,
 } from '../../github/pr-review-service.js'
-import { computeCoChangeAffinityFromGit } from '../../github/gh-cli.js'
-import { runGit } from '../../shell/run-git.js'
 import { analysePr } from '../../review/analyse.js'
 import { applyReadingOrder } from '../../review/apply-reading-order.js'
-import { findTestReferencesInRepo } from '../../review/test-references.js'
 import { ownedFilesOf } from './owned-files.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, PullRequestPayload, type GithubContext } from './context.js'
@@ -150,39 +146,16 @@ function checkFields(rollup: unknown) {
   return {
     ciStatus: mapCiStatus(rollup),
     lintStatus: mapCheckStatus(rollup, LINT_CHECK_NAMES),
-    coverageStatus: mapCheckStatus(rollup, COVERAGE_CHECK_NAMES),
     statusChecks: mapStatusChecks(rollup),
   }
 }
 
-/** The rollup as the insights pass reads it: each check's name, state and description. */
-function insightChecks(rollup: unknown) {
-  if (!Array.isArray(rollup)) return []
-  return (rollup as RawRecord[]).map((c) => ({
-    name: String(c.name ?? c.context ?? ''),
-    state: String(c.conclusion ?? c.state ?? ''),
-    description: c.description ? String(c.description) : undefined,
-  }))
-}
-
-/** Chapters grouped by meaning, git history (co-change) and imports. */
-async function chaptersFor(repoRoot: string, files: RawRecord[]): Promise<Chapter[]> {
-  const coChangeAffinity = await computeCoChangeAffinityFromGit(repoRoot, files.map(filePathOf))
-  return buildChapters(files, undefined, coChangeAffinity)
-}
-
 /** Definitions-first order, moved code and insights (R3, S4, R4). Never throws. */
 function analysisOf(
-  repoRoot: string,
   files: RawRecord[],
-  found: Pick<Parameters<typeof analysePr>[1], 'chapters' | 'statusChecks' | 'dryViolations'>
+  found: Pick<Parameters<typeof analysePr>[1], 'chapters' | 'dryViolations'>
 ) {
-  return analysePr(files, {
-    ...found,
-    readingOrder: [],
-    localCoverage: null,
-    findTestReferences: (symbols) => findTestReferencesInRepo(repoRoot, symbols, runGit),
-  })
+  return analysePr(files, { ...found, readingOrder: [] })
 }
 
 /** Issue keys in the PR body; a bare key tells a reviewer nothing, so the tracker adds title and state. */
@@ -223,15 +196,11 @@ async function prDetail(ctx: GithubContext, at: PrAt): Promise<{ pr: PrReviewDet
   const sources = await fetchPrSources(ctx, at, `${repoPath}/pulls/${at.prNumber}`)
   const { meta, files } = sources
   rememberPatches(ctx, at, sources)
-  const chapters = await chaptersFor(at.repoRoot, files)
+  const chapters = buildChapters(files)
   const issueRefs = await issueRefsOf(ctx, meta)
   const dryViolations = dryViolationsIn(files)
   const rollup = await checkRollup(ctx, meta, { repoRoot: at.repoRoot, repoPath })
-  const analysis = await analysisOf(at.repoRoot, files, {
-    chapters,
-    statusChecks: insightChecks(rollup),
-    dryViolations,
-  })
+  const analysis = await analysisOf(files, { chapters, dryViolations })
   const pr: PrReviewDetail = {
     ...prIdentity(meta),
     ...checkFields(rollup),
@@ -241,6 +210,7 @@ async function prDetail(ctx: GithubContext, at: PrAt): Promise<{ pr: PrReviewDet
     dryViolations,
     readingOrder: analysis.readingOrder,
     movedBlocks: analysis.movedBlocks,
+    sameShape: analysis.sameShape,
     insights: analysis.insights,
     ownedPaths: await ownedFilesOf(ctx, ownerLookupOf(at, repoPath, sources)),
   }

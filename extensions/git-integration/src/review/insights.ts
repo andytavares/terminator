@@ -1,10 +1,11 @@
 import type { Node } from 'web-tree-sitter'
-import { classifyHunk, classifyTier, COVERAGE_CHECK_NAMES } from '../github/pr-review-service'
+import { classifyHunk } from '../github/pr-review-service'
 import type { ComplexityHotspot } from '../github/pr-review-service'
 import {
   analyseLines,
   analyseSnippet,
-  withSyntaxTree,
+  isControlFlowNode,
+  withFunctionNodes,
   type SnippetAnalysis,
   type SnippetFunction,
 } from './symbols'
@@ -18,20 +19,10 @@ import type {
   ReadingStep,
 } from '../schemas/pr-review.schema'
 
-interface StatusCheckLike {
-  name: string
-  state: string
-  description?: string
-}
-
 export interface ComputeInsightsOptions {
   readingOrder: ReadingStep[]
   chapters: Chapter[]
-  statusChecks: StatusCheckLike[]
   dryViolations: DryViolation[]
-  localCoverage: number | null
-  /** Repo-wide grep for test references, when the caller can provide one. */
-  findTestReferences?: (symbols: string[]) => Promise<Set<string>>
 }
 
 function linesOf(
@@ -123,17 +114,7 @@ async function computeComplexity(files: ParsedPrFile[]): Promise<PrInsights['com
   return { branchDelta, functions, source: 'tree-sitter · hunk base vs head' }
 }
 
-// ─── Coverage ───────────────────────────────────────────────────────────────────
-
-const SOURCE_FILE_RE = /\.(ts|tsx|js|jsx|py|rb|go|java|cs)$/
-
-function isTestPath(path: string): boolean {
-  return classifyTier(path) === 2
-}
-
-function testStem(path: string): string {
-  return (path.split('/').pop() ?? path).toLowerCase()
-}
+// ─── Added text ─────────────────────────────────────────────────────────────────
 
 function addedTextOf(file: ParsedPrFile): string {
   return file.diff.hunks.flatMap((h) => linesOf(h.lines, 'add')).join('\n')
@@ -147,107 +128,33 @@ async function analyseAddedText(file: ParsedPrFile): Promise<SnippetAnalysis | n
   return analyseSnippet(file.path, text)
 }
 
-function countFilesWithTests(sourceFiles: ParsedPrFile[], testFiles: ParsedPrFile[]): number {
-  return sourceFiles.filter((src) => {
-    const stem = testStem(src.path).replace(/\.[^.]+$/, '')
-    return testFiles.some((t) => testStem(t.path).includes(stem))
-  }).length
-}
-
-/** Names of every function changed in a (non-test) source file with a grammar. */
-async function changedFunctionNamesOf(sourceFiles: ParsedPrFile[]): Promise<string[]> {
-  const names: string[] = []
-  for (const file of sourceFiles) {
-    const analysis = await analyseAddedText(file)
-    for (const fn of analysis?.functions ?? []) names.push(fn.name)
-  }
-  return [...new Set(names)]
-}
-
-async function referencedNamesOf(testFiles: ParsedPrFile[]): Promise<Set<string>> {
-  const referenced = new Set<string>()
-  for (const file of testFiles) {
-    const analysis = await analyseAddedText(file)
-    for (const ref of analysis?.references ?? []) referenced.add(ref)
-  }
-  return referenced
-}
-
-const PERCENT_RE = /(\d+(?:\.\d+)?)\s*%/
-
-function patchPercentFrom(opts: ComputeInsightsOptions): number | null {
-  for (const check of opts.statusChecks) {
-    const nameLower = check.name.toLowerCase()
-    if (!COVERAGE_CHECK_NAMES.some((n) => nameLower.includes(n))) continue
-    const match = check.description?.match(PERCENT_RE)
-    if (match) return Math.round(Number(match[1]))
-  }
-  if (opts.localCoverage == null) return null
-  return Math.round(opts.localCoverage)
-}
-
-async function untestedFunctionsOf(
-  changed: string[],
-  testFiles: ParsedPrFile[],
-  opts: ComputeInsightsOptions
-): Promise<string[]> {
-  const referencedByPrTests = await referencedNamesOf(testFiles)
-  const missingFromPrTests = changed.filter((name) => !referencedByPrTests.has(name))
-  const fromRepo =
-    missingFromPrTests.length > 0 && opts.findTestReferences
-      ? await opts.findTestReferences(missingFromPrTests)
-      : new Set<string>()
-  return missingFromPrTests.filter((name) => !fromRepo.has(name))
-}
-
-async function computeCoverage(
-  files: ParsedPrFile[],
-  opts: ComputeInsightsOptions
-): Promise<PrInsights['coverage']> {
-  const sourceFiles = files.filter((f) => SOURCE_FILE_RE.test(f.path) && !isTestPath(f.path))
-  const testFiles = files.filter((f) => isTestPath(f.path))
-  const changed = await changedFunctionNamesOf(sourceFiles)
-  const untestedFunctions = await untestedFunctionsOf(changed, testFiles, opts)
-  return {
-    changedFunctions: changed.length,
-    testedFunctions: changed.length - untestedFunctions.length,
-    untestedFunctions,
-    patchPercent: patchPercentFrom(opts),
-    source: 'test files referencing each changed function',
-    changedSourceFiles: sourceFiles.length,
-    changedSourceFilesWithTests: countFilesWithTests(sourceFiles, testFiles),
-  }
-}
-
 // ─── Health flags ───────────────────────────────────────────────────────────────
 
-const FUNCTION_NODE_TYPES = new Set([
-  'function_declaration',
-  'function_expression',
-  'arrow_function',
-  'method_definition',
-])
-
+/** Deepest chain of branch nodes under `node`; an `if` that is an `else`'s body stays at its depth. */
 function maxNestingDepth(node: Node): number {
   let max = 0
   function visit(n: Node, depth: number): void {
-    const nextDepth = n.type === 'statement_block' ? depth + 1 : depth
+    const elseBranch = n.parent?.type.split('_').includes('else') ?? false
+    const nextDepth = isControlFlowNode(n) && !elseBranch ? depth + 1 : depth
     if (nextDepth > max) max = nextDepth
-    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!, nextDepth)
+    for (const child of n.children) visit(child, nextDepth)
   }
   visit(node, 0)
   return max
 }
 
-function countParams(node: Node): number {
-  const params = node.childForFieldName('parameters')
-  if (!params) return 0
-  let count = 0
-  for (let i = 0; i < params.childCount; i++) {
-    const child = params.child(i)!
-    if (child.type !== '(' && child.type !== ')' && child.type !== ',') count++
+/** The `parameters` field of the function node or of its value (a function assigned to a name). */
+function parameterListOf(node: Node): Node | null {
+  const candidates = [node, ...node.namedChildren]
+  for (const candidate of candidates) {
+    const list = candidate.childForFieldName('parameters')
+    if (list?.type.includes('parameter')) return list
   }
-  return count
+  return null
+}
+
+function countParams(node: Node): number {
+  return parameterListOf(node)?.namedChildCount ?? 0
 }
 
 interface HealthFlag {
@@ -269,35 +176,24 @@ function flagsForFunction(node: Node, path: string): HealthFlag[] {
   return flags
 }
 
-function collectFunctionFlags(root: Node, path: string): HealthFlag[] {
-  const flags: HealthFlag[] = []
-  const visit = (n: Node): void => {
-    if (FUNCTION_NODE_TYPES.has(n.type)) flags.push(...flagsForFunction(n, path))
-    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
-  }
-  visit(root)
-  return flags
+function collectFunctionFlags(functions: Node[], path: string): HealthFlag[] {
+  return functions.flatMap((node) => flagsForFunction(node, path))
 }
 
 interface AddedTextMarker {
   kind: string
   label: string
   pattern: RegExp
-  /** Only files whose path matches carry this marker. */
-  paths?: RegExp
 }
 
 const ADDED_TEXT_MARKERS: AddedTextMarker[] = [
-  { kind: 'ts-ignore', label: 'New @ts-ignore', pattern: /@ts-ignore/ },
-  { kind: 'eslint-disable', label: 'New eslint-disable', pattern: /eslint-disable/ },
   { kind: 'todo', label: 'New TODO/FIXME', pattern: /\b(TODO|FIXME)\b/ },
-  { kind: 'any', label: 'New `any` type', pattern: /:\s*any\b/, paths: /\.tsx?$/ },
 ]
 
 function addedTextFlags(path: string, addedText: string): HealthFlag[] {
-  return ADDED_TEXT_MARKERS.filter(
-    (marker) => (!marker.paths || marker.paths.test(path)) && marker.pattern.test(addedText)
-  ).map(({ kind, label }) => ({ kind, label, path }))
+  return ADDED_TEXT_MARKERS.filter((marker) => marker.pattern.test(addedText)).map(
+    ({ kind, label }) => ({ kind, label, path })
+  )
 }
 
 function duplicateBlockFlags(dryViolations: DryViolation[]): HealthFlag[] {
@@ -318,8 +214,8 @@ async function computeHealthFlags(
     const addedText = file.patch ? addedTextOf(file) : ''
     if (!addedText) continue
     flags.push(...addedTextFlags(path, addedText))
-    const functionFlags = await withSyntaxTree(path, addedText, (root) =>
-      collectFunctionFlags(root, path)
+    const functionFlags = await withFunctionNodes(path, addedText, (functions) =>
+      collectFunctionFlags(functions, path)
     )
     if (functionFlags) flags.push(...functionFlags)
   }
@@ -384,7 +280,7 @@ async function computeUnderstandability(
   let linesToRead = 0
   let newExports = 0
   for (const file of files) {
-    if (!file.patch || classifyTier(file.path) === 3) continue
+    if (!file.patch) continue
     linesToRead += semanticLinesToRead(file.diff)
     const analysis = await analyseAddedText(file)
     if (analysis) newExports += analysis.definitions.length
@@ -401,7 +297,7 @@ async function computeUnderstandability(
 }
 
 /**
- * Computes the Review brief (R4): complexity, coverage, code health and
+ * Computes the Review brief (R4): complexity, code health and
  * understandability, each with the source that produced it.
  */
 export async function computeInsights(
@@ -409,13 +305,11 @@ export async function computeInsights(
   opts: ComputeInsightsOptions
 ): Promise<PrInsights> {
   const complexity = await computeComplexity(files)
-  const coverage = await computeCoverage(files, opts)
   const flags = await computeHealthFlags(files, opts.dryViolations)
   const understandability = await computeUnderstandability(files, opts)
 
   return {
     complexity,
-    coverage,
     health: { flags, source: 'tree-sitter · detectDryViolations' },
     understandability,
   }

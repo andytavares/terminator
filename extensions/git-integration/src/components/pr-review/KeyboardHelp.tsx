@@ -5,42 +5,28 @@ interface Props {
   onClose: () => void
 }
 
-const ROWS: Array<{ keys: string[]; label: string }> = [
-  { keys: ['k', 'j'], label: 'Next / previous hunk' },
-  { keys: [']', '['], label: 'Next / previous file' },
-  { keys: ['}', '{'], label: 'Next / previous chapter' },
-  { keys: ['n'], label: 'Next unviewed' },
-  { keys: ['v'], label: 'Mark file viewed' },
-  { keys: ['s'], label: 'Since my review / whole PR' },
-  { keys: ['c'], label: 'Cycle comments' },
-  { keys: ['⇧C'], label: 'Agent notes on / off' },
-  { keys: ['a'], label: 'Ask agent on selection' },
-  { keys: ['e'], label: 'Explain selection' },
-  { keys: ['r'], label: 'Comment on line' },
-  { keys: ['m'], label: 'Private note' },
-  { keys: ['g', 'd'], label: 'Peek definition' },
-  { keys: ['t'], label: 'Hide file list' },
-  { keys: ['i'], label: 'Overview' },
-  { keys: ['⌘↵'], label: 'Submit review' },
+const ROWS: Array<{ key: string; label: string }> = [
+  { key: 'k', label: 'Next hunk' },
+  { key: 'j', label: 'Previous hunk' },
+  { key: 'Space', label: 'Mark hunk read, next hunk' },
+  { key: 'c', label: 'Comment on line' },
+  { key: 'l', label: 'Later: revisit after the last hunk' },
+  { key: '⌘↵', label: 'Go to the verdict bar, then submit' },
 ]
 
-/** S3: the "?" keyboard-shortcut sheet. */
+/** S3: the keyboard-shortcut sheet, opened from the footer and the header menu. */
 export function KeyboardHelp({ onClose }: Props) {
   return (
     <Dialog title="Keyboard" size="wide" onDismiss={onClose} actions={[]}>
       <div className="rc-keys-overlay">
-        <div className="rc-keys">
+        <ul className="rc-keys">
           {ROWS.map((row) => (
-            <div key={row.label}>
-              {row.keys.map((k) => (
-                <span key={k} className="rc-kbd">
-                  {k}
-                </span>
-              ))}
+            <li key={row.label}>
+              <span className="rc-kbd">{row.key}</span>
               {row.label}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </Dialog>
   )

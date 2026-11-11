@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Tree } from 'web-tree-sitter'
-import { loadLanguageFor, analyseSnippet } from '../../src/review/symbols'
+import { loadLanguageFor, analyseSnippet, tagsOf } from '../../src/review/symbols'
 
 describe('loadLanguageFor()', () => {
   it('loads the typescript grammar for a .ts path', async () => {
@@ -64,37 +64,26 @@ describe('analyseSnippet() — grammar and memory', () => {
 })
 
 describe('analyseSnippet() — definitions', () => {
-  it('collects function, class, interface, type, enum and exported-const definitions', async () => {
+  it('collects the function, class and interface definitions the grammar tags', async () => {
     const code = `
 export function computeRiskScore(metrics: FileMetrics): RiskScore {
   return metrics.level
 }
 export class RiskEngine {}
 export interface RiskInput { path: string }
-export type RiskLevel = 'low' | 'high'
-export enum Tier { Zero, One }
-export const DEFAULT_WEIGHT = 5
 const localHelper = 1
 `
     const result = await analyseSnippet('src/risk.ts', code)
     expect(result).not.toBeNull()
     expect(result!.definitions).toEqual(
-      expect.arrayContaining([
-        'computeRiskScore',
-        'RiskEngine',
-        'RiskInput',
-        'RiskLevel',
-        'Tier',
-        'DEFAULT_WEIGHT',
-      ])
+      expect.arrayContaining(['computeRiskScore', 'RiskEngine', 'RiskInput'])
     )
-    // Non-exported const is a local binding, not a shared definition.
     expect(result!.definitions).not.toContain('localHelper')
   })
 })
 
 describe('analyseSnippet() — references', () => {
-  it('collects references, excluding local bindings and keywords', async () => {
+  it("collects calls, excluding keywords and the snippet's own definitions", async () => {
     const code = `
 import { RiskScore } from './schema'
 export function usePrReview() {
@@ -108,11 +97,18 @@ export function usePrReview() {
     const result = await analyseSnippet('src/hooks/usePrReview.ts', code)
     expect(result).not.toBeNull()
     expect(result!.references).toContain('computeRiskScore')
-    expect(result!.references).toContain('metrics')
-    // Function's own name is a definition, not a reference to itself.
     expect(result!.references).not.toContain('usePrReview')
     expect(result!.references).not.toContain('if')
     expect(result!.references).not.toContain('return')
+  })
+
+  it('does not report a call to a function the same snippet defines', async () => {
+    const code = `
+function helper() { return 1 }
+export function caller() { return helper() + external() }
+`
+    const result = await analyseSnippet('src/caller.ts', code)
+    expect(result!.references).toEqual(['external'])
   })
 })
 
@@ -173,44 +169,6 @@ export function callIt() {
   })
 })
 
-const LOCALS_SOURCE = `
-export function locals(req: number, opt?: number) {
-  for (const key in table) use(key, req, opt)
-  try { run() } catch (err) { report(err) }
-}
-`
-
-describe('analyseSnippet() — local bindings', () => {
-  it('pulls every bound identifier out of a destructuring pattern', async () => {
-    const code = `
-export function destructure(obj: { a: number; b: number }) {
-  const { a, b } = obj
-  return a + b
-}
-`
-    const result = await analyseSnippet('src/destructure.ts', code)
-    expect(result).not.toBeNull()
-    // a and b are local bindings, not cross-file references.
-    expect(result!.references).not.toContain('a')
-    expect(result!.references).not.toContain('b')
-  })
-
-  it('treats parameters, catch bindings and for-in variables as local', async () => {
-    const result = await analyseSnippet('src/locals.ts', LOCALS_SOURCE)
-    expect(result!.references).toEqual(expect.arrayContaining(['table', 'use', 'run', 'report']))
-    expect(
-      result!.references.filter((name) => ['req', 'opt', 'key', 'err'].includes(name))
-    ).toEqual([])
-  })
-
-  it('treats the plain parameters of a JavaScript function as local', async () => {
-    const result = await analyseSnippet('src/sum.js', 'function sum(a, b) { return a + b + c }')
-    expect(result!.references).toContain('c')
-    expect(result!.references).not.toContain('a')
-    expect(result!.references).not.toContain('b')
-  })
-})
-
 describe('analyseSnippet() — exported functions and methods', () => {
   it('resolves the enclosing symbol for arrow-function const exports', async () => {
     const code = `
@@ -239,5 +197,165 @@ export class Registry {
     expect(result).not.toBeNull()
     expect(result!.definitions).toContain('Registry')
     expect(result!.definitions).toContain('register')
+  })
+})
+
+const TYPESCRIPT_SOURCE = `interface RiskInput { path: string }
+export class RiskEngine {
+  score(input: RiskInput): number {
+    return weigh(input)
+  }
+}
+export function computeRiskScore(input: RiskInput) {
+  return new RiskEngine().score(input)
+}`
+
+const PYTHON_SOURCE = `class Ledger:
+    def total(self):
+        return summarise(self.rows)
+
+def open_ledger(path):
+    return Ledger()`
+
+const GO_SOURCE = `package ledger
+
+type Ledger struct{ rows []int }
+
+func (l Ledger) Total() int {
+	return sum(l.rows)
+}
+
+func Open() Ledger {
+	return Ledger{}
+}`
+
+const RUST_SOURCE = `struct Ledger { rows: Vec<i32> }
+
+impl Ledger {
+    fn total(&self) -> i32 {
+        sum(&self.rows)
+    }
+}
+
+fn open() -> Ledger {
+    Ledger { rows: Vec::new() }
+}`
+
+describe('analyseSnippet() — the same analysis for every tagged grammar', () => {
+  it('reads TypeScript definitions, references and functions from its tags query', async () => {
+    const result = await analyseSnippet('src/risk.ts', TYPESCRIPT_SOURCE)
+    expect(result!.definitions.toSorted()).toEqual([
+      'RiskEngine',
+      'RiskInput',
+      'computeRiskScore',
+      'score',
+    ])
+    expect(result!.references).toEqual(['weigh'])
+    expect(result!.functions).toEqual([
+      { name: 'score', line: 3, endLine: 5, branches: 0 },
+      { name: 'computeRiskScore', line: 7, endLine: 9, branches: 0 },
+    ])
+  })
+})
+
+describe('analyseSnippet() — Python and Go', () => {
+  it('reads Python definitions, references and functions from its tags query', async () => {
+    const result = await analyseSnippet('ledger.py', PYTHON_SOURCE)
+    expect(result!.definitions.toSorted()).toEqual(['Ledger', 'open_ledger', 'total'])
+    expect(result!.references).toEqual(['summarise'])
+    expect(result!.functions).toEqual([
+      { name: 'total', line: 2, endLine: 3, branches: 0 },
+      { name: 'open_ledger', line: 5, endLine: 6, branches: 0 },
+    ])
+  })
+
+  it('reads Go definitions, references and functions from its tags query', async () => {
+    const result = await analyseSnippet('ledger.go', GO_SOURCE)
+    expect(result!.definitions.toSorted()).toEqual(['Ledger', 'Open', 'Total'])
+    expect(result!.references).toContain('sum')
+    expect(result!.references).not.toContain('Ledger')
+    expect(result!.functions).toEqual([
+      { name: 'Total', line: 5, endLine: 7, branches: 0 },
+      { name: 'Open', line: 9, endLine: 11, branches: 0 },
+    ])
+  })
+})
+
+describe('analyseSnippet() — Rust and grammars with no tags query', () => {
+  it('reads Rust definitions, references and functions from its tags query, a method once', async () => {
+    const result = await analyseSnippet('ledger.rs', RUST_SOURCE)
+    expect(result!.definitions.toSorted()).toEqual(['Ledger', 'open', 'total'])
+    expect(result!.references).toContain('sum')
+    expect(result!.references).not.toContain('Ledger')
+    expect(result!.functions).toEqual([
+      { name: 'total', line: 4, endLine: 6, branches: 0 },
+      { name: 'open', line: 9, endLine: 11, branches: 0 },
+    ])
+  })
+
+  it('returns null for a grammar whose upstream repo ships no tags query', async () => {
+    const result = await analyseSnippet('src/theme.css', '.button { color: red; }')
+    expect(result).toBeNull()
+  })
+})
+
+const TYPESCRIPT_PICK = `function pick(a, b) {
+  if (a) {
+    return 1
+  } else if (b) {
+    return 2
+  }
+  for (const x of a) {}
+  while (b) {}
+  return a ? 1 : 2
+}`
+
+const PYTHON_PICK = `def pick(a, b):
+    if a:
+        return 1
+    elif b:
+        return 2
+    for x in a:
+        pass
+    while b:
+        pass
+    return 1 if a else 2`
+
+describe('analyseSnippet() — branches across grammars', () => {
+  it.each([
+    ['src/pick.ts', TYPESCRIPT_PICK],
+    ['pick.py', PYTHON_PICK],
+  ])(
+    'counts if, else-if, for, while and the conditional expression in %s as 5',
+    async (path, code) => {
+      const result = await analyseSnippet(path, code)
+      expect(result!.branches).toBe(5)
+      expect(result!.functions).toMatchObject([{ name: 'pick', branches: 5 }])
+    }
+  )
+})
+
+describe('tagsOf()', () => {
+  it('lists each definition with its kind and line span, and each reference with its line', async () => {
+    const tags = await tagsOf('ledger.py', PYTHON_SOURCE)
+    expect(tags).toEqual({
+      definitions: [
+        { name: 'Ledger', kind: 'class', startLine: 1, endLine: 3 },
+        { name: 'total', kind: 'function', startLine: 2, endLine: 3 },
+        { name: 'open_ledger', kind: 'function', startLine: 5, endLine: 6 },
+      ],
+      references: [
+        { name: 'summarise', line: 3 },
+        { name: 'Ledger', line: 6 },
+      ],
+    })
+  })
+
+  it('returns null for a grammar with no tags query', async () => {
+    expect(await tagsOf('src/theme.css', '.button { color: red; }')).toBeNull()
+  })
+
+  it('returns null for a path with no grammar', async () => {
+    expect(await tagsOf('README.md', '# hello')).toBeNull()
   })
 })

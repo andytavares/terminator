@@ -7,15 +7,6 @@ import type { ReviewQueuePR } from '../../src/schemas/pr-review.schema'
 
 vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
 
-const PASSING_DOTS: ReviewQueuePR['signalDots'] = {
-  tests: 'pass',
-  coverage: 'pass',
-  ci: 'pass',
-  lint: 'pass',
-  churn: 'pass',
-  blast: 'pass',
-}
-
 function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
   return {
     number: 1,
@@ -31,10 +22,7 @@ function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
     ciStatus: 'passing',
     headRefName: 'feat',
     baseRefName: 'main',
-    riskLevel: 'low',
-    estimatedMinutes: 10,
     sessionStatus: 'not-started',
-    signalDots: PASSING_DOTS,
     approvalCount: 0,
     approvedBy: [],
     requestedReviewers: [],
@@ -85,28 +73,16 @@ beforeEach(() => {
  * FR-034a. Approving is the one action in this extension that cannot be undone
  * from inside the app, and the queue row is the surface furthest from having
  * read the diff. Whatever else a row offers, "approve" must not be the thing
- * the eye lands on, and it must not look safer on a PR the tool happens to
- * have scored low-risk — the score is a heuristic and the mistake is permanent.
+ * the eye lands on.
  */
-const risks: ReviewQueuePR['riskLevel'][] = ['low', 'medium', 'high']
-
 describe('review queue rows never lead with approval', () => {
-  for (const riskLevel of risks) {
-    it(`offers reading, not approving, as the ${riskLevel}-risk row's action`, () => {
-      withQueue([makePr({ number: 7, title: 'Some change', riskLevel })])
-      render(<ReviewQueue {...props} />)
-
-      const row = screen.getByRole('group', { name: '#7 Some change' })
-      expect(within(row).queryByText(/approve/i)).toBeNull()
-      expect(within(row).getByRole('button', { name: 'Review' })).toBeTruthy()
-    })
-  }
-
-  it('states risk in words that need no legend', () => {
-    withQueue([makePr({ number: 8, title: 'Risky change', riskLevel: 'high' })])
+  it("offers reading, not approving, as the row's action", () => {
+    withQueue([makePr({ number: 7, title: 'Some change' })])
     render(<ReviewQueue {...props} />)
-    expect(screen.getByText('High risk')).toBeTruthy()
-    expect(screen.queryByText('HIGH')).toBeNull()
+
+    const row = screen.getByRole('group', { name: '#7 Some change' })
+    expect(within(row).queryByText(/approve/i)).toBeNull()
+    expect(within(row).getByRole('button', { name: 'Review' })).toBeTruthy()
   })
 })
 

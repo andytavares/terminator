@@ -64,7 +64,6 @@ interface PrRowProps {
     additions: number
     deletions: number
     fileCount: number
-    estimatedMinutes: number
   }
   meta: (MetaPart | null | false)[]
   /** The row's own action, which opens the pull request like the row does. While `busy`, the
@@ -98,7 +97,6 @@ export function PrRow({ pr, meta, action, testId, children, ...props }: PrRowPro
       </span>
       <span className="rd-side">
         <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
-        <span className="rd-num">~{pr.estimatedMinutes} min</span>
       </span>
       <span className="rd-actions">
         <RowAction action={action} onOpen={onOpen} />

@@ -1,7 +1,7 @@
 // Bridge module so extension components don't access window.electronAPI.github directly.
 // All calls go through extensionBridge.invoke which routes via registered IPC handlers.
 
-import type { IssueComment } from '../schemas/pr-review.schema'
+import type { IssueComment, PrChangedFile } from '../schemas/pr-review.schema'
 import type { ContributionsReply } from '../schemas/contributions.schema'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import type { BridgeResult } from './bridge'
@@ -10,11 +10,6 @@ const bridge = () => window.electronAPI.extensionBridge
 
 export interface RawFileMetrics {
   churn90d: number
-  blastRadius: number
-  topImporters: string[]
-  importerCount: number
-  testFilePresent: boolean
-  patchCoverage?: number | null
 }
 
 export interface StackPlan {
@@ -107,6 +102,13 @@ export const githubAPI = {
       paths,
     }),
 
+  /** Per changed file of the PR at `headSHA`: how many files use and also define what it changes. */
+  blastRadius: (repoRoot: string, prNumber: number, headSHA: string) =>
+    invoke<BridgeResult<{ radius: Record<string, PrChangedFile['blastRadius']> }>>(
+      'github:blast-radius',
+      { repoRoot, prNumber, headSHA }
+    ),
+
   prInlineComments: (repoRoot: string, prNumber: number) =>
     invoke<BridgeResult<{ comments: unknown[]; resolvedCommentIds?: number[] }>>(
       'github:pr-inline-comments',
@@ -164,14 +166,6 @@ export const githubAPI = {
 
   prCompare: (repoRoot: string, fromSha: string, toSha: string) =>
     invoke<BridgeResult<PrCompareResult>>('github:pr-compare', { repoRoot, fromSha, toSha }),
-
-  testsForBlock: (input: {
-    repoRoot: string
-    headSHA: string
-    path: string
-    code: string
-    hunkHeader?: string
-  }) => bridge().invoke('github:tests-for-block', input),
 
   cloneRepo: (repo: string, folder: string) =>
     bridge().invoke('github:clone-repo', { repo, folder }),

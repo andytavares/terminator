@@ -1,6 +1,5 @@
 /**
- * ReviewFooter: the single 48px bar under the diff, replacing the old
- * review-diff-nav-bar + SubmitBar pair. Tokens map onto the app's --tm-* set.
+ * ReviewFooter: the 48px bar under the review stream. Tokens map onto the app's --tm-* set.
  */
 
 .rf-bar {
@@ -14,38 +13,6 @@
   font: var(--tm-font-size-md) / 1.45 var(--tm-font-ui);
   color: var(--tm-text-primary);
   white-space: nowrap;
-  container-type: inline-size;
-}
-
-.rf-short {
-  display: none;
-}
-
-.rf-name {
-  display: inline-block;
-  max-width: 24ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: bottom;
-}
-
-/* Under 640px the primary shortens to "Next" and the previous file keeps only its arrow (its name stays in `.pr-visually-hidden`). */
-@container (max-width: 640px) {
-  .rf-long {
-    display: none;
-  }
-
-  .rf-short {
-    display: inline;
-  }
-
-  .rf-collapsible {
-    display: none;
-  }
-}
-
-.rf-sp {
-  flex: 1;
 }
 
 .rf-position {
@@ -53,19 +20,5 @@
   text-overflow: ellipsis;
   font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
-}
-
-.rf-viewed {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--tm-font-size-sm);
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-}
-
-@container (max-width: 640px) {
-  .rf-position {
-    display: none;
-  }
+  font-variant-numeric: tabular-nums;
 }

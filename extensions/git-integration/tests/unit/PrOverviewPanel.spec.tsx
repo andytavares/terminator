@@ -72,36 +72,16 @@ vi.mock('../../src/components/pr-review/RichContent', () => ({
   ),
 }))
 
-const overviewRiskScore = (level: 'low' | 'medium' | 'high', composite: number) => ({
-  level,
-  composite,
-  metrics: {
-    changeSize: 15,
-    churn90d: 5,
-    blastRadius: 2,
-    testFilePresent: true,
-    complexityDelta: 0,
-    patchCoverage: null,
-  },
-  dominantDriver: 'Change size',
-  topImporters: [],
-  importerCount: 0,
-})
-
-const makeFile = (
-  path: string,
-  risk: { level: 'low' | 'medium' | 'high'; composite: number },
-  size = { additions: 10, deletions: 5 }
-) => ({
+const makeFile = (path: string, size: { additions: number; deletions: number }) => ({
   path,
   oldPath: undefined,
   changeType: 'modified' as const,
   ...size,
   isBinary: false,
-  tier: 1 as const,
   whyHere: 'test',
-  riskScore: overviewRiskScore(risk.level, risk.composite),
-  estimatedMinutes: 5,
+  churn90d: 5,
+  blastRadius: null,
+  hunkCount: 1,
 })
 
 const basePr: PrReviewDetail = {
@@ -119,7 +99,6 @@ const basePr: PrReviewDetail = {
   mergeStateStatus: 'clean',
   ciStatus: 'passing',
   lintStatus: 'pass',
-  coverageStatus: 'pass',
   statusChecks: [{ name: 'CI', state: 'pass' }],
   approvals: [],
   requestedReviewers: [],
@@ -131,21 +110,17 @@ const basePr: PrReviewDetail = {
     {
       id: 'ch1',
       name: 'Core',
-      estimatedMinutes: 15,
       status: 'not-started',
       files: [
-        makeFile('src/high.ts', { level: 'high', composite: 80 }, { additions: 50, deletions: 20 }),
-        makeFile(
-          'src/medium.ts',
-          { level: 'medium', composite: 50 },
-          { additions: 30, deletions: 10 }
-        ),
-        makeFile('src/low.ts', { level: 'low', composite: 10 }, { additions: 5, deletions: 2 }),
+        makeFile('src/high.ts', { additions: 50, deletions: 20 }),
+        makeFile('src/medium.ts', { additions: 30, deletions: 10 }),
+        makeFile('src/low.ts', { additions: 5, deletions: 2 }),
       ],
     },
   ],
   readingOrder: [],
   movedBlocks: [],
+  sameShape: [],
   insights: null,
 }
 
@@ -233,7 +208,7 @@ describe('PrOverviewPanel — the header', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('Draft')
   })
 
-  it('puts author, branches, size and time on the meta line', () => {
+  it('puts author, branches and size on the meta line, with no time estimate', () => {
     renderPanel()
     const meta = within(screen.getByRole('group', { name: 'Pull request summary' }))
     expect(meta.getByText('alice')).toBeTruthy()
@@ -242,7 +217,7 @@ describe('PrOverviewPanel — the header', () => {
     expect(meta.getByText('3 files')).toBeTruthy()
     expect(meta.getByText('+85')).toBeTruthy()
     expect(meta.getByText('−32')).toBeTruthy()
-    expect(meta.getByText('about 15 min')).toBeTruthy()
+    expect(meta.queryByText(/min$/)).toBeNull()
     expect(meta.getByText('2 days ago').getAttribute('datetime')).toBe(basePr.openedAt)
   })
 })

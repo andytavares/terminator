@@ -82,9 +82,9 @@ interface Surface {
 const SURFACES: Surface[] = [
   {
     name: 'pr-rail',
-    selected: '.full-file-row--active',
+    selected: ".chapter-nav-header[aria-current='true']",
     indicator: 'border',
-    ready: '.full-file-row--active',
+    ready: ".chapter-nav-header[aria-current='true']",
   },
   {
     name: 'git-view',
@@ -98,7 +98,7 @@ const SURFACES: Surface[] = [
     ready: '[data-testid="conflict-file-row"]',
   },
   { name: 'reviews', ready: '.rd-row' },
-  { name: 'review-footer', ready: '.tmui-button--primary' },
+  { name: 'review-footer', ready: '.rf-position' },
   { name: 'review-queue', ready: '.tmui-button--primary' },
   { name: 'repo-picker', ready: '.rp-row' },
   {

@@ -7,11 +7,11 @@ import { unifiedSide } from './diff-pane/lines'
 import { markChangedWords, type Span } from './diff-pane/word-diff'
 import './diff-pane/diff-rows.css'
 
-export type Side = 'LEFT' | 'RIGHT'
+type Side = 'LEFT' | 'RIGHT'
 type Language = string | undefined
 
 export interface GutterChip {
-  kind: 'danger' | 'warn'
+  kind: 'warn'
   label: string
 }
 
@@ -38,13 +38,10 @@ interface LineRowProps {
   selected: boolean
   commented: boolean
   chip: GutterChip | null
-  hiddenThreadCount: number
-  findingCount: number
   /** Changed-word spans of a replaced line; the unified view marks them. */
   words?: Span[]
   onGutterMouseDown: (e: React.MouseEvent, lineNum: number, side: Side) => void
   onRowMouseEnter: (lineNum: number, side: Side) => void
-  onShowHiddenComments: () => void
 }
 
 function rowClassName(props: LineRowProps): string {
@@ -75,43 +72,7 @@ function GutterButton({ lineNum, side, onGutterMouseDown }: GutterButtonProps) {
   )
 }
 
-type PipProps = Pick<LineRowProps, 'hiddenThreadCount' | 'findingCount' | 'onShowHiddenComments'>
-
-function GutterPips(props: PipProps) {
-  const { hiddenThreadCount, findingCount } = props
-  return (
-    <>
-      {hiddenThreadCount > 0 && (
-        <button
-          type="button"
-          className="rs-pip"
-          aria-label={`${hiddenThreadCount} hidden comments`}
-          onClick={props.onShowHiddenComments}
-        >
-          {hiddenThreadCount}
-        </button>
-      )}
-      {findingCount > 0 && (
-        <span className="rs-pip rs-pip--ag" aria-label={`${findingCount} agent notes`}>
-          {findingCount}
-        </span>
-      )}
-    </>
-  )
-}
-
-/** The pips for a row, passed on prop by prop. */
-function RowPips({ row }: { row: PipProps }) {
-  return (
-    <GutterPips
-      hiddenThreadCount={row.hiddenThreadCount}
-      findingCount={row.findingCount}
-      onShowHiddenComments={row.onShowHiddenComments}
-    />
-  )
-}
-
-function ChipCell(props: { row: PipProps; chip: GutterChip | null; gutterWidth: number }) {
+function ChipCell(props: { chip: GutterChip | null; gutterWidth: number }) {
   const { chip, gutterWidth } = props
   return (
     <td
@@ -119,7 +80,6 @@ function ChipCell(props: { row: PipProps; chip: GutterChip | null; gutterWidth: 
       style={{ width: gutterWidth, minWidth: gutterWidth }}
     >
       {chip && <span className={`rs-gutter-chip rs-gutter-chip--${chip.kind}`}>{chip.label}</span>}
-      <RowPips row={props.row} />
     </td>
   )
 }
@@ -193,59 +153,13 @@ export const UnifiedLineRow = memo(function UnifiedLineRow(
       onMouseEnter={() => props.onRowMouseEnter(lineNum, side)}
     >
       <UnifiedNumbers line={line} side={side} button={button} />
-      <ChipCell row={props} chip={chip} gutterWidth={props.gutterWidth} />
+      <ChipCell chip={chip} gutterWidth={props.gutterWidth} />
       <CodeCells
         line={line}
         language={props.language}
         prefix={PREFIX[line.type]}
         words={props.words}
       />
-    </tr>
-  )
-})
-
-/** What a split row shows for its side: number, data attributes, number-cell class, prefix. */
-function splitSideView(line: DiffLine, side: Side) {
-  if (side === 'LEFT') {
-    return {
-      lineNum: line.oldLineNumber ?? 0,
-      attrs: { 'data-old-line': line.oldLineNumber ?? undefined },
-      numClass: 'diff-line__old-num diff-line__num-gutter',
-      prefix: choose(line.type === 'remove', PREFIX[line.type], ' '),
-    }
-  }
-  return {
-    lineNum: line.newLineNumber ?? 0,
-    attrs: { 'data-new-line': line.newLineNumber ?? undefined },
-    numClass: 'diff-line__new-num diff-line__num-gutter',
-    prefix: choose(line.type === 'add', PREFIX[line.type], ' '),
-  }
-}
-
-/** One side of a split-view row. The left side carries its pips in the number cell; the right side has the insight gutter. */
-export const SplitLineRow = memo(function SplitLineRow(
-  props: LineRowProps & { side: Side; numColWidth: number; gutterWidth: number }
-) {
-  const { line, side, numColWidth } = props
-  const view = splitSideView(line, side)
-  const { lineNum } = view
-  return (
-    <tr
-      className={rowClassName(props)}
-      aria-selected={props.selected}
-      data-expanded={expandedAttr(props.expanded)}
-      {...view.attrs}
-      onMouseEnter={() => props.onRowMouseEnter(lineNum, side)}
-    >
-      <td className={view.numClass} style={{ width: numColWidth, minWidth: numColWidth }}>
-        {lineNum || ''}
-        <GutterButton lineNum={lineNum} side={side} onGutterMouseDown={props.onGutterMouseDown} />
-        {side === 'LEFT' && <RowPips row={props} />}
-      </td>
-      {side === 'RIGHT' && (
-        <ChipCell row={props} chip={props.chip} gutterWidth={props.gutterWidth} />
-      )}
-      <CodeCells line={line} language={props.language} prefix={view.prefix} />
     </tr>
   )
 })

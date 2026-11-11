@@ -334,9 +334,7 @@ describe('github:pr-review-detail', () => {
 
   it('puts definitions before their callers and attaches the analysis', async () => {
     mockPrDetail(PR_META, CALLER_AND_DEFINITION_FILES)
-    mockGitFailure('no history') // co-change git log
     mockGitFailure('not found') // check-suites fallback
-    mockGitFailure('no match') // git grep for test references
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
@@ -756,31 +754,6 @@ describe('github:pr-review-detail — maps mergeStateStatus', () => {
       prNumber: 6,
     })) as { pr: { mergeStateStatus: string } }
     expect(result.pr.mergeStateStatus).toBe(expected)
-  })
-})
-
-describe('github:pr-review-detail — co-change affinity', () => {
-  const handlers = freshHandlers()
-
-  it('puts two files in different folders in one chapter when one commit changed both', async () => {
-    const twoFiles = [
-      { filename: 'src/foo.ts', additions: 3, deletions: 1, patch: '@@ -1 +1 @@' },
-      { filename: 'lib/bar.ts', additions: 1, deletions: 0, patch: '@@ -1 +1 @@' },
-    ]
-    // mockPrDetail uses 5 gh calls (ownerAndName + meta + files + reviews + reviewers)
-    mockPrDetail(
-      { ...PR_META, statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }] },
-      twoFiles
-    )
-    // 6th call: git log --name-only, with one commit that touched both files.
-    mockGitSuccess(`${'a'.repeat(40)}\nsrc/foo.ts\nlib/bar.ts\n`)
-
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { pr: { chapters: Array<{ files: Array<{ path: string }> }> } }
-    const chapterPaths = result.pr.chapters.map((c) => c.files.map((f) => f.path).sort())
-    expect(chapterPaths).toEqual([['lib/bar.ts', 'src/foo.ts']])
   })
 })
 
@@ -1879,37 +1852,6 @@ describe('github:pr-compare — returns rewritten:true when gh reports no common
   })
 })
 
-describe('github:tests-for-block', () => {
-  let handlers: Record<string, Handler>
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockExecFile.mockReset()
-    handlers = captureHandlers()
-  })
-
-  it('names the block and returns the test lines that mention it', async () => {
-    mockGitSuccess('abc:src/utils.spec.ts:7:  expect(sortByPriority([])).toEqual([])')
-    const result = (await handlers['github:tests-for-block']({
-      repoRoot: '/repo',
-      headSHA: 'abc',
-      path: 'src/utils.ts',
-      code: 'export function sortByPriority(items: number[]) {\n  return items\n}',
-    })) as { symbols: string[]; locations: unknown[] }
-    expect(result.symbols).toEqual(['sortByPriority'])
-    expect(result.locations).toEqual([
-      {
-        path: 'src/utils.spec.ts',
-        line: 7,
-        symbol: 'sortByPriority',
-        text: 'expect(sortByPriority([])).toEqual([])',
-      },
-    ])
-    const args: string[] = mockExecFile.mock.calls[0][1]
-    expect(args.slice(0, 2)).toEqual(['grep', '-n'])
-  })
-})
-
 describe('github:clone-repo', () => {
   let handlers: Record<string, Handler>
 
@@ -1959,20 +1901,17 @@ describe('review revamp — edge branches', () => {
     handlers = captureHandlers()
   })
 
-  it('reads patch coverage from a status context description', async () => {
-    const statusCheckRollup = [
-      { context: 'codecov/patch', state: 'SUCCESS', description: '84.21% of diff hit' },
-      { name: 'Lint', conclusion: 'SUCCESS' },
-    ]
-    mockPrDetail({ ...PR_META, statusCheckRollup }, [SHARD_GUARD_FILE])
-    mockGitFailure('no match') // git grep for test references
+  it('keeps no coverage section in the insights', async () => {
+    mockPrDetail(PR_META, [SHARD_GUARD_FILE])
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
       prNumber: 6,
-    })) as {
-      pr: { insights: { coverage: { patchPercent: number | null; source: string } } | null }
-    }
-    expect(result.pr.insights?.coverage.patchPercent).toBe(84)
+    })) as { pr: { insights: Record<string, unknown> | null } }
+    expect(Object.keys(result.pr.insights ?? {}).sort()).toEqual([
+      'complexity',
+      'health',
+      'understandability',
+    ])
   })
 })
 
@@ -2636,61 +2575,18 @@ describe('repository lookups run once — looks up the signed-in user once acros
   })
 })
 
-const REPO_FILES: Record<string, string> = {
-  'src/a.ts': 'export const a = 1',
-  'src/b.ts': "import { a } from './a'\nexport const b = a",
-  'src/c.ts': "import x from './b'\nimport y from './a'",
-  'src/a.spec.ts': "import { a } from './a'",
-  'lib/d.py': 'import a',
-  'top.ts': 'export const t = 1',
-  'top.spec.ts': 'x',
-}
 const COMMITS: Record<string, string[]> = {
   ['1'.repeat(40)]: ['src/a.ts', 'src/b.ts'],
   ['2'.repeat(40)]: ['src/a.ts'],
   ['3'.repeat(40)]: ['lib/d.py', 'top.ts'],
 }
-const globToRegExp = (g: string) =>
-  new RegExp('^' + g.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*') + '$')
 
-/** `git log`: every commit with its files, or the commits touching the one path asked. */
+/** `git log --name-only`: every commit with its files. */
 function fakeLog(a: string[]): string {
-  if (a.includes('--name-only')) {
-    return Object.entries(COMMITS)
-      .map(([h, files]) => `${h}\n\n${files.join('\n')}`)
-      .join('\n\n')
-  }
-  const path = a[a.indexOf('--') + 1]
+  if (!a.includes('log')) return ''
   return Object.entries(COMMITS)
-    .filter(([, files]) => files.includes(path))
-    .map(([h]) => `${h.slice(0, 7)} c`)
-    .join('\n')
-}
-
-/** `git grep` over REPO_FILES: matching files with -rl, else file, line and text. */
-function fakeGrep(a: string[]): string {
-  const pattern = new RegExp(a[a.length - 1])
-  const lines = Object.entries(REPO_FILES).flatMap(([file, text]) =>
-    text
-      .split('\n')
-      .map((l, i) => ({ file, n: i + 1, l }))
-      .filter((x) => pattern.test(x.l))
-  )
-  if (a.includes('-rl')) return [...new Set(lines.map((x) => x.file))].join('\n')
-  return lines.map((x) => `${x.file}\0${x.n}\0${x.l}`).join('\n')
-}
-
-/** A fake repository answering the git commands the metrics handlers use. */
-function fakeGit(a: string[]): string {
-  if (a.includes('log')) return fakeLog(a)
-  if (a[0] === 'grep') return fakeGrep(a)
-  if (a[0] === 'ls-files') {
-    const globs = a.slice(a.indexOf('--') + 1).map(globToRegExp)
-    return Object.keys(REPO_FILES)
-      .filter((f) => globs.some((g) => g.test(f)))
-      .join('\n')
-  }
-  return ''
+    .map(([h, files]) => `${h}\n\n${files.join('\n')}`)
+    .join('\n\n')
 }
 
 describe('github:files-metrics', () => {
@@ -2699,56 +2595,37 @@ describe('github:files-metrics', () => {
     handlers = captureHandlers()
   })
 
-  it('reports churn, importers and test presence for each path', async () => {
-    routeExec(fakeGit)
-    const paths = Object.keys(REPO_FILES)
+  it("reports each path's commits in the last 90 days, 0 for a path no commit touched", async () => {
+    routeExec(fakeLog)
+    const paths = ['src/a.ts', 'src/b.ts', 'top.ts', 'src/new.ts']
 
     const batch = (await handlers['github:files-metrics']({ repoRoot: '/repo', paths })) as {
       metrics: Record<string, unknown>
     }
 
-    expect(Object.keys(batch.metrics).sort()).toEqual([...paths].sort())
-    expect(batch.metrics['src/a.ts']).toMatchObject({
-      churn90d: 2,
-      importerCount: 3,
-      testFilePresent: true,
+    expect(batch.metrics).toEqual({
+      'src/a.ts': { churn90d: 2 },
+      'src/b.ts': { churn90d: 1 },
+      'top.ts': { churn90d: 1 },
+      'src/new.ts': { churn90d: 0 },
     })
   })
 
-  it('spawns the same number of processes for 1 path as for 20', async () => {
-    const few = routeExec(fakeGit)
+  it('spawns one git process for 1 path and for 20', async () => {
+    const few = routeExec(fakeLog)
     await handlers['github:files-metrics']({ repoRoot: '/repo', paths: ['src/a.ts'] })
     const manyPaths = Array.from({ length: 20 }, (_, i) => `src/gen${i}.ts`)
-    const many = routeExec(fakeGit)
+    const many = routeExec(fakeLog)
     await handlers['github:files-metrics']({ repoRoot: '/repo', paths: manyPaths })
 
-    expect(few.length).toBe(3)
-    expect(many.length).toBe(few.length)
+    expect(few.length).toBe(1)
+    expect(many.length).toBe(1)
   })
 })
 
-describe('github:files-metrics — falls back to a search per file when the combined search overflows', () => {
-  let handlers: Record<string, Handler>
-  beforeEach(() => {
-    handlers = captureHandlers()
-  })
-
-  it('falls back to a search per file when the combined search overflows', async () => {
-    const overflow = Object.assign(new Error('maxBuffer'), {
-      code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
-    })
-    const spawns = routeExec((a) => (a[0] === 'grep' && !a.includes('-rl') ? overflow : fakeGit(a)))
-    const paths = ['src/a.ts', 'src/b.ts']
-
-    const batch = (await handlers['github:files-metrics']({ repoRoot: '/repo', paths })) as {
-      metrics: Record<string, { importerCount: number }>
-    }
-
-    expect(spawns.filter((s) => s.args[0] === 'grep' && s.args.includes('-rl'))).toHaveLength(2)
-    expect(batch.metrics['src/a.ts'].importerCount).toBe(3)
-  })
-
+describe('github:files-metrics — unreadable history', () => {
   it('returns an error object when the history cannot be read', async () => {
+    const handlers = captureHandlers()
     routeExec((a) => (a.includes('log') ? new Error('not a git repo') : ''))
     const result = await handlers['github:files-metrics']({ repoRoot: '/repo', paths: ['a.ts'] })
     expect(result).toMatchObject({ error: expect.stringContaining('not a git repo') })
@@ -2971,5 +2848,95 @@ describe('github:dashboard-search sessions and cap — reports sections whose se
     )
     const result = (await handlers['github:dashboard-search']({})) as { capped: string[] }
     expect(result.capped).toEqual(['mine'])
+  })
+})
+
+const RADIUS_HEAD = 'b1a5700'
+const SCORE_FILE = {
+  filename: 'src/score.ts',
+  additions: 3,
+  deletions: 0,
+  patch: '@@ -0,0 +1,3 @@\n+export function score(n: number) {\n+  return n\n+}',
+}
+const SCORE_SOURCE = 'export function score(n: number) {\n  return n\n}\n'
+const USE_SOURCE = "import { score } from './score'\nexport const total = score(2)\n"
+
+/** The detail fetch of PR 6 at RADIUS_HEAD changing src/score.ts, which src/use.ts calls. */
+function radiusGhRoute(a: string[]): string | null {
+  if (isGhRepoView(a)) return JSON.stringify(REPO_VIEW)
+  if (isGhPrView(a)) return JSON.stringify({ ...PR_META, number: 6, headRefOid: RADIUS_HEAD })
+  if (a.some((arg) => arg.endsWith('/pulls/6/files'))) return JSON.stringify([SCORE_FILE])
+  if (a.some((arg) => arg.endsWith('/requested_reviewers'))) return '{"users":[],"teams":[]}'
+  if (a.some((arg) => arg.endsWith('/reviews'))) return '[]'
+  return null
+}
+
+function radiusGitRoute(a: string[]): string {
+  if (a.includes('grep')) return `${RADIUS_HEAD}:src/use.ts\n`
+  if (a.includes(`${RADIUS_HEAD}:src/score.ts`)) return SCORE_SOURCE
+  if (a.includes(`${RADIUS_HEAD}:src/use.ts`)) return USE_SOURCE
+  return ''
+}
+
+const radiusRoute = (a: string[]) => radiusGhRoute(a) ?? radiusGitRoute(a)
+
+describe('github:blast-radius', () => {
+  it('answers, per changed file, how many files use and also define what it changes', async () => {
+    const handlers = captureHandlers()
+    routeExec(radiusRoute)
+    await handlers['github:pr-review-detail']({ repoRoot: '/repo', prNumber: 6 })
+
+    const result = await handlers['github:blast-radius']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      headSHA: RADIUS_HEAD,
+    })
+
+    expect(result).toEqual({ radius: { 'src/score.ts': { usedIn: 1, alsoDefinedIn: 0 } } })
+  })
+
+  it('fetches the PR head first when the checkout does not have it', async () => {
+    const handlers = captureHandlers()
+    routeExec(radiusRoute)
+    await handlers['github:pr-review-detail']({ repoRoot: '/repo', prNumber: 6 })
+    const spawns = routeExec((a) => (a[0] === 'cat-file' ? new Error('missing') : radiusRoute(a)))
+
+    await handlers['github:blast-radius']({ repoRoot: '/repo', prNumber: 6, headSHA: RADIUS_HEAD })
+
+    expect(spawns.map((s) => s.args.join(' '))).toContain(
+      'fetch --force origin pull/6/head:refs/remotes/pull/6/head'
+    )
+  })
+})
+
+describe('github:blast-radius — nothing to measure', () => {
+  it('answers no files for a repository with no checkout, without running git', async () => {
+    const handlers = captureHandlers()
+    routeExec(radiusRoute)
+    await handlers['github:pr-review-detail']({ repoRoot: 'gh:acme/widgets', prNumber: 6 })
+    const spawns = routeExec(radiusRoute)
+
+    const result = await handlers['github:blast-radius']({
+      repoRoot: 'gh:acme/widgets',
+      prNumber: 6,
+      headSHA: RADIUS_HEAD,
+    })
+
+    expect(result).toEqual({ radius: {} })
+    expect(spawns).toEqual([])
+  })
+
+  it('answers no files for a head the last detail fetch did not return', async () => {
+    const handlers = captureHandlers()
+    routeExec(radiusRoute)
+    await handlers['github:pr-review-detail']({ repoRoot: '/repo', prNumber: 6 })
+
+    const result = await handlers['github:blast-radius']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      headSHA: 'newer11',
+    })
+
+    expect(result).toEqual({ radius: {} })
   })
 })

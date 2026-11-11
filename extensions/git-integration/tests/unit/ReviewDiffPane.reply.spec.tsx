@@ -8,6 +8,7 @@ import {
   PrReviewDetailSchema,
   type InlineComment,
   type PrChangedFile,
+  type PrReviewDetail,
 } from '../../src/schemas/pr-review.schema'
 
 /** A reply in the diff pane, with the real stores, thread and composer: only the bridge is faked. */
@@ -18,24 +19,10 @@ const file: PrChangedFile = {
   additions: 3,
   deletions: 0,
   isBinary: false,
-  tier: 1,
   whyHere: 'changed',
-  estimatedMinutes: 1,
-  riskScore: {
-    level: 'low',
-    composite: 1,
-    dominantDriver: 'changeSize',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {
-      changeSize: 3,
-      churn90d: null,
-      blastRadius: null,
-      testFilePresent: null,
-      complexityDelta: null,
-      patchCoverage: null,
-    },
-  },
+  churn90d: null,
+  blastRadius: null,
+  hunkCount: 1,
 }
 
 const pr = PrReviewDetailSchema.parse({
@@ -50,7 +37,6 @@ const pr = PrReviewDetailSchema.parse({
   headSHA: 'abc',
   ciStatus: 'passing',
   lintStatus: 'pass',
-  coverageStatus: 'pass',
   chapters: [
     { id: 'ch-1', name: 'Math', estimatedMinutes: 1, status: 'not-started', files: [file] },
   ],
@@ -184,16 +170,24 @@ function renderPaneWithQuestion() {
       resolved: false,
     },
   ])
-  render(
-    <ReviewDiffPane
-      repoRoot="/repo"
-      pr={pr}
-      file={file}
-      onMarkViewed={vi.fn()}
-      onPrevFile={vi.fn()}
-      onNextFile={vi.fn()}
-      onShowRisk={vi.fn()}
-    />
+  render(<PaneInScroller pr={pr} file={file} />)
+}
+
+/** The pane inside the review stream's scroll element, as the stream renders each file. */
+function PaneInScroller(props: { pr: PrReviewDetail; file: PrChangedFile }) {
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  return (
+    <div className="review-diff-scroll" ref={scrollRef}>
+      <ReviewDiffPane
+        repoRoot="/repo"
+        {...props}
+        band="stream"
+        scrollRef={scrollRef}
+        active
+        onPrevFile={vi.fn()}
+        onNextFile={vi.fn()}
+      />
+    </div>
   )
 }
 

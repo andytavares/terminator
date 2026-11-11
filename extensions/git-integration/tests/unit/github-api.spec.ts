@@ -209,10 +209,6 @@ const REVAMP_CALLS: BridgeCall[] = [
     (api) => api.setReviewRepos(['acme/widgets']),
     ['github:review-repos-set', { repos: ['acme/widgets'] }],
   ],
-  [
-    (api) => api.testsForBlock({ repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' }),
-    ['github:tests-for-block', { repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' }],
-  ],
 ]
 
 const BATCH_CALLS: BridgeCall[] = [

@@ -1,20 +1,15 @@
 import React from 'react'
 import { ChevronDown, ChevronUp, TriangleAlert, UnfoldVertical } from 'lucide-react'
 import { MovedRow } from '../MovedRow'
-import { SplitLineRow, UnifiedLineRow } from '../DiffLineRows'
+import { FoldRow } from '../FoldRow'
+import { UnifiedLineRow } from '../DiffLineRows'
 import { EXPAND_STEP } from '../../../review/expand-gaps'
 import type { DiffItem, MovedMark } from '../../../review/diff-items'
 import type { DiffHunk, DiffLine } from '../../../schemas/git.schema'
 import { plural } from '@terminator/extension-sdk'
 import type { PaneContext, Side } from './types'
-import {
-  AnnotationContent,
-  hasAnnotations,
-  LineAnnotations,
-  OpenTests,
-  SelectionExtras,
-} from './annotations'
-import { hunkCode, unifiedSide, wordSpansFor } from './lines'
+import { LineAnnotations, SelectionExtras } from './annotations'
+import { unifiedSide, wordSpansFor } from './lines'
 import { hunkContextText, symbolFromHunkHeader } from '../../../review/hunk-header'
 import './diff-rows.css'
 
@@ -30,32 +25,11 @@ interface UnifiedLineProps {
   expanded: boolean
 }
 
-interface SplitSideProps {
-  ctx: PaneContext
-  line: DiffLine | null | undefined
-  side: Side
-  expanded: boolean
-}
-
-interface SplitPairProps {
-  ctx: PaneContext
-  left: DiffLine | null | undefined
-  right: DiffLine | null | undefined
-  expanded: boolean
-}
-
 interface ExpandButtonProps {
   label: string
   disabled: boolean
   onClick: () => void
   children: React.ReactNode
-}
-
-interface TestsButtonProps {
-  ctx: PaneContext
-  anchor: string
-  code: string
-  hunkHeader?: string
 }
 
 type ItemOf<K extends DiffItem['kind']> = Extract<DiffItem, { kind: K }>
@@ -68,34 +42,11 @@ type ItemRenderers = {
 const NUM_CELL_CHROME_PX = 6
 const GUTTER_CELL_PADDING_PX = 8
 const PREFIX_COLUMN_PX = 16
-const PIP_GUTTER_PX = 22
 
 function chipOn(props: LineRef) {
   const { ctx, lineNum, side } = props
   if (side !== 'RIGHT') return null
   return ctx.lookups.chipsByLine.get(lineNum) ?? null
-}
-
-/** Threads hidden by the "hidden" setting still show as a count in the gutter. */
-function hiddenThreadCount(props: LineRef): number {
-  const { ctx, lineNum, side } = props
-  if (ctx.actions.commentVisibility !== 'hidden') return 0
-  return ctx.lookups.threadsForLine(lineNum, side).length
-}
-
-/** With agent notes off, a line's findings show as a count in the gutter instead. */
-function gutterFindingCount(props: LineRef): number {
-  const { ctx, lineNum, side } = props
-  if (ctx.actions.agentNotesOn) return 0
-  return ctx.lookups.findingsForLine(lineNum, side).length
-}
-
-/** The insight gutter's width: none when no row has a chip, unless hidden counts need a place. */
-function gutterWidthOf(ctx: PaneContext): number {
-  const { gutterWidth } = ctx.lookups
-  const showsPips = ctx.actions.commentVisibility === 'hidden' || !ctx.actions.agentNotesOn
-  if (gutterWidth === 0 && showsPips) return PIP_GUTTER_PX
-  return gutterWidth
 }
 
 /** What a memoised row shows for its line, as primitives so unchanged rows skip rendering. */
@@ -107,19 +58,16 @@ function rowProps(at: LineRef, expanded: boolean) {
     selected: ctx.drag.isLineSelected(lineNum, side),
     commented: ctx.lookups.isCommented(lineNum, side),
     chip: chipOn(at),
-    hiddenThreadCount: hiddenThreadCount(at),
-    findingCount: gutterFindingCount(at),
-    gutterWidth: gutterWidthOf(ctx),
+    gutterWidth: ctx.lookups.gutterWidth,
     onGutterMouseDown: ctx.drag.onGutterMouseDown,
     onRowMouseEnter: ctx.drag.onRowMouseEnter,
-    onShowHiddenComments: ctx.actions.showHiddenComments,
   }
 }
 
 function UnifiedRowsTable(props: { ctx: PaneContext; children: React.ReactNode }) {
   const { ctx, children } = props
   const numberColumn = ctx.layout.numColWidth + NUM_CELL_CHROME_PX
-  const gutter = gutterWidthOf(ctx)
+  const gutter = ctx.lookups.gutterWidth
   const gutterColumn = gutter === 0 ? 0 : gutter + GUTTER_CELL_PADDING_PX
   // Comment cards start where the code does, which inline-comment.css reads.
   const codeOffset = numberColumn * 2 + gutterColumn + PREFIX_COLUMN_PX
@@ -156,103 +104,6 @@ function UnifiedLine(props: UnifiedLineProps) {
       />
       <SelectionExtras ctx={ctx} lineNum={at.lineNum} side={at.side} />
       <LineAnnotations ctx={ctx} lineNum={at.lineNum} side={at.side} />
-    </>
-  )
-}
-
-function splitLineNum(line: DiffLine | null | undefined, side: Side): number {
-  if (side === 'LEFT') return line?.oldLineNumber ?? 0
-  return line?.newLineNumber ?? 0
-}
-
-/** The width of one side of the split, as a percentage. */
-function sidePct(ctx: PaneContext, side: Side): number {
-  if (side === 'LEFT') return ctx.layout.splitLeftPct
-  return 100 - ctx.layout.splitLeftPct
-}
-
-const EMPTY_SPAN: Record<Side, number> = { LEFT: 3, RIGHT: 4 }
-
-function SplitCodeTable(props: SplitSideProps) {
-  const { ctx, line, side, expanded } = props
-  const lineNum = splitLineNum(line, side)
-  const sideClass = side.toLowerCase()
-  return (
-    <table
-      className={`diff-table diff-table--split diff-table--${sideClass}`}
-      style={{ width: `${sidePct(ctx, side)}%` }}
-    >
-      <tbody>
-        {line && (
-          <SplitLineRow
-            line={line}
-            side={side}
-            numColWidth={ctx.layout.numColWidth}
-            {...rowProps({ ctx, lineNum, side }, expanded)}
-          />
-        )}
-        {!line && (
-          <tr className="diff-line">
-            <td colSpan={EMPTY_SPAN[side]} className="diff-line__empty-cell" />
-          </tr>
-        )}
-      </tbody>
-    </table>
-  )
-}
-
-/** True when the side's line carries a composer, threads or other annotations. */
-function sideAnnotated(props: Omit<SplitSideProps, 'expanded'>): boolean {
-  const { ctx, line, side } = props
-  if (line == null) return false
-  return hasAnnotations({ ctx, lineNum: splitLineNum(line, side), side })
-}
-
-function SplitComments(props: Omit<SplitSideProps, 'expanded'>) {
-  const { ctx, line, side } = props
-  const annotated = sideAnnotated({ ctx, line, side })
-  return (
-    <div className="diff-table--split" style={{ width: `${sidePct(ctx, side)}%` }}>
-      {annotated && (
-        <div
-          className="diff-split-comment-inner"
-          style={{ paddingLeft: ctx.layout.numColWidth + 18 }}
-        >
-          <AnnotationContent ctx={ctx} lineNum={splitLineNum(line, side)} side={side} />
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** The split divider is a vertical separator a person drags to resize the two sides. */
-const RESIZE_HANDLE = {
-  role: 'separator',
-  'aria-orientation': 'vertical',
-  'aria-label': 'Resize split',
-} as const
-
-/** One flex row per line pair, then a comment row with the same classes, so the two align. */
-function SplitPair(props: SplitPairProps) {
-  const { ctx, left, right, expanded } = props
-  const divider = ctx.layout.onSplitDividerMouseDown
-  const hasComments =
-    sideAnnotated({ ctx, line: left, side: 'LEFT' }) ||
-    sideAnnotated({ ctx, line: right, side: 'RIGHT' })
-  return (
-    <>
-      <div className="diff-split-tables">
-        <SplitCodeTable ctx={ctx} line={left} side="LEFT" expanded={expanded} />
-        <div className="diff-split-resize-handle" {...RESIZE_HANDLE} onMouseDown={divider} />
-        <SplitCodeTable ctx={ctx} line={right} side="RIGHT" expanded={expanded} />
-      </div>
-      {hasComments && (
-        <div className="diff-split-tables">
-          <SplitComments ctx={ctx} line={left} side="LEFT" />
-          <div className="diff-split-resize-handle" {...RESIZE_HANDLE} onMouseDown={divider} />
-          <SplitComments ctx={ctx} line={right} side="RIGHT" />
-        </div>
-      )}
     </>
   )
 }
@@ -368,13 +219,6 @@ const GAP_LABEL = 'Unchanged lines'
 function GapExpander(props: { ctx: PaneContext; gapKey: string; hidden: number | null }) {
   const { ctx, gapKey, hidden } = props
   const content = <ExpanderContent ctx={ctx} gapKey={gapKey} hidden={hidden} />
-  if (ctx.mode !== 'unified') {
-    return (
-      <div className="diff-gap-row" role="group" aria-label={GAP_LABEL}>
-        {content}
-      </div>
-    )
-  }
   return (
     <UnifiedRowsTable ctx={ctx}>
       <tr className="diff-gap-row">
@@ -385,27 +229,6 @@ function GapExpander(props: { ctx: PaneContext; gapKey: string; hidden: number |
         </td>
       </tr>
     </UnifiedRowsTable>
-  )
-}
-
-function TestsButton(props: TestsButtonProps) {
-  const { ctx, anchor, code, hunkHeader } = props
-  const openPeek = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    ctx.tests.openTests(anchor, code, hunkHeader)
-  }
-  return (
-    <>
-      <button
-        aria-label="Jump to the tests for this block"
-        type="button"
-        className="rs-hunk-tests"
-        onClick={openPeek}
-      >
-        Tests
-      </button>
-      <OpenTests ctx={ctx} anchor={anchor} />
-    </>
   )
 }
 
@@ -436,33 +259,21 @@ function HunkViewedToggle(props: { ctx: PaneContext; header: string; viewed: boo
   )
 }
 
-function HunkBar(props: { ctx: PaneContext; hunk: DiffHunk; hunkIndex: number; viewed: boolean }) {
-  const { ctx, hunk, hunkIndex, viewed } = props
+function HunkBar(props: { ctx: PaneContext; hunk: DiffHunk; viewed: boolean }) {
+  const { ctx, hunk, viewed } = props
   return (
     <div className="rs-hunk-bar">
       <span className="rs-hunk-bar__text">
         <HunkContext header={hunk.header} />
       </span>
       <HunkViewedToggle ctx={ctx} header={hunk.header} viewed={viewed} />
-      <TestsButton
-        ctx={ctx}
-        anchor={`hunk-${hunkIndex}`}
-        code={hunkCode(hunk.lines)}
-        hunkHeader={hunk.header}
-      />
     </div>
   )
 }
 
-function PaneHunkHeader(props: {
-  ctx: PaneContext
-  hunk: DiffHunk
-  hunkIndex: number
-  viewed: boolean
-}) {
+function PaneHunkHeader(props: { ctx: PaneContext; hunk: DiffHunk; viewed: boolean }) {
   const { ctx } = props
   const bar = <HunkBar {...props} />
-  if (ctx.mode !== 'unified') return <div className="diff-split-header rs-hunk-anchor">{bar}</div>
   return (
     <UnifiedRowsTable ctx={ctx}>
       <tr>
@@ -505,7 +316,7 @@ function FormattingNotice(props: { ctx: PaneContext; hiddenCount: number }) {
       {hiddenCount} formatting-only {plural(hiddenCount, 'hunk')} hidden —{' '}
       <button
         className="review-diff-formatting-show-btn"
-        onClick={() => ctx.actions.setHideFormattingHunks(false)}
+        onClick={ctx.actions.revealFormattingHunks}
       >
         show all
       </button>
@@ -529,21 +340,9 @@ function UnifiedItem(props: { ctx: PaneContext; line: DiffLine; moved: MovedMark
   )
 }
 
-function SplitItem(props: { ctx: PaneContext; item: ItemOf<'split-row'> }) {
-  const { ctx, item } = props
-  return (
-    <>
-      {item.movedLeft?.isStart && <MovedRowFor ctx={ctx} mark={item.movedLeft} />}
-      {item.movedRight?.isStart && <MovedRowFor ctx={ctx} mark={item.movedRight} />}
-      <SplitPair ctx={ctx} left={item.left} right={item.right} expanded={false} />
-    </>
-  )
-}
-
-/** A revealed unchanged line: one row in the unified view, both sides in the split view. */
+/** A revealed unchanged line. */
 function GapLine(props: { ctx: PaneContext; line: DiffLine }) {
   const { ctx, line } = props
-  if (ctx.mode !== 'unified') return <SplitPair expanded ctx={ctx} left={line} right={line} />
   return (
     <UnifiedRowsTable ctx={ctx}>
       <UnifiedLine expanded ctx={ctx} line={line} />
@@ -562,16 +361,21 @@ function Hotspot(props: { message: string }) {
 
 const ITEM_RENDERERS: ItemRenderers = {
   notice: (ctx, item) => <FormattingNotice ctx={ctx} hiddenCount={item.hiddenCount} />,
-  'hunk-header': (ctx, item) => (
-    <PaneHunkHeader ctx={ctx} hunk={item.hunk} hunkIndex={item.hunkIndex} viewed={item.viewed} />
-  ),
+  'hunk-header': (ctx, item) => <PaneHunkHeader ctx={ctx} hunk={item.hunk} viewed={item.viewed} />,
   line: (ctx, item) => <UnifiedItem ctx={ctx} line={item.line} moved={item.moved} />,
-  'split-row': (ctx, item) => <SplitItem ctx={ctx} item={item} />,
   'gap-line': (ctx, item) => <GapLine ctx={ctx} line={item.line} />,
   'gap-expander': (ctx, item) => (
     <GapExpander ctx={ctx} gapKey={item.gapKey} hidden={item.hidden} />
   ),
   hotspot: (_ctx, item) => <Hotspot message={item.message} />,
+  fold: (ctx, item) => (
+    <FoldRow
+      fold={item.fold}
+      expanded={item.expanded}
+      onToggleShow={() => ctx.actions.toggleFold(item.hunkIndex)}
+      onGoToFirst={ctx.actions.goToPath}
+    />
+  ),
 }
 
 /** One entry of the virtual list. */

@@ -373,14 +373,10 @@
 .chapter-nav-group + .chapter-nav-group {
   border-top: 1px solid var(--tm-border);
 }
-.chapter-nav-group .file-tree {
-  overflow: visible;
-  padding-bottom: 6px;
-}
 /* Row 1: number, name, counts, risk dot, check. Row 2: the summary, under the name, full width. */
 .chapter-nav-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: baseline;
   column-gap: 8px;
   row-gap: 2px;
@@ -395,6 +391,13 @@
 }
 .chapter-nav-header:hover {
   background: var(--tm-overlay-subtle);
+}
+/* The open chapter (chapters band) or the active file's chapter (stream band). */
+.chapter-nav-header[aria-current='true'],
+.chapter-nav-header[aria-current='true']:hover {
+  background: var(--tm-bg-card);
+  box-shadow: inset 3px 0 0 var(--tm-accent);
+  color: var(--tm-text-primary);
 }
 .chapter-nav-num {
   min-width: 14px;
@@ -429,23 +432,6 @@
 .chapter-nav-check svg {
   width: 12px;
   height: 12px;
-}
-
-.chapter-nav-risk-dot {
-  width: 7px;
-  height: 7px;
-  align-self: center;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.chapter-nav-risk-dot--low {
-  background: var(--tm-success);
-}
-.chapter-nav-risk-dot--medium {
-  background: var(--tm-warning);
-}
-.chapter-nav-risk-dot--high {
-  background: var(--tm-danger);
 }
 
 /* ─── ReviewDiffPane ──────────────────────────────────────────────────────── */
@@ -486,28 +472,6 @@
   left: 0;
   width: 100%;
 }
-.review-diff-table-wrap--split .diff-split-header {
-  border-top: 1px solid var(--tm-border);
-}
-.diff-split-tables {
-  display: flex;
-  width: 100%;
-}
-
-.diff-split-resize-handle:hover {
-  background: var(--tm-accent);
-  opacity: 0.5;
-}
-
-.diff-line__empty-cell {
-  background: var(--tm-bg-elevated);
-  opacity: 0.4;
-}
-
-.diff-split-comment-inner {
-  padding-left: 62px; /* num(44px) + prefix(18px) — aligns with code content column */
-}
-
 /* Formatting-only hunks hidden notice */
 .review-diff-formatting-notice {
   font-size: var(--tm-font-size-xs);
@@ -610,8 +574,6 @@
   border-top: 1px solid var(--tm-border);
 }
 
-/* ─── ReviewSubmitPanel ───────────────────────────────────────────────────── */
-
 /* ─── RiskBreakdownPanel ──────────────────────────────────────────────────── */
 
 .risk-importer-btn {
@@ -653,37 +615,6 @@
   cursor: pointer;
 }
 
-/* ─── FullFileList ────────────────────────────────────────────────────────── */
-
-.full-file-list {
-  overflow-y: auto;
-  flex: 1;
-}
-
-/* Chapter group */
-/* Principle XII: an SVG does not read font-size. */
-/* Principle XII: an SVG does not read font-size. */
-
-/* File rows within full view */
-
-.full-file-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 6px 10px 6px 18px;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--tm-border);
-  cursor: pointer;
-  font-size: var(--tm-font-size-sm);
-  text-align: left;
-  color: inherit;
-  transition: background 0.1s;
-}
-.full-file-row:hover {
-  background: var(--tm-overlay-subtle);
-}
 /* Principle XII: the glyphs these carried were text and took a font size; an
    icon takes real dimensions. One block for every check-state and control icon
    converted in this pass. */

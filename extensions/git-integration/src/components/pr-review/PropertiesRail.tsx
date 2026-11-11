@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { BookOpen, Copy, Flame, FlaskConical, GitBranch, HeartPulse } from 'lucide-react'
+import { BookOpen, Copy, GitBranch, HeartPulse } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { IconButton, RelativeTime } from '@terminator/extension-ui'
 import type { PrReviewDetail } from '../../schemas/pr-review.schema'
@@ -8,8 +8,6 @@ import { IssueRefList } from './IssueRefs'
 import './properties-rail.css'
 
 const SIGNAL_ICONS: Record<Signal['kind'], LucideIcon> = {
-  risk: Flame,
-  tests: FlaskConical,
   complexity: GitBranch,
   reading: BookOpen,
   health: HeartPulse,
@@ -32,14 +30,12 @@ function SignalRow({ signal }: { signal: Signal }) {
 }
 
 function SignalsSection({ pr }: { pr: PrReviewDetail }) {
-  const [risk, ...rest] = overviewSignals(pr)
   return (
     <section>
       <h2 className="pr-rail-heading">Signals</h2>
       <ul className="pr-rail-signals">
-        {risk && <SignalRow signal={risk} />}
         {insightsPending(pr) && <li className="pr-rail-pending">Analysing this PR…</li>}
-        {rest.map((signal) => (
+        {overviewSignals(pr).map((signal) => (
           <SignalRow key={signal.kind} signal={signal} />
         ))}
       </ul>

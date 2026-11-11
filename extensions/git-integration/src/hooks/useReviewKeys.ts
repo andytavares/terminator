@@ -1,16 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../stores/review-ui.store'
+import { REVIEW_KEY_EVENTS } from '../stores/review-ui.store'
 
 export interface ReviewKeyHandlers {
-  nextFile(): void
-  prevFile(): void
-  nextChapter(): void
-  prevChapter(): void
-  nextUnviewedFile(): void
-  markViewed(): void
-  toggleFileList?(): void
-  toggleInsights(): void
-  openSubmit(): void
+  focusVerdictBar(): void
 }
 
 const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA'])
@@ -21,52 +13,24 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable
 }
 
-type ReviewUi = ReturnType<typeof useReviewUiStore.getState>
-type KeyAction = (handlers: ReviewKeyHandlers, ui: ReviewUi) => void
+/** Controls that Space activates; Space there belongs to the control, not the review. */
+const SPACE_CONTROLS =
+  'button, a[href], select, summary, [role="button"], [role="checkbox"], [role="switch"], [role="tab"]'
 
-const G_D_WINDOW_MS = 1000
-
-/** Raises a key event the diff pane performs, since only it knows its hunks and selection. */
-function emitKeyEvent(event: string): KeyAction {
-  return () => window.dispatchEvent(new CustomEvent(event))
+function isSpaceOnControl(e: KeyboardEvent): boolean {
+  return e.key === ' ' && e.target instanceof Element && e.target.closest(SPACE_CONTROLS) !== null
 }
 
-const KEY_ACTIONS: Record<string, KeyAction> = {
-  k: emitKeyEvent(REVIEW_KEY_EVENTS.nextHunk),
-  j: emitKeyEvent(REVIEW_KEY_EVENTS.prevHunk),
-  ']': (h) => h.nextFile(),
-  '[': (h) => h.prevFile(),
-  '}': (h) => h.nextChapter(),
-  '{': (h) => h.prevChapter(),
-  n: (h) => h.nextUnviewedFile(),
-  v: (h) => h.markViewed(),
-  s: (_h, ui) => ui.setDiffRange(ui.diffRange === 'since' ? 'whole' : 'since'),
-  c: (_h, ui) => ui.cycleCommentVisibility(),
-  C: (_h, ui) => ui.setAgentNotesOn(!ui.agentNotesOn),
-  a: emitKeyEvent(REVIEW_KEY_EVENTS.askAgent),
-  e: emitKeyEvent(REVIEW_KEY_EVENTS.explain),
-  r: emitKeyEvent(REVIEW_KEY_EVENTS.comment),
-  m: emitKeyEvent(REVIEW_KEY_EVENTS.note),
-  t: (h, ui) => (h.toggleFileList ? h.toggleFileList() : ui.toggleFileList()),
-  i: (h) => h.toggleInsights(),
-  '?': (_h, ui) => ui.setKeyboardHelpOpen(!ui.keyboardHelpOpen),
+/** The pane event each bare key raises, since only the pane knows its hunks and selection. */
+const KEY_EVENTS: Record<string, string> = {
+  k: REVIEW_KEY_EVENTS.nextHunk,
+  j: REVIEW_KEY_EVENTS.prevHunk,
+  ' ': REVIEW_KEY_EVENTS.markHunkRead,
+  c: REVIEW_KEY_EVENTS.comment,
+  l: REVIEW_KEY_EVENTS.later,
 }
 
-/** The `g d` chord (peek definition): `g` starts it, `d` within a second ends it. True when the key
- *  was part of the chord; any other key cancels a started one. */
-function chordKey(key: string, gPressedAtRef: { current: number | null }): boolean {
-  if (key === 'g') {
-    gPressedAtRef.current = Date.now()
-    return true
-  }
-  const started = gPressedAtRef.current
-  gPressedAtRef.current = null
-  if (key !== 'd' || !started || Date.now() - started > G_D_WINDOW_MS) return false
-  window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.peekDefinition))
-  return true
-}
-
-/** Cmd+Enter (Ctrl+Enter off macOS) opens the submit panel. */
+/** Cmd+Enter (Ctrl+Enter off macOS) moves to the verdict bar. */
 function isSubmitShortcut(e: KeyboardEvent): boolean {
   return (e.metaKey || e.ctrlKey) && e.key === 'Enter'
 }
@@ -75,22 +39,22 @@ function hasCommandModifier(e: KeyboardEvent): boolean {
   return e.metaKey || e.ctrlKey || e.altKey
 }
 
-function keyDownHandler(
-  handlersRef: { current: ReviewKeyHandlers },
-  gPressedAtRef: { current: number | null }
-) {
+function keyDownHandler(handlersRef: { current: ReviewKeyHandlers }) {
   return (e: KeyboardEvent) => {
     if (e.key === 'Escape' || isEditableTarget(e.target)) return
     if (isSubmitShortcut(e)) {
       e.preventDefault()
-      handlersRef.current.openSubmit()
+      handlersRef.current.focusVerdictBar()
       return
     }
-    // Every other binding is a bare key or shift+key — reject any other
-    // modifier so OS/app shortcuts (Cmd+R, Ctrl+Tab, ...) pass through.
-    if (hasCommandModifier(e)) return
-    if (chordKey(e.key, gPressedAtRef)) return
-    KEY_ACTIONS[e.key]?.(handlersRef.current, useReviewUiStore.getState())
+    // Every other binding is a bare key — reject any modifier so OS/app
+    // shortcuts (Cmd+R, Ctrl+Tab, ...) pass through.
+    if (hasCommandModifier(e) || isSpaceOnControl(e)) return
+    const event = KEY_EVENTS[e.key]
+    if (!event) return
+    // Space would otherwise scroll the pane as well.
+    e.preventDefault()
+    window.dispatchEvent(new CustomEvent(event))
   }
 }
 
@@ -101,13 +65,12 @@ function keyDownHandler(
  * extension host uses to exit the extension on a double-press.
  */
 export function useReviewKeys(handlers: ReviewKeyHandlers): void {
-  const gPressedAtRef = useRef<number | null>(null)
   const handlersRef = useRef(handlers)
   useEffect(() => {
     handlersRef.current = handlers
   })
   useEffect(() => {
-    const handleKeyDown = keyDownHandler(handlersRef, gPressedAtRef)
+    const handleKeyDown = keyDownHandler(handlersRef)
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])

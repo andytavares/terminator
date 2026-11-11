@@ -7,6 +7,8 @@ import { RepoRoot, parseRemoteRepo } from '../repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope } from '../register.js'
 import { isOverflow, type GithubContext } from './context.js'
 import { measureFiles } from './file-metrics.js'
+import { parsePrFiles } from '../../review/parsed-file.js'
+import { blastRadius, fileBlastRadius } from '../../review/blast-radius.js'
 
 /** One file of a pull request, at the head the caller last saw when it knows it. */
 interface PrFile {
@@ -115,6 +117,48 @@ async function readPrFileContent(ctx: GithubContext, file: PrFile, ref: string) 
   return { content }
 }
 
+interface PrHead {
+  repoRoot: string
+  prNumber: number
+  headSHA: string
+}
+
+/** The head commit in the checkout, fetching the PR head when it is not there yet. */
+async function ensureHeadCommit(pr: PrHead): Promise<void> {
+  try {
+    await runGit(pr.repoRoot, ['cat-file', '-e', `${pr.headSHA}^{commit}`])
+  } catch {
+    await fetchPullRef(pr.repoRoot, pr.prNumber)
+  }
+}
+
+/** Per changed file, the blast radius at the head; no files without a checkout or without the
+ *  patches the PR detail fetch returned for that head. */
+async function prBlastRadius(ctx: GithubContext, pr: PrHead) {
+  const remembered = ctx.prPatches.get(`${pr.repoRoot}#${pr.prNumber}`)
+  if (parseRemoteRepo(pr.repoRoot) || remembered?.headSHA !== pr.headSHA) return { radius: {} }
+  const files = parsePrFiles([...remembered.patches].map(([path, patch]) => ({ path, patch })))
+  await ensureHeadCommit(pr)
+  const results = await blastRadius(pr.repoRoot, pr.headSHA, files)
+  return {
+    radius: Object.fromEntries(files.map((f) => [f.path, fileBlastRadius(results, f.path)])),
+  }
+}
+
+function blastRadiusChannel(ctx: GithubContext): ChannelSpec {
+  return defineChannel({
+    channel: 'github:blast-radius',
+    schema: z.object({
+      repoRoot: RepoRoot,
+      prNumber: z.number().int().positive(),
+      headSHA: z.string().min(1),
+    }),
+    invalid: VALIDATION_ERROR,
+    run: (pr) => prBlastRadius(ctx, pr),
+    onError: errorEnvelope,
+  })
+}
+
 export function prFileChannels(ctx: GithubContext): ChannelSpec[] {
   return [
     defineChannel({
@@ -141,5 +185,6 @@ export function prFileChannels(ctx: GithubContext): ChannelSpec[] {
       run: async ({ repoRoot, paths }) => ({ metrics: await measureFiles(repoRoot, paths) }),
       onError: errorEnvelope,
     }),
+    blastRadiusChannel(ctx),
   ]
 }

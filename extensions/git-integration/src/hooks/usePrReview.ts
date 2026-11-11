@@ -4,13 +4,6 @@ import { githubAPI, type RawFileMetrics } from '../api/github'
 import { usePrReviewStore, type PrReviewStore } from '../stores/pr-review.store'
 import { PrReviewDetailSchema } from '../schemas/pr-review.schema'
 import type { PrReviewDetail, IssueComment } from '../schemas/pr-review.schema'
-import {
-  measuredFiles,
-  prRiskLevel,
-  riskScores,
-  scoredFiles,
-  signalDots,
-} from '../review/pr-signals'
 import { mergeSessionStatuses, parsePrList } from './queue-sessions'
 import { NO_REPOSITORY } from '../review/open-status'
 
@@ -218,38 +211,43 @@ export function useLoadPrDetail(repoRoot: string | null) {
 
 // ─── File metrics loading ─────────────────────────────────────────────────────
 
-/** Scores each file from its metrics, then the PR's risk and signal dots in the queue. */
-async function scorePr(
+/** Fetches each changed file's 90-day commit count into the open PR. */
+async function loadChurn(
   repoRoot: string,
   pr: PrReviewDetail,
-  actions: Pick<Store, 'updateFileRiskScores' | 'updateQueuePrRisk'>
+  store: Pick<Store, 'updateFileChurn'>
 ) {
-  const files = scoredFiles(pr)
-  if (files.length === 0) return
-  const response = await githubAPI.filesMetrics(
-    repoRoot,
-    files.map((f) => f.path)
-  )
+  const paths = pr.chapters.flatMap((c) => c.files.map((f) => f.path))
+  if (paths.length === 0) return
+  const response = await githubAPI.filesMetrics(repoRoot, paths)
   if ('error' in response) return
-  const measured = measuredFiles(
-    files,
-    (response as { metrics: Record<string, RawFileMetrics> }).metrics
-  )
-  if (measured.length === 0) return
-  const scores = riskScores(measured)
-  actions.updateFileRiskScores(scores)
-  actions.updateQueuePrRisk(pr.number, prRiskLevel(measured, scores), signalDots(measured, pr))
+  const { metrics } = response as { metrics: Record<string, RawFileMetrics> }
+  store.updateFileChurn(Object.fromEntries(paths.map((p) => [p, metrics[p]?.churn90d ?? 0])))
+}
+
+/** Fetches what each changed file's definitions reach at the PR head into the open PR. */
+async function loadBlastRadius(
+  repoRoot: string,
+  pr: PrReviewDetail,
+  store: Pick<Store, 'updateFileBlastRadius'>
+) {
+  const response = await githubAPI.blastRadius(repoRoot, pr.number, pr.headSHA)
+  if ('error' in response) return
+  store.updateFileBlastRadius(response.radius)
 }
 
 export function useFetchFileMetrics(repoRoot: string | null) {
-  const { activePr, updateFileRiskScores, updateQueuePrRisk } = usePrReviewStore()
+  const { activePr, updateFileChurn, updateFileBlastRadius } = usePrReviewStore()
   return useCallback(
     async (prDetail?: PrReviewDetail) => {
       const pr = prDetail ?? activePr
       if (!repoRoot || !pr) return
-      await scorePr(repoRoot, pr, { updateFileRiskScores, updateQueuePrRisk })
+      await Promise.all([
+        loadChurn(repoRoot, pr, { updateFileChurn }),
+        loadBlastRadius(repoRoot, pr, { updateFileBlastRadius }),
+      ])
     },
-    [repoRoot, activePr, updateFileRiskScores, updateQueuePrRisk]
+    [repoRoot, activePr, updateFileChurn, updateFileBlastRadius]
   )
 }
 

@@ -1,7 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import {
   FileHeader,
   type FileHeaderProps,
@@ -9,16 +8,13 @@ import {
 import type { PrChangedFile } from '../../src/schemas/pr-review.schema'
 import { partialFake } from '../../../../packages/test-support/src/fakes'
 
-function changedFileAt(level: 'low' | 'medium' | 'high', churn90d: number | null): PrChangedFile {
+function changedFileAt(churn90d: number | null, whyHere = 'defines InputPin.debounce_ms') {
   return partialFake<PrChangedFile>({
     path: 'backend/hardware.py',
     additions: 121,
     deletions: 38,
-    whyHere: 'defines InputPin.debounce_ms',
-    riskScore: partialFake<PrChangedFile['riskScore']>({
-      level,
-      metrics: partialFake<PrChangedFile['riskScore']['metrics']>({ churn90d }),
-    }),
+    whyHere,
+    churn90d,
   })
 }
 
@@ -29,7 +25,6 @@ function renderFileHeader(file: PrChangedFile, over: Partial<FileHeaderProps> = 
     showChangedSince: false,
     usesWithDef: [],
     menuNote: null,
-    onShowRisk: vi.fn(),
     onPeekDefinition: vi.fn(),
     ...over,
   })
@@ -38,76 +33,90 @@ function renderFileHeader(file: PrChangedFile, over: Partial<FileHeaderProps> = 
 
 describe('FileHeader', () => {
   it('shows the folder and the file name separately, with the full path on hover', () => {
-    renderFileHeader(changedFileAt('low', null))
+    renderFileHeader(changedFileAt(null))
     expect(screen.getByText('backend/')).toBeTruthy()
     expect(screen.getByText('hardware.py')).toBeTruthy()
     expect(screen.getByTitle('backend/hardware.py')).toBeTruthy()
   })
 
   it('shows the lines added and removed', () => {
-    renderFileHeader(changedFileAt('low', null))
+    renderFileHeader(changedFileAt(null))
     expect(screen.getByText('+121')).toBeTruthy()
     expect(screen.getByText('−38')).toBeTruthy()
   })
 
-  it.each(['low', 'medium'] as const)('shows no risk chip for %s risk', (level) => {
-    renderFileHeader(changedFileAt(level, null))
-    expect(screen.queryByRole('button', { name: /risk/i })).toBeNull()
-  })
-
-  it('shows the High risk chip as the button that explains the risk', () => {
-    const onShowRisk = vi.fn()
-    renderFileHeader(changedFileAt('high', null), { onShowRisk })
-    const chip = screen.getByRole('button', { name: /High risk/ })
-    chip.click()
-    expect(onShowRisk).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('FileHeader — Why this file', () => {
-  it.each(['low', 'medium'] as const)(
-    'opens the explanation from the second line for %s risk',
-    async (level) => {
-      const onShowRisk = vi.fn()
-      renderFileHeader(changedFileAt(level, null), { onShowRisk })
-      await userEvent.setup().click(screen.getByRole('button', { name: 'Why this file' }))
-      expect(onShowRisk).toHaveBeenCalledTimes(1)
-    }
-  )
-
-  it('leaves the High risk chip as the only way in for high risk', () => {
-    renderFileHeader(changedFileAt('high', null))
-    expect(screen.queryByRole('button', { name: 'Why this file' })).toBeNull()
+  it('shows no risk chip and no Why this file button', () => {
+    renderFileHeader(changedFileAt(null))
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })
 
 describe('FileHeader second row', () => {
   it('says why the file is here', () => {
-    renderFileHeader(changedFileAt('low', null))
+    renderFileHeader(changedFileAt(null))
     expect(screen.getByText(/Why here:/).parentElement?.textContent).toBe(
       'Why here: defines InputPin.debounce_ms'
     )
   })
 
   it('says how often the file changed, in the singular too', () => {
-    renderFileHeader(changedFileAt('low', 31))
+    renderFileHeader(changedFileAt(31))
     expect(screen.getByText('Changed 31 times in 90 days')).toBeTruthy()
-    renderFileHeader(changedFileAt('low', 1))
+    renderFileHeader(changedFileAt(1))
     expect(screen.getByText('Changed 1 time in 90 days')).toBeTruthy()
+  })
+})
+
+describe('FileHeader second row — the two facts', () => {
+  it('separates the reason and the change count with a dot', () => {
+    renderFileHeader(changedFileAt(4))
+    expect(screen.getByText('·')).toBeTruthy()
+  })
+
+  it('shows only the change count when the file has no reason', () => {
+    renderFileHeader(changedFileAt(4, ''))
+    expect(screen.queryByText(/Why here:/)).toBeNull()
+    expect(screen.queryByText('·')).toBeNull()
+    expect(screen.getByText('Changed 4 times in 90 days')).toBeTruthy()
   })
 
   it('leaves out the churn line when it is unknown', () => {
-    renderFileHeader(changedFileAt('low', null))
+    renderFileHeader(changedFileAt(null))
     expect(screen.queryByText(/in 90 days/)).toBeNull()
   })
 
   it('has no Viewed checkbox, which lives in the footer beside the next file action', () => {
-    renderFileHeader(changedFileAt('low', null))
+    renderFileHeader(changedFileAt(null))
     expect(screen.queryByRole('checkbox')).toBeNull()
   })
 
   it('shows the note about which head the diff shows', () => {
-    renderFileHeader(changedFileAt('low', null), { menuNote: 'Showing 9f0c76eb… head' })
+    renderFileHeader(changedFileAt(null), { menuNote: 'Showing 9f0c76eb… head' })
     expect(screen.getByText('Showing 9f0c76eb… head')).toBeTruthy()
+  })
+})
+
+function changedFileWithRadius(blastRadius: PrChangedFile['blastRadius']) {
+  return partialFake<PrChangedFile>({ ...changedFileAt(null), blastRadius })
+}
+
+describe('FileHeader second row — blast radius', () => {
+  it('says how many files use what the file changes', () => {
+    renderFileHeader(changedFileWithRadius({ usedIn: 14, alsoDefinedIn: 0 }))
+    expect(screen.getByText('Used in 14 files')).toBeTruthy()
+  })
+
+  it('adds how many other files define the same name, in the singular too', () => {
+    renderFileHeader(changedFileWithRadius({ usedIn: 1, alsoDefinedIn: 2 }))
+    expect(screen.getByText('Used in 1 file · name also defined in 2 files')).toBeTruthy()
+  })
+
+  it.each([
+    ['unmeasured', null],
+    ['used nowhere and defined nowhere else', { usedIn: 0, alsoDefinedIn: 0 }],
+    ['used nowhere, though the name is defined elsewhere', { usedIn: 0, alsoDefinedIn: 2 }],
+  ])('shows no blast radius when the file is %s', (_case, blastRadius) => {
+    renderFileHeader(changedFileWithRadius(blastRadius))
+    expect(screen.queryByText(/Used in/)).toBeNull()
   })
 })

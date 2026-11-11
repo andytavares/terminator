@@ -59,24 +59,6 @@
   color: var(--tm-danger);
 }
 
-.fh-risk {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tm-space-1);
-  padding: 1px var(--tm-space-2);
-  border: 0;
-  border-radius: var(--tm-radius-sm);
-  background: color-mix(in srgb, var(--tm-danger) 12%, transparent);
-  color: var(--tm-danger);
-  font: 500 var(--tm-font-size-sm) / 1.4 var(--tm-font-ui);
-  cursor: pointer;
-}
-
-.fh-risk svg {
-  width: 12px;
-  height: 12px;
-}
-
 .fh-changed {
   font-size: var(--tm-font-size-sm);
   color: var(--tm-warning);
@@ -99,22 +81,6 @@
   gap: 10px;
   font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
-}
-
-.fh-why-file {
-  margin-left: auto;
-  padding: 1px var(--tm-space-2);
-  border: 0;
-  border-radius: var(--tm-radius-sm);
-  background: transparent;
-  color: var(--tm-text-muted);
-  font: var(--tm-font-size-sm) / 1.4 var(--tm-font-ui);
-  cursor: pointer;
-}
-
-.fh-why-file:hover {
-  background: var(--tm-overlay-subtle);
-  color: var(--tm-text-primary);
 }
 
 .fh-why-label {

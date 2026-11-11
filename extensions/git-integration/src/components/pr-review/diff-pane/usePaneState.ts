@@ -1,60 +1,31 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { usePrReviewStore } from '../../../stores/pr-review.store'
 import { useReviewUiStore } from '../../../stores/review-ui.store'
 import { classifyHunk, type ComplexityHotspot } from '../../../github/pr-review-service'
 import { measureDiffComplexity } from '../../../review/insights'
-import { buildSplitRows } from '../../FileDiffView'
-import { buildDiffItems, type GapView, type MovedMark } from '../../../review/diff-items'
-import type { Chapter, MovedBlock, PrHead, ReviewNote } from '../../../schemas/pr-review.schema'
+import {
+  buildDiffItems,
+  type GapView,
+  type MovedMark,
+  type SameShapeFold,
+} from '../../../review/diff-items'
+import type { ReviewBand } from '../../../review/review-layout'
+import type { Chapter, MovedBlock, SameShapeGroup } from '../../../schemas/pr-review.schema'
 import type { DiffItem } from '../../../review/diff-items'
 import type { FileDiff } from '../../../schemas/git.schema'
-import type { DiffViewMode } from '../../../stores/review-ui.store'
-import type { TestBlock } from '../TestsPopover'
-import type { VirtualDiffListHandle } from '../VirtualDiffList'
-import type {
-  Annotating,
-  ComposerAnchor,
-  NoteAnchor,
-  ReplyTarget,
-  Side,
-  TestsControl,
-} from './types'
-
-interface NoteTarget {
-  head: PrHead
-  path: string
-  addNote: (head: PrHead, note: ReviewNote) => void
-}
-
-interface JumpTarget {
-  path: string
-  diff: FileDiff | null
-  items: DiffItem[]
-  listRef: { current: VirtualDiffListHandle | null }
-}
-
-interface TestsSource extends JumpTarget {
-  head: PrHead
-  chapters: Chapter[]
-  goToPath: (path: string) => void
-}
+import type { Annotating, ComposerAnchor, ReplyTarget, Side } from './types'
 
 interface ItemSource {
   diff: FileDiff | null
   hotspots: ComplexityHotspot[]
-  mode: DiffViewMode
   hideFormattingHunks: boolean
   gapViews: Map<string, GapView>
   movedMark: (lineNum: number, side: Side) => MovedMark | null
   viewedHunks: Set<string>
-}
-
-interface ComplexityTarget {
-  diff: FileDiff | null
-  path: string
-  chapters: Chapter[]
-  patchFileComplexity: (chapterId: string, filePath: string, delta: number) => void
+  band: ReviewBand
+  sameShape: Map<number, SameShapeFold>
+  expandedFolds: Set<number>
 }
 
 export function usePaneReviewStore() {
@@ -62,16 +33,12 @@ export function usePaneReviewStore() {
     useShallow((s) => ({
       viewedFiles: s.viewedFiles,
       threads: s.threads,
-      patchFileComplexity: s.patchFileComplexity,
       changedSince: s.changedSince,
       viewedAt: s.viewedAt,
       viewedHunks: s.viewedHunks,
       toggleHunkViewed: s.toggleHunkViewed,
       historyRewritten: s.historyRewritten,
-      notes: s.notes,
       drafts: s.drafts,
-      addNote: s.addNote,
-      removeNote: s.removeNote,
       updateDraft: s.updateDraft,
       removeDraft: s.removeDraft,
       setCurrentChapter: s.setCurrentChapter,
@@ -85,12 +52,6 @@ export function usePaneReviewStore() {
 export function usePaneUiStore() {
   return useReviewUiStore(
     useShallow((s) => ({
-      commentVisibility: s.commentVisibility,
-      setCommentVisibility: s.setCommentVisibility,
-      agentNotesOn: s.agentNotesOn,
-      diffViewMode: s.diffViewMode,
-      hideFormattingHunks: s.hideFormattingHunks,
-      setHideFormattingHunks: s.setHideFormattingHunks,
       diffRange: s.diffRange,
       selection: s.selection,
       setSelection: s.setSelection,
@@ -98,88 +59,24 @@ export function usePaneUiStore() {
       requestComposer: s.requestComposer,
       agentRuns: s.agentRuns,
       openAgentPanel: s.openAgentPanel,
+      deferHunk: s.deferHunk,
+      setFileHunks: s.setFileHunks,
+      revisitHunk: s.revisitHunk,
+      clearRevisitHunk: s.clearRevisitHunk,
     }))
   )
 }
 
-/** The comment composer, the reply composer and the private-note box. */
-/** The private-note box: where it is open, what is typed, and saving or dropping it. */
-function useNoteBox(target: NoteTarget) {
-  const [noteAnchor, setNoteAnchor] = useState<NoteAnchor | null>(null)
-  const [noteDraft, setNoteDraft] = useState('')
-  const cancelNote = () => {
-    setNoteAnchor(null)
-    setNoteDraft('')
-  }
-  const saveNote = () => {
-    if (!noteAnchor || !noteDraft.trim()) return
-    const { line, side } = noteAnchor
-    const note = { id: crypto.randomUUID(), path: target.path, line, side, body: noteDraft }
-    target.addNote(target.head, { ...note, createdAt: new Date().toISOString() })
-    cancelNote()
-  }
-  return { noteAnchor, setNoteAnchor, noteDraft, setNoteDraft, saveNote, cancelNote }
-}
-
-export function useAnnotating(target: NoteTarget): Annotating {
+/** The comment composer and the reply composer. */
+export function useAnnotating(): Annotating {
   const [composerAnchor, setComposerAnchor] = useState<ComposerAnchor | null>(null)
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null)
-  const noteBox = useNoteBox(target)
   return {
     composerAnchor,
     setComposerAnchor,
     closeComposer: () => setComposerAnchor(null),
     replyTarget,
     setReplyTarget,
-    ...noteBox,
-  }
-}
-
-/** The index of the first entry showing new-file line `line`, or -1. */
-function indexShowingNewLine(items: DiffItem[], line: number): number {
-  return items.findIndex((item) => {
-    if (item.kind === 'line' || item.kind === 'gap-line') return item.line.newLineNumber === line
-    return item.kind === 'split-row' && item.right?.newLineNumber === line
-  })
-}
-
-/** Scrolls to a test opened from the tests popover once its file's diff is shown, once per jump. */
-function usePendingJump(target: JumpTarget) {
-  const [pendingJump, setPendingJump] = useState<{ path: string; line: number } | null>(null)
-  const performedJumpRef = useRef(pendingJump)
-  const { path, diff, items, listRef } = target
-  useEffect(() => {
-    if (!pendingJump || !diff || pendingJump.path !== path) return
-    if (performedJumpRef.current === pendingJump) return
-    const index = indexShowingNewLine(items, pendingJump.line)
-    if (index < 0) return
-    performedJumpRef.current = pendingJump
-    listRef.current?.scrollToIndex(index, 'center')
-  }, [pendingJump, diff, path, items, listRef])
-  return setPendingJump
-}
-
-/** The tests popover, and jumping from it to a test in this review. */
-export function useTests(source: TestsSource): TestsControl {
-  const [testsFor, setTestsFor] = useState<{ anchor: string; block: TestBlock } | null>(null)
-  const setPendingJump = usePendingJump(source)
-  const { head, path, chapters } = source
-  const prPaths = useMemo(
-    () => new Set(chapters.flatMap((c) => c.files.map((f) => f.path))),
-    [chapters]
-  )
-  return {
-    testsFor,
-    closeTests: () => setTestsFor(null),
-    openTests: (anchor, code, hunkHeader) => {
-      const block = { repoRoot: head.repoRoot, headSHA: head.headSHA, path, code, hunkHeader }
-      setTestsFor({ anchor, block })
-    },
-    openTestInReview: (testPath, line) => {
-      setPendingJump({ path: testPath, line })
-      source.goToPath(testPath)
-    },
-    prPaths,
   }
 }
 
@@ -222,6 +119,36 @@ export function useMovedMarks(movedBlocks: MovedBlock[], path: string) {
   return { movedMark, toggleMoved }
 }
 
+/** This file's hunks that repeat an earlier hunk, by hunk index, with the hunk each repeats. */
+export function useSameShapeFolds(groups: SameShapeGroup[], path: string) {
+  return useMemo(
+    () =>
+      new Map(
+        groups.flatMap((group) =>
+          group.rest
+            .filter((hunk) => hunk.path === path)
+            .map((hunk): [number, SameShapeFold] => [
+              hunk.hunkIndex,
+              { kind: 'same-shape', first: group.first, maskedValues: hunk.maskedValues },
+            ])
+        )
+      ),
+    [groups, path]
+  )
+}
+
+/** The folded hunks the reviewer opened, and opening or closing one. */
+export function useFoldToggles() {
+  const [expandedFolds, setExpandedFolds] = useState<Set<number>>(new Set())
+  const toggleFold = (hunkIndex: number) =>
+    setExpandedFolds((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(hunkIndex)) next.add(hunkIndex)
+      return next
+    })
+  return { expandedFolds, toggleFold }
+}
+
 function visibleHunksOf(diff: FileDiff | null, hideFormatting: boolean) {
   const all = (diff?.hunks ?? []).map((hunk, index) => ({ hunk, index }))
   if (!hideFormatting) return all
@@ -235,43 +162,38 @@ export function useViewedHunks(headers: string[] | undefined): Set<string> {
 
 /** The virtual list's entries for the diff as shown. */
 export function useDiffItems(source: ItemSource): DiffItem[] {
-  const { diff, mode, hideFormattingHunks, gapViews, movedMark, viewedHunks, hotspots } = source
-  const splitRows = useMemo(() => splitRowsOf(diff), [diff])
+  const { diff, hideFormattingHunks, gapViews, movedMark, viewedHunks, hotspots } = source
+  const { band, sameShape, expandedFolds } = source
   const visibleHunks = useMemo(
     () => visibleHunksOf(diff, hideFormattingHunks),
     [diff, hideFormattingHunks]
   )
   return useMemo(() => {
     if (!diff) return []
-    const parts = { visibleHunks, splitRows, gapViews, hotspots, movedMark, viewedHunks }
-    return buildDiffItems({ mode, hunkCount: diff.hunks.length, ...parts })
-  }, [diff, mode, visibleHunks, splitRows, gapViews, hotspots, movedMark, viewedHunks])
+    const parts = { visibleHunks, gapViews, hotspots, movedMark, viewedHunks }
+    const folds = { band, sameShape, expandedFolds }
+    return buildDiffItems({ hunkCount: diff.hunks.length, ...parts, ...folds })
+  }, [
+    diff,
+    visibleHunks,
+    gapViews,
+    hotspots,
+    movedMark,
+    viewedHunks,
+    band,
+    sameShape,
+    expandedFolds,
+  ])
 }
 
-function splitRowsOf(diff: FileDiff | null) {
-  return (diff?.hunks ?? []).map((hunk) => buildSplitRows(hunk.lines))
-}
-
-/** Measures the diff once. Its branch delta feeds the file's risk score, and its hotspot hunks go to
- *  the list. The chapters and the store action are read through refs: as dependencies they would
- *  loop (patching updates the chapters, which would refetch the diff and blank the pane). */
-export function useComplexityPatch(target: ComplexityTarget): ComplexityHotspot[] {
-  const patchRef = useRef(target.patchFileComplexity)
-  const chaptersRef = useRef<Chapter[]>(target.chapters)
-  useEffect(() => {
-    patchRef.current = target.patchFileComplexity
-    chaptersRef.current = target.chapters
-  })
+/** Measures the diff once; its hotspot hunks go to the list. */
+export function useComplexityHotspots(diff: FileDiff | null, path: string): ComplexityHotspot[] {
   const [measured, setMeasured] = useState<{ diff: FileDiff; hotspots: ComplexityHotspot[] }>()
-  const { diff, path } = target
   useEffect(() => {
     if (!diff) return
     let current = true
     void measureDiffComplexity(path, diff).then((result) => {
-      if (!current) return
-      setMeasured({ diff, hotspots: result?.hotspots ?? [] })
-      const chapter = chaptersRef.current.find((c) => c.files.some((f) => f.path === path))
-      if (chapter) patchRef.current(chapter.id, path, result?.delta ?? 0)
+      if (current) setMeasured({ diff, hotspots: result?.hotspots ?? [] })
     })
     return () => {
       current = false
