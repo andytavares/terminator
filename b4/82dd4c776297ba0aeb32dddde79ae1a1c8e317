@@ -1,0 +1,23 @@
+extensions/git-integration/src/review/same-shape.ts
+  s_6c2c30985200c2::t_8984bf02f0988d 1,4-9,15,20,22-66,69-75,78,80,82-88
+  s_6c2c30985200c2::t_bdecf1871b491d 2-3,10-14,16-19,21,67-68,76-77,79,81,89
+extensions/git-integration/tests/unit/same-shape.spec.ts
+  s_6c2c30985200c2::t_8984bf02f0988d 96-100
+  s_6c2c30985200c2::t_bdecf1871b491d 1-95,101-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b482dd4c776297ba0aeb32dddde79ae1a1c8e317",
+  "prompts": {},
+  "sessions": {
+    "s_6c2c30985200c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0fcc256-8205-49ce-a757-893d4406f77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
