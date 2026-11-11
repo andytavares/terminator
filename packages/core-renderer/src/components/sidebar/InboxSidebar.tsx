@@ -20,6 +20,7 @@ import { settleWithUndo } from '../home/InFlightMenu'
 import { carryThread, useDraggedThread } from '../home/thread-drag'
 import { SidebarSearch } from './SidebarSearch'
 import { useWorkMarks } from '../../home/work-marks'
+import { isSettled } from '../../home/settle'
 import {
   asksHiddenByRepo,
   filterInbox,
@@ -74,7 +75,7 @@ export function InboxList({ threads, now, repos }: InboxListProps): React.JSX.El
     <div className="inbox" onKeyDown={moveBetweenCards}>
       <InboxControls filter={filter} onChange={setFilter} repos={repos} />
       <div className="inbox__scroll">
-        <HiddenAsksLine threads={threads} />
+        <HiddenAsksLine threads={threads.filter((t) => !isSettled(t, marks, now))} />
         <ul className="inbox__cards" aria-label="Inbox">
           {cards.map((thread) => (
             <InboxCard
@@ -280,8 +281,8 @@ function useShownAgentTab() {
 
 function AttachButton({ thread }: { thread: WorkThread }): React.JSX.Element | null {
   const tab = useShownAgentTab()
-  if (!tab || !hasSessions(thread)) return null
-  const sessionIds = thread.lanes.flatMap((lane) => lane.sessionIds)
+  const sessionIds = thread.lanes.flatMap((lane) => lane.sessionIds).filter((id) => id !== tab?.id)
+  if (!tab || sessionIds.length === 0) return null
   return (
     <IconButton
       size="sm"
@@ -341,17 +342,15 @@ function settledLabel(count: number, searching: boolean): string {
 
 /** "N settled", folded until opened; open while searching, so its matches show. */
 function SettledSection({ threads, now, searching }: SettledProps) {
+  // A search opens the section, unless it was folded during a search.
   const [opened, setOpen] = useState(false)
-  const open = opened || searching
+  const [foldedInSearch, setFoldedInSearch] = useState(false)
+  const open = searching ? !foldedInSearch : opened
+  const toggle = (): void => (searching ? setFoldedInSearch(open) : setOpen(!open))
   if (threads.length === 0) return null
   return (
     <section className="inbox__settled">
-      <button
-        type="button"
-        className="inbox__settled-toggle"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
+      <button type="button" className="inbox__settled-toggle" aria-expanded={open} onClick={toggle}>
         <ChevronRight aria-hidden="true" className={open ? 'inbox__chevron--open' : undefined} />
         {settledLabel(threads.length, searching)}
       </button>

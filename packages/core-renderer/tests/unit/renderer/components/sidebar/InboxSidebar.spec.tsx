@@ -271,6 +271,15 @@ describe('InboxList — search reaches the settled section', () => {
     expect(screen.getByText('No active work matches')).toBeTruthy()
     expect(screen.getByRole('button', { name: '1 settled match' })).toBeTruthy()
   })
+
+  it('folds the settled section on a click while searching', async () => {
+    const user = userEvent.setup()
+    useWorkMarks.setState({ settled: { login: 1 } })
+    renderInbox([threadOf('login'), threadOf('other')])
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), 'login')
+    await user.click(screen.getByRole('button', { name: '1 settled match' }))
+    expect(screen.queryByRole('list', { name: 'Settled' })).toBeNull()
+  })
 })
 
 describe('InboxList — snoozing', () => {
@@ -305,6 +314,16 @@ describe('InboxList — asks the repo filter hides', () => {
       threadOf('b', { state: 'needs-you', repoRoot: '/repos/docs', repoName: 'docs' }),
     ])
     expect(screen.getByText('2 needs you in other repos')).toBeTruthy()
+  })
+
+  it('leaves out an ask settled by hand in another repo, which Show would not bring to the cards', () => {
+    useInboxFilter.setState({ filter: { text: '', repoRoot: '/repos/api' } })
+    useWorkMarks.setState({ snoozed: { a: NOW + HOUR_MS } })
+    renderInbox([
+      threadOf('a', { state: 'needs-you', repoRoot: '/repos/web', repoName: 'web' }),
+      threadOf('b'),
+    ])
+    expect(screen.queryByText(/needs you in/)).toBeNull()
   })
 })
 
@@ -349,6 +368,12 @@ describe('InboxList — attaching a card to the shown agent tab', () => {
       sessions: new Map([['agent-1', terminalSessionOf({ id: 'agent-1', projectId: 'p1' })]]),
     })
     renderInbox([threadOf('a', { laneSessionIds: [['s1']] })])
+    expect(within(cardFor('Work a')).queryByRole('button', { name: /^Attach to/ })).toBeNull()
+  })
+
+  it('offers no Attach on the card whose only session is the agent tab on screen', () => {
+    showAgentTab('Review')
+    renderInbox([threadOf('a', { laneSessionIds: [['agent-1']] })])
     expect(within(cardFor('Work a')).queryByRole('button', { name: /^Attach to/ })).toBeNull()
   })
 })

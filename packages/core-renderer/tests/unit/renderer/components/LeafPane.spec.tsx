@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, fireEvent, screen } from '@testing-library/react'
+import { act, render, fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { useSessionStore } from '../../../../src/stores/session.store'
@@ -12,6 +12,7 @@ import { partialFake } from '../../../../../test-support/src/fakes'
 import type { Terminal } from '@xterm/xterm'
 import { eventually } from '../../../../../test-support/src/eventually'
 import { useSessionRecordsStore } from '../../../../src/stores/session-records.store'
+import { useToastStore } from '../../../../src/stores/toast.store'
 import { SESSION_DRAG_TYPE } from '../../../../src/components/agent/session-drag'
 import type { SessionRecordListing } from '../../../../../core-shared/src/types/index'
 
@@ -287,5 +288,21 @@ describe('LeafPane — a session dropped on a terminal that runs an agent — pa
         expect.stringContaining('/t/login.jsonl')
       )
     )
+  })
+})
+
+describe('LeafPane — a session dropped on a pane that runs no agent', () => {
+  beforeEach(() => useSessionRecordsStore.setState({ records: new Map() }))
+
+  it('pastes nothing and says nothing, as when a drop on an agent composer bubbles up', async () => {
+    const instance = makeInstance()
+    withInstance(instance)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.drop(pane(), {
+      dataTransfer: { types: [SESSION_DRAG_TYPE], files: [], getData: () => 'login' },
+    })
+    await act(async () => {})
+    expect(instance.terminal.paste).not.toHaveBeenCalled()
+    expect(useToastStore.getState().toasts).toEqual([])
   })
 })

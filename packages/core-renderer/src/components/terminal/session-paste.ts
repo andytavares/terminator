@@ -46,7 +46,7 @@ export function allowSessionDrop(e: React.DragEvent, sessionId: string | null): 
 
 /** Pastes the context of the sessions a drop carries; false when it carries none. */
 export function dropSessions(e: React.DragEvent, sessionId: string): boolean {
-  if (!e.dataTransfer.types.includes(SESSION_DRAG_TYPE)) return false
+  if (!e.dataTransfer.types.includes(SESSION_DRAG_TYPE) || !runsAgent(sessionId)) return false
   void pasteSessionContext(sessionId, e.dataTransfer.getData(SESSION_DRAG_TYPE).split('\n'))
   return true
 }
