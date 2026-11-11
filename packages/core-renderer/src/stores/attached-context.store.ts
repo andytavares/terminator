@@ -1,6 +1,8 @@
 import { create, type StoreApi } from 'zustand'
 import { useToastStore } from './toast.store'
 import { recordUse } from '../usage/record'
+import { useSessionStore } from './session.store'
+import { useSessionRecordsStore } from './session-records.store'
 import {
   noAttachedContext,
   resolveSessionContext,
@@ -104,7 +106,32 @@ export const attachedOf =
   (state: AttachedContextState): AttachedContext =>
     state.byTab.get(tabId) ?? noAttachedContext
 
-/** Attaches each session that has a conversation to `tabId`, and says so when one has none. */
+const tabTitleOf = (sessionId: string): string | undefined =>
+  useSessionStore.getState().sessions.get(sessionId)?.tabTitle ??
+  useSessionRecordsStore.getState().records.get(sessionId)?.tabTitle
+
+/** The sessions by name, or by count when one of them has no name. */
+function namesOf(sessionIds: string[]): string {
+  const titles = sessionIds.map(tabTitleOf)
+  if (titles.every((title): title is string => title !== undefined)) {
+    return titles.length === 1
+      ? titles[0]
+      : `${titles.slice(0, -1).join(', ')} and ${titles[titles.length - 1]}`
+  }
+  return sessionIds.length === 1 ? '1 session' : `${sessionIds.length} sessions`
+}
+
+function sayWhatHadNothing(empty: string[], attached: number): void {
+  const names = `${namesOf(empty)} had no conversation or output.`
+  const total = empty.length + attached
+  const message =
+    attached === 0
+      ? `Nothing attached: ${names}`
+      : `Attached ${attached} of ${total} sessions. ${names}`
+  useToastStore.getState().addToast({ type: 'info', message })
+}
+
+/** Attaches each session that has a conversation to `tabId`, and names the ones that have none. */
 export async function attachSessions(tabId: string, sessionIds: string[]): Promise<void> {
   const others = sessionIds.filter((sessionId) => sessionId !== tabId)
   const resolved = await Promise.all(others.map(resolveSessionContext))
@@ -113,9 +140,6 @@ export async function attachSessions(tabId: string, sessionIds: string[]): Promi
     useAttachedContextStore.getState().addSessions(tabId, found)
     recordUse('core.agent.attach-session')
   }
-  if (found.length < resolved.length) {
-    useToastStore
-      .getState()
-      .addToast({ type: 'info', message: 'This session has no conversation to attach.' })
-  }
+  const empty = others.filter((_, i) => resolved[i] === null)
+  if (empty.length > 0) sayWhatHadNothing(empty, found.length)
 }

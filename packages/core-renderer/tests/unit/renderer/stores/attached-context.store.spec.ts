@@ -13,6 +13,7 @@ import {
 import { useSessionStore } from '../../../../src/stores/session.store'
 import { useSessionRecordsStore } from '../../../../src/stores/session-records.store'
 import { useToastStore } from '../../../../src/stores/toast.store'
+import { terminalSessionOf } from '../../../../../test-support/src/renderer-stores'
 import type { SessionRecordListing } from '../../../../../core-shared/src/types/index'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
 import { partialFake } from '../../../../../test-support/src/fakes'
@@ -82,35 +83,66 @@ describe('attached context store — citations, tabs and sends', () => {
   })
 })
 
-describe('attachSessions', () => {
-  beforeEach(() => {
-    installElectronApi({ agents: { history: async () => ({ data: [] }) } })
-    const agent = partialFake<NonNullable<SessionRecordListing['agent']>>({
-      agentId: 'claude',
-      transcriptPath: '/t/found.jsonl',
-    })
-    const found = partialFake<SessionRecordListing>({ tabTitle: 'Found', branch: null, agent })
-    useSessionStore.setState({ sessions: new Map(), terminalInstances: new Map() })
-    useSessionRecordsStore.setState({ records: new Map([['found', found]]) })
+function seedSessions(): void {
+  installElectronApi({ agents: { history: async () => ({ data: [] }) } })
+  const agent = partialFake<NonNullable<SessionRecordListing['agent']>>({
+    agentId: 'claude',
+    transcriptPath: '/t/found.jsonl',
   })
+  const found = partialFake<SessionRecordListing>({ tabTitle: 'Found', branch: null, agent })
+  const shell = terminalSessionOf({ id: 'shell', projectId: 'p1', tabTitle: 'Build shell' })
+  const server = terminalSessionOf({ id: 'server', projectId: 'p1', tabTitle: 'Dev server' })
+  useSessionStore.setState({
+    sessions: new Map([
+      ['shell', shell],
+      ['server', server],
+    ]),
+    terminalInstances: new Map(),
+  })
+  useSessionRecordsStore.setState({ records: new Map([['found', found]]) })
+}
+
+const toastMessages = () => useToastStore.getState().toasts.map((t) => t.message)
+
+describe('attachSessions', () => {
+  beforeEach(seedSessions)
 
   it('attaches each session that has a conversation, without a toast', async () => {
     await attachSessions('tab', ['found'])
     expect(attachedTo('tab').sessions.map((s) => s.title)).toEqual(['Found'])
-    expect(useToastStore.getState().toasts).toEqual([])
-  })
-
-  it('says so when a session has no conversation, and still attaches the others', async () => {
-    await attachSessions('tab', ['missing', 'found'])
-    expect(attachedTo('tab').sessions.map((s) => s.sessionId)).toEqual(['found'])
-    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([
-      'This session has no conversation to attach.',
-    ])
+    expect(toastMessages()).toEqual([])
   })
 
   it('ignores the tab dropped on itself', async () => {
     await attachSessions('found', ['found'])
     expect(attachedTo('found')).toBe(noAttachedContext)
-    expect(useToastStore.getState().toasts).toEqual([])
+    expect(toastMessages()).toEqual([])
+  })
+})
+
+describe('attachSessions — sessions with no conversation or output', () => {
+  beforeEach(seedSessions)
+
+  it('counts what it attached and names the session with nothing, leaving out the tab', async () => {
+    await attachSessions('tab', ['tab', 'shell', 'found'])
+    expect(attachedTo('tab').sessions.map((s) => s.sessionId)).toEqual(['found'])
+    expect(toastMessages()).toEqual([
+      'Attached 1 of 2 sessions. Build shell had no conversation or output.',
+    ])
+  })
+
+  it('counts a session it cannot name as one session', async () => {
+    await attachSessions('tab', ['missing', 'found'])
+    expect(toastMessages()).toEqual([
+      'Attached 1 of 2 sessions. 1 session had no conversation or output.',
+    ])
+  })
+
+  it('says nothing was attached, naming every session, when none had anything', async () => {
+    await attachSessions('tab', ['shell', 'server'])
+    expect(attachedTo('tab')).toBe(noAttachedContext)
+    expect(toastMessages()).toEqual([
+      'Nothing attached: Build shell and Dev server had no conversation or output.',
+    ])
   })
 })
