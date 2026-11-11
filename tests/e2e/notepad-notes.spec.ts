@@ -120,7 +120,7 @@ async function archivedRestoredDeleted(): Promise<void> {
   expect((await storedNote(notepad, 'Old draft'))?.archivedAt).toBeTruthy()
 
   await notepad.getByRole('button', { name: 'Archived (1)' }).click()
-  await rowMenu(notepad, 'Old draft', 'Unarchive')
+  await rowMenu(notepad, 'Old draft', 'Restore')
   await expect(notepad.getByRole('button', { name: /^Archived/ })).toHaveCount(0)
   expect((await storedNote(notepad, 'Old draft'))?.archivedAt).toBeNull()
 

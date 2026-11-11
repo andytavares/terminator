@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AlarmClock, Check, ChevronRight, Pin, Plus } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { AlarmClock, Check, ChevronRight, Paperclip, Pin, Plus, RotateCcw } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { useSessionStore } from '../../stores/session.store'
+import { attachSessions } from '../../stores/attached-context.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { revealSession } from '../../terminal/navigate-to-session'
 import { useNow } from '../session/useNow'
@@ -9,14 +11,24 @@ import { useWorkThreads } from '../home/useWorkThreads'
 import { useDeskSelection } from '../home/desk-selection'
 import { useStartWorkStore } from '../home/start-work'
 import { leadSessionOf } from '../home/thread-actions'
+import { openInExtension, untilLabel } from '../home/desk-actions'
+import { useOpenInApp } from '../home/open-in-app'
 import { compactAge } from '../home/thread-format'
 import { StateGlyph } from '../home/StateGlyph'
 import { SnoozeMenu } from '../home/SnoozeMenu'
+import { settleWithUndo } from '../home/InFlightMenu'
+import { carryThread, useDraggedThread } from '../home/thread-drag'
 import { SidebarSearch } from './SidebarSearch'
-import { useInboxMarks } from './inbox-marks'
-import { filterInbox, inboxSections, wokenKeys, type InboxFilter } from './inbox'
+import { useWorkMarks } from '../../home/work-marks'
+import { isSettled } from '../../home/settle'
+import {
+  asksHiddenByRepo,
+  filterInbox,
+  inboxSections,
+  useInboxFilter,
+  type InboxFilter,
+} from './inbox'
 import type { WorkThread } from '../../home/work-threads'
-import type { TaskState } from '../../home/task-state'
 import './InboxSidebar.css'
 
 const MINUTE_MS = 60_000
@@ -29,16 +41,20 @@ interface Repo {
 
 /** The Inbox sidebar: Home's work threads as cards, joined from the live stores. */
 export function InboxSidebar({ now }: { now?: number }): React.JSX.Element {
-  const { threads, allThreads } = useWorkThreads()
+  const { threads, settledThreads, allThreads } = useWorkThreads()
   const clock = useNow(MINUTE_MS)
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const repos = useMemo(
     () => workspaces.map((w) => ({ root: w.folderPath, name: w.name })),
     [workspaces]
   )
-  const shown = useMemo(() => threads.filter((t) => !t.archived), [threads])
+  // The Inbox draws its own settled section, so it takes the settled threads back.
+  const shown = useMemo(
+    () => [...threads, ...settledThreads].filter((t) => !t.archived),
+    [threads, settledThreads]
+  )
   useEffect(() => {
-    useInboxMarks.getState().forgetGone(new Set(allThreads.map((t) => t.key)), Date.now())
+    useWorkMarks.getState().forgetGone(new Set(allThreads.map((t) => t.key)), Date.now())
   }, [allThreads])
   return <InboxList threads={shown} now={now ?? clock} repos={repos} />
 }
@@ -52,14 +68,14 @@ interface InboxListProps {
 /** Search and the repo filter, the cards, then the settled section.
  * @internal */
 export function InboxList({ threads, now, repos }: InboxListProps): React.JSX.Element {
-  const [filter, setFilter] = useState<InboxFilter>({ text: '', repoRoot: null })
-  const marks = useInboxMarks()
-  useWakeOnActivity(threads)
+  const { filter, setFilter } = useInboxFilter()
+  const marks = useWorkMarks()
   const { cards, settled } = inboxSections(filterInbox(threads, filter), marks, now)
   return (
     <div className="inbox" onKeyDown={moveBetweenCards}>
       <InboxControls filter={filter} onChange={setFilter} repos={repos} />
       <div className="inbox__scroll">
+        <HiddenAsksLine threads={threads.filter((t) => !isSettled(t, marks, now))} />
         <ul className="inbox__cards" aria-label="Inbox">
           {cards.map((thread) => (
             <InboxCard
@@ -70,24 +86,38 @@ export function InboxList({ threads, now, repos }: InboxListProps): React.JSX.El
             />
           ))}
         </ul>
-        {cards.length === 0 && <div className="inbox__empty">{emptyText(filter)}</div>}
-        <SettledSection threads={settled} now={now} />
+        {cards.length === 0 && (
+          <div className="inbox__empty">{emptyText(filter, settled.length > 0)}</div>
+        )}
+        <SettledSection threads={settled} now={now} searching={filter.text !== ''} />
       </div>
     </div>
   )
 }
 
-const emptyText = (filter: InboxFilter): string =>
-  filter.text || filter.repoRoot ? 'No work matches' : 'Nothing needs you'
+function emptyText(filter: InboxFilter, settledMatch: boolean): string {
+  if (!filter.text && !filter.repoRoot) return 'Nothing needs you'
+  return settledMatch ? 'No active work matches' : 'No work matches'
+}
 
-/** Wakes settled threads whose agent ended a turn or started asking since the last render. */
-function useWakeOnActivity(threads: readonly WorkThread[]): void {
-  const before = useRef<Map<string, TaskState>>(new Map())
-  useEffect(() => {
-    const woken = wokenKeys(before.current, threads)
-    if (woken.length > 0) useInboxMarks.getState().wake(woken)
-    before.current = new Map(threads.map((t) => [t.key, t.state]))
-  }, [threads])
+/** "2 needs you in web", over the cards, when the repo filter hides asks. */
+function HiddenAsksLine({ threads }: { threads: readonly WorkThread[] }) {
+  const { filter, setFilter } = useInboxFilter()
+  const { count, repoNames } = asksHiddenByRepo(threads, filter)
+  if (count === 0) return null
+  const where = repoNames.length === 1 ? repoNames[0] : 'other repos'
+  return (
+    <div className="inbox__hidden-asks">
+      <span>{`${count} needs you in ${where}`}</span>
+      <button
+        type="button"
+        className="inbox__show"
+        onClick={() => setFilter({ ...filter, repoRoot: null })}
+      >
+        Show
+      </button>
+    </div>
+  )
 }
 
 /** Arrow keys move between cards, and from the search field onto the first one. Keys from
@@ -141,10 +171,11 @@ function InboxControls({ filter, onChange, repos }: ControlsProps): React.JSX.El
   )
 }
 
-/** Shows the thread's most recent session, or its drawer on Home when none is open. */
+/** Shows the thread's most recent session, else its extension's view, else its drawer on Home. */
 function openThread(thread: WorkThread): void {
   const lead = leadSessionOf(thread)
   if (lead) return revealSession(lead.sessionId)
+  if (thread.opensIn !== null) return void openInExtension(thread.opensIn.source, thread.opensIn)
   useExtensionRegistry.getState().setActiveGlobalTab('core.home')
   useDeskSelection.getState().openThread(thread.key)
 }
@@ -156,29 +187,60 @@ interface CardProps {
   settled?: boolean
 }
 
-function InboxCard({ thread, now, pinned, settled = false }: CardProps): React.JSX.Element {
+const hasSessions = (thread: WorkThread): boolean =>
+  thread.lanes.some((lane) => lane.sessionIds.length > 0)
+
+function cardClass(pinned: boolean, held: boolean): string {
+  return `inbox-card${pinned ? ' inbox-card--pinned' : ''}${held ? ' inbox-card--dragging' : ''}`
+}
+
+/** The repo and branch, or only the repo when the branch is already the title. */
+function whereOf(thread: WorkThread): string | null {
   const lane = thread.lanes[0]
+  if (!lane) return null
+  return lane.branch === thread.title ? lane.repoName : `${lane.repoName} · ${lane.branch}`
+}
+
+function InboxCard({ thread, now, pinned, settled = false }: CardProps): React.JSX.Element {
+  const held = useDraggedThread((s) => s.thread?.key === thread.key)
+  const where = whereOf(thread)
   return (
-    <li className={`inbox-card${pinned ? ' inbox-card--pinned' : ''}`} aria-label={thread.title}>
+    <li className={cardClass(pinned, held)} aria-label={thread.title}>
       <button
         type="button"
         className="inbox-card__open"
         data-inbox-card
+        title={thread.title}
+        draggable={hasSessions(thread)}
+        onDragStart={(event) => carryThread(event, thread)}
+        onDragEnd={() => useDraggedThread.setState({ thread: null })}
         onClick={() => openThread(thread)}
       >
         <StateGlyph state={thread.state} inferred={thread.inferred} />
         <span className="inbox-card__title">{thread.title}</span>
-        <span className="inbox-card__age">
-          {pinned && <Pin aria-label="Pinned" />}
-          {compactAge(now - thread.lastActivity)}
-        </span>
-        {lane && <span className="inbox-card__where">{`${lane.repoName} · ${lane.branch}`}</span>}
+        {where && <span className="inbox-card__where">{where}</span>}
         {thread.state === 'needs-you' && thread.nowLine && (
           <span className="inbox-card__ask">{thread.nowLine}</span>
         )}
       </button>
-      <CardActions thread={thread} now={now} pinned={pinned} settled={settled} />
+      <div className="inbox-card__end">
+        <CardAge thread={thread} now={now} pinned={pinned} />
+        <CardActions thread={thread} now={now} pinned={pinned} settled={settled} />
+      </div>
     </li>
+  )
+}
+
+/** How long ago the work moved, or when a snooze ends. */
+function CardAge({ thread, now, pinned }: Omit<CardProps, 'settled'>): React.JSX.Element {
+  const until = useWorkMarks((s) => s.snoozed[thread.key])
+  const snoozed = until !== undefined && until > now
+  return (
+    <span className="inbox-card__age">
+      {pinned && <Pin aria-label="Pinned" />}
+      {snoozed && <AlarmClock aria-label="Snoozed until" />}
+      {snoozed ? untilLabel(until) : compactAge(now - thread.lastActivity)}
+    </span>
   )
 }
 
@@ -192,7 +254,7 @@ function SnoozeButton({ threadKey, now }: { threadKey: string; now: number }) {
           now={now}
           onPick={(until) => {
             setSnoozing(false)
-            useInboxMarks.getState().snooze(threadKey, until)
+            useWorkMarks.getState().snooze(threadKey, until)
           }}
           onClose={() => setSnoozing(false)}
         />
@@ -201,8 +263,55 @@ function SnoozeButton({ threadKey, now }: { threadKey: string; now: number }) {
   )
 }
 
-function CardActions({ thread, now, pinned, settled }: CardProps): React.JSX.Element {
-  const marks = useInboxMarks.getState
+function OpenInAppButton({ thread }: { thread: WorkThread }): React.JSX.Element | null {
+  const openInApp = useOpenInApp(thread)
+  if (!openInApp) return null
+  return (
+    <IconButton size="sm" icon={openInApp.icon} label={openInApp.label} onClick={openInApp.open} />
+  )
+}
+
+/** The agent tab on screen in the active project, or null when it shows a terminal. */
+function useShownAgentTab() {
+  const projectId = useWorkspaceStore((s) => s.activeProjectId)
+  const tabId = useSessionStore((s) => (projectId ? s.getActiveSessionForProject(projectId) : null))
+  const session = useSessionStore((s) => (tabId ? s.sessions.get(tabId) : undefined))
+  return session?.surface === 'agent' ? session : null
+}
+
+function AttachButton({ thread }: { thread: WorkThread }): React.JSX.Element | null {
+  const tab = useShownAgentTab()
+  const sessionIds = thread.lanes.flatMap((lane) => lane.sessionIds).filter((id) => id !== tab?.id)
+  if (!tab || sessionIds.length === 0) return null
+  return (
+    <IconButton
+      size="sm"
+      icon={Paperclip}
+      label={`Attach to ${tab.tabTitle}`}
+      onClick={() => void attachSessions(tab.id, sessionIds)}
+    />
+  )
+}
+
+/** A thread settled by a quiet day has no mark to clear, so only marked ones offer Restore. */
+function SettleOrRestore({ thread, settled }: { thread: WorkThread; settled: boolean }) {
+  const marked = useWorkMarks((s) => thread.key in s.settled || thread.key in s.snoozed)
+  if (settled) {
+    if (!marked) return null
+    return (
+      <IconButton
+        size="sm"
+        icon={RotateCcw}
+        label="Restore"
+        onClick={() => useWorkMarks.getState().restore(thread.key)}
+      />
+    )
+  }
+  return <IconButton size="sm" icon={Check} label="Settle" onClick={() => settleWithUndo(thread)} />
+}
+
+function CardActions({ thread, now, pinned, settled = false }: CardProps): React.JSX.Element {
+  const marks = useWorkMarks.getState
   return (
     <div className="inbox-card__actions">
       <IconButton
@@ -212,33 +321,38 @@ function CardActions({ thread, now, pinned, settled }: CardProps): React.JSX.Ele
         pressed={pinned}
         onClick={() => marks().togglePin(thread.key, now)}
       />
+      <AttachButton thread={thread} />
+      <OpenInAppButton thread={thread} />
       <SnoozeButton threadKey={thread.key} now={now} />
-      {!settled && (
-        <IconButton
-          size="sm"
-          icon={Check}
-          label="Settle"
-          onClick={() => marks().settle(thread.key, now)}
-        />
-      )}
+      <SettleOrRestore thread={thread} settled={settled} />
     </div>
   )
 }
 
-/** "N settled", folded until opened. */
-function SettledSection({ threads, now }: { threads: WorkThread[]; now: number }) {
-  const [open, setOpen] = useState(false)
+interface SettledProps {
+  threads: WorkThread[]
+  now: number
+  searching: boolean
+}
+
+function settledLabel(count: number, searching: boolean): string {
+  if (!searching) return `${count} settled`
+  return `${count} settled ${count === 1 ? 'match' : 'matches'}`
+}
+
+/** "N settled", folded until opened; open while searching, so its matches show. */
+function SettledSection({ threads, now, searching }: SettledProps) {
+  // A search opens the section, unless it was folded during a search.
+  const [opened, setOpen] = useState(false)
+  const [foldedInSearch, setFoldedInSearch] = useState(false)
+  const open = searching ? !foldedInSearch : opened
+  const toggle = (): void => (searching ? setFoldedInSearch(open) : setOpen(!open))
   if (threads.length === 0) return null
   return (
     <section className="inbox__settled">
-      <button
-        type="button"
-        className="inbox__settled-toggle"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
+      <button type="button" className="inbox__settled-toggle" aria-expanded={open} onClick={toggle}>
         <ChevronRight aria-hidden="true" className={open ? 'inbox__chevron--open' : undefined} />
-        {`${threads.length} settled`}
+        {settledLabel(threads.length, searching)}
       </button>
       {open && (
         <ul className="inbox__cards" aria-label="Settled">

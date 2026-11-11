@@ -137,10 +137,10 @@ describe('buildCoreActions — an action without its context is disabled with th
 })
 
 describe('buildCoreActions — linking issues to a session vs a branch', () => {
-  it('offers a separate "Link issue to branch" action, disabled by "No project focused"', () => {
+  it('offers a separate "Link ticket to branch" action, disabled by "No project focused"', () => {
     const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
     const branch = actions.find((a) => a.id === 'core.link-issue-branch')!
-    expect(branch.label).toBe('Link issue to branch')
+    expect(branch.label).toBe('Link ticket to branch')
     expect(branch.disabledReason).toBe('No project focused')
   })
 })
@@ -251,18 +251,18 @@ describe('buildCoreActions — every action runs its own handler', () => {
 describe('buildCoreActions — issue labels name the linked issue', () => {
   it('names a linked issue and its tracker', () => {
     const actions = buildCoreActions(makeDeps({ issueLink: { key: 'J-7', tracker: 'linear' } }))
-    expect(actionLabelOf(actions, 'core.link-issue')).toBe('Change linked issue')
+    expect(actionLabelOf(actions, 'core.link-issue')).toBe('Change linked ticket')
     expect(actionLabelOf(actions, 'core.view-issue')).toBe('View J-7')
-    expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy issue key (J-7)')
+    expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy ticket key (J-7)')
     expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open J-7 in Linear')
   })
 
   it('says what it would do when nothing is linked', () => {
     const actions = buildCoreActions(makeDeps({ issueLink: null }))
-    expect(actionLabelOf(actions, 'core.link-issue')).toBe('Link issue')
-    expect(actionLabelOf(actions, 'core.view-issue')).toBe('View linked issue')
-    expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy issue key')
-    expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open issue in tracker')
+    expect(actionLabelOf(actions, 'core.link-issue')).toBe('Link ticket')
+    expect(actionLabelOf(actions, 'core.view-issue')).toBe('View linked ticket')
+    expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy ticket key')
+    expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open ticket in tracker')
   })
 })
 

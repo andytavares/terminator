@@ -676,7 +676,7 @@ function ItemContextMenu({ ui }: MenuProps): React.JSX.Element | null {
     >
       <MenuItem onClick={itemMenuAction(ui, editItem)}>Edit title &amp; tags</MenuItem>
       <MenuItem onClick={itemMenuAction(ui, (m) => void toggleArchived(m.item, m.isArchived))}>
-        {menu.isArchived ? 'Unarchive' : 'Archive'}
+        {menu.isArchived ? 'Restore' : 'Archive'}
       </MenuItem>
       {menu.isArchived && (
         <MenuItem

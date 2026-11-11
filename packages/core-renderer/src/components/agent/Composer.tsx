@@ -19,6 +19,8 @@ import {
   useAttachedContextStore,
 } from '../../stores/attached-context.store'
 import { useTabDragStore } from '../../terminal/tab-drag'
+import { heldThreadOf } from '../home/thread-drag'
+import type { WorkThread } from '../../home/work-threads'
 import { CitationCommentPopover } from './cite'
 import { readBase64 } from '../../../../core-shared/src/read-base64'
 
@@ -121,7 +123,11 @@ export function SessionChip(props: { context: SessionContext; onRemove?: () => v
     <li className="agent-context-chip">
       <Chip icon={<MessagesSquare aria-hidden />}>
         {context.title}
-        <span className="agent-context-chip__meta">{sourceKind(context)}</span>
+        <span className="agent-context-chip__meta">
+          {context.branch === null
+            ? sourceKind(context)
+            : `${sourceKind(context)} · ${context.branch}`}
+        </span>
         {onRemove && (
           <IconButton icon={X} size="sm" label={`Remove ${context.title}`} onClick={onRemove} />
         )}
@@ -399,17 +405,31 @@ function ComposerInput(props: {
   )
 }
 
-/** The composer takes sessions dragged from the sidebar, Home, or the tab bar as context. */
+const carriedSessionIds = (thread: WorkThread): string[] =>
+  thread.lanes.flatMap((lane) => lane.sessionIds)
+
+/** The held thread carries this tab and nothing else, so a drop would attach nothing. */
+function carriesOnlyTab(thread: WorkThread | null, sessionId: string): boolean {
+  if (thread === null) return false
+  const carried = carriedSessionIds(thread)
+  return carried.includes(sessionId) && carried.every((id) => id === sessionId)
+}
+
+/** The composer takes sessions dragged from the sidebar, Home, the Inbox, or the tab bar as context. */
 function useContextDrop(sessionId: string) {
   const [dragOver, setDragOver] = useState(false)
   const tabOver = useTabDragStore(
     (s) => s.overContextDrop === sessionId && s.sessionId !== sessionId
   )
+  const [held, setHeld] = useState<WorkThread | null>(null)
+  const onlyTab = (e: React.DragEvent): boolean =>
+    carriesOnlyTab(heldThreadOf(e.dataTransfer.types), sessionId)
   const handlers = {
     onDragOver: (e: React.DragEvent) => {
       if (!isSessionDrag(e)) return
       e.preventDefault()
-      e.dataTransfer.dropEffect = 'copy'
+      e.dataTransfer.dropEffect = onlyTab(e) ? 'none' : 'copy'
+      setHeld(heldThreadOf(e.dataTransfer.types))
       setDragOver(true)
     },
     onDragLeave: (e: React.DragEvent) => {
@@ -419,14 +439,41 @@ function useContextDrop(sessionId: string) {
       if (!isSessionDrag(e)) return
       e.preventDefault()
       setDragOver(false)
+      if (onlyTab(e)) return
       void attachSessions(sessionId, e.dataTransfer.getData(SESSION_DRAG_TYPE).split('\n'))
     },
   }
-  return { dropping: dragOver || tabOver, handlers }
+  return { dropping: dragOver || tabOver, held: dragOver ? held : null, handlers }
+}
+
+/** The names of the held thread's sessions, other than this tab. */
+function namesToAttach(thread: WorkThread, sessionId: string): string {
+  const others = carriedSessionIds(thread).filter((id) => id !== sessionId)
+  const names = others
+    .map((id) => thread.sessions.find((facts) => facts.sessionId === id)?.name)
+    .filter((name) => name !== undefined)
+  return `${names.length} ${names.length === 1 ? 'session' : 'sessions'}: ${names.join(', ')}`
+}
+
+/** What a drop here attaches: the held thread by name, or the one session a drag carries. */
+function DropHint(props: { sessionId: string; thread: WorkThread | null }) {
+  const { thread } = props
+  if (thread === null) return <>Drop to attach this session as context</>
+  if (carriesOnlyTab(thread, props.sessionId)) {
+    return <>This is the agent you are dragging; nothing to attach</>
+  }
+  return (
+    <span className="agent-composer__drop-text">
+      <span>{`Drop to attach ${thread.title}`}</span>
+      <span className="agent-composer__drop-sessions">
+        {namesToAttach(thread, props.sessionId)}
+      </span>
+    </span>
+  )
 }
 
 function ContextDropZone(props: { sessionId: string; children: React.ReactNode }) {
-  const { dropping, handlers } = useContextDrop(props.sessionId)
+  const { dropping, held, handlers } = useContextDrop(props.sessionId)
   return (
     <div
       className={`agent-composer${dropping ? ' agent-composer--drop' : ''}`}
@@ -438,7 +485,7 @@ function ContextDropZone(props: { sessionId: string; children: React.ReactNode }
       {dropping && (
         <div className="agent-composer__drop">
           <MessagesSquare aria-hidden />
-          Drop to attach this session as context
+          <DropHint sessionId={props.sessionId} thread={held} />
         </div>
       )}
       {props.children}

@@ -14,7 +14,7 @@ const isKeptAside = (thread: WorkThread): boolean =>
 function ArchivedRow({ thread }: { thread: WorkThread }): React.JSX.Element {
   const [verb, undo] = thread.archived
     ? ['Restore', () => toggleArchived(thread)]
-    : ['Undo done', () => void toggleDone(thread)]
+    : ['Restore', () => void toggleDone(thread)]
   return (
     <li className="archived-tasks__row">
       <span className="archived-tasks__title">{thread.title}</span>

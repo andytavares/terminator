@@ -274,7 +274,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   // "Link issue to branch", below.
   {
     id: 'core.link-issue',
-    label: (d) => (d.issueLink ? 'Change linked issue' : 'Link issue'),
+    label: (d) => (d.issueLink ? 'Change linked ticket' : 'Link ticket'),
     group: 'workspace',
     mnemonic: 'l',
     requires: 'terminal',
@@ -282,7 +282,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   },
   {
     id: 'core.link-issue-branch',
-    label: 'Link issue to branch',
+    label: 'Link ticket to branch',
     group: 'workspace',
     mnemonic: 'k',
     requires: 'project',
@@ -290,7 +290,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   },
   {
     id: 'core.view-issue',
-    label: (d) => (d.issueLink ? `View ${linkedIssueKey(d)}` : 'View linked issue'),
+    label: (d) => (d.issueLink ? `View ${linkedIssueKey(d)}` : 'View linked ticket'),
     group: 'workspace',
     mnemonic: 'v',
     requires: 'issue',
@@ -298,7 +298,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   },
   {
     id: 'core.copy-issue-key',
-    label: (d) => (d.issueLink ? `Copy issue key (${linkedIssueKey(d)})` : 'Copy issue key'),
+    label: (d) => (d.issueLink ? `Copy ticket key (${linkedIssueKey(d)})` : 'Copy ticket key'),
     group: 'workspace',
     mnemonic: 'c',
     requires: 'issue',
@@ -306,7 +306,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   },
   {
     id: 'core.open-issue',
-    label: (d) => (d.issueLink ? `Open ${linkedIssueKey(d)} in Linear` : 'Open issue in tracker'),
+    label: (d) => (d.issueLink ? `Open ${linkedIssueKey(d)} in Linear` : 'Open ticket in tracker'),
     group: 'workspace',
     mnemonic: 'o',
     requires: 'issue',

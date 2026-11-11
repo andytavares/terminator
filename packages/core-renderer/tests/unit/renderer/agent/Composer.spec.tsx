@@ -15,6 +15,9 @@ import { attachedOf, useAttachedContextStore } from '../../../../src/stores/atta
 import { useSessionStore } from '../../../../src/stores/session.store'
 import { useSessionRecordsStore } from '../../../../src/stores/session-records.store'
 import { useTabDragStore } from '../../../../src/terminal/tab-drag'
+import { THREAD_DRAG_TYPE, useDraggedThread } from '../../../../src/components/home/thread-drag'
+import type { WorkThread } from '../../../../src/home/work-threads'
+import type { SessionFacts } from '../../../../src/sidebar/session-facts'
 import type { SessionRecordListing } from '../../../../../core-shared/src/types/index'
 import { installElectronApi, pushedEvent } from '../../../../../test-support/src/electron-api'
 import { partialFake } from '../../../../../test-support/src/fakes'
@@ -64,6 +67,7 @@ beforeEach(() => {
   installElectronApi({ agents: { ...agents, onQueueChanged: queues.addListener } })
   useAttachedContextStore.setState({ byTab: new Map(), sendRequests: new Map() })
   useTabDragStore.setState({ sessionId: null, overSessionId: null, overContextDrop: null })
+  useDraggedThread.setState({ thread: null })
   seedSessions()
 })
 
@@ -78,8 +82,8 @@ const box = (): HTMLTextAreaElement => screen.getByLabelText('Message the agent'
 const composer = (): HTMLElement => screen.getByRole('group', { name: 'Message composer' })
 const attached = (): AttachedContext => attachedOf('agent-1')(useAttachedContextStore.getState())
 
-const sessionDrag = (ids: string) => ({
-  types: [SESSION_DRAG_TYPE],
+const sessionDrag = (ids: string, types = [SESSION_DRAG_TYPE]) => ({
+  types,
   getData: (type: string) => (type === SESSION_DRAG_TYPE ? ids : ''),
   files: [],
   dropEffect: 'none',
@@ -116,6 +120,55 @@ describe('Composer — dragging a session over it', () => {
   })
 })
 
+const facts = (sessionId: string, name: string) => partialFake<SessionFacts>({ sessionId, name })
+
+function holdThread(sessionIds: string[]): void {
+  const thread = partialFake<WorkThread>({
+    title: 'Rate limits',
+    lanes: [partialFake<WorkThread['lanes'][number]>({ sessionIds })],
+    sessions: [facts('login', 'Fix the login test'), facts('agent-1', 'Rate limit agent')],
+  })
+  useDraggedThread.setState({ thread })
+}
+
+const threadDrag = (ids: string) => sessionDrag(ids, [SESSION_DRAG_TYPE, THREAD_DRAG_TYPE])
+
+describe('Composer — dragging a Home row or an Inbox card over it', () => {
+  it('names the held thread and the sessions it attaches, leaving out this tab', async () => {
+    await mountComposer()
+    holdThread(['login', 'agent-1'])
+    const dataTransfer = threadDrag('login\nagent-1')
+    fireEvent.dragOver(composer(), { dataTransfer })
+    expect(screen.getByText('Drop to attach Rate limits')).toBeTruthy()
+    expect(screen.getByText('1 session: Fix the login test')).toBeTruthy()
+    expect(screen.queryByText(/Rate limit agent/)).toBeNull()
+    expect(dataTransfer.dropEffect).toBe('copy')
+  })
+
+  it('refuses a held thread whose only session is this tab, and a drop attaches nothing', async () => {
+    await mountComposer()
+    holdThread(['agent-1'])
+    const dataTransfer = threadDrag('agent-1')
+    fireEvent.dragOver(composer(), { dataTransfer })
+    expect(screen.getByText('This is the agent you are dragging; nothing to attach')).toBeTruthy()
+    expect(dataTransfer.dropEffect).toBe('none')
+    fireEvent.drop(composer(), { dataTransfer })
+    await act(async () => {})
+    expect(attached()).toBe(noAttachedContext)
+  })
+})
+
+describe('Composer — a thread left held by an earlier drag', () => {
+  it('ignores it when a single session is dragged', async () => {
+    await mountComposer()
+    holdThread(['agent-1'])
+    const dataTransfer = sessionDrag('login')
+    fireEvent.dragOver(composer(), { dataTransfer })
+    expect(screen.getByText('Drop to attach this session as context')).toBeTruthy()
+    expect(dataTransfer.dropEffect).toBe('copy')
+  })
+})
+
 describe('Composer — session chips', () => {
   it('drops a session as a chip with its kind, and the drop state goes away', async () => {
     await mountComposer()
@@ -130,6 +183,19 @@ describe('Composer — session chips', () => {
     await dropSession(box())
     expect(attached().sessions.map((s) => s.sessionId)).toEqual(['login'])
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('shows the branch after the kind when the session has one', async () => {
+    await mountComposer()
+    const source = { kind: 'transcript', agentId: 'claude', path: LOGIN_TRANSCRIPT } as const
+    act(() =>
+      useAttachedContextStore
+        .getState()
+        .addSessions('agent-1', [
+          { sessionId: 'login', title: 'Login', branch: 'fix/login', source },
+        ])
+    )
+    expect(screen.getByText('session · fix/login')).toBeTruthy()
   })
 })
 

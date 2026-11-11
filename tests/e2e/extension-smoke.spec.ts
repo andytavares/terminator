@@ -356,7 +356,7 @@ async function todayWithATask(vault: ExtensionView): Promise<string[]> {
 async function taskVaultLinesUpWithContent(): Promise<void> {
   const vault = await openVault(handle)
   const found = [...(await projectCardWithATask(vault)), ...(await todayWithATask(vault))]
-  for (const section of ['Inbox', 'Areas', 'History']) {
+  for (const section of ['Inbox', 'Areas', 'Archive']) {
     await goToSection(vault, section)
     found.push(...(await misalignedOn(vault, `Task Vault: ${section}`)))
   }

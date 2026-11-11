@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useTaskStore } from '../../stores/task.store'
@@ -7,8 +7,8 @@ import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { useSessionFacts } from '../session/useSessionFacts'
 import { useNow } from '../session/useNow'
 import { useParkedThreads } from './parked-threads'
-import { endedSessionsOfDismissed, isDismissed, useDismissedThreads } from './dismissed-threads'
-import { useSessionRecordsStore } from '../../stores/session-records.store'
+import { useWorkMarks } from '../../home/work-marks'
+import { isSettled, wokenKeys, type WorkMarks } from '../../home/settle'
 import {
   allWorkThreads,
   buildWorkThreads,
@@ -17,6 +17,7 @@ import {
   type WorkThread,
   type WorkThreadInput,
 } from '../../home/work-threads'
+import type { TaskState } from '../../home/task-state'
 import type { ChangeStats } from '../../../../core-shared/src/schemas/git.schema'
 import type { Issue } from '../../../../core-shared/src/types/index'
 
@@ -28,8 +29,8 @@ export interface WorkThreads {
   groups: ThreadGroup[]
   /** Every thread, finished ones too; a Focus item reads a shipped thread from here. */
   allThreads: WorkThread[]
-  /** The rows Home would show but the operator dismissed. */
-  dismissedThreads: WorkThread[]
+  /** The rows Home would show but the Inbox settles: by hand, snoozed, or quiet for a day. */
+  settledThreads: WorkThread[]
 }
 
 /** Each project's repo root: its workspace's folder, which is what an extension names a branch by. */
@@ -90,17 +91,27 @@ function parkedByHand(threads: WorkThread[], keys: readonly string[]): WorkThrea
   return threads.map((t) => (keys.includes(t.key) ? { ...t, archived: true } : t))
 }
 
-/** The threads worth showing, those parked by hand marked archived, split by dismissal. */
-function shownThreads(
+/** The threads worth showing, those parked by hand marked archived, split by the Inbox's settle rule. */
+export function shownThreads(
   input: WorkThreadInput,
   parkedKeys: readonly string[],
-  dismissed: Record<string, number>
-): { threads: WorkThread[]; dismissedThreads: WorkThread[] } {
+  marks: WorkMarks
+): { threads: WorkThread[]; settledThreads: WorkThread[] } {
   const worth = parkedByHand(buildWorkThreads(input), parkedKeys)
   return {
-    threads: worth.filter((t) => !isDismissed(dismissed, t)),
-    dismissedThreads: worth.filter((t) => isDismissed(dismissed, t)),
+    threads: worth.filter((t) => !isSettled(t, marks, input.now)),
+    settledThreads: worth.filter((t) => isSettled(t, marks, input.now)),
   }
+}
+
+/** Wakes settled threads whose agent ended a turn or started asking since the last render. */
+export function useWakeOnActivity(threads: readonly WorkThread[]): void {
+  const before = useRef<Map<string, TaskState>>(new Map())
+  useEffect(() => {
+    const woken = wokenKeys(before.current, threads)
+    if (woken.length > 0) useWorkMarks.getState().wake(woken)
+    before.current = new Map(threads.map((t) => [t.key, t.state]))
+  }, [threads])
 }
 
 /** Everything the threads are joined from; the clock ticks each minute. */
@@ -127,28 +138,25 @@ function useThreadInput(): WorkThreadInput {
 export function useWorkThreads(): WorkThreads {
   const input = useThreadInput()
   const parkedKeys = useParkedThreads((s) => s.keys)
-  const dismissed = useDismissedThreads((s) => s.dismissed)
+  const settled = useWorkMarks((s) => s.settled)
+  const pinned = useWorkMarks((s) => s.pinned)
+  const snoozed = useWorkMarks((s) => s.snoozed)
   const result = useMemo(() => {
-    // `allThreads` keeps dismissed threads so a Focus item's done check still sees the work.
-    const { threads, dismissedThreads } = shownThreads(input, parkedKeys, dismissed)
+    // `allThreads` keeps settled threads so a Focus item's done check still sees the work.
+    const marks = { settled, pinned, snoozed }
+    const { threads, settledThreads } = shownThreads(input, parkedKeys, marks)
     return {
       threads,
-      dismissedThreads,
+      settledThreads,
       groups: groupThreads(threads),
       allThreads: parkedByHand(allWorkThreads(input), parkedKeys),
     }
-  }, [input, parkedKeys, dismissed])
+  }, [input, parkedKeys, settled, pinned, snoozed])
+  useWakeOnActivity(result.allThreads)
   useEffect(() => {
     const live = new Set(result.allThreads.map((t) => t.key))
     useParkedThreads.getState().forgetGone(live, Date.now())
-    useDismissedThreads.getState().forgetGone(live, Date.now())
+    useWorkMarks.getState().forgetGone(live, Date.now())
   }, [result.allThreads])
-  const deletesSessions = useDismissedThreads((s) => s.deletesSessions)
-  useEffect(() => {
-    // Dismissed means gone: a dismissed row's sessions are deleted as soon as they have ended.
-    const { forget } = useSessionRecordsStore.getState()
-    const ended = endedSessionsOfDismissed(result.allThreads, dismissed, deletesSessions)
-    for (const id of ended) void forget(id)
-  }, [result.allThreads, dismissed, deletesSessions])
   return result
 }

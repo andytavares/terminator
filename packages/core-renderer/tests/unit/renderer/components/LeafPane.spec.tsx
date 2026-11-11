@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, fireEvent, screen } from '@testing-library/react'
+import { act, render, fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { useSessionStore } from '../../../../src/stores/session.store'
@@ -11,6 +11,10 @@ import { installElectronApi } from '../../../../../test-support/src/electron-api
 import { partialFake } from '../../../../../test-support/src/fakes'
 import type { Terminal } from '@xterm/xterm'
 import { eventually } from '../../../../../test-support/src/eventually'
+import { useSessionRecordsStore } from '../../../../src/stores/session-records.store'
+import { useToastStore } from '../../../../src/stores/toast.store'
+import { SESSION_DRAG_TYPE } from '../../../../src/components/agent/session-drag'
+import type { SessionRecordListing } from '../../../../../core-shared/src/types/index'
 
 const mockTerminalInput = vi.fn()
 
@@ -215,5 +219,90 @@ describe('LeafPane — closing one pane — leaves a drag of something other tha
     Object.assign(event, { dataTransfer: { types: ['text/plain'] } })
     pane().dispatchEvent(event)
     expect(event.defaultPrevented).toBe(false)
+  })
+})
+
+/** A dragover carrying sessions, as an Inbox card or a sidebar row starts it. */
+function sessionDragOver(): Event & { dataTransfer: { types: string[]; dropEffect: string } } {
+  const event = new Event('dragover', { bubbles: true, cancelable: true })
+  return Object.assign(event, { dataTransfer: { types: [SESSION_DRAG_TYPE], dropEffect: 'none' } })
+}
+
+/** sess-1 as a terminal running Claude Code, and `login` as a session with a transcript. */
+function sess1RunsClaude(): void {
+  useSessionStore.setState((s) => ({
+    sessions: new Map(s.sessions).set(
+      'sess-1',
+      terminalSessionOf({
+        id: 'sess-1',
+        projectId: 'proj-1',
+        tabTitle: 'Terminal 1',
+        agentTurn: false,
+      })
+    ),
+  }))
+  const agent = partialFake<NonNullable<SessionRecordListing['agent']>>({
+    agentId: 'claude',
+    transcriptPath: '/t/login.jsonl',
+  })
+  useSessionRecordsStore.setState({
+    records: new Map([
+      ['login', partialFake<SessionRecordListing>({ tabTitle: 'Login', branch: null, agent })],
+    ]),
+  })
+}
+
+describe('LeafPane — a session dropped on a terminal that runs an agent', () => {
+  beforeEach(() => useSessionRecordsStore.setState({ records: new Map() }))
+
+  it('takes a session drag as a copy when the terminal runs an agent', () => {
+    sess1RunsClaude()
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    const event = sessionDragOver()
+    pane().dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    expect(event.dataTransfer.dropEffect).toBe('copy')
+  })
+
+  it('refuses a session drag on a plain shell', () => {
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    const event = sessionDragOver()
+    pane().dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+})
+
+describe('LeafPane — a session dropped on a terminal that runs an agent — pasting', () => {
+  beforeEach(() => useSessionRecordsStore.setState({ records: new Map() }))
+
+  it("pastes the dropped session's context into the terminal", async () => {
+    sess1RunsClaude()
+    const instance = makeInstance()
+    withInstance(instance)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.drop(pane(), {
+      dataTransfer: { types: [SESSION_DRAG_TYPE], files: [], getData: () => 'login' },
+    })
+    await eventually(() =>
+      expect(instance.terminal.paste).toHaveBeenCalledWith(
+        expect.stringContaining('/t/login.jsonl')
+      )
+    )
+  })
+})
+
+describe('LeafPane — a session dropped on a pane that runs no agent', () => {
+  beforeEach(() => useSessionRecordsStore.setState({ records: new Map() }))
+
+  it('pastes nothing and says nothing, as when a drop on an agent composer bubbles up', async () => {
+    const instance = makeInstance()
+    withInstance(instance)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.drop(pane(), {
+      dataTransfer: { types: [SESSION_DRAG_TYPE], files: [], getData: () => 'login' },
+    })
+    await act(async () => {})
+    expect(instance.terminal.paste).not.toHaveBeenCalled()
+    expect(useToastStore.getState().toasts).toEqual([])
   })
 })

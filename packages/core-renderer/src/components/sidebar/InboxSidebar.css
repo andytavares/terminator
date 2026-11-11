@@ -51,7 +51,8 @@
 }
 
 .inbox-card {
-  position: relative;
+  display: flex;
+  align-items: flex-start;
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm);
   background: var(--tm-bg-card);
@@ -66,15 +67,21 @@
   border-color: var(--tm-border-strong);
 }
 
-/* The card itself is the open button; the actions sit over its top-right corner. */
+/* Held on its way to an agent tab. */
+.inbox-card--dragging {
+  opacity: 0.45;
+}
+
+/* The card is the open button; the age and the actions share the cell at its right. */
 .inbox-card__open {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
+  flex: 1;
+  min-width: 0;
+  grid-template-columns: 16px minmax(0, 1fr);
   column-gap: 6px;
   row-gap: 2px;
   align-items: center;
-  width: 100%;
-  padding: 7px 8px;
+  padding: 7px 0 7px 8px;
   border: 0;
   background: transparent;
   color: var(--tm-text-primary);
@@ -116,7 +123,7 @@
 
 .inbox-card__where,
 .inbox-card__ask {
-  grid-column: 2 / 4;
+  grid-column: 2;
   overflow: hidden;
   font-size: var(--tm-font-size-xs);
   text-overflow: ellipsis;
@@ -131,14 +138,18 @@
   color: var(--tm-text-secondary);
 }
 
+.inbox-card__end {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  padding: 4px 4px 0 6px;
+}
+
 .inbox-card__actions {
-  position: absolute;
-  top: 4px;
-  right: 4px;
   display: none;
   gap: 2px;
-  border-radius: var(--tm-radius-xs);
-  background: var(--tm-bg-card-hover);
 }
 
 .inbox-card:hover .inbox-card__actions,
@@ -148,6 +159,27 @@
 
 .inbox-card__snooze {
   position: relative;
+}
+
+.inbox__hidden-asks {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0 8px 6px;
+  padding: 4px 8px;
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-card);
+  color: var(--tm-text-secondary);
+  font-size: var(--tm-font-size-xs);
+}
+
+.inbox__show {
+  border: 0;
+  background: transparent;
+  color: var(--tm-accent);
+  font: inherit;
+  cursor: pointer;
 }
 
 .inbox__settled {

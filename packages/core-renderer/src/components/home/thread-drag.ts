@@ -9,8 +9,9 @@ import type { WorkThread } from '../../home/work-threads'
 // Drag one Home row onto another to merge them. Both rows are in one window, so plain HTML drag
 // and drop is enough; the dragged row is held here because a drag event cannot carry objects.
 
-const THREAD_TYPE = 'application/x-terminator-thread'
-const useDraggedThread = create<{ thread: WorkThread | null }>(() => ({ thread: null }))
+export const THREAD_DRAG_TYPE = 'application/x-terminator-thread'
+/** The thread being dragged, from a Home row or an Inbox card; null when none is. */
+export const useDraggedThread = create<{ thread: WorkThread | null }>(() => ({ thread: null }))
 
 /** Merges, then says what happened, with Undo. */
 async function mergeAndSay(dragged: WorkThread, target: WorkThread): Promise<void> {
@@ -39,6 +40,22 @@ function dropOn(target: WorkThread): void {
   if (dragged !== null && canMergeThreads(dragged, target)) void mergeAndSay(dragged, target)
 }
 
+/** Starts a drag that carries the thread's sessions to an agent tab or a terminal. */
+export function carryThread(event: React.DragEvent, thread: WorkThread): void {
+  event.dataTransfer.setData(THREAD_DRAG_TYPE, thread.key)
+  event.dataTransfer.setData(
+    SESSION_DRAG_TYPE,
+    thread.lanes.flatMap((lane) => lane.sessionIds).join('\n')
+  )
+  event.dataTransfer.effectAllowed = 'copyMove'
+  useDraggedThread.setState({ thread })
+}
+
+/** The held thread, when this drag carries one; a source that unmounts mid-drag never clears it. */
+export function heldThreadOf(types: readonly string[]): WorkThread | null {
+  return types.includes(THREAD_DRAG_TYPE) ? useDraggedThread.getState().thread : null
+}
+
 export interface MergeDrop {
   /** Something that can merge is held over this row. */
   over: boolean
@@ -52,15 +69,7 @@ export function useMergeDrop(thread: WorkThread, renaming: boolean): MergeDrop {
   const props: MergeDrop['props'] = {
     // A draggable row would take a drag in its rename field, so text could not be selected.
     draggable: thread.lanes.length > 0 && !renaming,
-    onDragStart: (event) => {
-      event.dataTransfer.setData(THREAD_TYPE, thread.key)
-      event.dataTransfer.setData(
-        SESSION_DRAG_TYPE,
-        thread.lanes.flatMap((lane) => lane.sessionIds).join('\n')
-      )
-      event.dataTransfer.effectAllowed = 'copyMove'
-      useDraggedThread.setState({ thread })
-    },
+    onDragStart: (event) => carryThread(event, thread),
     onDragEnd: () => useDraggedThread.setState({ thread: null }),
     onDragOver: (event) => {
       if (!accepts(thread)) return

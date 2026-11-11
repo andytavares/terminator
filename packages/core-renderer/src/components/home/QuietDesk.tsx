@@ -18,7 +18,7 @@ export function QuietDesk({
       <span>
         <b>Nothing needs you.</b>{' '}
         {working > 0 && `${working} ${working === 1 ? 'agent is' : 'agents are'} working. `}
-        Done today: {desk.doneToday}.
+        Settled today: {desk.doneToday}.
       </span>
       <Button size="sm" onClick={() => useStartWorkStore.getState().openLauncher()}>
         Start work <Kbd>⌘N</Kbd>

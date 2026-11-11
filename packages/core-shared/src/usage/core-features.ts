@@ -32,7 +32,7 @@ export const CORE_FEATURES: FeatureDeclaration[] = [
   { id: 'core.home.snooze', label: 'Snooze', kind: 'control', source: 'core' },
   { id: 'core.home.search', label: 'Desk search', kind: 'control', source: 'core' },
   { id: 'core.home.archived', label: 'Archived tasks', kind: 'control', source: 'core' },
-  { id: 'core.home.dismissed', label: 'Dismissed tasks', kind: 'control', source: 'core' },
+  { id: 'core.home.settled', label: 'Settled tasks', kind: 'control', source: 'core' },
   { id: 'core.home.insights-window', label: 'Insights period', kind: 'control', source: 'core' },
   {
     id: 'core.overview.open-tile',
@@ -87,6 +87,12 @@ export const CORE_FEATURES: FeatureDeclaration[] = [
   {
     id: 'core.agent.attach-session',
     label: 'Attach a session as context',
+    kind: 'control',
+    source: 'core',
+  },
+  {
+    id: 'core.terminal.paste-session-context',
+    label: 'Paste a session as context into an agent terminal',
     kind: 'control',
     source: 'core',
   },

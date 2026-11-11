@@ -285,6 +285,16 @@
   height: 16px;
 }
 
+.agent-composer__drop-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-composer__drop-sessions {
+  font-size: var(--tm-font-size-xs);
+  color: var(--tm-text-secondary);
+}
+
 .agent-context-chip {
   display: flex;
   align-items: center;

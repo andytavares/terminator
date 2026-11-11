@@ -62,6 +62,8 @@ export interface BranchRowProps {
    * grouping (EA-2). This is the same escape the old ScopeMenu provided.
    */
   repoActions?: Array<{ id: string; label: string; onSelect: () => void }>
+  /** Shows the extension view that owns this branch's work. */
+  openInApp?: { label: string; onSelect: () => void }
   /**
    * Drag-to-reorder within the repo. Absent under "no grouping", where the one
    * list spans every repo and the stores keep no order that crosses them.
@@ -146,7 +148,7 @@ function BranchRowContent(props: BranchRowProps & { rename: Rename }): React.JSX
   )
 }
 
-/** Rename, Open in the editor, the issue actions, the repo's actions, then Remove. Each that
+/** Rename, Open in the editor, the issue actions, Open in the work's extension, the repo's actions, then Remove. Each that
  * does not end the menu itself closes it first. */
 function branchMenuItems(
   props: BranchRowProps,
@@ -176,16 +178,27 @@ function branchMenuItems(
   return items
 }
 
-/** The repo's extension actions, then Remove branch. */
+/** Open in the work's extension, the repo's extension actions, then Remove branch. */
 function repoAndRemoveItems(
-  { repoActions = [], onRemove }: BranchRowProps,
+  { repoActions = [], openInApp, onRemove }: BranchRowProps,
   closeMenu: () => void
 ): ContextMenuItem[] {
-  const items: ContextMenuItem[] = repoActions.map((action, i) => ({
-    label: action.label,
-    separatorBefore: i === 0,
-    onSelect: afterClosing(closeMenu, action.onSelect),
-  }))
+  const items: ContextMenuItem[] = openInApp
+    ? [
+        {
+          label: openInApp.label,
+          separatorBefore: true,
+          onSelect: afterClosing(closeMenu, openInApp.onSelect),
+        },
+      ]
+    : []
+  items.push(
+    ...repoActions.map((action, i) => ({
+      label: action.label,
+      separatorBefore: i === 0 && openInApp === undefined,
+      onSelect: afterClosing(closeMenu, action.onSelect),
+    }))
+  )
   if (onRemove) {
     items.push({ label: 'Remove branch', danger: true, separatorBefore: true, onSelect: onRemove })
   }

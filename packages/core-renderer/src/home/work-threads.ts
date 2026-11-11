@@ -1,4 +1,8 @@
-import type { ThreadFacet, WorkKey } from '../../../core-shared/src/schemas/home-feed.schema'
+import type {
+  Sourced,
+  ThreadFacet,
+  WorkKey,
+} from '../../../core-shared/src/schemas/home-feed.schema'
 import type { ChangeStats } from '../../../core-shared/src/schemas/git.schema'
 import type { IssueSummary } from '../../../core-shared/src/types/index'
 import type { Task } from '../../../core-shared/src/schemas/tasks.schema'
@@ -56,11 +60,13 @@ export interface WorkThread {
   archived: boolean
   /** Every facet is closed and no session is open: the work is over. */
   closed: boolean
+  /** The extension view that owns this work, from the first facet that names one. */
+  opensIn: { source: string; command: string; args?: unknown } | null
 }
 
 export interface WorkThreadInput {
   facts: readonly SessionFacts[]
-  facets: readonly ThreadFacet[]
+  facets: readonly Sourced<ThreadFacet>[]
   tasks: readonly Task[]
   issues: readonly IssueSummary[]
   /** Uncommitted change stats by project id. */
@@ -90,7 +96,7 @@ interface Draft {
   key: string
   task: Task | null
   sessions: SessionFacts[]
-  facets: ThreadFacet[]
+  facets: Sourced<ThreadFacet>[]
 }
 
 /** A closed session has no live project, so its record's snapshot says where it ran. */
@@ -324,6 +330,11 @@ function linksOf(facets: readonly ThreadFacet[]): ThreadLink[] {
   return [...byUrl.values()]
 }
 
+function opensInOf(facets: readonly Sourced<ThreadFacet>[]): WorkThread['opensIn'] {
+  const facet = facets.find((f) => f.open !== undefined)
+  return facet?.open === undefined ? null : { source: facet.source, ...facet.open }
+}
+
 function toThread(draft: Draft, input: WorkThreadInput): WorkThread {
   const { lanes, loose } = groupIntoLanes(draft, draft.task?.lanes ?? [], (s) =>
     repoRootOf(s, input)
@@ -335,6 +346,7 @@ function toThread(draft: Draft, input: WorkThreadInput): WorkThread {
     sessions: draft.sessions,
     facets: draft.facets,
     links: linksOf(draft.facets),
+    opensIn: opensInOf(draft.facets),
   }
 }
 

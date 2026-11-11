@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  AUTO_SETTLE_AFTER_MS,
+  asksHiddenByRepo,
   filterInbox,
   inboxSections,
-  wokenKeys,
-  type InboxMarks,
 } from '../../../../../src/components/sidebar/inbox'
+import { AUTO_SETTLE_AFTER_MS, type WorkMarks } from '../../../../../src/home/settle'
 import type { WorkThread } from '../../../../../src/home/work-threads'
 import type { TaskState } from '../../../../../src/home/task-state'
 
@@ -16,6 +15,7 @@ interface ThreadFixture {
   lastActivity?: number
   startedAt?: number
   repoRoot?: string
+  repoName?: string
   branch?: string
 }
 
@@ -23,7 +23,7 @@ function threadOf(key: string, fixture: ThreadFixture = {}): WorkThread {
   const { state = 'running', lastActivity = NOW, startedAt = 0 } = fixture
   const lane = {
     repoRoot: fixture.repoRoot ?? '/repos/api',
-    repoName: 'api',
+    repoName: fixture.repoName ?? 'api',
     branch: fixture.branch ?? key,
   }
   return {
@@ -37,7 +37,7 @@ function threadOf(key: string, fixture: ThreadFixture = {}): WorkThread {
   } as unknown as WorkThread
 }
 
-const noMarks: InboxMarks = { settled: {}, pinned: {}, snoozed: {} }
+const noMarks: WorkMarks = { settled: {}, pinned: {}, snoozed: {} }
 const keysOf = (threads: readonly WorkThread[]) => threads.map((t) => t.key)
 
 describe('inboxSections — order', () => {
@@ -87,25 +87,6 @@ describe('inboxSections — auto-settle', () => {
   })
 })
 
-describe('wokenKeys', () => {
-  it('names threads whose agent ended a turn or started asking', () => {
-    const before = new Map<string, TaskState>([
-      ['turn-ended', 'running'],
-      ['asked', 'quiet'],
-      ['still-running', 'running'],
-      ['still-asking', 'needs-you'],
-    ])
-    const threads = [
-      threadOf('turn-ended', { state: 'quiet' }),
-      threadOf('asked', { state: 'needs-you' }),
-      threadOf('still-running', { state: 'running' }),
-      threadOf('still-asking', { state: 'needs-you' }),
-      threadOf('new', { state: 'needs-you' }),
-    ]
-    expect(wokenKeys(before, threads)).toEqual(['turn-ended', 'asked'])
-  })
-})
-
 describe('filterInbox', () => {
   const threads = [
     threadOf('one', { repoRoot: '/repos/api', branch: 'fix-login' }),
@@ -120,5 +101,40 @@ describe('filterInbox', () => {
   it('keeps only the chosen repo', () => {
     expect(keysOf(filterInbox(threads, { text: '', repoRoot: '/repos/web' }))).toEqual(['two'])
     expect(keysOf(filterInbox(threads, { text: '', repoRoot: null }))).toEqual(['one', 'two'])
+  })
+})
+
+describe('asksHiddenByRepo', () => {
+  const asking = (key: string, repoRoot: string, repoName: string) =>
+    threadOf(key, { state: 'needs-you', repoRoot, repoName, branch: key })
+
+  it('counts the asks the repo filter hides, with the one repo they sit in', () => {
+    const threads = [
+      asking('a', '/repos/web', 'web'),
+      asking('b', '/repos/web', 'web'),
+      threadOf('quiet', { repoRoot: '/repos/web', repoName: 'web' }),
+      asking('shown', '/repos/api', 'api'),
+    ]
+    expect(asksHiddenByRepo(threads, { text: '', repoRoot: '/repos/api' })).toEqual({
+      count: 2,
+      repoNames: ['web'],
+    })
+  })
+
+  it('names each repo once when the hidden asks sit in more than one', () => {
+    const threads = [asking('a', '/repos/web', 'web'), asking('b', '/repos/docs', 'docs')]
+    const hidden = asksHiddenByRepo(threads, { text: '', repoRoot: '/repos/api' })
+    expect(hidden).toEqual({ count: 2, repoNames: ['web', 'docs'] })
+  })
+
+  it('counts nothing when every repo is shown', () => {
+    const threads = [asking('a', '/repos/web', 'web')]
+    expect(asksHiddenByRepo(threads, { text: '', repoRoot: null }).count).toBe(0)
+  })
+
+  it('leaves out an ask the search text hides on its own', () => {
+    const threads = [asking('login', '/repos/web', 'web'), asking('dark', '/repos/web', 'web')]
+    const hidden = asksHiddenByRepo(threads, { text: 'login', repoRoot: '/repos/api' })
+    expect(hidden).toEqual({ count: 1, repoNames: ['web'] })
   })
 })

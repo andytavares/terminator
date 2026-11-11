@@ -1,6 +1,6 @@
 # ADR 149: A new session brings a dismissed row back
 
-**Status**: Accepted
+**Status**: Superseded by [ADR 157](157-settle-is-the-one-word.md)
 
 **Date**: 2026-11-07
 

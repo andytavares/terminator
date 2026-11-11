@@ -26,7 +26,7 @@ vi.mock('../../../../src/components/home/useWorkThreads', () => ({
     threads: state.threads,
     groups: [],
     allThreads: state.threads,
-    dismissedThreads: [],
+    settledThreads: [],
   }),
 }))
 vi.mock('../../../../src/components/home/start-work-model', () => ({
@@ -148,7 +148,7 @@ describe('HomeScreen — the Quiet desk', () => {
     render(<HomeScreen />)
     expect(screen.queryByRole('region', { name: 'Your move' })).toBeNull()
     expect(screen.getByText('Nothing needs you.')).toBeTruthy()
-    expect(screen.getByText(/Done today: 0/)).toBeTruthy()
+    expect(screen.getByText(/Settled today: 0/)).toBeTruthy()
     expect(document.body.textContent).not.toMatch(/Foundry/)
   })
 
@@ -210,7 +210,7 @@ describe('HomeScreen — acting on an ask', () => {
 })
 
 describe('HomeScreen — dismissing an ask', () => {
-  it('marks an ask done with E and drops its row, counting it in Done today', async () => {
+  it('marks an ask done with E and drops its row, counting it in Settled today', async () => {
     const user = userEvent.setup()
     useHomeFeedStore.setState({
       asks: [
@@ -223,7 +223,7 @@ describe('HomeScreen — dismissing an ask', () => {
     await user.keyboard('e')
     expect(askRows()).toHaveLength(1)
     expect(screen.queryByText('Review requested')).toBeNull()
-    expect(screen.getByText('Done today: 1')).toBeTruthy()
+    expect(screen.getByText('Settled today: 1')).toBeTruthy()
   })
 
   it('snoozes with H and the chosen time, and says how many are snoozed', async () => {

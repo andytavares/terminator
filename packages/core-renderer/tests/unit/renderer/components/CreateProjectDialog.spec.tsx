@@ -517,7 +517,7 @@ describe('CreateProjectDialog — from an issue', () => {
   it('prefills the branch from the picked issue, and asks for no other name', async () => {
     const user = userEvent.setup()
     await openWithIssues()
-    await user.click(screen.getByPlaceholderText(/Search, or type an issue key/))
+    await user.click(screen.getByPlaceholderText(/Search, or type a ticket key/))
     await user.click(await screen.findByText('TAV-42'))
 
     expect(screen.getByDisplayValue('andrew/tav-42-unify-linear')).toBeTruthy()
@@ -528,7 +528,7 @@ describe('CreateProjectDialog — from an issue', () => {
   it('derives a branch when the issue has no suggested branch', async () => {
     const user = userEvent.setup()
     await openWithIssues(true, [UNSUGGESTED_ISSUE])
-    await user.click(screen.getByPlaceholderText(/Search, or type an issue key/))
+    await user.click(screen.getByPlaceholderText(/Search, or type a ticket key/))
     await user.click(await screen.findByText('TAV-7'))
 
     expect(screen.getByDisplayValue(/tav-7-unify-linear/)).toBeTruthy()
@@ -541,7 +541,7 @@ describe('CreateProjectDialog — from an issue — honours an edit made after p
   it('honours an edit made after prefilling', async () => {
     const user = userEvent.setup()
     await openWithIssues()
-    await user.click(screen.getByPlaceholderText(/Search, or type an issue key/))
+    await user.click(screen.getByPlaceholderText(/Search, or type a ticket key/))
     await user.click(await screen.findByText('TAV-42'))
 
     const branch = screen.getByDisplayValue('andrew/tav-42-unify-linear')
@@ -558,11 +558,11 @@ describe('CreateProjectDialog — from an issue — honours an edit made after p
   it('lets the operator back out of the issue', async () => {
     const user = userEvent.setup()
     await openWithIssues()
-    await user.click(screen.getByPlaceholderText(/Search, or type an issue key/))
+    await user.click(screen.getByPlaceholderText(/Search, or type a ticket key/))
     await user.click(await screen.findByText('TAV-42'))
 
     await user.click(await screen.findByTitle('Choose a different issue'))
-    expect(screen.getByPlaceholderText(/Search, or type an issue key/)).toBeTruthy()
+    expect(screen.getByPlaceholderText(/Search, or type a ticket key/)).toBeTruthy()
   })
 })
 
@@ -572,7 +572,7 @@ describe('CreateProjectDialog — from an issue — attaches the issue', () => {
   it('attaches the issue to the project it just created (FR-011)', async () => {
     const user = userEvent.setup()
     await openWithIssues()
-    await user.click(screen.getByPlaceholderText(/Search, or type an issue key/))
+    await user.click(screen.getByPlaceholderText(/Search, or type a ticket key/))
     await user.click(await screen.findByText('TAV-42'))
 
     await user.click(await screen.findByText('Create'))

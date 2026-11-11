@@ -68,7 +68,7 @@ function subtaskTests() {
   it('completes an open subtask with a notice that leads back to it', async () => {
     const user = userEvent.setup()
     const { props } = renderDailyLog(withSubtasks())
-    await user.click(within(subtask('Step one')).getByTitle('Complete subtask'))
+    await user.click(within(subtask('Step one')).getByTitle('Mark subtask done'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 's1' }])
     const [type, message, options] = vi.mocked(notify).mock.calls.at(-1)!

@@ -6,14 +6,23 @@ import { InFlight } from '../../../../src/components/home/InFlight'
 import { useDeskSelection } from '../../../../src/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/stores/task.store'
 import { useParkedThreads } from '../../../../src/components/home/parked-threads'
-import { useDismissedThreads } from '../../../../src/components/home/dismissed-threads'
+import { useWorkMarks } from '../../../../src/home/work-marks'
 import { useAddToTaskStore } from '../../../../src/components/tasks/add-to-task'
 import { useToastStore } from '../../../../src/stores/toast.store'
 import { ToastContainer } from '../../../../src/components/ToastContainer'
 import { useHomeFeedStore } from '../../../../src/stores/home-feed.store'
 import { useChangeStatsStore } from '../../../../src/stores/change-stats.store'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
-import { FACTS, REPO_ROOT, seedDesk, sendToAgentAsk, ticket } from '../home/desk-world'
+import {
+  FACTS,
+  REPO_ROOT,
+  SHOW_ORDER,
+  extensionCommands,
+  seedDesk,
+  seedFoundryOrder,
+  sendToAgentAsk,
+  ticket,
+} from '../home/desk-world'
 import { fact } from '../sidebar/fixtures/facts'
 import { task } from '../home/fixtures'
 
@@ -40,7 +49,7 @@ vi.mock('../../../../src/components/session/session-actions', () => ({
 const linkStub = vi.hoisted(() => {
   function FakeLinkDialog({ onClose }: { facts: unknown; onClose: () => void }): React.JSX.Element {
     return (
-      <div role="dialog" aria-label="Link a work item">
+      <div role="dialog" aria-label="Link a ticket">
         <button onClick={onClose}>Close link dialog</button>
       </div>
     )
@@ -88,7 +97,7 @@ function resetDesk(): void {
   useDeskSelection.setState({ expandedGroupIds: [] })
   useParkedThreads.setState({ keys: [] })
   useTaskStore.setState({ tasks: [] })
-  useDismissedThreads.setState({ dismissed: {}, deletesSessions: {} })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
   // Change stats are cached per project; a test that mocks other stats must not leak them.
   useChangeStatsStore.setState({ entries: new Map() })
 }
@@ -103,6 +112,7 @@ beforeEach(() => {
     agentUsage: { get: usageGet },
     shell: { openExternal },
     git: { changeStats: vi.fn().mockResolvedValue({ added: 412, removed: 88, files: 3 }) },
+    extension: extensionCommands,
   })
 })
 
@@ -133,8 +143,8 @@ describe('In flight rows', () => {
     expect(building.getByText('tav-20')).toBeTruthy()
     expect(building.getByText('Running')).toBeTruthy()
     const waiting = within(inFlightRowNamed('Make all text in the app scale with settings'))
-    expect(waiting.getByText('Waiting on others · 1 day')).toBeTruthy()
-    expect(waiting.getByText('1 d')).toBeTruthy()
+    expect(waiting.getByText('Waiting on others · 23 hours')).toBeTruthy()
+    expect(waiting.getByText('23 h')).toBeTruthy()
   })
 })
 
@@ -254,6 +264,24 @@ describe('the work-thread drawer — checks', () => {
   })
 })
 
+describe('the work-thread drawer — Open in Foundry', () => {
+  it('opens the order in the extension that owns the work', async () => {
+    const user = userEvent.setup()
+    seedFoundryOrder()
+    const drawer = within(await openBuilding(user))
+    await user.click(drawer.getByRole('button', { name: 'Open in Foundry' }))
+    await waitFor(() =>
+      expect(extensionCommands.executeCommand).toHaveBeenCalledWith(...SHOW_ORDER)
+    )
+  })
+
+  it('offers none when no extension can open the work', async () => {
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
+    expect(drawer.queryByRole('button', { name: /^Open in Foundry/ })).toBeNull()
+  })
+})
+
 describe('the work-thread drawer — actions', () => {
   it('opens the terminal', async () => {
     const user = userEvent.setup()
@@ -351,7 +379,7 @@ const TICKETED_MENU = [
   'Rename…',
   'Add to task…',
   'Archive',
-  'Dismiss',
+  'Settle',
   'Close sessions',
   'Remove worktree…',
 ]
@@ -360,7 +388,7 @@ const SCRATCH_MENU = [
   'Rename…',
   'Link ticket…',
   'Archive',
-  'Dismiss',
+  'Settle',
   'Close sessions',
 ]
 
@@ -384,7 +412,7 @@ describe('the row menu — which items', () => {
     render(<InFlight />)
     const row = inFlightRowNamed('Make all text in the app scale with settings')
     await user.click(within(row).getByRole('button', { name: 'Work actions' }))
-    expect(contextMenuItemNames()).toEqual(['Add to task…', 'Archive', 'Dismiss'])
+    expect(contextMenuItemNames()).toEqual(['Add to task…', 'Archive', 'Settle'])
     expect(
       screen.queryByRole('dialog', { name: 'Make all text in the app scale with settings' })
     ).toBeNull()
@@ -409,6 +437,26 @@ describe('the row menu — Add to task', () => {
     await rightClickRow(user, 'PR overview shows status before story')
     await user.click(openMenuItem('Add to task…'))
     expect(useAddToTaskStore.getState().lane).toEqual({ repoRoot: REPO_ROOT, branch: 'tav-20' })
+  })
+})
+
+describe('the row menu — Open in Foundry', () => {
+  it('opens the order in the extension that owns the work', async () => {
+    const user = userEvent.setup()
+    seedFoundryOrder()
+    render(<InFlight />)
+    await rightClickRow(user, 'PR overview shows status before story')
+    await user.click(openMenuItem('Open in Foundry'))
+    await waitFor(() =>
+      expect(extensionCommands.executeCommand).toHaveBeenCalledWith(...SHOW_ORDER)
+    )
+  })
+
+  it('is absent when no extension can open the work', async () => {
+    const user = userEvent.setup()
+    render(<InFlight />)
+    await rightClickRow(user, 'PR overview shows status before story')
+    expect(within(document.body).queryByRole('menuitem', { name: /^Open in / })).toBeNull()
   })
 })
 
@@ -452,7 +500,7 @@ describe('the row menu — Link ticket', () => {
     render(<InFlight />)
     await openScratchRow(user)
     await user.click(openMenuItem('Link ticket…'))
-    expect(screen.getByRole('dialog', { name: 'Link a work item' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Link a ticket' })).toBeTruthy()
   })
 })
 
@@ -461,7 +509,7 @@ const parkViaMenu = async (user: User, title: string, item: string): Promise<voi
   await user.click(openMenuItem(item))
 }
 
-describe('the row menu — Archive and Dismiss', () => {
+describe('the row menu — Archive and Settle', () => {
   it('Archive takes work with no stored task out of the lists', async () => {
     const user = userEvent.setup()
     render(<InFlight />)
@@ -490,15 +538,15 @@ describe('the row menu — Archive and Dismiss', () => {
   })
 })
 
-describe('the row menu — Dismiss', () => {
-  it('Dismiss hides the row and keeps it hidden while nothing new happens', async () => {
+describe('the row menu — Settle', () => {
+  it('Settle hides the row and keeps it hidden while nothing new happens', async () => {
     const user = userEvent.setup()
     render(<InFlight />)
-    await parkViaMenu(user, 'Reproduce staging 429s before release', 'Dismiss')
+    await parkViaMenu(user, 'Reproduce staging 429s before release', 'Settle')
     expect(
       screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
     ).toBeNull()
-    expect(useDismissedThreads.getState().dismissed['linear:TAV-31']).toBeDefined()
+    expect(useWorkMarks.getState().settled['linear:TAV-31']).toBeDefined()
   })
 })
 
@@ -515,9 +563,9 @@ describe('the row menu — a dismissed thread stays gone', () => {
         <ToastContainer />
       </>
     )
-    await parkViaMenu(user, TITLE, 'Dismiss')
+    await parkViaMenu(user, TITLE, 'Settle')
     expect(rowShown()).toBe(false)
-    expect(screen.getByRole('status').textContent).toContain(`Dismissed "${TITLE}"`)
+    expect(screen.getByRole('status').textContent).toContain(`Settled "${TITLE}"`)
     spies.facts = FACTS.map((f: { sessionId: string }) =>
       f.sessionId === 'asking' ? { ...f, lastActivityAt: Date.now() + 60_000 } : f
     )
@@ -533,7 +581,7 @@ describe('the row menu — a dismissed thread stays gone', () => {
   })
 })
 
-describe('the row menu — Dismiss deletes the sessions it holds', () => {
+describe('the row menu — Settle keeps the sessions it holds', () => {
   const TITLE = 'Reproduce staging 429s before release'
   const endedOnTav31 = fact({
     sessionId: 'ended-31',
@@ -545,7 +593,7 @@ describe('the row menu — Dismiss deletes the sessions it holds', () => {
     snapshot: { ...fact().snapshot, projectId: 'p31' },
   })
 
-  it('deletes the ended session record of a dismissed row, never the live one, and the row is gone', async () => {
+  it('hides the row and deletes no session record; the retention setting handles ended ones', async () => {
     const user = userEvent.setup()
     const forget = vi.fn().mockResolvedValue({ data: true })
     installElectronApi({
@@ -558,9 +606,9 @@ describe('the row menu — Dismiss deletes the sessions it holds', () => {
     spies.facts = [...FACTS, endedOnTav31]
     render(<InFlight />)
     expect(forget).not.toHaveBeenCalled()
-    await parkViaMenu(user, TITLE, 'Dismiss')
+    await parkViaMenu(user, TITLE, 'Settle')
     expect(screen.queryByRole('button', { name: TITLE })).toBeNull()
-    expect(forget.mock.calls.map(([input]) => input)).toEqual([{ sessionId: 'ended-31' }])
+    expect(forget).not.toHaveBeenCalled()
   })
 })
 

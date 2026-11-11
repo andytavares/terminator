@@ -8,6 +8,7 @@ import { useSessionRecordsStore } from '../../../../src/stores/session-records.s
 import { useBreakoutStore } from '../../../../src/stores/breakout.store'
 import { useTabDragStore } from '../../../../src/terminal/tab-drag'
 import { TabBar } from '../../../../src/components/terminal/TabBar'
+import { SESSION_DRAG_TYPE } from '../../../../src/components/agent/session-drag'
 import type { ElectronAPI } from '../../../../../core-shared/src/electron-api/api-type'
 import type {
   SessionRecordListing,
@@ -471,15 +472,15 @@ describe('TabBar — session work item', () => {
     expect(screen.getByText('ENG-4')).toBeTruthy()
   })
 
-  it('offers only "Link issue…" when the tab has no own link', async () => {
+  it('offers only "Link ticket…" when the tab has no own link', async () => {
     const user = userEvent.setup()
     seedSessions([session('ses-1', { tabTitle: 'bash' })], 'ses-1')
     renderTabBar()
     const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
-    expect(screen.getByText('Link issue…')).toBeTruthy()
+    expect(screen.getByText('Link ticket…')).toBeTruthy()
     expect(screen.queryByText('Remove session link')).toBeNull()
-    await user.click(screen.getByText('Link issue…'))
+    await user.click(screen.getByText('Link ticket…'))
     expect(screen.getByTestId('session-link-dialog')).toBeTruthy()
   })
 })
@@ -492,7 +493,7 @@ describe('TabBar — session work item — offers change and remove, and removes
     renderTabBar()
     const tab = screen.getByRole('tab', { name: 'bash' })
     await user.pointer({ keys: '[MouseRight]', target: tab })
-    expect(screen.getByText('Change linked issue…')).toBeTruthy()
+    expect(screen.getByText('Change linked ticket…')).toBeTruthy()
     await user.click(screen.getByText('Remove session link'))
     await eventually(() => expect(screen.queryByText('ENG-4')).toBeNull())
   })
@@ -902,5 +903,53 @@ describe('TabBar — a tab let go on an agent composer', () => {
     await eventually(() => expect(attachSessions).toHaveBeenCalledWith('agent-1', ['ses-2']))
     expect(tabTitles()).toEqual(['Tab 1', 'Tab 2', 'Tab 3'])
     expect(breakOut).not.toHaveBeenCalled()
+  })
+})
+
+const sessionDrag = { dataTransfer: { types: [SESSION_DRAG_TYPE], files: [] } }
+
+function holdFor(ms: number): void {
+  act(() => {
+    vi.advanceTimersByTime(ms)
+  })
+}
+
+/** Tab 3 of three, with Tab 1 shown, and timers that move only when the test moves them. */
+function thirdTabOnFakeTimers(): Element {
+  seedSessions(threeTabs, 'ses-1')
+  vi.useFakeTimers()
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+  renderTabBar()
+  return sessionTabs()[2]
+}
+
+describe('TabBar — a session dragged from elsewhere held over a tab', () => {
+  it('marks the tab and shows its session after 600 ms', () => {
+    const tab = thirdTabOnFakeTimers()
+    fireEvent.dragEnter(tab, sessionDrag)
+    expect(tab.classList.contains('tab-bar__tab--spring')).toBe(true)
+    holdFor(600)
+    expect(isActive(tab)).toBe(true)
+    expect(useSessionStore.getState().focusRequest?.sessionId).toBe('ses-3')
+  })
+
+  it('does not show the session, and unmarks the tab, when the drag leaves at 300 ms', () => {
+    const tab = thirdTabOnFakeTimers()
+    fireEvent.dragEnter(tab, sessionDrag)
+    holdFor(300)
+    fireEvent.dragLeave(tab, { relatedTarget: document.body })
+    holdFor(600)
+    expect(isActive(tab)).toBe(false)
+    expect(tab.classList.contains('tab-bar__tab--spring')).toBe(false)
+  })
+
+  it('ignores a file drag', () => {
+    const tab = thirdTabOnFakeTimers()
+    fireEvent.dragEnter(tab, { dataTransfer: { types: ['Files'], files: [] } })
+    holdFor(600)
+    expect(isActive(tab)).toBe(false)
+    expect(tab.classList.contains('tab-bar__tab--spring')).toBe(false)
   })
 })

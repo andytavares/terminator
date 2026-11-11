@@ -33,7 +33,7 @@ export function SessionLinkDialog({ facts, onClose }: Props): JSX.Element {
       }}
     >
       <Dialog
-        title="Link a work item"
+        title="Link a ticket"
         onDismiss={onClose}
         actions={linkActions({ own: own !== null, selected, busy, write }, onClose)}
       >
@@ -92,7 +92,7 @@ function linkActions(
     ...(own ? [{ label: 'Remove session link', disabled: busy, onSelect: () => write(null) }] : []),
     { label: 'Cancel', onSelect: onClose },
     {
-      label: selected === null ? 'Link issue' : `Link ${selected.key}`,
+      label: selected === null ? 'Link ticket' : `Link ${selected.key}`,
       tone: 'primary',
       disabled: selected === null || busy,
       onSelect: () =>

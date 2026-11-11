@@ -7,7 +7,7 @@ import { useIntegrationsStore } from '../../../../src/stores/integrations.store'
 import { useSessionRecordsStore } from '../../../../src/stores/session-records.store'
 import { useSessionStore } from '../../../../src/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/extensions/registry'
-import { useDismissedThreads } from '../../../../src/components/home/dismissed-threads'
+import { useWorkMarks } from '../../../../src/home/work-marks'
 import { useWorkspaceStore } from '../../../../src/stores/workspace.store'
 import { useStartWorkStore } from '../../../../src/components/home/start-work'
 import type { Schedule } from '../../../../../core-shared/src/schemas/schedules.schema'
@@ -374,32 +374,32 @@ describe('StartWork — Enter on a ticket', () => {
 describe('StartWork — starting dismissed work', () => {
   it('brings a dismissed ticket back to In flight once it has started', async () => {
     const user = userEvent.setup()
-    useDismissedThreads.setState({ dismissed: { 'linear:TAV-33': 1, 'linear:TAV-99': 1 } })
+    useWorkMarks.setState({ settled: { 'linear:TAV-33': 1, 'linear:TAV-99': 1 } })
     const onClose = await open()
     await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(Object.keys(useDismissedThreads.getState().dismissed)).toEqual(['linear:TAV-99'])
+    expect(Object.keys(useWorkMarks.getState().settled)).toEqual(['linear:TAV-99'])
   })
 
   it('brings a dismissed branch back once a session started on it', async () => {
     const user = userEvent.setup()
-    useDismissedThreads.setState({ dismissed: { '/repo#main': 1 } })
+    useWorkMarks.setState({ settled: { '/repo#main': 1 } })
     const onClose = await open()
     await goToTab(user, 'Branch')
     await screen.findByRole('option', { name: /main/ })
     await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(useDismissedThreads.getState().dismissed).toEqual({})
+    expect(useWorkMarks.getState().settled).toEqual({})
   })
 
   it('leaves a dismissed ticket dismissed when starting it failed', async () => {
     const user = userEvent.setup()
-    useDismissedThreads.setState({ dismissed: { 'linear:TAV-33': 1 } })
+    useWorkMarks.setState({ settled: { 'linear:TAV-33': 1 } })
     launched.createFromDraft.mockResolvedValue({ field: 'form', message: 'Worktree error: nope' })
     await open()
     await pressInBox(user, '{Enter}')
     await waitFor(() => expect(launched.createFromDraft).toHaveBeenCalled())
-    expect(Object.keys(useDismissedThreads.getState().dismissed)).toEqual(['linear:TAV-33'])
+    expect(Object.keys(useWorkMarks.getState().settled)).toEqual(['linear:TAV-33'])
   })
 })
 

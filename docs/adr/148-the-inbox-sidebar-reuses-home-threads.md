@@ -1,6 +1,6 @@
 # ADR 148: The Inbox sidebar reuses Home's work threads
 
-**Status**: Accepted
+**Status**: Accepted, amended by [ADR 157](157-settle-is-the-one-word.md) (one store for Home and the Inbox) and [ADR 158](158-a-facet-says-where-it-opens.md)
 
 **Date**: 2026-11-07
 

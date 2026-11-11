@@ -320,7 +320,7 @@ function TaskMarker({ row }: RowProps): React.JSX.Element {
     <button
       className="daily-log__task-checkbox"
       onClick={() => void completeTask(row.props.onComplete, row.task.id)}
-      title="Complete task"
+      title="Mark done"
     >
       <StatusIcon status={row.task.status} />
     </button>
@@ -428,11 +428,7 @@ function FinishedActions({ row }: RowProps): React.JSX.Element {
   return (
     <span className="daily-log__task-actions">
       {(status === 'done' || removable) && (
-        <IconButton
-          icon={RotateCcw}
-          label="Restore to open"
-          onClick={() => void row.commands.restore()}
-        />
+        <IconButton icon={RotateCcw} label="Restore" onClick={() => void row.commands.restore()} />
       )}
       {removable && (
         <IconButton icon={Trash2} label="Remove" onClick={() => void row.commands.remove()} />
