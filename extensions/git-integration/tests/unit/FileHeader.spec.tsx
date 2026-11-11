@@ -114,6 +114,7 @@ describe('FileHeader second row — blast radius', () => {
   it.each([
     ['unmeasured', null],
     ['used nowhere and defined nowhere else', { usedIn: 0, alsoDefinedIn: 0 }],
+    ['used nowhere, though the name is defined elsewhere', { usedIn: 0, alsoDefinedIn: 2 }],
   ])('shows no blast radius when the file is %s', (_case, blastRadius) => {
     renderFileHeader(changedFileWithRadius(blastRadius))
     expect(screen.queryByText(/Used in/)).toBeNull()

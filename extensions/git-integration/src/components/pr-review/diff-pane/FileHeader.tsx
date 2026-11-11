@@ -65,7 +65,7 @@ function BlastRadiusFact({ radius }: { radius: BlastRadius }) {
 }
 
 function shownRadius(radius: PrChangedFile['blastRadius']): BlastRadius | null {
-  return radius && (radius.usedIn > 0 || radius.alsoDefinedIn > 0) ? radius : null
+  return radius && radius.usedIn > 0 ? radius : null
 }
 
 /** The reading-order reason, the 90-day change count and the blast radius, each when known. */
