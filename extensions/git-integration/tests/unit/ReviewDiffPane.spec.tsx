@@ -129,6 +129,7 @@ function baseReviewUiStoreState() {
     requestComposer: mockRequestComposer,
     agentRuns: [],
     openAgentPanel: mockOpenAgentPanel,
+    setFileHunks: vi.fn(),
   }
 }
 
@@ -173,7 +174,7 @@ const defaultProps = {
   repoRoot: '/repo',
   pr: mockPr,
   file: mockFile,
-  onMarkViewed: vi.fn(),
+  active: true,
   onPrevFile: vi.fn(),
   onNextFile: vi.fn(),
 }
@@ -237,8 +238,18 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
+/** The pane inside the review stream's scroll element, as the stream renders each file. */
+function PaneInScroller(props: typeof defaultProps) {
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  return (
+    <div className="review-diff-scroll" data-testid="review-diff-scroll" ref={scrollRef}>
+      <ReviewDiffPane {...props} scrollRef={scrollRef} />
+    </div>
+  )
+}
+
 async function renderPane(props: Partial<typeof defaultProps> = {}) {
-  return render(<ReviewDiffPane {...defaultProps} {...props} />)
+  return render(<PaneInScroller {...defaultProps} {...props} />)
 }
 
 const ctxLine = (n: number, content = `line ${n}`) => ({
@@ -648,20 +659,6 @@ describe('ReviewDiffPane — renders inline comment threads on matching lines', 
   })
 })
 
-describe('ReviewDiffPane — fires keyboard navigation events for prev-file and mark-viewed-next', () => {
-  it('fires keyboard navigation events for prev-file and mark-viewed-next', async () => {
-    const onPrevFile = vi.fn()
-    const onMarkViewed = vi.fn()
-    await renderPane({ onPrevFile, onMarkViewed })
-
-    window.dispatchEvent(new CustomEvent('pr-review:prev-file'))
-    window.dispatchEvent(new CustomEvent('pr-review:mark-viewed-next'))
-
-    expect(onPrevFile).toHaveBeenCalled()
-    expect(onMarkViewed).toHaveBeenCalled()
-  })
-})
-
 describe('ReviewDiffPane — comments', () => {
   it('shows every thread on the line, resolved ones too', async () => {
     storeThreads([threadOnLineOne('thread-open'), threadOnLineOne('thread-resolved', true)])
@@ -882,6 +879,20 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — leaving the
     })
     window.dispatchEvent(new CustomEvent('review:next-hunk'))
     expect(onNextFile).toHaveBeenCalled()
+  })
+})
+
+describe('ReviewDiffPane — only the active file section handles the review keys', () => {
+  useOneRowViewport()
+
+  it('ignores nextHunk while another section is active', async () => {
+    const onNextFile = vi.fn()
+    await renderDiffPane(oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'a')]), {
+      onNextFile,
+      active: false,
+    })
+    window.dispatchEvent(new CustomEvent('review:next-hunk'))
+    expect(onNextFile).not.toHaveBeenCalled()
   })
 })
 
@@ -1178,7 +1189,7 @@ describe('ReviewDiffPane expandable context — resets expansions when another f
 
     const other = { ...mockFile, path: 'src/bar.ts' }
     mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
-    rerender(<ReviewDiffPane {...defaultProps} file={other} />)
+    rerender(<PaneInScroller {...defaultProps} file={other} />)
     await screen.findByTitle('src/bar.ts')
     await waitFor(() => expect(gaps().length).toBe(3))
     expect(expandedRows().length).toBe(0)
@@ -1263,8 +1274,7 @@ describe('ReviewDiffPane — fetch and render cost', () => {
       viewedFiles: new Set(['src/foo.ts']),
       viewedAt: { 'src/foo.ts': 'abc' },
     })
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
-    view.rerender(<ReviewDiffPane {...defaultProps} />)
+    view.rerender(<PaneInScroller {...defaultProps} />)
     expect(mockPrFileDiff).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('Loading diff…')).toBeNull()
     expect(screen.getByText(codeLine('const viewedMark = 1'))).toBeTruthy()
@@ -1278,10 +1288,9 @@ describe('ReviewDiffPane — fetch and render cost — shows a diff it already h
     )
     const view = await renderPane()
     await screen.findByText(codeLine('const in_foo = 1'))
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
-    view.rerender(<ReviewDiffPane {...defaultProps} file={otherFile} />)
+    view.rerender(<PaneInScroller {...defaultProps} file={otherFile} />)
     await screen.findByText(codeLine('const in_bar = 1'))
-    view.rerender(<ReviewDiffPane {...defaultProps} />)
+    view.rerender(<PaneInScroller {...defaultProps} />)
     expect(screen.getByText(codeLine('const in_foo = 1'))).toBeTruthy()
     expect(screen.queryByText('Loading diff…')).toBeNull()
     expect(mockPrFileDiff).toHaveBeenCalledTimes(2)
@@ -1291,8 +1300,7 @@ describe('ReviewDiffPane — fetch and render cost — shows a diff it already h
     mockPrFileDiff.mockResolvedValue({ diff: diffOf('src/foo.ts', 'const headMoves = 1') })
     const view = await renderPane()
     await screen.findByText(codeLine('const headMoves = 1'))
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
-    view.rerender(<ReviewDiffPane {...defaultProps} pr={{ ...mockPr, headSHA: 'def' }} />)
+    view.rerender(<PaneInScroller {...defaultProps} pr={{ ...mockPr, headSHA: 'def' }} />)
     await waitFor(() => expect(mockPrFileDiff).toHaveBeenCalledTimes(2))
   })
 })
@@ -1306,9 +1314,8 @@ describe('ReviewDiffPane — fetch and render cost — highlights each distinct 
       String(c[0]).includes('highlightOnce')
     ).length
     expect(seen).toBe(2)
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
-    view.rerender(<ReviewDiffPane {...defaultProps} onMarkViewed={vi.fn()} />)
-    view.rerender(<ReviewDiffPane {...defaultProps} onMarkViewed={vi.fn()} />)
+    view.rerender(<PaneInScroller {...defaultProps} onNextFile={vi.fn()} />)
+    view.rerender(<PaneInScroller {...defaultProps} onNextFile={vi.fn()} />)
     const after = highlightSpy.mock.calls.filter((c) =>
       String(c[0]).includes('highlightOnce')
     ).length

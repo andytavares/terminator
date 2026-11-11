@@ -35,10 +35,7 @@ function run(id: string, status: AgentRun['status']): AgentRun {
 
 beforeEach(() => {
   localStorage.clear()
-  useReviewUiStore.setState({
-    diffRange: 'since',
-    groupBy: 'all',
-  })
+  useReviewUiStore.setState({ diffRange: 'since' })
   useReviewUiStore.getState().resetForPr()
 })
 
@@ -47,15 +44,6 @@ describe('review UI store', () => {
     useReviewUiStore.getState().setDiffRange('whole')
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY)!)
     expect(saved).toMatchObject({ diffRange: 'whole' })
-  })
-})
-
-describe('review UI store — group by', () => {
-  it('groups the file list by folders by default and remembers a switch to chapters', () => {
-    expect(useReviewUiStore.getState().groupBy).toBe('all')
-    useReviewUiStore.getState().setGroupBy('chapters')
-    expect(useReviewUiStore.getState().groupBy).toBe('chapters')
-    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!).groupBy).toBe('chapters')
   })
 })
 
@@ -96,24 +84,18 @@ describe('review UI store — upserts agent runs newest first without duplicates
 })
 
 describe('review UI store — loads persisted preferences from localStorage on module init', () => {
-  it('loads a persisted diff range and grouping on module init', async () => {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ diffRange: 'whole', groupBy: 'chapters' }))
+  it('loads a persisted diff range on module init', async () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ diffRange: 'whole' }))
     vi.resetModules()
     const fresh = await import('../../src/stores/review-ui.store')
-    expect(fresh.useReviewUiStore.getState()).toMatchObject({
-      diffRange: 'whole',
-      groupBy: 'chapters',
-    })
+    expect(fresh.useReviewUiStore.getState()).toMatchObject({ diffRange: 'whole' })
   })
 
   it('falls back to defaults when persisted JSON is malformed', async () => {
     localStorage.setItem(PREFS_KEY, '{not json')
     vi.resetModules()
     const fresh = await import('../../src/stores/review-ui.store')
-    expect(fresh.useReviewUiStore.getState()).toMatchObject({
-      diffRange: 'since',
-      groupBy: 'all',
-    })
+    expect(fresh.useReviewUiStore.getState()).toMatchObject({ diffRange: 'since' })
   })
 })
 
@@ -124,8 +106,10 @@ describe('review UI store — resetForPr clears per-PR state but keeps preferenc
     s.setSelection({ path: 'a.ts', side: 'RIGHT', startLine: 1, endLine: 3 })
     s.upsertAgentRun(run('a', 'running'))
     s.setKeyboardHelpOpen(true)
+    s.setFileHunks('a.ts', ['@@ -1 +1 @@'])
     s.resetForPr()
     const after = useReviewUiStore.getState()
+    expect(after.fileHunks).toEqual({})
     expect(after.selection).toBeNull()
     expect(after.agentRuns).toEqual([])
     expect(after.keyboardHelpOpen).toBe(false)

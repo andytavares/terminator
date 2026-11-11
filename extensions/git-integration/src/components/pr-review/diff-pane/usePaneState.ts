@@ -51,6 +51,7 @@ export function usePaneUiStore() {
       agentRuns: s.agentRuns,
       openAgentPanel: s.openAgentPanel,
       deferHunk: s.deferHunk,
+      setFileHunks: s.setFileHunks,
       revisitHunk: s.revisitHunk,
       clearRevisitHunk: s.clearRevisitHunk,
     }))

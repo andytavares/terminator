@@ -40,6 +40,8 @@ export interface HunkMarkSource {
 }
 
 export interface KeyEventSource {
+  /** False for every file section but the active one, so one key moves one section. */
+  enabled: boolean
   selection: LineSelection | null
   path: string
   scrollHunkIntoView: (direction: 1 | -1) => void
@@ -50,20 +52,6 @@ export interface KeyEventSource {
 }
 
 type HunkHeaderItem = Extract<DiffItem, { kind: 'hunk-header' }>
-
-/** The window events the file header's keyboard shortcuts raise for the previous and next file. */
-export function useFileNavEvents(onPrevFile: () => void, onMarkViewed: () => void): void {
-  useEffect(() => {
-    const handlePrev = () => onPrevFile()
-    const handleMarkNext = () => onMarkViewed()
-    window.addEventListener('pr-review:prev-file', handlePrev)
-    window.addEventListener('pr-review:mark-viewed-next', handleMarkNext)
-    return () => {
-      window.removeEventListener('pr-review:prev-file', handlePrev)
-      window.removeEventListener('pr-review:mark-viewed-next', handleMarkNext)
-    }
-  }, [onPrevFile, onMarkViewed])
-}
 
 function anchorFromRequest(request: ComposerRequest): ComposerAnchor {
   return {
@@ -236,14 +224,30 @@ function keyEventHandlers(src: KeyEventSource): Array<[string, () => void]> {
 /** REVIEW_KEY_EVENTS: the surface-level key handler (useReviewKeys) raises these; only the pane
  *  knows its hunks and selection. */
 export function useReviewKeyEvents(src: KeyEventSource): void {
-  const { selection, path, scrollHunkIntoView, markHunkRead, deferHunk, selectionTouchesRevealed } =
-    src
+  const {
+    enabled,
+    selection,
+    path,
+    scrollHunkIntoView,
+    markHunkRead,
+    deferHunk,
+    selectionTouchesRevealed,
+  } = src
   useEffect(() => {
+    if (!enabled) return
     const handlers = keyEventHandlers(src)
     for (const [event, handler] of handlers) window.addEventListener(event, handler)
     return () => {
       for (const [event, handler] of handlers) window.removeEventListener(event, handler)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, path, scrollHunkIntoView, markHunkRead, deferHunk, selectionTouchesRevealed])
+  }, [
+    enabled,
+    selection,
+    path,
+    scrollHunkIntoView,
+    markHunkRead,
+    deferHunk,
+    selectionTouchesRevealed,
+  ])
 }

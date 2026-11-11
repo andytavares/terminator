@@ -8,6 +8,7 @@ import {
   PrReviewDetailSchema,
   type InlineComment,
   type PrChangedFile,
+  type PrReviewDetail,
 } from '../../src/schemas/pr-review.schema'
 
 /** A reply in the diff pane, with the real stores, thread and composer: only the bridge is faked. */
@@ -168,15 +169,23 @@ function renderPaneWithQuestion() {
       resolved: false,
     },
   ])
-  render(
-    <ReviewDiffPane
-      repoRoot="/repo"
-      pr={pr}
-      file={file}
-      onMarkViewed={vi.fn()}
-      onPrevFile={vi.fn()}
-      onNextFile={vi.fn()}
-    />
+  render(<PaneInScroller pr={pr} file={file} />)
+}
+
+/** The pane inside the review stream's scroll element, as the stream renders each file. */
+function PaneInScroller(props: { pr: PrReviewDetail; file: PrChangedFile }) {
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  return (
+    <div className="review-diff-scroll" ref={scrollRef}>
+      <ReviewDiffPane
+        repoRoot="/repo"
+        {...props}
+        scrollRef={scrollRef}
+        active
+        onPrevFile={vi.fn()}
+        onNextFile={vi.fn()}
+      />
+    </div>
   )
 }
 

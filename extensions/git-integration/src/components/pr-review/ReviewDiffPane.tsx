@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VirtualDiffList, type VirtualDiffListHandle } from './VirtualDiffList'
 import { laterKey } from '../../stores/review-ui.store'
 import { extensionOf } from '../../utils/syntax'
@@ -13,7 +13,6 @@ import { useLineSelection } from './diff-pane/useLineSelection'
 import {
   hunkMarks,
   useComposerRequest,
-  useFileNavEvents,
   useHunkNav,
   useReviewKeyEvents,
 } from './diff-pane/usePaneEvents'
@@ -37,7 +36,10 @@ interface Props {
   repoRoot: string
   pr: PrReviewDetail
   file: PrChangedFile
-  onMarkViewed: () => void
+  /** The review's one scroll element, which every file section of the stream shares. */
+  scrollRef: React.RefObject<HTMLDivElement | null>
+  /** Only the active section, the one at the top of the viewport, handles the review keys. */
+  active: boolean
   onPrevFile: () => void
   onNextFile: () => void
 }
@@ -69,8 +71,6 @@ interface ContextParts {
   layout: PaneContext['layout']
   actions: PaneContext['actions']
 }
-
-type ScrollRef = React.RefObject<HTMLDivElement | null>
 
 type ListRef = React.RefObject<VirtualDiffListHandle | null>
 
@@ -137,6 +137,24 @@ function useFormattingReveal(path: string) {
   }
 }
 
+/** Tells the review the file's hunk headers once its diff loads, for chapter progress; a binary
+ *  file has none. */
+function useRegisterFileHunks(
+  file: PrChangedFile,
+  diff: FileDiff | null,
+  setFileHunks: UiStore['setFileHunks']
+) {
+  const { path, isBinary } = file
+  useEffect(() => {
+    if (isBinary) setFileHunks(path, [])
+    else if (diff)
+      setFileHunks(
+        path,
+        diff.hunks.map((h) => h.header)
+      )
+  }, [path, isBinary, diff, setFileHunks])
+}
+
 /** The diff, its gaps and the list's entries for the file shown. */
 function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   const { pr, file } = props
@@ -161,6 +179,7 @@ function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
     movedMark: moved.movedMark,
     viewedHunks: useViewedHunks(store.viewedHunks[file.path]),
   })
+  useRegisterFileHunks(file, loaded.diff, ui.setFileHunks)
   return { request, loaded, gaps, moved, items, formatting }
 }
 
@@ -203,14 +222,13 @@ function peekFirstDefinition(
 /** The review key events the surface raises for this pane: hunk moves, Space, `l` and `c`. */
 function useHunkKeys(w: Wiring, listRef: React.RefObject<VirtualDiffListHandle | null>): void {
   const { props, ui, view } = w
-  const { onPrevFile, onNextFile } = props
   const path = props.file.path
   const nav = useHunkNav({
     items: view.items,
     diffKey: view.request.diffKey,
     path,
-    onPrevFile,
-    onNextFile,
+    onPrevFile: props.onPrevFile,
+    onNextFile: props.onNextFile,
     listRef,
     revisitHunk: ui.revisitHunk,
     clearRevisitHunk: ui.clearRevisitHunk,
@@ -223,6 +241,7 @@ function useHunkKeys(w: Wiring, listRef: React.RefObject<VirtualDiffListHandle |
     deferHunk: ui.deferHunk,
   })
   useReviewKeyEvents({
+    enabled: props.active,
     selection: ui.selection,
     path,
     scrollHunkIntoView: nav.scrollHunkIntoView,
@@ -232,14 +251,13 @@ function useHunkKeys(w: Wiring, listRef: React.RefObject<VirtualDiffListHandle |
   })
 }
 
-/** Hunk keys, file keys and the review key events the surface raises for this pane. */
+/** Hunk keys and the review key events the surface raises for this pane. */
 function useNavigation(
   w: Wiring,
   usesWithDef: ReturnType<typeof useUsesWithDefinition>,
   listRef: React.RefObject<VirtualDiffListHandle | null>
 ) {
   const goToPath = useGoToPath(w.props.pr, w.store)
-  useFileNavEvents(w.props.onPrevFile, w.props.onMarkViewed)
   useHunkKeys(w, listRef)
   const peekDefinition = () => peekFirstDefinition(usesWithDef, goToPath)
   return { goToPath, peekDefinition }
@@ -304,7 +322,7 @@ function useReviewDiffPane(props: Props, listRef: ListRef) {
   return { ctx: paneContext({ w, layout, actions }), w, usesWithDef, nav }
 }
 
-function PaneDiffBody(props: { pane: PaneState; scrollRef: ScrollRef; listRef: ListRef }) {
+function PaneDiffBody(props: { pane: PaneState; scrollRef: Props['scrollRef']; listRef: ListRef }) {
   const { ctx, w } = props.pane
   const { diff, diffLoading, diffError } = w.view.loaded
   if (ctx.file.isBinary)
@@ -348,21 +366,14 @@ function PaneHeader({ pane, props }: { pane: PaneState; props: Props }) {
   )
 }
 
+/** One file of the review stream: its header and its diff, scrolled by the stream. */
 export function ReviewDiffPane(props: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<VirtualDiffListHandle>(null)
   const pane = useReviewDiffPane(props, listRef)
   return (
-    <div className="review-diff-pane">
+    <div className="review-diff-pane" onClick={pane.ctx.drag.clearSelectionOnBackgroundClick}>
       <PaneHeader pane={pane} props={props} />
-      <div
-        className="review-diff-scroll"
-        data-testid="review-diff-scroll"
-        ref={scrollRef}
-        onClick={pane.ctx.drag.clearSelectionOnBackgroundClick}
-      >
-        <PaneDiffBody pane={pane} scrollRef={scrollRef} listRef={listRef} />
-      </div>
+      <PaneDiffBody pane={pane} scrollRef={props.scrollRef} listRef={listRef} />
     </div>
   )
 }

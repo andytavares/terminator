@@ -35,7 +35,8 @@ test("a pull request's diff is drawn on the review screen with its controls line
   const view = await openCodeReviews(handle, 'Review Diff')
   await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
   await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
-  await view.locator('.full-file-row[title="src/math.ts"]').click()
-  await expect(view.getByRole('main')).toContainText('return a - b')
+  // A three-line pull request is the page band: every file is on the page, with no chapter rail.
+  await expect(view.locator('[data-review-path="src/math.ts"]')).toContainText('return a - b')
+  await expect(view.getByRole('navigation', { name: 'PR chapters' })).toHaveCount(0)
   await expect.poll(() => misalignedOn(view, 'Review screen')).toEqual([])
 })

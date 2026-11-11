@@ -80,6 +80,8 @@ export interface PrReviewStore {
   markFilesViewed(head: PrHead, filePaths: string[]): void
   unmarkFileViewed(head: PrHead, filePath: string): void
   toggleHunkViewed(head: PrHead, filePath: string, hunkHeader: string): void
+  /** Marks each file's listed hunk headers read, keeping those already read. */
+  markHunksViewed(head: PrHead, headersByPath: Record<string, string[]>): void
   reorderFiles(head: PrHead, chapterId: string, orderedPaths: string[]): void
   setScrollPosition(pos: number | null): void
   setPaused(head: PrHead, isoTimestamp: string | null): void
@@ -262,6 +264,22 @@ function hunkViewedToggled(state: PrReviewStore, path: string, hunkHeader: strin
   return { viewedHunks: next.length > 0 ? { ...others, [path]: next } : others }
 }
 
+/** `headersByPath` added to each file's viewed hunks. */
+function hunksViewedAdded(state: PrReviewStore, headersByPath: Record<string, string[]>) {
+  const viewedHunks = { ...state.viewedHunks }
+  for (const [path, headers] of Object.entries(headersByPath)) {
+    if (headers.length > 0)
+      viewedHunks[path] = [...new Set([...(viewedHunks[path] ?? []), ...headers])]
+  }
+  return { viewedHunks }
+}
+
+/** The read hunks of the files a push did not touch; a touched file's hunks are new hunks. */
+function untouchedHunks(viewedHunks: Record<string, string[]>, touched: Set<string> | null) {
+  if (touched === null) return {}
+  return Object.fromEntries(Object.entries(viewedHunks).filter(([path]) => !touched.has(path)))
+}
+
 /** Viewed files a push touched move to `changedSince`; 'all' (a force-push) moves every one. */
 function reconciled(state: PrReviewStore, changedPaths: string[] | 'all', addedPaths: string[]) {
   const touched = changedPaths === 'all' ? null : new Set(changedPaths)
@@ -272,7 +290,14 @@ function reconciled(state: PrReviewStore, changedPaths: string[] | 'all', addedP
     else viewedFiles.add(path)
   }
   const historyRewritten = changedPaths === 'all' && changedSince.size > 0
-  return { viewedFiles, changedSince, historyRewritten, newSinceLook: new Set(addedPaths) }
+  const viewedHunks = untouchedHunks(state.viewedHunks, touched)
+  return {
+    viewedFiles,
+    changedSince,
+    historyRewritten,
+    newSinceLook: new Set(addedPaths),
+    viewedHunks,
+  }
 }
 
 /** The active PR with `update` applied to each file `matches` picks. */
@@ -329,12 +354,22 @@ function viewedActions(set: SetState, get: GetState) {
       persistSession(get(), head)
       syncViewed(viewedTarget(get(), head), filePath, false)
     },
+    reconcileHead: (head: PrHead, changedPaths: string[] | 'all', addedPaths: string[] = []) => {
+      set((state) => reconciled(state, changedPaths, addedPaths))
+      persistSession(get(), head)
+    },
+  }
+}
+
+/** Read hunks, each change saved with the session. */
+function hunkActions(set: SetState, get: GetState) {
+  return {
     toggleHunkViewed: (head: PrHead, filePath: string, hunkHeader: string) => {
       set((state) => hunkViewedToggled(state, filePath, hunkHeader))
       persistSession(get(), head)
     },
-    reconcileHead: (head: PrHead, changedPaths: string[] | 'all', addedPaths: string[] = []) => {
-      set((state) => reconciled(state, changedPaths, addedPaths))
+    markHunksViewed: (head: PrHead, headersByPath: Record<string, string[]>) => {
+      set((state) => hunksViewedAdded(state, headersByPath))
       persistSession(get(), head)
     },
   }
@@ -440,6 +475,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   ...queueActions(set),
   ...viewActions(set),
   ...viewedActions(set, get),
+  ...hunkActions(set, get),
   ...churnActions(set),
   ...draftActions(set, get),
   ...prSessionActions(set, get),

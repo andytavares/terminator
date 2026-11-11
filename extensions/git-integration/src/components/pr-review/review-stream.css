@@ -1,0 +1,61 @@
+/* ReviewStream: every file of the shown chapters in one scroll element. */
+
+.rs-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* A section grows with its diff; the stream scrolls, not the section. */
+.rs-file .review-diff-pane {
+  flex: none;
+  overflow: visible;
+}
+
+.rs-file + .rs-file {
+  border-top: 1px solid var(--tm-border);
+}
+
+/* Scrolling to a file leaves its chapter's sticky header above it. */
+.rs-file {
+  scroll-margin-top: 40px;
+}
+
+.rs-placeholder {
+  background: var(--tm-bg-base);
+}
+
+.rs-chapter-head {
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--tm-layer-overlay) + 1);
+  display: flex;
+  align-items: baseline;
+  gap: var(--tm-space-2);
+  margin: 0;
+  padding: var(--tm-space-2) 14px;
+  background: var(--tm-bg-elevated);
+  border-bottom: 1px solid var(--tm-border);
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+}
+
+.rs-chapter-progress {
+  font-size: var(--tm-font-size-sm);
+  font-weight: 400;
+  color: var(--tm-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rs-end {
+  display: flex;
+  justify-content: center;
+  padding: var(--tm-space-4) 14px;
+}
+
+.rs-page-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--tm-space-1) 14px;
+  border-bottom: 1px solid var(--tm-border);
+}

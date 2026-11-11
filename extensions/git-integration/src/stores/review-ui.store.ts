@@ -5,7 +5,6 @@ import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
 type AgentRequest = 'review' | 'explain' | 'ask'
 
 type DiffRange = 'since' | 'whole'
-type GroupBy = 'chapters' | 'all'
 
 /** A line range the reviewer has selected in the diff, for the float bar and the agent. */
 export interface LineSelection {
@@ -50,14 +49,12 @@ const PREFS_KEY = 'git-integration.review-ui.prefs'
 
 interface Prefs {
   diffRange: DiffRange
-  groupBy: GroupBy
   queueSort: SortMode
   dashboardSort: SortMode
 }
 
 const DEFAULT_PREFS: Prefs = {
   diffRange: 'since',
-  groupBy: 'all',
   queueSort: 'newest',
   dashboardSort: 'newest',
 }
@@ -78,9 +75,10 @@ interface ReviewUiStore extends Prefs {
   laterHunks: Record<string, LaterHunk[]>
   /** A later hunk the review came back to; the diff pane scrolls to it, then clears it. */
   revisitHunk: LaterHunk | null
+  /** The hunk headers of each file whose diff has loaded, for chapter progress. Memory only. */
+  fileHunks: Record<string, string[]>
 
   setDiffRange(r: DiffRange): void
-  setGroupBy(groupBy: GroupBy): void
   setQueueSort(mode: SortMode): void
   setDashboardSort(mode: SortMode): void
   setSelection(s: LineSelection | null): void
@@ -93,6 +91,7 @@ interface ReviewUiStore extends Prefs {
   deferHunk(key: string, hunk: LaterHunk): void
   takeLaterHunk(key: string): LaterHunk | null
   clearRevisitHunk(): void
+  setFileHunks(path: string, headers: string[]): void
   resetForPr(): void
 }
 
@@ -127,7 +126,6 @@ type GetState = StoreApi<ReviewUiStore>['getState']
 function prefsOf(state: ReviewUiStore): Prefs {
   return {
     diffRange: state.diffRange,
-    groupBy: state.groupBy,
     queueSort: state.queueSort,
     dashboardSort: state.dashboardSort,
   }
@@ -141,7 +139,6 @@ function prefActions(set: SetState, get: GetState) {
   }
   return {
     setDiffRange: (r: DiffRange) => persist({ diffRange: r }),
-    setGroupBy: (groupBy: GroupBy) => persist({ groupBy }),
     setQueueSort: (mode: SortMode) => persist({ queueSort: mode }),
     setDashboardSort: (mode: SortMode) => persist({ dashboardSort: mode }),
   }
@@ -156,6 +153,7 @@ const NO_PR_STATE = {
   keyboardHelpOpen: false,
   insightsOpen: false,
   revisitHunk: null,
+  fileHunks: {},
 }
 
 const isSameHunk = (a: LaterHunk, b: LaterHunk) => a.path === b.path && a.header === b.header
@@ -194,6 +192,8 @@ function uiSessionActions(set: SetState) {
       set({ agentPanelScope: scope, agentPanelRequest: request, agentPanelAutoStart: autoStart }),
     setKeyboardHelpOpen: (open: boolean) => set({ keyboardHelpOpen: open }),
     setInsightsOpen: (open: boolean) => set({ insightsOpen: open }),
+    setFileHunks: (path: string, headers: string[]) =>
+      set((state) => ({ fileHunks: { ...state.fileHunks, [path]: headers } })),
     resetForPr: () => set(NO_PR_STATE),
   }
 }

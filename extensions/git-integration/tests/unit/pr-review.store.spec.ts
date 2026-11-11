@@ -273,3 +273,40 @@ describe('pr-review store — viewed hunks', () => {
     expect(usePrReviewStore.getState().viewedHunks['playwright.config.ts']).toBeUndefined()
   })
 })
+
+const AT_HEAD = { repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' }
+const SHARD_HUNKS = ['@@ -1,3 +1,4 @@', '@@ -20,2 +21,2 @@']
+
+/** Marks the shard script's hunks read, then reloads the saved session the way PrReviewTab does. */
+function readHunksAndReload(): void {
+  usePrReviewStore.getState().markHunksViewed(AT_HEAD, { 'scripts/e2e-shard.ts': SHARD_HUNKS })
+  const [, saved] = sessionSet.mock.calls.at(-1)!
+  usePrReviewStore.getState().reset()
+  usePrReviewStore.getState().initSession(saved as ReviewSession)
+}
+
+describe('pr-review store — saved hunk progress', () => {
+  it('keeps the read hunks across a reload of the same head', () => {
+    readHunksAndReload()
+    expect(usePrReviewStore.getState().viewedHunks).toEqual({ 'scripts/e2e-shard.ts': SHARD_HUNKS })
+  })
+
+  it('drops the read hunks of a file the new head changed, and keeps the others', () => {
+    usePrReviewStore
+      .getState()
+      .markHunksViewed(AT_HEAD, { 'scripts/e2e-timings.ts': ['@@ -5 +5 @@'] })
+    readHunksAndReload()
+    usePrReviewStore
+      .getState()
+      .reconcileHead({ ...AT_HEAD, headSHA: 'bbb222' }, ['scripts/e2e-shard.ts'])
+    expect(usePrReviewStore.getState().viewedHunks).toEqual({
+      'scripts/e2e-timings.ts': ['@@ -5 +5 @@'],
+    })
+  })
+
+  it('drops every read hunk when the old head is gone', () => {
+    readHunksAndReload()
+    usePrReviewStore.getState().reconcileHead({ ...AT_HEAD, headSHA: 'bbb222' }, 'all')
+    expect(usePrReviewStore.getState().viewedHunks).toEqual({})
+  })
+})

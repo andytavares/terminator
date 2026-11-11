@@ -5,7 +5,6 @@
  */
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { FullFileList } from '../../extensions/git-integration/src/components/pr-review/FullFileList'
 import { ChapterNav } from '../../extensions/git-integration/src/components/pr-review/ChapterNav'
 import { ReviewDashboard } from '../../extensions/git-integration/src/components/pr-review/ReviewDashboard'
 import { ReviewFooter } from '../../extensions/git-integration/src/components/pr-review/ReviewFooter'
@@ -81,21 +80,6 @@ const chapters = [
     files: [contrastFile('package-lock.json', { additions: 400, deletions: 380 })],
   },
 ]
-
-const prDetail = {
-  number: 182,
-  title: 'Session Home and Monitor Wall',
-  chapters,
-  readingOrder: [
-    {
-      step: 1,
-      path: 'packages/core-main/src/session/session-store.ts',
-      symbol: 'SessionStore',
-      reason: 'Defines the record every later file reads',
-      uses: [],
-    },
-  ],
-}
 
 const gitStatus = {
   branch: 'feat/git-speed-contrast-keys',
@@ -304,27 +288,18 @@ window.electronAPI = electronApiOf({
 })
 
 function PrRail(): React.JSX.Element {
-  usePrReviewStore.setState({
-    viewedFiles: new Set(['packages/core-main/src/session/session-types.ts', 'package-lock.json']),
-    currentChapterId: 'ch-1',
-    currentFilePath: 'packages/core-main/src/session/session-records.ts',
-  })
   return (
     <div className="pr-review-view" style={{ height: 640, width: 280 }}>
       <div className="pr-review-panels">
-        <aside className="pr-review-panel pr-review-panel--left">
+        <aside aria-label="Chapters" className="pr-review-panel pr-review-panel--left">
           <div className="pr-review-panel-header">
-            <span className="pr-review-chapter-name">Files</span>
+            <span className="pr-review-chapter-name">Chapters</span>
           </div>
-          <div className="pr-rail-chapters">
-            <ChapterNav chapters={chapters as never} />
-          </div>
-          <FullFileList
-            pr={prDetail as never}
-            repoRoot={REPO}
-            headSHA="abc1234"
-            currentFilePath="packages/core-main/src/session/session-records.ts"
-            onSelectFile={() => {}}
+          <ChapterNav
+            chapters={chapters as never}
+            progress={{ 'ch-1': { read: 2, total: 5 }, 'ch-2': { read: 0, total: 3 } }}
+            activeId="ch-1"
+            onSelectChapter={() => {}}
           />
         </aside>
       </div>
@@ -386,19 +361,7 @@ function PausedQueue(): React.JSX.Element {
 
 const surfaces: Record<string, () => React.JSX.Element> = {
   'review-footer': () => (
-    <ReviewFooter
-      previousFileName="math.ts"
-      nextFileName={null}
-      isLastFile
-      isLastChapter
-      position="file 2 of 2"
-      isViewed={false}
-      onToggleViewed={() => {}}
-      onPrevFile={() => {}}
-      onMarkViewed={() => {}}
-      onFinishChapter={() => {}}
-      onOpenShortcuts={() => {}}
-    />
+    <ReviewFooter position="Chapter 1 of 3 · 40% read" onOpenShortcuts={() => {}} />
   ),
   'review-queue': PausedQueue,
   'pr-rail': PrRail,
