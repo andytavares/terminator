@@ -17,7 +17,7 @@ interface Props {
   agentRuns: AgentRun[]
   changedSinceCount: number
   onContinue: () => void
-  /** Opens the drafts not yet submitted, in the submit dialog. */
+  /** Moves to the verdict bar, which submits the drafts not yet submitted. */
   onReviewDrafts: () => void
 }
 

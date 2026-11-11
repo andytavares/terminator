@@ -50,6 +50,9 @@ export function usePaneUiStore() {
       requestComposer: s.requestComposer,
       agentRuns: s.agentRuns,
       openAgentPanel: s.openAgentPanel,
+      deferHunk: s.deferHunk,
+      revisitHunk: s.revisitHunk,
+      clearRevisitHunk: s.clearRevisitHunk,
     }))
   )
 }

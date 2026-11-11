@@ -36,7 +36,7 @@ function PreviousButton(props: ReviewFooterProps) {
   )
 }
 
-/** The forward action: mark viewed and go on, finish the chapter, or submit at the very end. */
+/** The forward action: mark viewed and go on, or finish the chapter; the verdict bar submits. */
 function ForwardButton(props: ReviewFooterProps) {
   const { isLastFile, isLastChapter, nextFileName } = props
   if (!isLastFile) {
@@ -49,7 +49,7 @@ function ForwardButton(props: ReviewFooterProps) {
       </ForwardLabel>
     )
   }
-  const label = isLastChapter ? 'Viewed, submit review' : 'Viewed, next chapter'
+  const label = isLastChapter ? 'Viewed' : 'Viewed, next chapter'
   return <ForwardLabel onClick={props.onFinishChapter}>{label}</ForwardLabel>
 }
 
@@ -76,9 +76,6 @@ function ViewedToggle(props: { isViewed: boolean; onToggleViewed: (viewed: boole
         onChange={() => props.onToggleViewed(!props.isViewed)}
       />
       <span aria-hidden="true">Viewed</span>
-      <kbd className="tmui-kbd" aria-hidden="true">
-        v
-      </kbd>
     </label>
   )
 }

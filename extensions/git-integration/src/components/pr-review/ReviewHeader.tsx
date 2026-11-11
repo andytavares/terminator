@@ -3,7 +3,6 @@ import { ArrowLeft, Sparkles, MoreHorizontal, X } from 'lucide-react'
 import { Button, IconButton, Menu, Popover } from '@terminator/extension-ui'
 import { StatusChecksBar } from './StatusChecksBar'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
-import { plural } from '@terminator/extension-sdk'
 import './review-header.css'
 import './review-layout.css'
 
@@ -22,8 +21,6 @@ export interface ReviewHeaderProps {
   viewedCount: number
   totalFiles: number
   chapters: ChapterProgress[]
-  draftCount: number
-  onSubmit: () => void
   onPause: () => void
   onAskAgent: () => void
   onShowOverview?: () => void
@@ -158,7 +155,6 @@ function ReviewProgress(props: ReviewHeaderProps) {
 
 interface MenuItemProps {
   label: string
-  hint?: React.ReactNode
   disabled?: boolean
   onSelect: () => void
 }
@@ -176,7 +172,6 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
       }}
     >
       <span>{props.label}</span>
-      {props.hint && <span className="rh-menu-hint">{props.hint}</span>}
     </button>
   )
 }
@@ -184,11 +179,11 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
 /** The "more" menu's actions, in order. An action whose handler is absent is left out. */
 function menuItems(props: ReviewHeaderProps): MenuItemProps[] {
   const items: (MenuItemProps | false)[] = [
-    !!props.onShowOverview && { label: 'Overview', hint: 'i', onSelect: props.onShowOverview },
+    !!props.onShowOverview && { label: 'Overview', onSelect: props.onShowOverview },
     { label: 'Pause review', onSelect: props.onPause },
     { label: 'Refresh pull request', disabled: props.refreshing, onSelect: props.onRefresh },
     !!props.onPopOut && { label: 'Pop out', onSelect: props.onPopOut },
-    { label: 'Keyboard shortcuts', hint: '?', onSelect: props.onOpenKeyboardHelp },
+    { label: 'Keyboard shortcuts', onSelect: props.onOpenKeyboardHelp },
   ]
   return items.filter((item): item is MenuItemProps => item !== false)
 }
@@ -221,20 +216,6 @@ function MoreMenu({ header }: { header: ReviewHeaderProps }) {
   )
 }
 
-function SubmitButton(props: { draftCount: number; onSubmit: () => void }) {
-  return (
-    <Button variant="primary" onClick={props.onSubmit}>
-      Submit review
-      {props.draftCount > 0 && (
-        <span className="rh-count">
-          {props.draftCount}
-          <span className="pr-visually-hidden"> {plural(props.draftCount, 'pending comment')}</span>
-        </span>
-      )}
-    </Button>
-  )
-}
-
 /** One 44px row holding everything that is not the diff, in place of the old top bar, checks band,
  *  and progress track (design: docs/research/review-screen-declutter.md). */
 export function ReviewHeader(props: ReviewHeaderProps): React.JSX.Element {
@@ -258,7 +239,6 @@ export function ReviewHeader(props: ReviewHeaderProps): React.JSX.Element {
         >
           <span className="rh-ask-label">Ask agent</span>
         </Button>
-        <SubmitButton draftCount={props.draftCount} onSubmit={props.onSubmit} />
       </div>
       <MoreMenu header={props} />
       <IconButton icon={X} label="Close review" onClick={props.onClose} />

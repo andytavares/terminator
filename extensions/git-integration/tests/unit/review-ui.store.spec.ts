@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useReviewUiStore } from '../../src/stores/review-ui.store'
+import { laterKey, useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 
 const PREFS_KEY = 'git-integration.review-ui.prefs'
@@ -130,5 +130,38 @@ describe('review UI store — resetForPr clears per-PR state but keeps preferenc
     expect(after.agentRuns).toEqual([])
     expect(after.keyboardHelpOpen).toBe(false)
     expect(after.diffRange).toBe('whole')
+  })
+})
+
+describe('review UI store — later hunks', () => {
+  const key = laterKey('/r', 211)
+  const first = { path: 'src/a.ts', header: '@@ -1,2 +1,3 @@' }
+  const second = { path: 'src/b.ts', header: '@@ -8,1 +8,2 @@' }
+
+  beforeEach(() => useReviewUiStore.setState({ laterHunks: {}, revisitHunk: null }))
+
+  it('hands back later hunks in the order they were put off, and marks each for revisiting', () => {
+    const s = useReviewUiStore.getState()
+    s.deferHunk(key, first)
+    s.deferHunk(key, second)
+    expect(s.takeLaterHunk(key)).toEqual(first)
+    expect(useReviewUiStore.getState().revisitHunk).toEqual(first)
+    expect(useReviewUiStore.getState().laterHunks[key]).toEqual([second])
+  })
+
+  it('keeps a hunk put off twice once, at the end', () => {
+    const s = useReviewUiStore.getState()
+    s.deferHunk(key, first)
+    s.deferHunk(key, second)
+    s.deferHunk(key, first)
+    expect(useReviewUiStore.getState().laterHunks[key]).toEqual([second, first])
+  })
+
+  it('keeps each pull request’s later hunks apart, and across resetForPr', () => {
+    const s = useReviewUiStore.getState()
+    s.deferHunk(key, first)
+    s.resetForPr()
+    expect(s.takeLaterHunk(laterKey('/r', 212))).toBeNull()
+    expect(useReviewUiStore.getState().laterHunks[key]).toEqual([first])
   })
 })

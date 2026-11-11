@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   REVIEW_KEY_EVENTS,
   type ComposerRequest,
+  type LaterHunk,
   type LineSelection,
 } from '../../../stores/review-ui.store'
-import type { AgentScope } from '../../../schemas/review-agent.schema'
-import type { FileDiff } from '../../../schemas/git.schema'
 import type { DiffItem } from '../../../review/diff-items'
+import type { PrHead } from '../../../schemas/pr-review.schema'
 import type { VirtualDiffListHandle } from '../VirtualDiffList'
 import type { ComposerAnchor } from './types'
-import { hunkNearTop, rangeStart } from './lines'
+import { rangeStart } from './lines'
 
 interface ComposerRequestSource {
   path: string
@@ -21,25 +21,35 @@ interface ComposerRequestSource {
 interface HunkNavSource {
   items: DiffItem[]
   diffKey: string
+  path: string
   onPrevFile: () => void
   onNextFile: () => void
   listRef: { current: VirtualDiffListHandle | null }
+  /** A later hunk the review came back to, and how to clear it once shown. */
+  revisitHunk: LaterHunk | null
+  clearRevisitHunk: () => void
+}
+
+/** What Space and `l` change outside the pane: the hunk's read mark and the later list. */
+export interface HunkMarkSource {
+  head: PrHead
+  path: string
+  laterKey: string
+  toggleHunkViewed: (head: PrHead, path: string, hunkHeader: string) => void
+  deferHunk: (key: string, hunk: LaterHunk) => void
 }
 
 export interface KeyEventSource {
   selection: LineSelection | null
   path: string
-  diff: FileDiff | null
   scrollHunkIntoView: (direction: 1 | -1) => void
-  openAgentPanel: (
-    scope: AgentScope | null,
-    request?: 'review' | 'explain',
-    autoStart?: boolean
-  ) => void
+  markHunkRead: () => void
+  deferHunk: () => void
   selectionTouchesRevealed: (sel: LineSelection | null) => boolean
   setComposerAnchor: (anchor: ComposerAnchor) => void
-  peekDefinition: () => void
 }
+
+type HunkHeaderItem = Extract<DiffItem, { kind: 'hunk-header' }>
 
 /** The window events the file header's keyboard shortcuts raise for the previous and next file. */
 export function useFileNavEvents(onPrevFile: () => void, onMarkViewed: () => void): void {
@@ -86,18 +96,84 @@ export function useComposerRequest(source: ComposerRequestSource): void {
   }, [requestForThisFile, requestComposer])
 }
 
-/** Moves between hunks, past the first or last into the previous or next file. The last hunk
- *  scrolled to is kept, since jsdom (and some real layouts) report untrustworthy rects. */
-export function useHunkNav(src: HunkNavSource) {
-  const { items, diffKey, onPrevFile, onNextFile, listRef } = src
+interface RevisitSource {
+  src: HunkNavSource
+  hunkHeaderIndexes: number[]
+  currentHunkIndexRef: { current: number }
+  scrollToCurrent: () => void
+}
+
+function headerOf(item: DiffItem | undefined): string | null {
+  return item?.kind === 'hunk-header' ? item.hunk.header : null
+}
+
+/** Scrolls to a later hunk the review came back to, once its file's hunks are listed. */
+function useRevisitHunk({
+  src,
+  hunkHeaderIndexes,
+  currentHunkIndexRef,
+  scrollToCurrent,
+}: RevisitSource) {
+  const { revisitHunk, path, items, clearRevisitHunk } = src
+  useEffect(() => {
+    if (!revisitHunk || revisitHunk.path !== path) return
+    const at = hunkHeaderIndexes.findIndex((i) => headerOf(items[i]) === revisitHunk.header)
+    if (at < 0) return
+    currentHunkIndexRef.current = at
+    scrollToCurrent()
+    clearRevisitHunk()
+  }, [
+    revisitHunk,
+    path,
+    items,
+    hunkHeaderIndexes,
+    currentHunkIndexRef,
+    scrollToCurrent,
+    clearRevisitHunk,
+  ])
+}
+
+/** Scrolls to the current hunk again after the list re-renders, once asked to: a hunk marked read
+ *  folds its lines away, which moves every later hunk up. */
+function useRescroll(scrollToCurrent: () => void, diffKey: string) {
+  const rescrollRef = useRef(false)
+  useEffect(() => {
+    rescrollRef.current = false
+  }, [diffKey])
+  useEffect(() => {
+    if (!rescrollRef.current) return
+    rescrollRef.current = false
+    scrollToCurrent()
+  }, [scrollToCurrent])
+  return useCallback(() => {
+    rescrollRef.current = true
+  }, [])
+}
+
+/** The index of the hunk the keys act on, back to the first hunk when another diff opens. */
+function useCurrentHunkIndex(diffKey: string) {
   const currentHunkIndexRef = useRef(0)
   useEffect(() => {
     currentHunkIndexRef.current = 0
   }, [diffKey])
+  return currentHunkIndexRef
+}
+
+/** Moves between hunks, past the first or last into the previous or next file. The last hunk
+ *  scrolled to is kept, since jsdom (and some real layouts) report untrustworthy rects. */
+export function useHunkNav(src: HunkNavSource) {
+  const { items, diffKey, onPrevFile, onNextFile, listRef } = src
+  const currentHunkIndexRef = useCurrentHunkIndex(diffKey)
   const hunkHeaderIndexes = useMemo(
     () => items.flatMap((item, index) => [index].filter(() => item.kind === 'hunk-header')),
     [items]
   )
+  const scrollToCurrent = useCallback(() => {
+    const index = hunkHeaderIndexes[currentHunkIndexRef.current]
+    if (index !== undefined) listRef.current?.scrollToIndex(index, 'start')
+  }, [hunkHeaderIndexes, listRef, currentHunkIndexRef])
+  useRevisitHunk({ src, hunkHeaderIndexes, currentHunkIndexRef, scrollToCurrent })
+  const rescrollAfterRender = useRescroll(scrollToCurrent, diffKey)
   const scrollHunkIntoView = useCallback(
     (direction: 1 | -1) => {
       if (hunkHeaderIndexes.length === 0) return
@@ -105,23 +181,34 @@ export function useHunkNav(src: HunkNavSource) {
       if (nextIndex < 0) return onPrevFile()
       if (nextIndex >= hunkHeaderIndexes.length) return onNextFile()
       currentHunkIndexRef.current = nextIndex
-      listRef.current?.scrollToIndex(hunkHeaderIndexes[nextIndex], 'start')
+      scrollToCurrent()
     },
-    [hunkHeaderIndexes, onNextFile, onPrevFile, listRef]
+    [hunkHeaderIndexes, onNextFile, onPrevFile, scrollToCurrent, currentHunkIndexRef]
   )
-  return { scrollHunkIntoView }
+  const currentHunk = () =>
+    items[hunkHeaderIndexes[currentHunkIndexRef.current]] as HunkHeaderItem | undefined
+  return { scrollHunkIntoView, currentHunk, rescrollAfterRender }
 }
 
-/** The selection's lines when it is in this file, else the first hunk, for the agent to read. */
-function agentScope(src: KeyEventSource): AgentScope | null {
-  const { selection, path } = src
-  if (selection && selection.path === path) {
-    const { startLine, endLine, side } = selection
-    return { kind: 'lines', path, startLine, endLine, side, chapter: null }
+type HunkNav = ReturnType<typeof useHunkNav>
+
+/** Space: marks the current hunk read, then moves to the next. `l`: puts it off, then moves on. */
+export function hunkMarks(nav: HunkNav, src: HunkMarkSource) {
+  return {
+    markHunkRead: () => {
+      const current = nav.currentHunk()
+      if (current && !current.viewed) {
+        nav.rescrollAfterRender()
+        src.toggleHunkViewed(src.head, src.path, current.hunk.header)
+      }
+      nav.scrollHunkIntoView(1)
+    },
+    deferHunk: () => {
+      const current = nav.currentHunk()
+      if (current) src.deferHunk(src.laterKey, { path: src.path, header: current.hunk.header })
+      nav.scrollHunkIntoView(1)
+    },
   }
-  const hunk = hunkNearTop(src.diff?.hunks ?? [])
-  if (!hunk) return null
-  return { kind: 'hunk', path, ...hunk, side: 'RIGHT', chapter: null }
 }
 
 function selectionHere(src: KeyEventSource): LineSelection | null {
@@ -131,14 +218,6 @@ function selectionHere(src: KeyEventSource): LineSelection | null {
 
 /** What each review key event does in this pane. */
 function keyEventHandlers(src: KeyEventSource): Array<[string, () => void]> {
-  const reviewSelection = () => {
-    const scope = agentScope(src)
-    if (scope) src.openAgentPanel(scope, 'review')
-  }
-  const explain = () => {
-    const scope = agentScope(src)
-    if (scope) src.openAgentPanel(scope, 'explain', true)
-  }
   const commentOnSelection = () => {
     const sel = selectionHere(src)
     if (!sel || src.selectionTouchesRevealed(sel)) return
@@ -148,17 +227,16 @@ function keyEventHandlers(src: KeyEventSource): Array<[string, () => void]> {
   return [
     [REVIEW_KEY_EVENTS.nextHunk, () => src.scrollHunkIntoView(1)],
     [REVIEW_KEY_EVENTS.prevHunk, () => src.scrollHunkIntoView(-1)],
-    [REVIEW_KEY_EVENTS.askAgent, reviewSelection],
-    [REVIEW_KEY_EVENTS.explain, explain],
+    [REVIEW_KEY_EVENTS.markHunkRead, src.markHunkRead],
+    [REVIEW_KEY_EVENTS.later, src.deferHunk],
     [REVIEW_KEY_EVENTS.comment, commentOnSelection],
-    [REVIEW_KEY_EVENTS.peekDefinition, () => src.peekDefinition()],
   ]
 }
 
 /** REVIEW_KEY_EVENTS: the surface-level key handler (useReviewKeys) raises these; only the pane
  *  knows its hunks and selection. */
 export function useReviewKeyEvents(src: KeyEventSource): void {
-  const { selection, path, diff, scrollHunkIntoView, openAgentPanel, selectionTouchesRevealed } =
+  const { selection, path, scrollHunkIntoView, markHunkRead, deferHunk, selectionTouchesRevealed } =
     src
   useEffect(() => {
     const handlers = keyEventHandlers(src)
@@ -167,5 +245,5 @@ export function useReviewKeyEvents(src: KeyEventSource): void {
       for (const [event, handler] of handlers) window.removeEventListener(event, handler)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, path, diff, scrollHunkIntoView, openAgentPanel, selectionTouchesRevealed])
+  }, [selection, path, scrollHunkIntoView, markHunkRead, deferHunk, selectionTouchesRevealed])
 }

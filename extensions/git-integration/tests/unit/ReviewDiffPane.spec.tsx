@@ -140,6 +140,7 @@ const mockFile: PrChangedFile = {
   isBinary: false,
   whyHere: 'changed',
   churn90d: null,
+  blastRadius: null,
 }
 
 // Parsed as the review channel's answer is, so the schema's defaults are filled in.
@@ -784,16 +785,6 @@ const topOfHunk = (hunkIndex: number) => {
   return Number(hunkEntries[hunkIndex].dataset.index) * ROW_PX
 }
 
-/** The hunk at line 1, the scope the agent keys act on without a selection. */
-const firstHunkScope = {
-  kind: 'hunk',
-  path: 'src/foo.ts',
-  startLine: 1,
-  endLine: 1,
-  side: 'RIGHT',
-  chapter: null,
-}
-
 describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
   useOneRowViewport()
 
@@ -821,29 +812,51 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
   })
 })
 
-describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — agent keys', () => {
+const FIRST_HUNK = '@@ -1,1 +1,1 @@'
+const SECOND_HUNK = '@@ -10,1 +10,1 @@'
+
+describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — Space and later', () => {
   useOneRowViewport()
 
-  it('askAgent with no selection opens the agent panel scoped to the nearest hunk', async () => {
-    const uiStore = await useRealUiStore()
+  it('markHunkRead marks the current hunk read and scrolls to the next one', async () => {
+    const prStore = await useRealPrStore()
     await renderTwoHunks()
-    window.dispatchEvent(new CustomEvent('review:ask-agent'))
-    expect(uiStore.getState()).toMatchObject({
-      agentPanelScope: firstHunkScope,
-      agentPanelRequest: 'review',
-      agentPanelAutoStart: false,
-    })
+    const scroller = screen.getByTestId('review-diff-scroll')
+    window.dispatchEvent(new CustomEvent('review:mark-hunk-read'))
+    expect(prStore.getState().viewedHunks['src/foo.ts']).toEqual([FIRST_HUNK])
+    await waitFor(() =>
+      expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+        expect.objectContaining({ top: topOfHunk(1) })
+      )
+    )
   })
 
-  it('explain requests explain with autoStart', async () => {
+  it('later keeps the current hunk for the end of the review and scrolls to the next one', async () => {
     const uiStore = await useRealUiStore()
     await renderTwoHunks()
-    window.dispatchEvent(new CustomEvent('review:explain'))
-    expect(uiStore.getState()).toMatchObject({
-      agentPanelScope: firstHunkScope,
-      agentPanelRequest: 'explain',
-      agentPanelAutoStart: true,
-    })
+    const scroller = screen.getByTestId('review-diff-scroll')
+    window.dispatchEvent(new CustomEvent('review:later-hunk'))
+    expect(uiStore.getState().laterHunks['/repo#1']).toEqual([
+      { path: 'src/foo.ts', header: FIRST_HUNK },
+    ])
+    expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: topOfHunk(1) })
+    )
+  })
+})
+
+describe('ReviewDiffPane — coming back to a later hunk', () => {
+  useOneRowViewport()
+
+  it('scrolls to a later hunk the review comes back to, then clears the request', async () => {
+    const uiStore = await useRealUiStore()
+    uiStore.setState({ revisitHunk: { path: 'src/foo.ts', header: SECOND_HUNK } })
+    await renderTwoHunks()
+    const scroller = screen.getByTestId('review-diff-scroll')
+    await waitFor(() => expect(uiStore.getState().revisitHunk).toBeNull())
+    expect(scroller.scrollTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: topOfHunk(1) })
+    )
   })
 })
 
@@ -869,16 +882,6 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — leaving the
     })
     window.dispatchEvent(new CustomEvent('review:next-hunk'))
     expect(onNextFile).toHaveBeenCalled()
-  })
-
-  it('peekDefinition selects the definition file', async () => {
-    const prStore = await useRealPrStore()
-    await renderTwoHunks({ pr: prWithReadingOrder() })
-    window.dispatchEvent(new CustomEvent('review:peek-definition'))
-    expect(prStore.getState()).toMatchObject({
-      currentChapterId: 'ch-2',
-      currentFilePath: 'src/other.ts',
-    })
   })
 })
 

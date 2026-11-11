@@ -4,11 +4,12 @@ import { render, screen } from '@testing-library/react'
 import { useReviewKeys, type ReviewKeyHandlers } from '../../src/hooks/useReviewKeys'
 import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../../src/stores/review-ui.store'
 
-function TestHarness({ handlers }: { handlers: Parameters<typeof useReviewKeys>[0] }) {
+function TestHarness({ handlers }: { handlers: ReviewKeyHandlers }) {
   useReviewKeys(handlers)
   return (
     <div>
       <input data-testid="text-input" />
+      <textarea data-testid="text-area" />
     </div>
   )
 }
@@ -16,6 +17,7 @@ function TestHarness({ handlers }: { handlers: Parameters<typeof useReviewKeys>[
 function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}, target?: EventTarget) {
   const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...opts })
   ;(target ?? window).dispatchEvent(event)
+  return event
 }
 
 function listenFor(type: string) {
@@ -28,23 +30,11 @@ function listenFor(type: string) {
 let handlers: Record<keyof ReviewKeyHandlers, Mock<() => void>>
 
 beforeEach(() => {
-  handlers = {
-    nextFile: vi.fn<() => void>(),
-    prevFile: vi.fn<() => void>(),
-    nextChapter: vi.fn<() => void>(),
-    prevChapter: vi.fn<() => void>(),
-    nextUnviewedFile: vi.fn<() => void>(),
-    markViewed: vi.fn<() => void>(),
-    toggleInsights: vi.fn<() => void>(),
-    openSubmit: vi.fn<() => void>(),
-  }
-  useReviewUiStore.setState({
-    diffRange: 'since',
-    keyboardHelpOpen: false,
-  })
+  handlers = { focusVerdictBar: vi.fn<() => void>() }
+  useReviewUiStore.setState({ diffRange: 'since', keyboardHelpOpen: false })
 })
 
-describe('useReviewKeys', () => {
+describe('useReviewKeys — hunk keys', () => {
   it('dispatches nextHunk on k and prevHunk on j', () => {
     render(<TestHarness handlers={handlers} />)
     const nextSpy = listenFor(REVIEW_KEY_EVENTS.nextHunk)
@@ -56,124 +46,97 @@ describe('useReviewKeys', () => {
     expect(prevSpy).toHaveBeenCalledTimes(1)
     expect(nextSpy).toHaveBeenCalledTimes(1)
   })
-})
 
-describe('useReviewKeys — calls the matching handler for ], [, n and v', () => {
   it.each([
-    [']', 'nextFile'],
-    ['[', 'prevFile'],
-    ['n', 'nextUnviewedFile'],
-    ['v', 'markViewed'],
-  ] as const)('calls %s → %s once', (key, handlerName) => {
-    render(<TestHarness handlers={handlers} />)
-    fireKey(key)
-    expect(handlers[handlerName]).toHaveBeenCalledTimes(1)
-  })
-
-  it('calls nextChapter on } and prevChapter on {', () => {
-    render(<TestHarness handlers={handlers} />)
-    fireKey('}', { shiftKey: true })
-    expect(handlers.nextChapter).toHaveBeenCalledTimes(1)
-    expect(handlers.prevChapter).not.toHaveBeenCalled()
-    fireKey('{', { shiftKey: true })
-    expect(handlers.prevChapter).toHaveBeenCalledTimes(1)
-    expect(handlers.nextFile).not.toHaveBeenCalled()
-  })
-})
-
-describe('useReviewKeys — calls the latest handlers after a rerender', () => {
-  it('calls the handlers of the latest render', () => {
-    const { rerender } = render(<TestHarness handlers={handlers} />)
-    const newer = { ...handlers, nextFile: vi.fn() }
-    rerender(<TestHarness handlers={newer} />)
-    rerender(<TestHarness handlers={{ ...newer }} />)
-    fireKey(']')
-    expect(newer.nextFile).toHaveBeenCalledTimes(1)
-    expect(handlers.nextFile).not.toHaveBeenCalled()
-  })
-
-  it('toggles diffRange on s', () => {
-    render(<TestHarness handlers={handlers} />)
-    fireKey('s')
-    expect(useReviewUiStore.getState().diffRange).toBe('whole')
-  })
-})
-
-describe('useReviewKeys — opens the keyboard help sheet on ?', () => {
-  it('opens the keyboard help sheet on ?', () => {
-    render(<TestHarness handlers={handlers} />)
-    fireKey('?')
-    expect(useReviewUiStore.getState().keyboardHelpOpen).toBe(true)
-  })
-
-  it('opens submit on Cmd+Enter', () => {
-    render(<TestHarness handlers={handlers} />)
-    fireKey('Enter', { metaKey: true })
-    expect(handlers.openSubmit).toHaveBeenCalledTimes(1)
-  })
-
-  it('calls toggleInsights on i', () => {
-    render(<TestHarness handlers={handlers} />)
-    fireKey('i')
-    expect(handlers.toggleInsights).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('useReviewKeys — dispatches peekDefinition when g then d within 1s', () => {
-  it('dispatches peekDefinition when g then d within 1s', () => {
-    render(<TestHarness handlers={handlers} />)
-    const spy = listenFor(REVIEW_KEY_EVENTS.peekDefinition)
-    fireKey('g')
-    fireKey('d')
-    expect(spy).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('useReviewKeys — dispatches askAgent, explain and comment events', () => {
-  it.each([
-    ['a', REVIEW_KEY_EVENTS.askAgent],
-    ['e', REVIEW_KEY_EVENTS.explain],
-    ['r', REVIEW_KEY_EVENTS.comment],
-  ])('dispatches %s → %s once', (key, eventType) => {
+    [' ', REVIEW_KEY_EVENTS.markHunkRead],
+    ['c', REVIEW_KEY_EVENTS.comment],
+    ['l', REVIEW_KEY_EVENTS.later],
+  ])('dispatches %j → %s once', (key, eventType) => {
     render(<TestHarness handlers={handlers} />)
     const listener = listenFor(eventType)
     fireKey(key)
     expect(listener).toHaveBeenCalledTimes(1)
   })
+
+  it('stops Space from scrolling the pane', () => {
+    render(<TestHarness handlers={handlers} />)
+    expect(fireKey(' ').defaultPrevented).toBe(true)
+  })
 })
 
-describe('useReviewKeys — keys it does not handle', () => {
+describe('useReviewKeys — submit shortcut', () => {
+  it('focuses the verdict bar on Cmd+Enter', () => {
+    render(<TestHarness handlers={handlers} />)
+    fireKey('Enter', { metaKey: true })
+    expect(handlers.focusVerdictBar).toHaveBeenCalledTimes(1)
+  })
+
+  it('focuses the verdict bar on Ctrl+Enter', () => {
+    render(<TestHarness handlers={handlers} />)
+    fireKey('Enter', { ctrlKey: true })
+    expect(handlers.focusVerdictBar).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls the handlers of the latest render', () => {
+    const { rerender } = render(<TestHarness handlers={handlers} />)
+    const newer = { focusVerdictBar: vi.fn() }
+    rerender(<TestHarness handlers={newer} />)
+    fireKey('Enter', { metaKey: true })
+    expect(newer.focusVerdictBar).toHaveBeenCalledTimes(1)
+    expect(handlers.focusVerdictBar).not.toHaveBeenCalled()
+  })
+})
+
+const REMOVED_KEYS = [']', '[', '}', '{', 'n', 'v', 's', 'a', 'e', 'r', 'i', '?', 'g', 'd']
+
+describe('useReviewKeys — removed keys', () => {
+  it.each(REMOVED_KEYS)('does nothing on %j', (key) => {
+    render(<TestHarness handlers={handlers} />)
+    const stateBefore = useReviewUiStore.getState()
+    const event = fireKey(key)
+    expect(event.defaultPrevented).toBe(false)
+    expect(useReviewUiStore.getState()).toBe(stateBefore)
+  })
+
   it('runs no handler and changes no state on Escape', () => {
     render(<TestHarness handlers={handlers} />)
     const stateBefore = useReviewUiStore.getState()
     fireKey('Escape')
-    const handlersCalled = Object.entries(handlers).filter(
-      ([, handler]) => handler.mock.calls.length
-    )
-    expect(handlersCalled).toEqual([])
+    expect(handlers.focusVerdictBar).not.toHaveBeenCalled()
     expect(useReviewUiStore.getState()).toBe(stateBefore)
-  })
-
-  it('ignores keydown while typing in an input, textarea or contenteditable', () => {
-    render(<TestHarness handlers={handlers} />)
-    const input = screen.getByTestId('text-input')
-    fireKey('v', {}, input)
-    expect(handlers.markViewed).not.toHaveBeenCalled()
   })
 })
 
-describe('useReviewKeys — ignores keys held with an unrelated modifier', () => {
+describe('useReviewKeys — typing', () => {
+  it('ignores Space while typing in a textarea, and lets it type', () => {
+    render(<TestHarness handlers={handlers} />)
+    const listener = listenFor(REVIEW_KEY_EVENTS.markHunkRead)
+    const event = fireKey(' ', {}, screen.getByTestId('text-area'))
+    expect(listener).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('ignores c while typing in an input', () => {
+    render(<TestHarness handlers={handlers} />)
+    const listener = listenFor(REVIEW_KEY_EVENTS.comment)
+    fireKey('c', {}, screen.getByTestId('text-input'))
+    expect(listener).not.toHaveBeenCalled()
+  })
+})
+
+describe('useReviewKeys — modifiers and unmount', () => {
   it('ignores keys held with an unrelated modifier', () => {
     render(<TestHarness handlers={handlers} />)
-    fireKey('v', { ctrlKey: true })
-    fireKey('v', { altKey: true })
-    expect(handlers.markViewed).not.toHaveBeenCalled()
+    const listener = listenFor(REVIEW_KEY_EVENTS.comment)
+    fireKey('c', { ctrlKey: true })
+    fireKey('c', { altKey: true })
+    expect(listener).not.toHaveBeenCalled()
   })
 
   it('unbinds the listener on unmount', () => {
     const { unmount } = render(<TestHarness handlers={handlers} />)
     unmount()
-    fireKey('v')
-    expect(handlers.markViewed).not.toHaveBeenCalled()
+    fireKey('Enter', { metaKey: true })
+    expect(handlers.focusVerdictBar).not.toHaveBeenCalled()
   })
 })

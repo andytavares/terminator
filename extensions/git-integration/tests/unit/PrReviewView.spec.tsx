@@ -30,20 +30,16 @@ vi.mock('../../src/components/pr-review/ReviewDiffPane', () => ({
   ReviewDiffPane: ({
     onMarkViewed,
     onPrevFile,
+    onNextFile,
   }: {
     onMarkViewed: () => void
     onPrevFile: () => void
+    onNextFile: () => void
   }) => (
     <div data-testid="review-diff-pane">
       <button onClick={onMarkViewed}>MarkViewed</button>
       <button onClick={onPrevFile}>PrevFile</button>
-    </div>
-  ),
-}))
-vi.mock('../../src/components/pr-review/ReviewSubmitPanel', () => ({
-  ReviewSubmitPanel: ({ onClose }: { onClose: () => void }) => (
-    <div data-testid="submit-panel">
-      <button onClick={onClose}>CloseSubmit</button>
+      <button onClick={onNextFile}>NextFile</button>
     </div>
   ),
 }))
@@ -92,7 +88,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   usePrReviewStore.getState().reset()
   localStorage.clear()
-  useReviewUiStore.setState({ groupBy: 'all' })
+  useReviewUiStore.setState({ groupBy: 'all', laterHunks: {}, revisitHunk: null })
 })
 
 /** Seeds the real review store, renders the view on `mockPr` with `prOverrides`, and returns a
@@ -150,13 +146,46 @@ describe('PrReviewView — single-chapter PRs', () => {
     expect(screen.queryByRole('radiogroup', { name: 'File list mode' })).toBeNull()
     expect(screen.getByText('Files')).toBeTruthy()
   })
+})
 
-  it('opens the submit panel from Submit review and hides it on CloseSubmit', async () => {
+describe('PrReviewView — verdict bar', () => {
+  it('shows the verdict bar and no Submit review button or dialog', async () => {
+    await renderView({}, { currentFilePath: 'src/foo.ts' })
+    expect(screen.getByRole('region', { name: 'Review verdict' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Submit review/ })).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('blocks Approve when the viewer wrote the pull request', async () => {
+    await renderView({}, { currentFilePath: 'src/foo.ts', currentUserLogin: 'alice' })
+    expect(screen.getByRole('button', { name: 'Approve' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('moves focus to the review summary on Cmd+Enter', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
-    await user.click(screen.getByRole('button', { name: /^Submit review/ }))
-    expect(screen.getByTestId('submit-panel')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'CloseSubmit' }))
-    expect(screen.queryByTestId('submit-panel')).toBeNull()
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
+    expect(screen.getByRole('textbox', { name: 'Review summary' }).matches(':focus')).toBe(true)
+  })
+})
+
+describe('PrReviewView — resuming with drafts', () => {
+  it('moves focus to the review summary from Review drafts', async () => {
+    const draft = {
+      id: 'd1',
+      path: 'src/foo.ts',
+      line: 3,
+      startLine: null,
+      side: 'RIGHT' as const,
+      body: 'Rename this.',
+      fromFindingId: null,
+    }
+    const { user } = await renderView(
+      {},
+      { currentFilePath: 'src/foo.ts', lastAccessedAt: '2025-01-01T00:00:00Z', drafts: [draft] }
+    )
+    await user.click(screen.getByRole('button', { name: 'Review drafts' }))
+    expect(screen.getByRole('textbox', { name: 'Review summary' }).matches(':focus')).toBe(true)
   })
 })
 
@@ -173,11 +202,6 @@ describe('PrReviewView — pausing', () => {
     await renderView({}, { currentFilePath: 'src/foo.ts' })
     expect(screen.getByText('0 of 1 viewed')).toBeTruthy()
     expect(screen.queryByText(/files reviewed/)).toBeNull()
-  })
-
-  it('shows exactly one Submit review control', async () => {
-    await renderView({}, { currentFilePath: 'src/foo.ts' })
-    expect(screen.getAllByRole('button', { name: /^Submit review/ })).toHaveLength(1)
   })
 })
 
@@ -197,15 +221,16 @@ describe('PrReviewView — opens the inspector from Ask agent, and closes it', (
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 
-  it('opens submit panel when FinishChapter is clicked on the last (only) chapter', async () => {
+  it('marks the last file viewed and opens no dialog on the last chapter', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
-    await user.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
-    expect(screen.getByTestId('submit-panel')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /^Viewed(?!,)/ }))
+    expect([...usePrReviewStore.getState().viewedFiles]).toEqual(['src/foo.ts'])
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
 
 describe('PrReviewView — finishing a non-final chapter', () => {
-  it('opens the next chapter, not the submit panel, when Viewed, next chapter is clicked', async () => {
+  it('opens the next chapter when Viewed, next chapter is clicked', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2', files: [mockFile] }
     const { user } = await renderView(
       { chapters: [mockChapter, ch2] },
@@ -213,7 +238,6 @@ describe('PrReviewView — finishing a non-final chapter', () => {
     )
     await user.click(screen.getByRole('button', { name: /^Viewed, next chapter/ }))
     expect(usePrReviewStore.getState().currentChapterId).toBe('ch-2')
-    expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
 })
 
@@ -225,7 +249,7 @@ describe('PrReviewView — finishing a chapter marks its unviewed files in one b
       { chapters: [{ ...mockChapter, files: [mockFile, file2, file3] }] },
       { currentFilePath: 'src/baz.ts', viewedFiles: new Set(['src/bar.ts']) }
     )
-    await user.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
+    await user.click(screen.getByRole('button', { name: /^Viewed(?!,)/ }))
     expect([...usePrReviewStore.getState().viewedFiles].sort()).toEqual([
       'src/bar.ts',
       'src/baz.ts',
@@ -313,102 +337,52 @@ const chapters = [
   { ...mockChapter, id: 'ch-3', name: 'Three', files: [f('e.ts')] },
 ]
 
-// user-event reads `{` and `[` as the start of a key name; doubling one types it.
-describe('PrReviewView (continued) — chapter keyboard navigation', () => {
-  it('} selects the next chapter and its first file', async () => {
+describe('PrReviewView — moving past the first or last hunk of a file', () => {
+  it('crosses into the next chapter from the last file of a chapter', async () => {
     const { user } = await renderView(
       { chapters },
       { currentChapterId: 'ch-1', currentFilePath: 'b.ts' }
     )
-    await user.keyboard('}')
+    await user.click(screen.getByRole('button', { name: 'NextFile' }))
     expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
   })
 
-  it('{ selects the previous chapter and its first file', async () => {
-    const { user } = await renderView(
-      { chapters },
-      { currentChapterId: 'ch-3', currentFilePath: 'e.ts' }
-    )
-    await user.keyboard('{{')
-    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
-  })
-
-  it.each([
-    { key: '{{', name: '{ at the first chapter', chapterId: 'ch-1', path: 'a.ts' },
-    { key: '}', name: '} at the last chapter', chapterId: 'ch-3', path: 'e.ts' },
-  ])('$name leaves the position unchanged', async ({ key, chapterId, path }) => {
-    const { user } = await renderView(
-      { chapters },
-      { currentChapterId: chapterId, currentFilePath: path }
-    )
-    await user.keyboard(key)
-    expect(position()).toEqual({ currentChapterId: chapterId, currentFilePath: path })
-  })
-})
-
-describe('PrReviewView (continued) — chapter keyboard navigation — } respects the file order override of the target chapter', () => {
-  it('} respects the file order override of the target chapter', async () => {
-    const { user } = await renderView(
-      { chapters },
-      {
-        currentChapterId: 'ch-1',
-        currentFilePath: 'a.ts',
-        fileOrderOverrides: { 'ch-2': ['d.ts', 'c.ts'] },
-      }
-    )
-    await user.keyboard('}')
-    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'd.ts' })
-  })
-
-  it('] crosses into the next chapter from the last file of a chapter (Files view)', async () => {
-    const { user } = await renderView(
-      { chapters },
-      { currentChapterId: 'ch-1', currentFilePath: 'b.ts' }
-    )
-    await user.keyboard(']')
-    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
-  })
-
-  it('] stays in the chapter and does not switch it mid-chapter', async () => {
-    const { user } = await renderView(
-      { chapters },
-      { currentChapterId: 'ch-1', currentFilePath: 'a.ts' }
-    )
-    await user.keyboard(']')
-    expect(position()).toEqual({ currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
-  })
-})
-
-describe('PrReviewView (continued) — chapter keyboard navigation — ] crosses chapters in the Chapters view too', () => {
-  it('] crosses chapters in the Chapters view too', async () => {
-    const { user } = await renderView(
-      { chapters },
-      { currentChapterId: 'ch-1', currentFilePath: 'b.ts' }
-    )
-    await user.click(screen.getByRole('radio', { name: 'Chapters' }))
-    await user.keyboard(']')
-    expect(position()).toEqual({ currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
-  })
-
-  it('[ crosses back to the last file of the previous chapter', async () => {
+  it('crosses back to the last file of the previous chapter', async () => {
     const { user } = await renderView(
       { chapters },
       { currentChapterId: 'ch-2', currentFilePath: 'c.ts' }
     )
-    await user.keyboard('[[')
+    await user.click(screen.getByRole('button', { name: 'PrevFile' }))
     expect(position()).toEqual({ currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
   })
 
   it.each([
-    { key: '[[', name: '[ at the first file of the PR', chapterId: 'ch-1', path: 'a.ts' },
-    { key: ']', name: '] at the last file of the PR', chapterId: 'ch-3', path: 'e.ts' },
-  ])('$name leaves the position unchanged', async ({ key, chapterId, path }) => {
+    { button: 'PrevFile', name: 'the first file of the PR', chapterId: 'ch-1', path: 'a.ts' },
+    { button: 'NextFile', name: 'the last file of the PR', chapterId: 'ch-3', path: 'e.ts' },
+  ])('$button at $name leaves the position unchanged', async ({ button, chapterId, path }) => {
     const { user } = await renderView(
       { chapters },
       { currentChapterId: chapterId, currentFilePath: path }
     )
-    await user.keyboard(key)
+    await user.click(screen.getByRole('button', { name: button }))
     expect(position()).toEqual({ currentChapterId: chapterId, currentFilePath: path })
+  })
+})
+
+describe('PrReviewView — later hunks', () => {
+  it('opens the first later hunk after the last hunk of the PR', async () => {
+    useReviewUiStore.getState().deferHunk('/repo#1', { path: 'a.ts', header: '@@ -1,2 +1,3 @@' })
+    const { user } = await renderView(
+      { chapters },
+      { currentChapterId: 'ch-3', currentFilePath: 'e.ts' }
+    )
+    await user.click(screen.getByRole('button', { name: 'NextFile' }))
+    expect(position()).toEqual({ currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
+    expect(useReviewUiStore.getState().revisitHunk).toEqual({
+      path: 'a.ts',
+      header: '@@ -1,2 +1,3 @@',
+    })
+    expect(useReviewUiStore.getState().laterHunks['/repo#1']).toEqual([])
   })
 })
 

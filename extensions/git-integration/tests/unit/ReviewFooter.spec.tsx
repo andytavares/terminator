@@ -54,9 +54,9 @@ describe('ReviewFooter — forward action', () => {
     expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
   })
 
-  it('says "submit review" on the last file overall and finishes, which opens the submit panel', async () => {
+  it('says only "Viewed" on the last file overall, and finishes the chapter', async () => {
     const handlers = renderFooter({ isLastFile: true, isLastChapter: true, nextFileName: null })
-    await userEvent.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Viewed(?!,)/ }))
     expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
   })
 })
@@ -65,7 +65,7 @@ describe('ReviewFooter — one primary action', () => {
   it.each([
     [false, false, /^Viewed, next: api.py/],
     [true, false, /^Viewed, next chapter/],
-    [true, true, /^Viewed, submit review/],
+    [true, true, /^Viewed(?!,)/],
   ])(
     'renders exactly one primary button (last file %s, last chapter %s)',
     (isLastFile, isLastChapter, name) => {

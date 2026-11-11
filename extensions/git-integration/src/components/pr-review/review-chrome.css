@@ -83,10 +83,12 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px 22px;
+  margin: 0;
   padding: 14px;
+  list-style: none;
 }
 
-.rc-keys > div {
+.rc-keys > li {
   white-space: nowrap;
   display: flex;
   gap: 10px;

@@ -32,8 +32,6 @@ function baseProps(overrides: Partial<ReviewHeaderProps> = {}): ReviewHeaderProp
       { id: 'c1', fileCount: 6, viewedCount: 2 },
       { id: 'c2', fileCount: 4, viewedCount: 0 },
     ],
-    draftCount: 0,
-    onSubmit: vi.fn(),
     onPause: vi.fn(),
     onAskAgent: vi.fn(),
     onRefresh: vi.fn(),
@@ -174,11 +172,11 @@ describe('ReviewHeader (continued) — More menu', () => {
     await openMenu(user)
     const items = within(screen.getByRole('menu')).getAllByRole('menuitem')
     expect(items.map((item) => item.textContent)).toEqual([
-      'Overviewi',
+      'Overview',
       'Pause review',
       'Refresh pull request',
       'Pop out',
-      'Keyboard shortcuts?',
+      'Keyboard shortcuts',
     ])
   })
 
@@ -272,19 +270,9 @@ describe('ReviewHeader — back arrow', () => {
 })
 
 describe('ReviewHeader — submit and pause', () => {
-  it('shows the draft count on the Submit review button', async () => {
-    const user = userEvent.setup()
-    const onSubmit = vi.fn()
-    render(<ReviewHeader {...baseProps({ draftCount: 2, onSubmit })} />)
-    const submit = screen.getByRole('button', { name: /^Submit review/ })
-    expect(submit.textContent).toContain('2')
-    await user.click(submit)
-    expect(onSubmit).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows no count badge without drafts', () => {
-    render(<ReviewHeader {...baseProps({ draftCount: 0 })} />)
-    expect(screen.getByRole('button', { name: 'Submit review' }).textContent).toBe('Submit review')
+  it('has no Submit review button, since the verdict bar submits', () => {
+    render(<ReviewHeader {...baseProps()} />)
+    expect(screen.queryByRole('button', { name: /Submit review/ })).toBeNull()
   })
 
   it('keeps Pause review in the more menu', async () => {

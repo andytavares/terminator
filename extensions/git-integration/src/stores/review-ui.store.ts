@@ -25,15 +25,25 @@ export interface ComposerRequest {
   fromFindingId: string | null
 }
 
+/** A hunk the reviewer put off with `l`, to come back to after the last hunk. */
+export interface LaterHunk {
+  path: string
+  header: string
+}
+
+/** The key laterHunks keeps a pull request's later hunks under. */
+export function laterKey(repoRoot: string, prNumber: number): string {
+  return `${repoRoot}#${prNumber}`
+}
+
 // Keyboard actions the surface-level key handler (useReviewKeys) raises and the
 // diff pane performs, because only the pane knows its hunks and selection.
 export const REVIEW_KEY_EVENTS = {
   nextHunk: 'review:next-hunk',
   prevHunk: 'review:prev-hunk',
-  askAgent: 'review:ask-agent',
-  explain: 'review:explain',
+  markHunkRead: 'review:mark-hunk-read',
+  later: 'review:later-hunk',
   comment: 'review:comment',
-  peekDefinition: 'review:peek-definition',
 } as const
 
 const PREFS_KEY = 'git-integration.review-ui.prefs'
@@ -64,6 +74,10 @@ interface ReviewUiStore extends Prefs {
   agentPanelAutoStart: boolean
   keyboardHelpOpen: boolean
   insightsOpen: boolean
+  /** Later hunks per pull request (laterKey), in the order they were put off. Kept in memory only. */
+  laterHunks: Record<string, LaterHunk[]>
+  /** A later hunk the review came back to; the diff pane scrolls to it, then clears it. */
+  revisitHunk: LaterHunk | null
 
   setDiffRange(r: DiffRange): void
   setGroupBy(groupBy: GroupBy): void
@@ -76,6 +90,9 @@ interface ReviewUiStore extends Prefs {
   openAgentPanel(scope: AgentScope | null, request?: AgentRequest, autoStart?: boolean): void
   setKeyboardHelpOpen(open: boolean): void
   setInsightsOpen(open: boolean): void
+  deferHunk(key: string, hunk: LaterHunk): void
+  takeLaterHunk(key: string): LaterHunk | null
+  clearRevisitHunk(): void
   resetForPr(): void
 }
 
@@ -138,6 +155,28 @@ const NO_PR_STATE = {
   agentPanelScope: null,
   keyboardHelpOpen: false,
   insightsOpen: false,
+  revisitHunk: null,
+}
+
+const isSameHunk = (a: LaterHunk, b: LaterHunk) => a.path === b.path && a.header === b.header
+
+/** Putting hunks off with `l` and coming back to them after the last hunk. */
+function laterActions(set: SetState, get: GetState) {
+  const listFor = (key: string) => get().laterHunks[key] ?? []
+  const setList = (key: string, list: LaterHunk[]) =>
+    set((state) => ({ laterHunks: { ...state.laterHunks, [key]: list } }))
+  return {
+    deferHunk: (key: string, hunk: LaterHunk) =>
+      setList(key, [...listFor(key).filter((h) => !isSameHunk(h, hunk)), hunk]),
+    takeLaterHunk: (key: string) => {
+      const [first, ...rest] = listFor(key)
+      if (!first) return null
+      setList(key, rest)
+      set({ revisitHunk: first })
+      return first
+    },
+    clearRevisitHunk: () => set({ revisitHunk: null }),
+  }
 }
 
 function uiSessionActions(set: SetState) {
@@ -162,8 +201,10 @@ function uiSessionActions(set: SetState) {
 export const useReviewUiStore = create<ReviewUiStore>((set, get) => ({
   ...loadPrefs(),
   ...NO_PR_STATE,
+  laterHunks: {},
   agentPanelRequest: 'review',
   agentPanelAutoStart: false,
   ...prefActions(set, get),
   ...uiSessionActions(set),
+  ...laterActions(set, get),
 }))

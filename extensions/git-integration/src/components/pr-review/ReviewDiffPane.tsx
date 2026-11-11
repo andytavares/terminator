@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { VirtualDiffList, type VirtualDiffListHandle } from './VirtualDiffList'
+import { laterKey } from '../../stores/review-ui.store'
 import { extensionOf } from '../../utils/syntax'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import type { PrChangedFile, PrReviewDetail, PrHead } from '../../schemas/pr-review.schema'
@@ -10,6 +11,7 @@ import { useGaps } from './diff-pane/useFileText'
 import { useLineLookups } from './diff-pane/line-lookups'
 import { useLineSelection } from './diff-pane/useLineSelection'
 import {
+  hunkMarks,
   useComposerRequest,
   useFileNavEvents,
   useHunkNav,
@@ -198,34 +200,48 @@ function peekFirstDefinition(
   if (use?.definedInPath) goToPath(use.definedInPath)
 }
 
+/** The review key events the surface raises for this pane: hunk moves, Space, `l` and `c`. */
+function useHunkKeys(w: Wiring, listRef: React.RefObject<VirtualDiffListHandle | null>): void {
+  const { props, ui, view } = w
+  const { onPrevFile, onNextFile } = props
+  const path = props.file.path
+  const nav = useHunkNav({
+    items: view.items,
+    diffKey: view.request.diffKey,
+    path,
+    onPrevFile,
+    onNextFile,
+    listRef,
+    revisitHunk: ui.revisitHunk,
+    clearRevisitHunk: ui.clearRevisitHunk,
+  })
+  const marks = hunkMarks(nav, {
+    head: w.head,
+    path,
+    laterKey: laterKey(w.head.repoRoot, w.head.prNumber),
+    toggleHunkViewed: w.store.toggleHunkViewed,
+    deferHunk: ui.deferHunk,
+  })
+  useReviewKeyEvents({
+    selection: ui.selection,
+    path,
+    scrollHunkIntoView: nav.scrollHunkIntoView,
+    ...marks,
+    selectionTouchesRevealed: view.gaps.selectionTouchesRevealed,
+    setComposerAnchor: w.lines.annot.setComposerAnchor,
+  })
+}
+
 /** Hunk keys, file keys and the review key events the surface raises for this pane. */
 function useNavigation(
   w: Wiring,
   usesWithDef: ReturnType<typeof useUsesWithDefinition>,
   listRef: React.RefObject<VirtualDiffListHandle | null>
 ) {
-  const { props, ui, view } = w
-  const goToPath = useGoToPath(props.pr, w.store)
-  useFileNavEvents(props.onPrevFile, props.onMarkViewed)
-  const { onPrevFile, onNextFile } = props
-  const nav = useHunkNav({
-    items: view.items,
-    diffKey: view.request.diffKey,
-    onPrevFile,
-    onNextFile,
-    listRef,
-  })
+  const goToPath = useGoToPath(w.props.pr, w.store)
+  useFileNavEvents(w.props.onPrevFile, w.props.onMarkViewed)
+  useHunkKeys(w, listRef)
   const peekDefinition = () => peekFirstDefinition(usesWithDef, goToPath)
-  useReviewKeyEvents({
-    selection: ui.selection,
-    path: props.file.path,
-    diff: view.loaded.diff,
-    scrollHunkIntoView: nav.scrollHunkIntoView,
-    openAgentPanel: ui.openAgentPanel,
-    selectionTouchesRevealed: view.gaps.selectionTouchesRevealed,
-    setComposerAnchor: w.lines.annot.setComposerAnchor,
-    peekDefinition,
-  })
   return { goToPath, peekDefinition }
 }
 

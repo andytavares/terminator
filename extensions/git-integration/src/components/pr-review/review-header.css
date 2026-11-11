@@ -44,7 +44,7 @@
   flex-shrink: 0;
 }
 
-/* Level 1: the title, with Submit review the only other emphasised control. */
+/* Level 1: the title. */
 .rh-title {
   font-size: var(--tm-font-size-lg);
   font-weight: 600;
@@ -174,11 +174,6 @@
   background: none;
 }
 
-.rh-menu-hint {
-  font-size: var(--tm-font-size-xs);
-  color: var(--tm-text-muted);
-}
-
 @container rh-bar (max-width: 1200px) {
   .rh-progress-text {
     display: none;
@@ -199,15 +194,6 @@
   .rh-progress {
     display: none;
   }
-}
-
-.rh-count {
-  font-size: var(--tm-font-size-xs);
-  font-variant-numeric: tabular-nums;
-  background: color-mix(in srgb, var(--tm-on-accent) 22%, transparent);
-  padding: 0 6px;
-  border-radius: 999px;
-  line-height: 17px;
 }
 
 /* Passing checks are level 3: a dot and muted text, until a check fails or is pending. */

@@ -1,13 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Button, Dialog, SegmentedControl } from '@terminator/extension-ui'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Button, SegmentedControl } from '@terminator/extension-ui'
 import { useShallow } from 'zustand/react/shallow'
 import { usePrReviewStore } from '../../stores/pr-review.store'
-import { useReviewUiStore } from '../../stores/review-ui.store'
+import { laterKey, useReviewUiStore } from '../../stores/review-ui.store'
 import { ChapterNav } from './ChapterNav'
 import { ChapterFileList } from './ChapterFileList'
 import { FullFileList } from './FullFileList'
 import { ReviewDiffPane } from './ReviewDiffPane'
-import { ReviewSubmitPanel } from './ReviewSubmitPanel'
 import { AgentPanel } from './AgentPanel'
 import { SinceBanner } from './SinceBanner'
 import { ResumeCard } from './ResumeCard'
@@ -15,6 +14,7 @@ import { KeyboardHelp } from './KeyboardHelp'
 import { ReviewHeader, type ChapterProgress } from './ReviewHeader'
 import { ReviewFooter } from './ReviewFooter'
 import { ReviewInspector } from './ReviewInspector'
+import { VerdictBar } from './VerdictBar'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import { useAgentRuns } from '../../hooks/useAgentRuns'
 import { useReviewKeys } from '../../hooks/useReviewKeys'
@@ -125,20 +125,6 @@ function reviewSequence(displayPr: PrReviewDetail, overrides: FileOrder): FileEn
   )
 }
 
-/** The first file after the current one, wrapping round, that has not been viewed. */
-function nextUnviewed(
-  displayPr: PrReviewDetail,
-  currentFilePath: string | null,
-  viewed: Set<string>
-) {
-  const allFiles = displayPr.chapters.flatMap((c) =>
-    c.files.map((f) => ({ chapterId: c.id, path: f.path }))
-  )
-  const startAt = allFiles.findIndex((entry) => entry.path === currentFilePath)
-  const rest = [...allFiles.slice(startAt + 1), ...allFiles.slice(0, Math.max(startAt, 0))]
-  return rest.find((entry) => !viewed.has(entry.path))
-}
-
 /** The finished agent run for the panel's scope, if there is one. */
 function finishedRunFor(agentRuns: AgentRun[], prNumber: number, scope: AgentScope | null) {
   if (!scope) return undefined
@@ -166,6 +152,7 @@ function useUiState() {
       agentRuns: ui.agentRuns,
       agentPanelScope: ui.agentPanelScope,
       openAgentPanel: ui.openAgentPanel,
+      takeLaterHunk: ui.takeLaterHunk,
       groupBy: ui.groupBy,
       setGroupBy: ui.setGroupBy,
     }))
@@ -175,14 +162,13 @@ function useUiState() {
 /** The view's own toggles and panels. */
 function useViewState(store: ReviewStore) {
   const [showResume, setShowResume] = useState(() => isStaleReviewSession(store.lastAccessedAt))
-  const [showSubmit, setShowSubmit] = useState(false)
+  const summaryRef = useRef<HTMLTextAreaElement>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [ownedOnly, setOwnedOnly] = useState(false)
   return {
     showResume,
     setShowResume,
-    showSubmit,
-    setShowSubmit,
+    summaryRef,
     refreshing,
     setRefreshing,
     ownedOnly,
@@ -248,18 +234,33 @@ function selectChapterIn(r: ReviewState, id: string): void {
   startAtChapter(r.store, r.displayPr.chapters, id)
 }
 
-function stepChapter(r: ReviewState, delta: 1 | -1): void {
-  const target = r.displayPr.chapters[r.position.activeChapterIndex + delta]
-  if (target) selectChapterIn(r, target.id)
-}
-
-function stepFile(r: ReviewState, delta: 1 | -1): void {
+/** Moves one file along the review order; false when there is no file there. */
+function stepFile(r: ReviewState, delta: 1 | -1): boolean {
   const all = reviewSequence(r.displayPr, r.store.fileOrderOverrides)
   const { activeChapterId, activeFile } = r.position
   const at = all.findIndex((e) => e.chapterId === activeChapterId && e.path === activeFile?.path)
   const target = all[at + delta]
-  if (at < 0 || !target) return
+  if (at < 0 || !target) return false
   goToFile(r, target)
+  return true
+}
+
+/** Past the last hunk of the review, opens the first hunk put off with `l`. */
+function revisitLaterHunk(r: ReviewState): void {
+  const hunk = r.ui.takeLaterHunk(laterKey(r.props.repoRoot, r.props.pr.number))
+  if (!hunk) return
+  const entry = reviewSequence(r.displayPr, r.store.fileOrderOverrides).find(
+    (e) => e.path === hunk.path
+  )
+  if (entry) goToFile(r, entry)
+}
+
+function nextFileOrLaterHunk(r: ReviewState): void {
+  if (!stepFile(r, 1)) revisitLaterHunk(r)
+}
+
+function focusVerdictBar(r: ReviewState): void {
+  r.view.summaryRef.current?.focus()
 }
 
 /** Sets the open file's viewed mark from the footer box, without leaving the file. */
@@ -277,7 +278,7 @@ function markOpenFileViewed(r: ReviewState): void {
   stepFile(r, 1)
 }
 
-/** Marks the chapter's unviewed files viewed, then opens the next chapter, or the submit dialog. */
+/** Marks the chapter's unviewed files viewed, then opens the next chapter, if there is one. */
 function finishChapter(r: ReviewState): void {
   const { activeChapter, activeChapterId, orderedFiles } = r.position
   if (!activeChapter) return
@@ -286,7 +287,6 @@ function finishChapter(r: ReviewState): void {
   const chapterIndex = r.displayPr.chapters.findIndex((c) => c.id === activeChapterId)
   const nextChapter = r.displayPr.chapters[chapterIndex + 1]
   if (nextChapter) selectChapterIn(r, nextChapter.id)
-  else r.view.setShowSubmit(true)
 }
 
 /** Moving through the files and chapters. */
@@ -294,14 +294,11 @@ function navHandlers(r: ReviewState) {
   const { store } = r
   return {
     selectChapter: (id: string) => selectChapterIn(r, id),
-    prevFile: () => stepFile(r, -1),
-    nextFile: () => stepFile(r, 1),
+    prevFile: () => void stepFile(r, -1),
+    nextFile: () => nextFileOrLaterHunk(r),
     selectFile: (path: string) => store.setCurrentFile(path),
     selectFileFromFull: (path: string, chapterId: string) => goToFile(r, { chapterId, path }),
-    nextUnviewedFile: () => {
-      const next = nextUnviewed(r.displayPr, store.currentFilePath, store.viewedFiles)
-      if (next) goToFile(r, next)
-    },
+    focusVerdictBar: () => focusVerdictBar(r),
   }
 }
 
@@ -333,20 +330,6 @@ function reviewHandlers(r: ReviewState) {
 }
 
 type Handlers = ReturnType<typeof reviewHandlers>
-
-function useKeys(r: ReviewState, h: Handlers): void {
-  const { onShowOverview } = r.props
-  useReviewKeys({
-    nextFile: h.nextFile,
-    prevFile: h.prevFile,
-    nextChapter: () => stepChapter(r, 1),
-    prevChapter: () => stepChapter(r, -1),
-    nextUnviewedFile: h.nextUnviewedFile,
-    markViewed: h.markViewed,
-    toggleInsights: () => onShowOverview?.(),
-    openSubmit: () => r.view.setShowSubmit(true),
-  })
-}
 
 function reviewedCount(r: ReviewState): number {
   return [...r.store.viewedFiles].filter((p) => r.displayedPaths.has(p)).length
@@ -386,7 +369,6 @@ function progressOf(r: ReviewState) {
     viewedCount: reviewedCount(r),
     totalFiles: totalFilesOf(displayPr),
     chapters: chapterProgressOf(displayPr, store.viewedFiles),
-    draftCount: store.drafts.length,
   }
 }
 
@@ -400,7 +382,6 @@ function Header({ r, h }: { r: ReviewState; h: Handlers }) {
       isDraft={!!pr.isDraft}
       checks={pr.statusChecks ?? []}
       {...progressOf(r)}
-      onSubmit={() => view.setShowSubmit(true)}
       onPause={h.pause}
       onAskAgent={() => ui.openAgentPanel(PR_SCOPE, 'review')}
       onShowOverview={r.props.onShowOverview}
@@ -522,7 +503,7 @@ function Resume({ r }: { r: ReviewState }) {
       agentRuns={r.ui.agentRuns}
       changedSinceCount={store.changedSince.size}
       onContinue={() => r.view.setShowResume(false)}
-      onReviewDrafts={() => r.view.setShowSubmit(true)}
+      onReviewDrafts={() => focusVerdictBar(r)}
     />
   )
 }
@@ -560,6 +541,7 @@ function CentrePane({ r, h }: { r: ReviewState; h: Handlers }) {
         onFinishChapter={h.finishChapter}
         onOpenShortcuts={() => r.ui.setKeyboardHelpOpen(true)}
       />
+      <Verdict r={r} />
     </main>
   )
 }
@@ -596,24 +578,18 @@ function Panels({ r, h }: { r: ReviewState; h: Handlers }) {
   )
 }
 
-/** ReviewSubmitPanel carries its own submit controls, so the dialog adds none of its own. */
-function SubmitDialog({ r }: { r: ReviewState }) {
+function Verdict({ r }: { r: ReviewState }) {
   const { repoRoot, pr, onApproved } = r.props
   const { currentUserLogin } = r.store
-  const closeSubmit = () => r.view.setShowSubmit(false)
   return (
-    <Dialog title="Submit review" onDismiss={closeSubmit} actions={[]}>
-      <ReviewSubmitPanel
-        repoRoot={repoRoot}
-        prNumber={pr.number}
-        headSHA={pr.headSHA}
-        isOwnPr={!!currentUserLogin && currentUserLogin === pr.author}
-        viewedCount={reviewedCount(r)}
-        totalFiles={totalFilesOf(r.displayPr)}
-        onClose={closeSubmit}
-        onApproved={onApproved}
-      />
-    </Dialog>
+    <VerdictBar
+      repoRoot={repoRoot}
+      prNumber={pr.number}
+      headSHA={pr.headSHA}
+      isOwnPr={!!currentUserLogin && currentUserLogin === pr.author}
+      onApproved={onApproved}
+      summaryRef={r.view.summaryRef}
+    />
   )
 }
 
@@ -633,14 +609,13 @@ function Since({ r, info }: { r: ReviewState; info: SinceInfo }) {
 export function PrReviewView(props: Props) {
   const r = useReviewState(props)
   const h = reviewHandlers(r)
-  useKeys(r, h)
+  useReviewKeys({ focusVerdictBar: h.focusVerdictBar })
   const { ui } = r
   return (
     <div className="pr-review-view">
       <Header r={r} h={h} />
       {props.sinceInfo && <Since r={r} info={props.sinceInfo} />}
       <Panels r={r} h={h} />
-      {r.view.showSubmit && <SubmitDialog r={r} />}
       {/* S3: keyboard shortcut sheet */}
       {ui.keyboardHelpOpen && <KeyboardHelp onClose={() => ui.setKeyboardHelpOpen(false)} />}
     </div>
