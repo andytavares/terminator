@@ -10,6 +10,7 @@ export const makeFile = (path: string) => ({
   whyHere: 'test',
   churn90d: 5,
   blastRadius: null,
+  hunkCount: 1,
 })
 
 export const baseInsights: PrInsights = {

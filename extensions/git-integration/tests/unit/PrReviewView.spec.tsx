@@ -52,6 +52,7 @@ const mockFile = {
   isBinary: false,
   whyHere: 'changed',
   churn90d: null,
+  hunkCount: 1,
 }
 
 const mockChapter = {

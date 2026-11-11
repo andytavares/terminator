@@ -10,6 +10,7 @@ function TestHarness({ handlers }: { handlers: ReviewKeyHandlers }) {
     <div>
       <input data-testid="text-input" />
       <textarea data-testid="text-area" />
+      <button type="button">Approve</button>
     </div>
   )
 }
@@ -112,6 +113,14 @@ describe('useReviewKeys — typing', () => {
     render(<TestHarness handlers={handlers} />)
     const listener = listenFor(REVIEW_KEY_EVENTS.markHunkRead)
     const event = fireKey(' ', {}, screen.getByTestId('text-area'))
+    expect(listener).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('leaves Space to a focused button, so the button activates', () => {
+    render(<TestHarness handlers={handlers} />)
+    const listener = listenFor(REVIEW_KEY_EVENTS.markHunkRead)
+    const event = fireKey(' ', {}, screen.getByRole('button', { name: 'Approve' }))
     expect(listener).not.toHaveBeenCalled()
     expect(event.defaultPrevented).toBe(false)
   })

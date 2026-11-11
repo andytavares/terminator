@@ -4,7 +4,7 @@ import type { ComplexityHotspot } from '../github/pr-review-service'
 import {
   analyseLines,
   analyseSnippet,
-  isBranchNode,
+  isControlFlowNode,
   withFunctionNodes,
   type SnippetAnalysis,
   type SnippetFunction,
@@ -135,7 +135,7 @@ function maxNestingDepth(node: Node): number {
   let max = 0
   function visit(n: Node, depth: number): void {
     const elseBranch = n.parent?.type.split('_').includes('else') ?? false
-    const nextDepth = isBranchNode(n) && !elseBranch ? depth + 1 : depth
+    const nextDepth = isControlFlowNode(n) && !elseBranch ? depth + 1 : depth
     if (nextDepth > max) max = nextDepth
     for (const child of n.children) visit(child, nextDepth)
   }

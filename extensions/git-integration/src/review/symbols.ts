@@ -148,9 +148,13 @@ function isShortCircuit(node: Node): boolean {
   return !!operator && !operator.isNamed && SHORT_CIRCUIT_OPERATORS.has(operator.type)
 }
 
-export function isBranchNode(node: Node): boolean {
-  if (!node.isNamed) return false
-  return node.type.split('_').some((part) => BRANCH_WORDS.has(part)) || isShortCircuit(node)
+/** A node whose type names control flow (if, for, while, ...); conditions inside it are not. */
+export function isControlFlowNode(node: Node): boolean {
+  return node.isNamed && node.type.split('_').some((part) => BRANCH_WORDS.has(part))
+}
+
+function isBranchNode(node: Node): boolean {
+  return isControlFlowNode(node) || (node.isNamed && isShortCircuit(node))
 }
 
 /** Branches under `node`, not descending into `nested` (other functions count their own). */

@@ -90,9 +90,24 @@ async function grepFiles(at: Revision, names: string[]): Promise<string[]> {
   return [...paths]
 }
 
-async function candidateFile(at: Revision, path: string): Promise<CandidateFile> {
-  const text = await fileAt(at, path)
+/** A file that cannot be read at the revision (e.g. a submodule path) is left out. */
+async function candidateFile(at: Revision, path: string): Promise<CandidateFile | null> {
+  const text = await fileAt(at, path).catch(() => null)
+  if (text === null) return null
   return { path, tags: await tagsOf(path, text), words: new Set(text.split(/\W+/)) }
+}
+
+/** Git processes started at once while reading candidate files. */
+const READ_BATCH = 16
+
+async function candidateFiles(at: Revision, paths: string[]): Promise<CandidateFile[]> {
+  const files: CandidateFile[] = []
+  for (let i = 0; i < paths.length; i += READ_BATCH) {
+    const batch = paths.slice(i, i + READ_BATCH)
+    const read = await Promise.all(batch.map((path) => candidateFile(at, path)))
+    files.push(...read.filter((file): file is CandidateFile => file !== null))
+  }
+  return files
 }
 
 function references(candidate: CandidateFile, name: string): boolean {
@@ -118,7 +133,7 @@ async function scanRevision(at: Revision, files: ParsedPrFile[]): Promise<BlastR
   if (definitions.length === 0) return []
   const names = [...new Set(definitions.map((definition) => definition.name))]
   const paths = await grepFiles(at, names)
-  const candidates = await Promise.all(paths.map((path) => candidateFile(at, path)))
+  const candidates = await candidateFiles(at, paths)
   return definitions.map((definition) => radiusOf(definition, candidates))
 }
 

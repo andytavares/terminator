@@ -81,6 +81,7 @@ const makeFile = (path: string, size: { additions: number; deletions: number }) 
   whyHere: 'test',
   churn90d: 5,
   blastRadius: null,
+  hunkCount: 1,
 })
 
 const basePr: PrReviewDetail = {

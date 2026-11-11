@@ -16,11 +16,11 @@ export function SelectionBar(props: Props) {
     <div className="rs-float" onClick={(e) => e.stopPropagation()}>
       {canComment && (
         <Button size="sm" onClick={props.onComment}>
-          Comment <kbd className="tmui-kbd">r</kbd>
+          Comment <kbd className="tmui-kbd">c</kbd>
         </Button>
       )}
       <Button variant="primary" size="sm" onClick={props.onAskAgent}>
-        Ask agent <kbd className="tmui-kbd">a</kbd>
+        Ask agent
       </Button>
       <Button size="sm" onClick={props.onExplain}>
         Explain

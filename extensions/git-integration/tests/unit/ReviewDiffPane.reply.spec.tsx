@@ -22,6 +22,7 @@ const file: PrChangedFile = {
   whyHere: 'changed',
   churn90d: null,
   blastRadius: null,
+  hunkCount: 1,
 }
 
 const pr = PrReviewDetailSchema.parse({

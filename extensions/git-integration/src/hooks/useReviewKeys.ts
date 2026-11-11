@@ -13,6 +13,14 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable
 }
 
+/** Controls that Space activates; Space there belongs to the control, not the review. */
+const SPACE_CONTROLS =
+  'button, a[href], select, summary, [role="button"], [role="checkbox"], [role="switch"], [role="tab"]'
+
+function isSpaceOnControl(e: KeyboardEvent): boolean {
+  return e.key === ' ' && e.target instanceof Element && e.target.closest(SPACE_CONTROLS) !== null
+}
+
 /** The pane event each bare key raises, since only the pane knows its hunks and selection. */
 const KEY_EVENTS: Record<string, string> = {
   k: REVIEW_KEY_EVENTS.nextHunk,
@@ -41,7 +49,7 @@ function keyDownHandler(handlersRef: { current: ReviewKeyHandlers }) {
     }
     // Every other binding is a bare key — reject any modifier so OS/app
     // shortcuts (Cmd+R, Ctrl+Tab, ...) pass through.
-    if (hasCommandModifier(e)) return
+    if (hasCommandModifier(e) || isSpaceOnControl(e)) return
     const event = KEY_EVENTS[e.key]
     if (!event) return
     // Space would otherwise scroll the pane as well.

@@ -63,12 +63,30 @@ describe('buildChapters() has no file-name rules', () => {
 
   it('applies a saved file order to the chapter it names', () => {
     const chapters = buildChapters([f('src/types.ts'), f('src/service.ts'), f('src/utils.ts')], {
-      src: ['src/utils.ts', 'src/service.ts', 'src/types.ts'],
+      'chapter:src': ['src/utils.ts', 'src/service.ts', 'src/types.ts'],
     })
     expect(chapters[0].files.map((file) => file.path)).toEqual([
       'src/utils.ts',
       'src/service.ts',
       'src/types.ts',
     ])
+  })
+})
+
+describe('buildChapters() chapter ids', () => {
+  it('gives distinct ids to directories whose names differ only in punctuation, and to a "root" folder', () => {
+    const files = ['src/a-b', 'src/a_b', 'root'].flatMap((dir) =>
+      ['x.go', 'y.go', 'z.go'].map((name) => f(`${dir}/${name}`))
+    )
+    const ids = buildChapters([...files, f('README.md')]).map((c) => c.id)
+    expect(new Set(ids).size).toBe(4)
+  })
+})
+
+describe('buildChapters() hunk counts', () => {
+  it('counts the hunks of each patch that change more than formatting', () => {
+    const patch = ['@@ -1,1 +1,1 @@', '-a', '+b', '@@ -9,1 +9,1 @@', '-  c', '+c'].join('\n')
+    const [chapter] = buildChapters([{ ...f('main.go'), patch }])
+    expect(chapter.files[0].hunkCount).toBe(1)
   })
 })

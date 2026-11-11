@@ -12,6 +12,7 @@ function file(path: string): PrChangedFile {
     whyHere: 'Source file — implementation',
     churn90d: null,
     blastRadius: null,
+    hunkCount: 1,
   }
 }
 

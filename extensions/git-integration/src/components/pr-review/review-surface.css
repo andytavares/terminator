@@ -256,3 +256,31 @@ tr.diff-gap-row > td {
 .diff-line--expanded .diff-line__num-gutter {
   color: var(--tm-text-muted);
 }
+
+.rs-hunk-anchor {
+  position: relative;
+}
+
+.rs-hunk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.rs-hunk-viewed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.rs-hunk-bar__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

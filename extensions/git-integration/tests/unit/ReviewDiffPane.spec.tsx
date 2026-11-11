@@ -143,6 +143,7 @@ const mockFile: PrChangedFile = {
   whyHere: 'changed',
   churn90d: null,
   blastRadius: null,
+  hunkCount: 1,
 }
 
 // Parsed as the review channel's answer is, so the schema's defaults are filled in.

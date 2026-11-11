@@ -25,6 +25,7 @@ interface RawFile {
   additions: number
   deletions: number
   changeType?: string
+  hunkCount: number
 }
 
 /** Totals for a queue row, from its file list when GitHub sent one, else from its counters. */
@@ -109,12 +110,18 @@ function firstOf(obj: object, keys: string[]): unknown {
 
 function rawFileFrom(raw: unknown): RawFile {
   const obj = raw as RawRecord
+  const path = String(firstOf(obj, ['path', 'filename']) ?? '')
   return {
-    path: String(firstOf(obj, ['path', 'filename']) ?? ''),
+    path,
     additions: Number(obj.additions ?? 0),
     deletions: Number(obj.deletions ?? 0),
     changeType: String(firstOf(obj, ['changeType', 'status']) ?? 'modified'),
+    hunkCount: semanticHunkCount(typeof obj.patch === 'string' ? obj.patch : '', path),
   }
+}
+
+function semanticHunkCount(patch: string, path: string): number {
+  return parsePrFileDiff(patch, path).hunks.filter((h) => classifyHunk(h) === 'semantic').length
 }
 
 function changedFileFrom(f: RawFile): PrChangedFile {
@@ -127,6 +134,7 @@ function changedFileFrom(f: RawFile): PrChangedFile {
     whyHere: '',
     churn90d: null,
     blastRadius: null,
+    hunkCount: f.hunkCount,
   }
 }
 
@@ -136,7 +144,7 @@ function chapterFor(
   overrides?: Record<string, string[]>
 ): Chapter {
   const name = dir === ROOT_DIR ? 'Root' : dir
-  const id = name.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+  const id = `chapter:${dir}`
   const sorted = [...groupFiles].sort(byPath).map(changedFileFrom)
   return { id, name, files: applyOverrides(sorted, overrides?.[id]), status: 'not-started' }
 }

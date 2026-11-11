@@ -210,7 +210,11 @@ function headOf(r: ReviewState) {
 }
 
 function hunkSetsOf(r: ReviewState): HunkSets {
-  return { viewedHunks: r.store.viewedHunks, fileHunks: r.ui.fileHunks }
+  return {
+    viewedHunks: r.store.viewedHunks,
+    fileHunks: r.ui.fileHunks,
+    viewedFiles: r.store.viewedFiles,
+  }
 }
 
 /** Makes `target` the active file, opening its chapter, and scrolls the stream to it. */
@@ -468,8 +472,8 @@ function Resume({ r }: { r: ReviewState }) {
 
 /** "40% read" on one page, else "Chapter 2 of 5 · 40% read". */
 function positionText(r: ReviewState): string {
-  const paths = r.position.sequence.map((e) => e.path)
-  const read = `${percentRead(filesHunkProgress(paths, hunkSetsOf(r)))}% read`
+  const files = r.displayPr.chapters.flatMap((c) => c.files)
+  const read = `${percentRead(filesHunkProgress(files, hunkSetsOf(r)))}% read`
   if (r.band === 'page') return read
   const { activeChapterIndex } = r.position
   return `Chapter ${activeChapterIndex + 1} of ${r.displayPr.chapters.length} · ${read}`

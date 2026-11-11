@@ -20,6 +20,8 @@ const PrChangedFileSchema = z.object({
   /** Files that use, and files that also define, the widest definition the PR changes here; null
    *  until measured or when the PR changes no definition here. */
   blastRadius: z.object({ usedIn: z.number(), alsoDefinedIn: z.number() }).nullable().default(null),
+  /** Hunks of the patch that change more than formatting. */
+  hunkCount: z.number().default(0),
 })
 
 // ─── Chapter ──────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ export function changedFile(path: string, overrides: Partial<PrChangedFile> = {}
     whyHere: '',
     churn90d: null,
     blastRadius: null,
+    hunkCount: 1,
     ...overrides,
   }
 }

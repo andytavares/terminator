@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { Chapter, PrChangedFile, PrReviewDetail } from '../../schemas/pr-review.schema'
-import type { HunkProgress, ReviewBand } from '../../review/review-layout'
+import { sectionToActivate, type HunkProgress, type ReviewBand } from '../../review/review-layout'
 import { ReviewDiffPane } from './ReviewDiffPane'
 import { ESTIMATED_ITEM_PX } from './VirtualDiffList'
 import './review-stream.css'
@@ -19,6 +19,8 @@ export interface StreamChapter {
 }
 
 type ScrollRef = React.RefObject<HTMLDivElement | null>
+/** The section the keys last moved to, kept active while it is on screen. */
+type PinRef = React.RefObject<string | null>
 
 interface Props {
   repoRoot: string
@@ -72,35 +74,49 @@ function sections(scroller: HTMLElement): HTMLElement[] {
   return [...scroller.querySelectorAll<HTMLElement>('[data-review-path]')]
 }
 
-/** The file section at the top of the viewport, under the sticky chapter header. */
-function sectionAtTop(scroller: HTMLElement): HTMLElement | undefined {
-  const top = scroller.getBoundingClientRect().top + STICKY_HEADER_PX
-  return sections(scroller).find((s) => s.getBoundingClientRect().bottom > top)
+/** The path of the section to make active, keeping `pinnedRef` while it stays on screen. */
+function activePathIn(scroller: HTMLElement, pinnedRef: string | null): string | undefined {
+  const frame = scroller.getBoundingClientRect()
+  const boxes = sections(scroller).map((s) => {
+    const { top, bottom } = s.getBoundingClientRect()
+    return { path: s.dataset.reviewPath!, top, bottom }
+  })
+  return sectionToActivate(
+    { top: frame.top + STICKY_HEADER_PX, bottom: frame.bottom },
+    boxes,
+    pinnedRef
+  )
 }
 
 /** Makes the file section at the top of the viewport the active one as the reader scrolls. */
-function useActiveSection(scrollRef: ScrollRef, onActivate: Props['onActivate']) {
+function useActiveSection(
+  scrollRef: ScrollRef,
+  onActivate: Props['onActivate'],
+  pinnedRef: PinRef
+) {
   useEffect(() => {
     const scroller = scrollRef.current
     if (!scroller) return
     const handleScroll = () => {
-      const section = sectionAtTop(scroller)
+      const path = activePathIn(scroller, pinnedRef.current)
+      if (path !== pinnedRef.current) pinnedRef.current = null
+      const section = sections(scroller).find((s) => s.dataset.reviewPath === path)
       if (!section) return
-      const { reviewPath, reviewChapter } = section.dataset
-      onActivate({ path: reviewPath!, chapterId: reviewChapter! })
+      onActivate({ path: path!, chapterId: section.dataset.reviewChapter! })
     }
     scroller.addEventListener('scroll', handleScroll, { passive: true })
     return () => scroller.removeEventListener('scroll', handleScroll)
-  }, [scrollRef, onActivate])
+  }, [scrollRef, onActivate, pinnedRef])
 }
 
-function useScrollToTarget(scrollRef: ScrollRef, target: Props['scrollTarget']) {
+function useScrollToTarget(scrollRef: ScrollRef, target: Props['scrollTarget'], pinnedRef: PinRef) {
   useEffect(() => {
     const scroller = scrollRef.current
     if (!scroller || !target) return
     const section = sections(scroller).find((s) => s.dataset.reviewPath === target.path)
+    pinnedRef.current = target.path
     section?.scrollIntoView?.({ block: 'start' })
-  }, [scrollRef, target])
+  }, [scrollRef, target, pinnedRef])
 }
 
 /** What every file section needs from the stream, apart from its scroll element. */
@@ -184,8 +200,9 @@ export function ReviewStream(props: Props) {
   const { scrollRef, chapters, showChapterHeaders, end } = props
   const { repoRoot, pr, band, activePath, onPrevFile, onNextFile } = props
   const context = { repoRoot, pr, band, activePath, onPrevFile, onNextFile }
-  useActiveSection(scrollRef, props.onActivate)
-  useScrollToTarget(scrollRef, props.scrollTarget)
+  const pinnedRef = useRef<string | null>(null)
+  useActiveSection(scrollRef, props.onActivate, pinnedRef)
+  useScrollToTarget(scrollRef, props.scrollTarget, pinnedRef)
   return (
     <div className="review-diff-scroll rs-scroll" data-testid="review-stream" ref={scrollRef}>
       <div className="rs-content">

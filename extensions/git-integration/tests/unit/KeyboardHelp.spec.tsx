@@ -33,7 +33,7 @@ describe('KeyboardHelp', () => {
       'SpaceMark hunk read, next hunk',
       'cComment on line',
       'lLater: revisit after the last hunk',
-      '⌘↵Submit review',
+      '⌘↵Go to the verdict bar, then submit',
     ])
   })
 

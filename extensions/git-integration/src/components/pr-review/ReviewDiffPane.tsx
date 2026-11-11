@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VirtualDiffList, type VirtualDiffListHandle } from './VirtualDiffList'
 import { laterKey } from '../../stores/review-ui.store'
 import { extensionOf } from '../../utils/syntax'
+import { classifyHunk } from '../../github/pr-review-service'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import type { PrChangedFile, PrReviewDetail, PrHead } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
@@ -142,8 +143,8 @@ function useFormattingReveal(path: string) {
   }
 }
 
-/** Tells the review the file's hunk headers once its diff loads, for chapter progress; a binary
- *  file has none. */
+/** Tells the review the file's hunk headers once its diff loads, for chapter progress. Hidden
+ *  formatting-only hunks and a binary file's none do not count. */
 function useRegisterFileHunks(
   file: PrChangedFile,
   diff: FileDiff | null,
@@ -155,7 +156,7 @@ function useRegisterFileHunks(
     else if (diff)
       setFileHunks(
         path,
-        diff.hunks.map((h) => h.header)
+        diff.hunks.filter((h) => classifyHunk(h) === 'semantic').map((h) => h.header)
       )
   }, [path, isBinary, diff, setFileHunks])
 }

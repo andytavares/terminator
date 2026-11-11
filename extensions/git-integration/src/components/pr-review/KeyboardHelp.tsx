@@ -11,7 +11,7 @@ const ROWS: Array<{ key: string; label: string }> = [
   { key: 'Space', label: 'Mark hunk read, next hunk' },
   { key: 'c', label: 'Comment on line' },
   { key: 'l', label: 'Later: revisit after the last hunk' },
-  { key: '⌘↵', label: 'Submit review' },
+  { key: '⌘↵', label: 'Go to the verdict bar, then submit' },
 ]
 
 /** S3: the keyboard-shortcut sheet, opened from the footer and the header menu. */

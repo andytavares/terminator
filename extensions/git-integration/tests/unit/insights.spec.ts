@@ -291,6 +291,20 @@ const SMALL_GO_FILE = addedFile('small.go', [
   '}',
 ])
 
+const CHAINED_CONDITION_FILE = addedFile('src/ready.ts', [
+  'export function ready(a: boolean, b: boolean, c: boolean) {',
+  '  if (a && b && c && a && b && c) return true',
+  '  return false',
+  '}',
+])
+
+describe('computeInsights() — conditions are not nesting', () => {
+  it('flags no nesting for one if whose condition chains six operands', async () => {
+    const insights = await insightsOf([CHAINED_CONDITION_FILE], baseOpts)
+    expect(insights.health.flags).toEqual([])
+  })
+})
+
 describe('computeInsights() — function health flags in any grammar', () => {
   it('flags a TypeScript function over 80 lines, nested five deep, with six parameters', async () => {
     const insights = await insightsOf([OVERSIZED_TS_FILE], baseOpts)

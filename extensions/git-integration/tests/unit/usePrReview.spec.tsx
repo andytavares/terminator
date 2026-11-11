@@ -82,6 +82,7 @@ function file(path: string): PrChangedFile {
     whyHere: 'changed',
     churn90d: null,
     blastRadius: null,
+    hunkCount: 1,
   }
 }
 
