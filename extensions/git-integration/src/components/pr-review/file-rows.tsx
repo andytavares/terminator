@@ -3,7 +3,7 @@ import { Circle, CircleCheck, MessageSquare } from 'lucide-react'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 import type { PrReviewStore } from '../../stores/pr-review.store'
 import { plural } from '@terminator/extension-sdk'
-import { choose, splitPath } from '../text'
+import { splitPath } from '../text'
 import './file-tree.css'
 import './review-layout.css'
 
@@ -58,7 +58,7 @@ export function classNames(base: string, flags: Record<string, boolean>): string
 const STATE_LABEL = { changed: 'changed', new: 'new file' } as const
 
 /** The row's viewed / unviewed / high-risk glyph; its label is the state for assistive tech. */
-function RowGlyph(props: { isViewed: boolean; isHighRisk: boolean }) {
+function RowGlyph(props: { isViewed: boolean }) {
   if (props.isViewed) {
     return (
       <span className="file-tree-glyph file-tree-glyph--done" role="img" aria-label="Viewed">
@@ -66,10 +66,8 @@ function RowGlyph(props: { isViewed: boolean; isHighRisk: boolean }) {
       </span>
     )
   }
-  const label = choose(props.isHighRisk, 'High risk, not viewed', 'Not viewed')
-  const tone = choose(props.isHighRisk, 'risk', 'todo')
   return (
-    <span className={`file-tree-glyph file-tree-glyph--${tone}`} role="img" aria-label={label}>
+    <span className="file-tree-glyph file-tree-glyph--todo" role="img" aria-label="Not viewed">
       <Circle aria-hidden="true" />
     </span>
   )
@@ -91,10 +89,9 @@ interface FileRowContentProps {
 export function FileRowContent(props: FileRowContentProps) {
   const { file, threadCount } = props
   const { dir, name } = splitPath(file.path)
-  const isHighRisk = file.riskScore.level === 'high'
   return (
     <>
-      <RowGlyph isViewed={props.isViewed} isHighRisk={isHighRisk} />
+      <RowGlyph isViewed={props.isViewed} />
       <span className="file-tree-name">
         <b>{name}</b>
         {dir && <small> {dir}</small>}

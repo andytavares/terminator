@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Dialog, SegmentedControl } from '@terminator/extension-ui'
+import { Button, Dialog, SegmentedControl } from '@terminator/extension-ui'
 import { useShallow } from 'zustand/react/shallow'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useReviewUiStore } from '../../stores/review-ui.store'
@@ -14,16 +14,15 @@ import { ResumeCard } from './ResumeCard'
 import { KeyboardHelp } from './KeyboardHelp'
 import { ReviewHeader, type ChapterProgress } from './ReviewHeader'
 import { ReviewFooter } from './ReviewFooter'
-import { ReviewInspector, type InspectorTab } from './ReviewInspector'
+import { ReviewInspector } from './ReviewInspector'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import { useAgentRuns } from '../../hooks/useAgentRuns'
 import { useReviewKeys } from '../../hooks/useReviewKeys'
-import { QUEUE_RISK_HIGH_LINES } from '../../github/pr-review-service'
 import { useResizePanel } from '../../hooks/useResizePanel'
 import type { PrReviewDetail, PrChangedFile, Chapter } from '../../schemas/pr-review.schema'
 import type { AgentRun, AgentScope } from '../../schemas/review-agent.schema'
 import { orderedFiles as orderedFilesOf, startAtChapter } from './file-rows'
-import { visiblePr, type PrFilters } from '../../review/visible-pr'
+import { visiblePr } from '../../review/visible-pr'
 import './review-chrome.css'
 import './review-layout.css'
 
@@ -64,14 +63,7 @@ const GROUP_BY_OPTIONS = [
 type ReviewStore = ReturnType<typeof usePrReviewStore.getState>
 type FileOrder = ReviewStore['fileOrderOverrides']
 
-/** The PR's changed lines and a reading estimate of 25 minutes per hundred lines. */
-function largePrInfo(pr: PrReviewDetail, dismissed: boolean) {
-  const loc = pr.chapters.flatMap((c) => c.files).reduce((s, f) => s + f.additions + f.deletions, 0)
-  if (dismissed || loc < QUEUE_RISK_HIGH_LINES) return null
-  return { loc, minutes: Math.round((loc / 100) * 25) }
-}
-
-/** The chapter and file being shown, resolved against the focus-filtered PR. */
+/** The chapter and file being shown, resolved against the filtered PR. */
 interface Position {
   activeChapterId: string | null
   activeChapter: Chapter | null
@@ -161,15 +153,6 @@ function openFindingCount(run: AgentRun | undefined): number {
   return run.findings.filter((f) => !f.dismissed).length
 }
 
-function inspectorFile(repoRoot: string, file: PrChangedFile | null) {
-  if (!file) return null
-  return {
-    path: file.path,
-    riskScore: file.riskScore,
-    repoRoot,
-  }
-}
-
 function isStaleReviewSession(lastAccessedAt: string | null | undefined): boolean {
   if (!lastAccessedAt) return false
   return Date.now() - new Date(lastAccessedAt).getTime() > RESUME_CARD_STALE_MS
@@ -183,7 +166,6 @@ function useUiState() {
       agentRuns: ui.agentRuns,
       agentPanelScope: ui.agentPanelScope,
       openAgentPanel: ui.openAgentPanel,
-      fileListHidden: ui.fileListHidden,
       groupBy: ui.groupBy,
       setGroupBy: ui.setGroupBy,
     }))
@@ -194,38 +176,18 @@ function useUiState() {
 function useViewState(store: ReviewStore) {
   const [showResume, setShowResume] = useState(() => isStaleReviewSession(store.lastAccessedAt))
   const [showSubmit, setShowSubmit] = useState(false)
-  const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [focusMode, setFocusMode] = useState(false)
   const [ownedOnly, setOwnedOnly] = useState(false)
-  const [largePrDismissed, setLargePrDismissed] = useState(false)
   return {
     showResume,
     setShowResume,
     showSubmit,
     setShowSubmit,
-    showRiskFor,
-    setShowRiskFor,
     refreshing,
     setRefreshing,
-    focusMode,
-    setFocusMode,
     ownedOnly,
     setOwnedOnly,
-    largePrDismissed,
-    setLargePrDismissed,
   }
-}
-
-/** The inspector's tab, switched to the agent whenever the agent panel gets a new scope. */
-function useInspectorTab(agentPanelScope: AgentScope | null) {
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('agent')
-  const [shownAgentScope, setShownAgentScope] = useState(agentPanelScope)
-  if (shownAgentScope !== agentPanelScope) {
-    setShownAgentScope(agentPanelScope)
-    if (agentPanelScope) setInspectorTab('agent')
-  }
-  return { inspectorTab, setInspectorTab }
 }
 
 function useLayout() {
@@ -234,12 +196,8 @@ function useLayout() {
 }
 
 /** The PR as displayed and the reader's position in it. */
-function usePosition(pr: PrReviewDetail, store: ReviewStore, filters: PrFilters) {
-  const { focusMode, ownedOnly } = filters
-  const displayPr = useMemo(
-    () => visiblePr(pr, { focusMode, ownedOnly }),
-    [pr, focusMode, ownedOnly]
-  )
+function usePosition(pr: PrReviewDetail, store: ReviewStore, ownedOnly: boolean) {
+  const displayPr = useMemo(() => visiblePr(pr, { ownedOnly }), [pr, ownedOnly])
   const activeChapter = activeChapterOf(displayPr, store.currentChapterId)
   const { fileOrderOverrides } = store
   const orderedFiles = useMemo(() => {
@@ -264,14 +222,13 @@ function useReviewState(props: Props) {
   const ui = useUiState()
   useAgentRuns(repoRoot, pr)
   const view = useViewState(store)
-  const inspector = useInspectorTab(ui.agentPanelScope)
   const layout = useLayout()
-  const { displayPr, position, displayedPaths } = usePosition(pr, store, view)
+  const { displayPr, position, displayedPaths } = usePosition(pr, store, view.ownedOnly)
   const loadInlineComments = useLoadInlineComments(repoRoot)
   useEffect(() => {
     loadInlineComments()
   }, [pr.number, loadInlineComments])
-  return { props, store, ui, view, inspector, layout, displayPr, position, displayedPaths }
+  return { props, store, ui, view, layout, displayPr, position, displayedPaths }
 }
 
 type ReviewState = ReturnType<typeof useReviewState>
@@ -334,19 +291,13 @@ function finishChapter(r: ReviewState): void {
 
 /** Moving through the files and chapters. */
 function navHandlers(r: ReviewState) {
-  const { store, view } = r
+  const { store } = r
   return {
     selectChapter: (id: string) => selectChapterIn(r, id),
     prevFile: () => stepFile(r, -1),
     nextFile: () => stepFile(r, 1),
-    selectFile: (path: string) => {
-      store.setCurrentFile(path)
-      view.setShowRiskFor(null)
-    },
-    selectFileFromFull: (path: string, chapterId: string) => {
-      goToFile(r, { chapterId, path })
-      view.setShowRiskFor(null)
-    },
+    selectFile: (path: string) => store.setCurrentFile(path),
+    selectFileFromFull: (path: string, chapterId: string) => goToFile(r, { chapterId, path }),
     nextUnviewedFile: () => {
       const next = nextUnviewed(r.displayPr, store.currentFilePath, store.viewedFiles)
       if (next) goToFile(r, next)
@@ -413,14 +364,6 @@ function chapterProgressOf(displayPr: PrReviewDetail, viewed: Set<string>): Chap
   }))
 }
 
-/** Reading time still ahead: the estimate of every displayed file not yet viewed. */
-function minutesLeftOf(displayPr: PrReviewDetail, viewed: Set<string>): number {
-  return displayPr.chapters
-    .flatMap((c) => c.files)
-    .filter((f) => !viewed.has(f.path))
-    .reduce((sum, f) => sum + f.estimatedMinutes, 0)
-}
-
 function baseName(path: string | undefined): string | null {
   return path?.split('/').pop() ?? null
 }
@@ -443,7 +386,6 @@ function progressOf(r: ReviewState) {
     viewedCount: reviewedCount(r),
     totalFiles: totalFilesOf(displayPr),
     chapters: chapterProgressOf(displayPr, store.viewedFiles),
-    minutesLeft: minutesLeftOf(displayPr, store.viewedFiles),
     draftCount: store.drafts.length,
   }
 }
@@ -460,13 +402,6 @@ function Header({ r, h }: { r: ReviewState; h: Handlers }) {
       {...progressOf(r)}
       onSubmit={() => view.setShowSubmit(true)}
       onPause={h.pause}
-      largePr={largePrInfo(pr, view.largePrDismissed)}
-      onDismissLargePr={() => view.setLargePrDismissed(true)}
-      focusMode={view.focusMode}
-      onToggleFocusMode={() => view.setFocusMode((v) => !v)}
-      ownedCount={pr.ownedPaths.length}
-      ownedOnly={view.ownedOnly}
-      onToggleOwnedOnly={() => view.setOwnedOnly((v) => !v)}
       onAskAgent={() => ui.openAgentPanel(PR_SCOPE, 'review')}
       onShowOverview={r.props.onShowOverview}
       onPopOut={r.props.onPopOut}
@@ -478,7 +413,23 @@ function Header({ r, h }: { r: ReviewState; h: Handlers }) {
   )
 }
 
-/** The sidebar's Files / Chapters switch: a shortcut to the saved File list setting. */
+/** Shows only the changed files the viewer owns by CODEOWNERS; absent when they own none. */
+function OwnedOnlyToggle({ r }: { r: ReviewState }) {
+  const { view } = r
+  if (r.props.pr.ownedPaths.length === 0) return null
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      aria-pressed={view.ownedOnly}
+      onClick={() => view.setOwnedOnly((on) => !on)}
+    >
+      Only my files
+    </Button>
+  )
+}
+
+/** The sidebar's Files / Chapters switch, and the Only my files filter. */
 function ListHeader({ r }: { r: ReviewState }) {
   const { ui, displayPr } = r
   return (
@@ -493,6 +444,7 @@ function ListHeader({ r }: { r: ReviewState }) {
         />
       )}
       {displayPr.chapters.length <= 1 && <span className="pr-review-chapter-name">Files</span>}
+      <OwnedOnlyToggle r={r} />
     </div>
   )
 }
@@ -542,10 +494,6 @@ function DiffArea({ r, h }: { r: ReviewState; h: Handlers }) {
   if (!activeFile || !activeChapter) {
     return <div className="pr-review-empty-state">Select a file to review.</div>
   }
-  const showRisk = () => {
-    r.view.setShowRiskFor(activeFile.path)
-    r.inspector.setInspectorTab('file')
-  }
   return (
     <ReviewDiffPane
       repoRoot={r.props.repoRoot}
@@ -554,7 +502,6 @@ function DiffArea({ r, h }: { r: ReviewState; h: Handlers }) {
       onMarkViewed={h.markViewed}
       onPrevFile={h.prevFile}
       onNextFile={h.nextFile}
-      onShowRisk={showRisk}
     />
   )
 }
@@ -571,7 +518,6 @@ function Resume({ r }: { r: ReviewState }) {
       currentChapterId={r.position.activeChapterId}
       currentFilePath={store.currentFilePath}
       lastLine={null}
-      notes={store.notes}
       drafts={store.drafts}
       agentRuns={r.ui.agentRuns}
       changedSinceCount={store.changedSince.size}
@@ -622,17 +568,10 @@ function InspectorPane({ r }: { r: ReviewState }) {
   const { repoRoot, pr } = r.props
   const { ui } = r
   const run = finishedRunFor(ui.agentRuns, pr.number, ui.agentPanelScope)
-  const closeAgentPanel = () => {
-    ui.openAgentPanel(null)
-    r.view.setShowRiskFor(null)
-  }
   return (
     <aside className="ri-drawer">
       <ReviewInspector
-        tab={r.inspector.inspectorTab}
-        onTabChange={r.inspector.setInspectorTab}
-        onClose={closeAgentPanel}
-        agentAvailable={!!ui.agentPanelScope}
+        onClose={() => ui.openAgentPanel(null)}
         agentFindingCount={openFindingCount(run)}
         agent={
           <AgentPanel
@@ -641,27 +580,18 @@ function InspectorPane({ r }: { r: ReviewState }) {
             currentFilePath={r.position.activeFile?.path ?? null}
           />
         }
-        file={inspectorFile(repoRoot, r.position.activeFile)}
       />
     </aside>
   )
 }
 
-/** The inspector shows while the agent has a scope or the risk breakdown is open for this file. */
-function inspectorOpen(r: ReviewState): boolean {
-  const { activeFile } = r.position
-  const riskOpen = !!activeFile && r.view.showRiskFor === activeFile.path
-  return !!r.ui.agentPanelScope || riskOpen
-}
-
 function Panels({ r, h }: { r: ReviewState; h: Handlers }) {
-  const showList = !r.ui.fileListHidden
   return (
     <div className="pr-review-panels">
-      {showList && <LeftPanel r={r} h={h} />}
-      {showList && <div className="pr-resize-handle" onMouseDown={r.layout.left.handleMouseDown} />}
+      <LeftPanel r={r} h={h} />
+      <div className="pr-resize-handle" onMouseDown={r.layout.left.handleMouseDown} />
       <CentrePane r={r} h={h} />
-      {inspectorOpen(r) && <InspectorPane r={r} />}
+      {r.ui.agentPanelScope && <InspectorPane r={r} />}
     </div>
   )
 }

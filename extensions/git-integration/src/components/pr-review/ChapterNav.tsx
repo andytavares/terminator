@@ -2,7 +2,6 @@ import React from 'react'
 import { Check } from 'lucide-react'
 import type { Chapter } from '../../schemas/pr-review.schema'
 import { usePrReviewStore } from '../../stores/pr-review.store'
-import { chapterRiskLevel } from '../../github/pr-review-service'
 import { currentAttr } from './file-rows'
 
 interface Props {
@@ -50,9 +49,8 @@ function ChapterOutlineHeader(props: ChapterOutlineHeaderProps) {
         {chapter.summary && <span className="chapter-nav-summary">{chapter.summary}</span>}
       </span>
       <span className="chapter-nav-meta">
-        {viewedCount}/{chapter.files.length} · {chapter.estimatedMinutes} min
+        {viewedCount}/{chapter.files.length}
       </span>
-      <span className={`chapter-nav-risk-dot chapter-nav-risk-dot--${chapterRiskLevel(chapter)}`} />
       {complete && (
         <span className="chapter-nav-check" aria-label="complete">
           <Check aria-hidden="true" />

@@ -59,7 +59,17 @@ async function changedDefinitions(at: Revision, file: ParsedPrFile): Promise<Cha
 /** `git grep` exits 1 with no stderr when nothing matches. */
 async function grepRun(at: Revision, names: string[]): Promise<string> {
   const patterns = names.flatMap((name) => ['-e', name])
-  const args = ['-c', 'core.quotepath=false', 'grep', '-l', '-w', '-F', ...patterns, at.headSha, '--']
+  const args = [
+    '-c',
+    'core.quotepath=false',
+    'grep',
+    '-l',
+    '-w',
+    '-F',
+    ...patterns,
+    at.headSha,
+    '--',
+  ]
   try {
     return await runGit(at.repoRoot, args, { maxBuffer: SHOW_MAX_BUFFER })
   } catch (error) {
@@ -97,8 +107,9 @@ function radiusOf(definition: ChangedDefinition, candidates: CandidateFile[]): B
     name,
     path,
     usedIn: others.filter((candidate) => references(candidate, name)).length,
-    alsoDefinedIn: others.filter((candidate) => candidate.tags?.definitions.some((d) => d.name === name))
-      .length,
+    alsoDefinedIn: others.filter((candidate) =>
+      candidate.tags?.definitions.some((d) => d.name === name)
+    ).length,
   }
 }
 

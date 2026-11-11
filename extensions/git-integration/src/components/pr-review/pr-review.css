@@ -380,7 +380,7 @@
 /* Row 1: number, name, counts, risk dot, check. Row 2: the summary, under the name, full width. */
 .chapter-nav-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: baseline;
   column-gap: 8px;
   row-gap: 2px;
@@ -431,23 +431,6 @@
   height: 12px;
 }
 
-.chapter-nav-risk-dot {
-  width: 7px;
-  height: 7px;
-  align-self: center;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.chapter-nav-risk-dot--low {
-  background: var(--tm-success);
-}
-.chapter-nav-risk-dot--medium {
-  background: var(--tm-warning);
-}
-.chapter-nav-risk-dot--high {
-  background: var(--tm-danger);
-}
-
 /* ─── ReviewDiffPane ──────────────────────────────────────────────────────── */
 
 .review-diff-pane {
@@ -486,28 +469,6 @@
   left: 0;
   width: 100%;
 }
-.review-diff-table-wrap--split .diff-split-header {
-  border-top: 1px solid var(--tm-border);
-}
-.diff-split-tables {
-  display: flex;
-  width: 100%;
-}
-
-.diff-split-resize-handle:hover {
-  background: var(--tm-accent);
-  opacity: 0.5;
-}
-
-.diff-line__empty-cell {
-  background: var(--tm-bg-elevated);
-  opacity: 0.4;
-}
-
-.diff-split-comment-inner {
-  padding-left: 62px; /* num(44px) + prefix(18px) — aligns with code content column */
-}
-
 /* Formatting-only hunks hidden notice */
 .review-diff-formatting-notice {
   font-size: var(--tm-font-size-xs);

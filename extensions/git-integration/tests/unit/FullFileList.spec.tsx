@@ -6,14 +6,9 @@ import { FullFileList } from '../../src/components/pr-review/FullFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { PrReviewDetailSchema, type PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { changedFile } from './support/pr-review-file'
-import { makeRiskScore } from './risk-score-fixtures'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
-}))
-
-vi.mock('../../src/github/pr-review-service', () => ({
-  chapterRiskLevel: vi.fn().mockReturnValue('low'),
 }))
 
 // Parsed as the review channel's answer is, so the schema's defaults are filled in.
@@ -34,7 +29,7 @@ function makePr(chapters: PrReviewDetail['chapters']): PrReviewDetail {
 }
 
 function makeFile(path: string) {
-  return changedFile(path, { additions: 5, deletions: 2, riskScore: makeRiskScore() })
+  return changedFile(path, { additions: 5, deletions: 2 })
 }
 
 beforeEach(() => {
@@ -50,7 +45,6 @@ const defaultProps = {
     {
       id: 'ch-1',
       name: 'Core',
-      estimatedMinutes: 10,
       status: 'not-started',
       files: [makeFile('src/foo.ts'), makeFile('src/bar.ts')],
     },
@@ -70,12 +64,10 @@ describe('FullFileList', () => {
 
   it("shows each file's additions on its own row", () => {
     const files = [
-      changedFile('src/foo.ts', { additions: 5, riskScore: makeRiskScore() }),
-      changedFile('src/bar.ts', { additions: 9, riskScore: makeRiskScore() }),
+      changedFile('src/foo.ts', { additions: 5 }),
+      changedFile('src/bar.ts', { additions: 9 }),
     ]
-    const pr = makePr([
-      { id: 'ch-1', name: 'Core', estimatedMinutes: 10, status: 'not-started', files },
-    ])
+    const pr = makePr([{ id: 'ch-1', name: 'Core', status: 'not-started', files }])
     render(<FullFileList {...defaultProps} pr={pr} />)
     expect(within(screen.getByTitle('src/foo.ts')).getByText('+5')).toBeTruthy()
     expect(within(screen.getByTitle('src/bar.ts')).getByText('+9')).toBeTruthy()
@@ -172,7 +164,6 @@ describe.each([
       {
         id: 'ch-1',
         name: 'Core',
-        estimatedMinutes: 10,
         status: 'not-started',
         files: [{ ...makeFile('src/new.ts'), changeType: 'added' }],
       },
@@ -189,33 +180,20 @@ describe.each([
 })
 
 describe('FullFileList — row details', () => {
-  const highRiskFile = {
-    ...makeFile('src/risky.ts'),
-    riskScore: { ...makeRiskScore(), level: 'high' as const },
-  }
-  const riskyPr = makePr([
-    {
-      id: 'ch-1',
-      name: 'Core',
-      estimatedMinutes: 10,
-      status: 'not-started',
-      files: [highRiskFile],
-    },
-  ])
-
-  it('shows the risk state on an unviewed high-risk file', () => {
-    render(<FullFileList {...defaultProps} pr={riskyPr} />)
-    expect(screen.getByRole('img', { name: 'High risk, not viewed' })).toBeTruthy()
+  it('marks an unviewed file as not viewed', () => {
+    render(<FullFileList {...defaultProps} />)
+    expect(screen.getAllByRole('img', { name: 'Not viewed' })).toHaveLength(2)
   })
 
-  it('shows viewed, not risk, once a high-risk file is viewed', () => {
+  it('marks a viewed file as viewed', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
-      viewedFiles: new Set(['src/risky.ts']),
+      viewedFiles: new Set(['src/foo.ts']),
       fileOrderOverrides: {},
     })
-    render(<FullFileList {...defaultProps} pr={riskyPr} />)
-    expect(screen.getByRole('img', { name: 'Viewed' })).toBeTruthy()
-    expect(screen.queryByRole('img', { name: /High risk/ })).toBeNull()
+    render(<FullFileList {...defaultProps} />)
+    expect(
+      within(screen.getByTitle('src/foo.ts')).getByRole('img', { name: 'Viewed' })
+    ).toBeTruthy()
   })
 })
 

@@ -4,9 +4,7 @@ import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
 
 type AgentRequest = 'review' | 'explain' | 'ask'
 
-export type CommentVisibility = 'all' | 'unresolved' | 'hidden'
 type DiffRange = 'since' | 'whole'
-export type DiffViewMode = 'unified' | 'split'
 type GroupBy = 'chapters' | 'all'
 
 /** A line range the reviewer has selected in the diff, for the float bar and the agent. */
@@ -35,31 +33,20 @@ export const REVIEW_KEY_EVENTS = {
   askAgent: 'review:ask-agent',
   explain: 'review:explain',
   comment: 'review:comment',
-  note: 'review:note',
   peekDefinition: 'review:peek-definition',
 } as const
 
 const PREFS_KEY = 'git-integration.review-ui.prefs'
 
 interface Prefs {
-  commentVisibility: CommentVisibility
-  agentNotesOn: boolean
   diffRange: DiffRange
-  fileListHidden: boolean
-  diffViewMode: DiffViewMode
-  hideFormattingHunks: boolean
   groupBy: GroupBy
   queueSort: SortMode
   dashboardSort: SortMode
 }
 
 const DEFAULT_PREFS: Prefs = {
-  commentVisibility: 'all',
-  agentNotesOn: true,
   diffRange: 'since',
-  fileListHidden: false,
-  diffViewMode: 'unified',
-  hideFormattingHunks: true,
   groupBy: 'all',
   queueSort: 'newest',
   dashboardSort: 'newest',
@@ -78,13 +65,7 @@ interface ReviewUiStore extends Prefs {
   keyboardHelpOpen: boolean
   insightsOpen: boolean
 
-  setCommentVisibility(v: CommentVisibility): void
-  cycleCommentVisibility(): void
-  setAgentNotesOn(on: boolean): void
   setDiffRange(r: DiffRange): void
-  toggleFileList(): void
-  setDiffViewMode(mode: DiffViewMode): void
-  setHideFormattingHunks(on: boolean): void
   setGroupBy(groupBy: GroupBy): void
   setQueueSort(mode: SortMode): void
   setDashboardSort(mode: SortMode): void
@@ -122,20 +103,13 @@ function savePrefs(prefs: Prefs): void {
   }
 }
 
-const CYCLE: CommentVisibility[] = ['all', 'unresolved', 'hidden']
-
 type SetState = StoreApi<ReviewUiStore>['setState']
 type GetState = StoreApi<ReviewUiStore>['getState']
 
 /** The preference fields of the store, as savePrefs keeps them. */
 function prefsOf(state: ReviewUiStore): Prefs {
   return {
-    commentVisibility: state.commentVisibility,
-    agentNotesOn: state.agentNotesOn,
     diffRange: state.diffRange,
-    fileListHidden: state.fileListHidden,
-    diffViewMode: state.diffViewMode,
-    hideFormattingHunks: state.hideFormattingHunks,
     groupBy: state.groupBy,
     queueSort: state.queueSort,
     dashboardSort: state.dashboardSort,
@@ -149,16 +123,7 @@ function prefActions(set: SetState, get: GetState) {
     savePrefs(prefsOf(get()))
   }
   return {
-    setCommentVisibility: (v: CommentVisibility) => persist({ commentVisibility: v }),
-    cycleCommentVisibility: () => {
-      const i = CYCLE.indexOf(get().commentVisibility)
-      persist({ commentVisibility: CYCLE[(i + 1) % CYCLE.length] })
-    },
-    setAgentNotesOn: (on: boolean) => persist({ agentNotesOn: on }),
     setDiffRange: (r: DiffRange) => persist({ diffRange: r }),
-    toggleFileList: () => persist({ fileListHidden: !get().fileListHidden }),
-    setDiffViewMode: (mode: DiffViewMode) => persist({ diffViewMode: mode }),
-    setHideFormattingHunks: (on: boolean) => persist({ hideFormattingHunks: on }),
     setGroupBy: (groupBy: GroupBy) => persist({ groupBy }),
     setQueueSort: (mode: SortMode) => persist({ queueSort: mode }),
     setDashboardSort: (mode: SortMode) => persist({ dashboardSort: mode }),

@@ -38,12 +38,7 @@ function reviewRequestAsk(pr: DashboardPR, tickets: TicketIndex): HomeAsk {
     title: pr.reviewedByMe ? 'Re-review requested' : 'Review requested',
     detail: pr.title,
     where: pullRequestWhere(pr, tickets),
-    facts: [
-      `${pr.fileCount} files`,
-      `+${pr.additions} −${pr.deletions}`,
-      `about ${pr.estimatedMinutes} min`,
-      `${pr.riskLevel} risk`,
-    ],
+    facts: [`${pr.fileCount} files`, `+${pr.additions} −${pr.deletions}`],
     workKey: workKeyOf(pr, tickets),
     since: pr.reviewRequestedAt ?? pr.createdAt,
     actions: [{ id: 'start-review', label: 'Start review', primary: true }],

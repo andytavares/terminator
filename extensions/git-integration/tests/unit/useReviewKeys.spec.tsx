@@ -25,7 +25,7 @@ function listenFor(type: string) {
   return listener
 }
 
-let handlers: Record<Exclude<keyof ReviewKeyHandlers, 'toggleFileList'>, Mock<() => void>>
+let handlers: Record<keyof ReviewKeyHandlers, Mock<() => void>>
 
 beforeEach(() => {
   handlers = {
@@ -40,10 +40,7 @@ beforeEach(() => {
   }
   useReviewUiStore.setState({
     diffRange: 'since',
-    commentVisibility: 'all',
-    agentNotesOn: true,
     keyboardHelpOpen: false,
-    fileListHidden: false,
   })
 })
 
@@ -95,18 +92,10 @@ describe('useReviewKeys — calls the latest handlers after a rerender', () => {
     expect(handlers.nextFile).not.toHaveBeenCalled()
   })
 
-  it('toggles diffRange on s and comment visibility on c', () => {
+  it('toggles diffRange on s', () => {
     render(<TestHarness handlers={handlers} />)
     fireKey('s')
     expect(useReviewUiStore.getState().diffRange).toBe('whole')
-    fireKey('c')
-    expect(useReviewUiStore.getState().commentVisibility).toBe('unresolved')
-  })
-
-  it('toggles agentNotesOn on shift+C', () => {
-    render(<TestHarness handlers={handlers} />)
-    fireKey('C', { shiftKey: true })
-    expect(useReviewUiStore.getState().agentNotesOn).toBe(false)
   })
 })
 
@@ -140,35 +129,20 @@ describe('useReviewKeys — dispatches peekDefinition when g then d within 1s', 
   })
 })
 
-describe('useReviewKeys — dispatches askAgent, explain, comment and note events', () => {
+describe('useReviewKeys — dispatches askAgent, explain and comment events', () => {
   it.each([
     ['a', REVIEW_KEY_EVENTS.askAgent],
     ['e', REVIEW_KEY_EVENTS.explain],
     ['r', REVIEW_KEY_EVENTS.comment],
-    ['m', REVIEW_KEY_EVENTS.note],
   ])('dispatches %s → %s once', (key, eventType) => {
     render(<TestHarness handlers={handlers} />)
     const listener = listenFor(eventType)
     fireKey(key)
     expect(listener).toHaveBeenCalledTimes(1)
   })
-
-  it('toggles the file list on t via the store when no override is given', () => {
-    render(<TestHarness handlers={handlers} />)
-    fireKey('t')
-    expect(useReviewUiStore.getState().fileListHidden).toBe(true)
-  })
 })
 
-describe('useReviewKeys — calls an explicit toggleFileList handler on t when given', () => {
-  it('calls an explicit toggleFileList handler on t when given', () => {
-    const toggleFileList = vi.fn()
-    render(<TestHarness handlers={{ ...handlers, toggleFileList }} />)
-    fireKey('t')
-    expect(toggleFileList).toHaveBeenCalledTimes(1)
-    expect(useReviewUiStore.getState().fileListHidden).toBe(false)
-  })
-
+describe('useReviewKeys — keys it does not handle', () => {
   it('runs no handler and changes no state on Escape', () => {
     render(<TestHarness handlers={handlers} />)
     const stateBefore = useReviewUiStore.getState()

@@ -7,9 +7,7 @@ import * as prReviewService from '../../src/github/pr-review-service'
 const baseOpts = {
   readingOrder: [],
   chapters: [],
-  statusChecks: [],
   dryViolations: [],
-  localCoverage: null,
 }
 
 afterEach(() => {

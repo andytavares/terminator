@@ -27,23 +27,6 @@ describe('parseReviewQueuePR()', () => {
     expect(pr.headRefName).toBe('feat/login')
     expect(pr.isDraft).toBe(false)
   })
-
-  it('derives estimatedMinutes as ceil((additions+deletions)/60)', () => {
-    const pr = parseReviewQueuePR(makeRawPr())
-    // (120 + 15) / 60 = 2.25 → ceil = 3
-    expect(pr.estimatedMinutes).toBe(3)
-  })
-})
-
-describe('parseReviewQueuePR() — estimates at least one minute', () => {
-  it('estimates 1 minute for a PR with no changed lines', () => {
-    const pr = parseReviewQueuePR(
-      makeRawPr({
-        files: [{ path: 'x.ts', additions: 0, deletions: 0, status: 'modified' }],
-      })
-    )
-    expect(pr.estimatedMinutes).toBe(1)
-  })
 })
 
 describe('parseReviewQueuePR() — defaults approvalCount to 0 when no reviews present', () => {

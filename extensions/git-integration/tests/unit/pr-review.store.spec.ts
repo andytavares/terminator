@@ -35,7 +35,6 @@ function session(overrides: Partial<ReviewSession> = {}): ReviewSession {
       'scripts/e2e-shard.ts': 'aaa111',
       'playwright.config.ts': 'aaa111',
     },
-    notes: [],
     drafts: [],
     ...overrides,
   }
@@ -141,19 +140,10 @@ const DRAFT = {
   fromFindingId: 'f1',
 }
 
-const NOTE = {
-  id: 'n1',
-  path: 'src/hooks/usePrReview.ts',
-  line: 312,
-  side: 'RIGHT' as const,
-  body: 'why is this recomputed??',
-  createdAt: '2026-09-27T10:00:00.000Z',
-}
-
 /** The session the store saved last. */
 const lastPersisted = () => sessionSet.mock.calls.at(-1)![1] as ReviewSession
 
-describe('pr-review store — session v2 — drafts and notes persist with the session', () => {
+describe('pr-review store — session v2 — drafts persist with the session', () => {
   it('saves a reworded draft with the session', () => {
     const store = usePrReviewStore.getState()
     store.initSession(session())
@@ -164,25 +154,9 @@ describe('pr-review store — session v2 — drafts and notes persist with the s
     ])
     expect(lastPersisted().drafts.map((d) => d.body)).toEqual(['Keep the scores from the loop.'])
   })
-
-  it('saves a private note with the session', () => {
-    const store = usePrReviewStore.getState()
-    store.initSession(session())
-    store.addNote(HEAD_A, NOTE)
-    expect(usePrReviewStore.getState().notes).toEqual([NOTE])
-    expect(lastPersisted().notes).toEqual([NOTE])
-  })
 })
 
-describe('pr-review store — session v2 — removing drafts and notes persists with the session', () => {
-  it('removes a note from the session', () => {
-    const store = usePrReviewStore.getState()
-    store.initSession(session({ notes: [NOTE] }))
-    store.removeNote(HEAD_A, 'n1')
-    expect(usePrReviewStore.getState().notes).toEqual([])
-    expect(lastPersisted().notes).toEqual([])
-  })
-
+describe('pr-review store — session v2 — removing a draft persists with the session', () => {
   it('removes a draft from the session', () => {
     const store = usePrReviewStore.getState()
     store.initSession(session({ drafts: [DRAFT, { ...DRAFT, id: 'd2' }] }))
@@ -200,17 +174,7 @@ describe('pr-review store — session v2 — removing drafts and notes persists 
   })
 })
 
-const riskScore = (composite: number) =>
-  ({
-    level: 'low',
-    composite,
-    dominantDriver: 'changeSize',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {},
-  }) as never
-
-const file = (path: string) => ({ path, riskScore: riskScore(0) })
+const file = (path: string) => ({ path, churn90d: null })
 
 const activePr = () =>
   ({
@@ -223,7 +187,7 @@ const activePr = () =>
     ],
   }) as never
 
-describe('pr-review store — session v2 (continued) — viewed marks and risk scores against an active PR', () => {
+describe('pr-review store — session v2 (continued) — viewed marks and churn against an active PR', () => {
   it('passes the PR node id so a single mark costs one GitHub call', () => {
     usePrReviewStore.getState().setActivePr(activePr())
     usePrReviewStore
@@ -239,7 +203,7 @@ describe('pr-review store — session v2 (continued) — viewed marks and risk s
   })
 })
 
-describe('pr-review store — session v2 (continued) — viewed marks and risk scores against an active PR — marks several files with one session write and one GitHub request', () => {
+describe('pr-review store — session v2 (continued) — viewed marks and churn against an active PR — marks several files with one session write and one GitHub request', () => {
   it('marks several files with one session write and one GitHub request', () => {
     usePrReviewStore.getState().setActivePr(activePr())
     usePrReviewStore
@@ -261,7 +225,7 @@ describe('pr-review store — session v2 (continued) — viewed marks and risk s
   })
 })
 
-describe('pr-review store — session v2 (continued) — viewed marks and risk scores against an active PR — does nothing for an empty batch', () => {
+describe('pr-review store — session v2 (continued) — viewed marks and churn against an active PR — does nothing for an empty batch', () => {
   it('does nothing for an empty batch', () => {
     usePrReviewStore
       .getState()
@@ -271,32 +235,17 @@ describe('pr-review store — session v2 (continued) — viewed marks and risk s
   })
 })
 
-describe('pr-review store — session v2 (continued) — viewed marks and risk scores against an active PR — applies many risk scores across chapters in one store update', () => {
-  it('applies many risk scores across chapters in one store update', () => {
+describe('pr-review store — session v2 (continued) — viewed marks and churn against an active PR — sets churn across chapters in one store update', () => {
+  it("sets each named file's 90-day commit count across chapters in one store update", () => {
     usePrReviewStore.getState().setActivePr(activePr())
     let updates = 0
     const unsub = usePrReviewStore.subscribe(() => updates++)
-    usePrReviewStore.getState().updateFileRiskScores({
-      'a.ts': riskScore(40),
-      'c.ts': riskScore(80),
-    })
+    usePrReviewStore.getState().updateFileChurn({ 'a.ts': 4, 'c.ts': 0 })
     unsub()
     const chapters = usePrReviewStore.getState().activePr!.chapters
     expect(updates).toBe(1)
-    expect(chapters[0].files.map((f) => f.riskScore.composite)).toEqual([40, 0])
-    expect(chapters[1].files[0].riskScore.composite).toBe(80)
-  })
-})
-
-describe('pr-review store — complexity keeps the threshold-based risk level', () => {
-  it('raises the composite but leaves a low file low', () => {
-    usePrReviewStore.getState().setActivePr(activePr())
-    const measured = { ...(riskScore(75) as object), metrics: { changeSize: 3 } } as never
-    usePrReviewStore.getState().updateFileRiskScores({ 'a.ts': measured })
-    usePrReviewStore.getState().patchFileComplexity('ch-1', 'a.ts', 15)
-    const scored = usePrReviewStore.getState().activePr!.chapters[0].files[0].riskScore
-    expect(scored.composite).toBeGreaterThan(75)
-    expect(scored.level).toBe('low')
+    expect(chapters[0].files.map((f) => f.churn90d)).toEqual([4, null])
+    expect(chapters[1].files[0].churn90d).toBe(0)
   })
 })
 

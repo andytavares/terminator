@@ -256,7 +256,9 @@ describe('analyseSnippet() — the same analysis for every tagged grammar', () =
       { name: 'computeRiskScore', line: 7, endLine: 9, branches: 0 },
     ])
   })
+})
 
+describe('analyseSnippet() — Python and Go', () => {
   it('reads Python definitions, references and functions from its tags query', async () => {
     const result = await analyseSnippet('ledger.py', PYTHON_SOURCE)
     expect(result!.definitions.toSorted()).toEqual(['Ledger', 'open_ledger', 'total'])
@@ -277,7 +279,9 @@ describe('analyseSnippet() — the same analysis for every tagged grammar', () =
       { name: 'Open', line: 9, endLine: 11, branches: 0 },
     ])
   })
+})
 
+describe('analyseSnippet() — Rust and grammars with no tags query', () => {
   it('reads Rust definitions, references and functions from its tags query, a method once', async () => {
     const result = await analyseSnippet('ledger.rs', RUST_SOURCE)
     expect(result!.definitions.toSorted()).toEqual(['Ledger', 'open', 'total'])

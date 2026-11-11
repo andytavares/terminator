@@ -1,38 +1,14 @@
 import type { PrReviewDetail, PrInsights } from '../../src/schemas/pr-review.schema'
 
-interface Risk {
-  level: 'low' | 'medium' | 'high'
-  composite: number | null
-  dominantDriver: string
-}
-
-const insightRiskScore = ({ level, composite, dominantDriver }: Risk) => ({
-  level,
-  composite,
-  metrics: {
-    changeSize: 15,
-    churn90d: 5,
-    blastRadius: 2,
-    testFilePresent: true,
-    complexityDelta: 0,
-    patchCoverage: null,
-  },
-  dominantDriver,
-  topImporters: [],
-  importerCount: 0,
-})
-
-export const makeFile = (path: string, risk: Risk, estimatedMinutes = 6) => ({
+export const makeFile = (path: string) => ({
   path,
   oldPath: undefined,
   changeType: 'modified' as const,
   additions: 10,
   deletions: 5,
   isBinary: false,
-  tier: 1 as const,
   whyHere: 'test',
-  riskScore: insightRiskScore(risk),
-  estimatedMinutes,
+  churn90d: 5,
 })
 
 export const baseInsights: PrInsights = {
@@ -48,19 +24,10 @@ export const baseInsights: PrInsights = {
     ],
     source: 'tree-sitter · base vs head',
   },
-  coverage: {
-    changedFunctions: 7,
-    testedFunctions: 5,
-    untestedFunctions: ['shardByDuration', 'readBurnIn'],
-    patchPercent: 84,
-    source: 'CI check codecov/patch',
-    changedSourceFiles: 5,
-    changedSourceFilesWithTests: 4,
-  },
   health: {
     flags: [
       { kind: 'long-function', label: 'function over 80 lines', path: 'scripts/e2e-shard.ts' },
-      { kind: 'eslint-disable', label: 'new eslint-disable', path: 'scripts/e2e-shard.ts' },
+      { kind: 'todo', label: 'New TODO/FIXME', path: 'scripts/e2e-shard.ts' },
       {
         kind: 'duplicate',
         label: 'block duplicated in 2 files',
@@ -93,7 +60,6 @@ const prHeader = () => ({
   mergeStateStatus: 'clean' as const,
   ciStatus: 'passing' as const,
   lintStatus: 'pass' as const,
-  coverageStatus: 'pass' as const,
   statusChecks: [],
   approvals: [],
   requestedReviewers: [],
@@ -103,20 +69,8 @@ const prHeader = () => ({
 export const shardingChapter = () => ({
   id: 'ch1',
   name: 'Sharding',
-  estimatedMinutes: 18,
   status: 'not-started' as const,
-  files: [
-    makeFile(
-      'playwright.config.ts',
-      { level: 'high', composite: 78, dominantDriver: 'Wide blast radius — 41 importers' },
-      12
-    ),
-    makeFile(
-      'scripts/e2e-shard.ts',
-      { level: 'medium', composite: 50, dominantDriver: 'High churn — 14 commits/90d' },
-      6
-    ),
-  ],
+  files: [makeFile('playwright.config.ts'), makeFile('scripts/e2e-shard.ts')],
 })
 
 export const buildPr = (overrides: Partial<PrReviewDetail> = {}): PrReviewDetail => ({
@@ -134,10 +88,6 @@ export const buildPr = (overrides: Partial<PrReviewDetail> = {}): PrReviewDetail
 export const secondChapter = () => ({
   id: 'ch2',
   name: 'Docs',
-  estimatedMinutes: 5,
   status: 'not-started' as const,
-  files: [
-    makeFile('docs/sharding.md', { level: 'low', composite: 8, dominantDriver: 'Small change' }, 3),
-    makeFile('src/util/timing.ts', { level: 'low', composite: 12, dominantDriver: 'Small' }, 4),
-  ],
+  files: [makeFile('docs/sharding.md'), makeFile('src/util/timing.ts')],
 })

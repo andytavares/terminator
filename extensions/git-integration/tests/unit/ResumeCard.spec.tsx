@@ -1,15 +1,9 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ResumeCard } from '../../src/components/pr-review/ResumeCard'
-import { useReviewUiStore } from '../../src/stores/review-ui.store'
-import type {
-  Chapter,
-  PrReviewDetail,
-  ReviewNote,
-  DraftComment,
-} from '../../src/schemas/pr-review.schema'
+import type { Chapter, PrReviewDetail, DraftComment } from '../../src/schemas/pr-review.schema'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 import { partialFake } from '../../../../packages/test-support/src/fakes'
 
@@ -33,7 +27,6 @@ function renderCard(props: Partial<CardProps> = {}) {
       currentChapterId={null}
       currentFilePath={null}
       lastLine={null}
-      notes={[]}
       drafts={[]}
       agentRuns={[]}
       changedSinceCount={0}
@@ -58,18 +51,6 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     body: 'b',
     suggestedCode: null,
     dismissed: false,
-    ...overrides,
-  }
-}
-
-function makeNote(overrides: Partial<ReviewNote> = {}): ReviewNote {
-  return {
-    id: 'n1',
-    path: 'forge/amend.ts',
-    line: 118,
-    side: 'RIGHT',
-    body: 'why does amendOrder skip the ledger here??',
-    createdAt: '2025-01-01T00:00:00Z',
     ...overrides,
   }
 }
@@ -109,10 +90,6 @@ function makeRun(overrides: Partial<AgentRun> = {}): AgentRun {
   }
 }
 
-beforeEach(() => {
-  useReviewUiStore.setState({ agentPanelScope: null })
-})
-
 describe('ResumeCard', () => {
   it('shows the PR number and viewed count', () => {
     renderCard({
@@ -134,31 +111,6 @@ describe('ResumeCard — shows the last-position row with chapter and file', () 
     expect(screen.getByText(/Chapter 2/)).toBeTruthy()
     expect(screen.getByText('forge/amend.ts')).toBeTruthy()
     expect(screen.getByText('last position')).toBeTruthy()
-  })
-})
-
-describe('ResumeCard — shows notes with the question quoted and an Ask agent button', () => {
-  it('shows notes with the question quoted and an Ask agent button', () => {
-    renderCard({ notes: [makeNote(), makeNote({ id: 'n2', body: 'a plain note' })] })
-    expect(screen.getByText(/2 notes, 1 is a question/)).toBeTruthy()
-    expect(screen.getByText('Ask agent')).toBeTruthy()
-  })
-})
-
-describe('ResumeCard — opens the agent panel for the question note line when Ask agent is clicked', () => {
-  it('opens the agent panel for the question note line when Ask agent is clicked', async () => {
-    const user = userEvent.setup()
-    const note = makeNote()
-    renderCard({ notes: [note] })
-    await user.click(screen.getByRole('button', { name: 'Ask agent' }))
-    expect(useReviewUiStore.getState().agentPanelScope).toEqual({
-      kind: 'lines',
-      path: note.path,
-      startLine: note.line,
-      endLine: note.line,
-      side: 'RIGHT',
-      chapter: null,
-    })
   })
 })
 

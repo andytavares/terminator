@@ -1,8 +1,7 @@
-import React, { useCallback, useMemo, useRef } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { VirtualDiffList, type VirtualDiffListHandle } from './VirtualDiffList'
 import { extensionOf } from '../../utils/syntax'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
-import { useSplitDrag } from '../../hooks/useSplitDrag'
 import type { PrChangedFile, PrReviewDetail, PrHead } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
 import type { DiffItem } from '../../review/diff-items'
@@ -19,12 +18,11 @@ import {
 import {
   findChapterId,
   useAnnotating,
-  useComplexityPatch,
+  useComplexityHotspots,
   useDiffItems,
   useMovedMarks,
   usePaneReviewStore,
   usePaneUiStore,
-  useTests,
   useViewedHunks,
 } from './diff-pane/usePaneState'
 import { maxLineNumber, numColWidthFor } from './diff-pane/lines'
@@ -40,7 +38,6 @@ interface Props {
   onMarkViewed: () => void
   onPrevFile: () => void
   onNextFile: () => void
-  onShowRisk: () => void
 }
 
 type ReviewStore = ReturnType<typeof usePaneReviewStore>
@@ -63,12 +60,10 @@ interface Wiring {
 interface ActionExtras {
   refreshComments: () => void
   goToPath: (path: string) => void
-  showHiddenComments: () => void
 }
 
 interface ContextParts {
   w: Wiring
-  tests: PaneContext['tests']
   layout: PaneContext['layout']
   actions: PaneContext['actions']
 }
@@ -131,18 +126,23 @@ function readyLineCount(fileText: PaneContext['gaps']['fileText']): number {
   return fileText.lines.length
 }
 
+/** Formatting-only hunks stay hidden until the reviewer reveals them for the open file. */
+function useFormattingReveal(path: string) {
+  const [revealedPath, setRevealedPath] = useState<string | null>(null)
+  return {
+    hideFormattingHunks: revealedPath !== path,
+    revealFormattingHunks: () => setRevealedPath(path),
+  }
+}
+
 /** The diff, its gaps and the list's entries for the file shown. */
 function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   const { pr, file } = props
   const request = diffRequest(props, store, ui)
   const loaded = useDiffLoad(request, Boolean(file.isBinary))
   const { diff } = loaded
-  const hotspots = useComplexityPatch({
-    diff,
-    path: file.path,
-    chapters: pr.chapters,
-    patchFileComplexity: store.patchFileComplexity,
-  })
+  const hotspots = useComplexityHotspots(diff, file.path)
+  const formatting = useFormattingReveal(file.path)
   const target = {
     repoRoot: props.repoRoot,
     prNumber: pr.number,
@@ -154,26 +154,23 @@ function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   const items = useDiffItems({
     diff,
     hotspots,
-    mode: ui.diffViewMode,
-    hideFormattingHunks: ui.hideFormattingHunks,
+    hideFormattingHunks: formatting.hideFormattingHunks,
     gapViews: gaps.gapViews,
     movedMark: moved.movedMark,
     viewedHunks: useViewedHunks(store.viewedHunks[file.path]),
   })
-  return { request, loaded, gaps, moved, items }
+  return { request, loaded, gaps, moved, items, formatting }
 }
 
 /** The line lookups, drag selection and composers for the file shown. */
-function useLineState(src: { props: Props; store: ReviewStore; ui: UiStore; head: PrHead }) {
-  const { props, store, ui, head } = src
+function useLineState(src: { props: Props; store: ReviewStore; ui: UiStore }) {
+  const { props, store, ui } = src
   const { pr, file } = props
   const fileThreads = useMemo(() => store.threads[file.path] ?? [], [store.threads, file.path])
   const lookups = useLineLookups({
     path: file.path,
     fileThreads,
-    commentVisibility: ui.commentVisibility,
     agentRuns: ui.agentRuns,
-    notes: store.notes,
     drafts: store.drafts,
     insights: pr.insights,
   })
@@ -182,7 +179,7 @@ function useLineState(src: { props: Props; store: ReviewStore; ui: UiStore; head
     selection: ui.selection,
     setSelection: ui.setSelection,
   })
-  const annot = useAnnotating({ head, path: file.path, addNote: store.addNote })
+  const annot = useAnnotating()
   useComposerRequest({
     path: file.path,
     composerRequest: ui.composerRequest,
@@ -227,7 +224,6 @@ function useNavigation(
     openAgentPanel: ui.openAgentPanel,
     selectionTouchesRevealed: view.gaps.selectionTouchesRevealed,
     setComposerAnchor: w.lines.annot.setComposerAnchor,
-    setNoteAnchor: w.lines.annot.setNoteAnchor,
     peekDefinition,
   })
   return { goToPath, peekDefinition }
@@ -237,11 +233,8 @@ function paneActions(w: Wiring, extra: ActionExtras) {
   const { store, ui } = w
   return {
     ...extra,
-    commentVisibility: ui.commentVisibility,
-    agentNotesOn: ui.agentNotesOn,
-    setHideFormattingHunks: ui.setHideFormattingHunks,
+    revealFormattingHunks: w.view.formatting.revealFormattingHunks,
     openAgentPanel: ui.openAgentPanel,
-    removeNote: store.removeNote,
     updateDraft: store.updateDraft,
     removeDraft: store.removeDraft,
     toggleMoved: w.view.moved.toggleMoved,
@@ -250,7 +243,7 @@ function paneActions(w: Wiring, extra: ActionExtras) {
 }
 
 function paneContext(parts: ContextParts): PaneContext {
-  const { w, tests, layout, actions } = parts
+  const { w, layout, actions } = parts
   const { props, ui, lines, view } = w
   return {
     repoRoot: props.repoRoot,
@@ -258,13 +251,11 @@ function paneContext(parts: ContextParts): PaneContext {
     file: props.file,
     head: w.head,
     diff: view.loaded.diff,
-    mode: ui.diffViewMode,
     lang: extensionOf(props.file.path),
     selection: ui.selection,
     lookups: lines.lookups,
     drag: lines.drag,
     annot: lines.annot,
-    tests,
     layout,
     gaps: view.gaps,
     actions,
@@ -281,36 +272,20 @@ function useWiring(props: Props): Wiring {
     [repoRoot, pr.number, pr.headSHA]
   )
   const view = useDiffView(props, store, ui)
-  const lines = useLineState({ props, store, ui, head })
+  const lines = useLineState({ props, store, ui })
   return { props, store, ui, view, lines, head }
 }
 
-function useReviewDiffPane(props: Props, scrollRef: ScrollRef, listRef: ListRef) {
+function useReviewDiffPane(props: Props, listRef: ListRef) {
   const w = useWiring(props)
   const { pr, file } = props
   const usesWithDef = useUsesWithDefinition(pr, file.path)
   const nav = useNavigation(w, usesWithDef, listRef)
-  const divider = useSplitDrag(scrollRef)
   const refreshComments = useLoadInlineComments(props.repoRoot)
-  const { setCommentVisibility } = w.ui
-  const showHiddenComments = useCallback(() => setCommentVisibility('all'), [setCommentVisibility])
   const { diff } = w.view.loaded
-  const tests = useTests({
-    head: w.head,
-    path: file.path,
-    chapters: pr.chapters,
-    goToPath: nav.goToPath,
-    diff,
-    items: w.view.items,
-    listRef,
-  })
-  const layout = {
-    numColWidth: useNumColWidth(diff, readyLineCount(w.view.gaps.fileText)),
-    splitLeftPct: divider.splitLeftPct,
-    onSplitDividerMouseDown: divider.onDividerMouseDown,
-  }
-  const actions = paneActions(w, { refreshComments, goToPath: nav.goToPath, showHiddenComments })
-  return { ctx: paneContext({ w, tests, layout, actions }), w, usesWithDef, nav }
+  const layout = { numColWidth: useNumColWidth(diff, readyLineCount(w.view.gaps.fileText)) }
+  const actions = paneActions(w, { refreshComments, goToPath: nav.goToPath })
+  return { ctx: paneContext({ w, layout, actions }), w, usesWithDef, nav }
 }
 
 function PaneDiffBody(props: { pane: PaneState; scrollRef: ScrollRef; listRef: ListRef }) {
@@ -322,7 +297,7 @@ function PaneDiffBody(props: { pane: PaneState; scrollRef: ScrollRef; listRef: L
   if (diffError) return <div className="review-diff-error">Failed to load diff: {diffError}</div>
   if (!diff) return null
   return (
-    <div className={`review-diff-table-wrap review-diff-table-wrap--${ctx.mode}`}>
+    <div className="review-diff-table-wrap">
       <VirtualDiffList
         items={w.view.items}
         scrollRef={props.scrollRef}
@@ -352,7 +327,6 @@ function PaneHeader({ pane, props }: { pane: PaneState; props: Props }) {
       showChangedSince={store.changedSince.has(file.path) && ui.diffRange === 'since'}
       usesWithDef={pane.usesWithDef}
       menuNote={menuNote(pane)}
-      onShowRisk={props.onShowRisk}
       onPeekDefinition={pane.nav.peekDefinition}
     />
   )
@@ -361,7 +335,7 @@ function PaneHeader({ pane, props }: { pane: PaneState; props: Props }) {
 export function ReviewDiffPane(props: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<VirtualDiffListHandle>(null)
-  const pane = useReviewDiffPane(props, scrollRef, listRef)
+  const pane = useReviewDiffPane(props, listRef)
   return (
     <div className="review-diff-pane">
       <PaneHeader pane={pane} props={props} />

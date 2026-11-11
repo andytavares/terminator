@@ -1,6 +1,5 @@
 import type { DiffHunk, DiffLine } from '../schemas/git.schema'
 import type { MovedBlock } from '../schemas/pr-review.schema'
-import type { SplitRow } from '../components/FileDiffView'
 
 type Side = 'LEFT' | 'RIGHT'
 
@@ -27,21 +26,11 @@ export type DiffItem =
   | { kind: 'gap-expander'; key: string; gapKey: string; hidden: number | null }
   | { kind: 'hunk-header'; key: string; hunkIndex: number; hunk: DiffHunk; viewed: boolean }
   | { kind: 'line'; key: string; line: DiffLine; moved: MovedMark | null }
-  | {
-      kind: 'split-row'
-      key: string
-      left: DiffLine | null
-      right: DiffLine | null
-      movedLeft: MovedMark | null
-      movedRight: MovedMark | null
-    }
   | { kind: 'hotspot'; key: string; message: string }
 
 export interface DiffItemSource {
-  mode: 'unified' | 'split'
   hunkCount: number
   visibleHunks: Array<{ hunk: DiffHunk; index: number }>
-  splitRows: SplitRow[][]
   gapViews: Map<string, GapView>
   hotspots: Array<{ hunkIndex: number; message: string }>
   movedMark: (lineNum: number, side: Side) => MovedMark | null
@@ -82,44 +71,10 @@ function unifiedItems(source: DiffItemSource, hunk: DiffHunk, hunkIndex: number)
   return items
 }
 
-function splitRowSides(row: SplitRow): { left: DiffLine | null; right: DiffLine | null } {
-  if (row.kind === 'context') return { left: row.line, right: row.line }
-  return { left: row.oldLine, right: row.newLine }
-}
-
-/** The moved block a split row's side shows, read by that side's line number. */
-function sideMark(source: DiffItemSource, line: DiffLine | null, side: Side): MovedMark | null {
-  if (!line) return null
-  const lineNum = side === 'LEFT' ? line.oldLineNumber : line.newLineNumber
-  return source.movedMark(lineNum ?? 0, side)
-}
-
-function splitItems(source: DiffItemSource, hunkIndex: number): DiffItem[] {
-  const items: DiffItem[] = []
-  source.splitRows[hunkIndex].forEach((row, rowIndex) => {
-    const { left, right } = splitRowSides(row)
-    const movedLeft = sideMark(source, left, 'LEFT')
-    const movedRight = sideMark(source, right, 'RIGHT')
-    if (hiddenByMove(movedLeft) || hiddenByMove(movedRight)) return
-    items.push({
-      kind: 'split-row',
-      key: `${hunkIndex}-row-${rowIndex}`,
-      left,
-      right,
-      movedLeft,
-      movedRight,
-    })
-  })
-  return items
-}
-
 function hunkItems(source: DiffItemSource, hunk: DiffHunk, hunkIndex: number): DiffItem[] {
   const viewed = source.viewedHunks.has(hunk.header)
   const hotspot = viewed ? undefined : source.hotspots.find((h) => h.hunkIndex === hunkIndex)
-  const rows =
-    source.mode === 'unified'
-      ? unifiedItems(source, hunk, hunkIndex)
-      : splitItems(source, hunkIndex)
+  const rows = unifiedItems(source, hunk, hunkIndex)
   return [
     ...(hunkIndex === 0 ? gapItems(source, 'top') : []),
     { kind: 'hunk-header', key: `${hunkIndex}-header`, hunkIndex, hunk, viewed },

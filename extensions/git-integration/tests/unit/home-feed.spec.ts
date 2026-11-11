@@ -17,14 +17,14 @@ const NO_ISSUES: TicketIndex = new Map()
 const MY_ISSUES: TicketIndex = new Map([['TAV-20', 'linear']])
 
 describe('buildAsks: review', () => {
-  it('asks for a review of each requested pull request, with its size and risk', () => {
+  it('asks for a review of each requested pull request, with its size', () => {
     const pr = dashboardPrFixture({ section: 'requested', number: 40, title: 'Fix cache' })
     const [ask] = buildAsks([pr], NO_ISSUES)
     expect(ask).toMatchObject({
       id: 'review:acme/widgets#40',
       title: 'Review requested',
       detail: 'Fix cache',
-      facts: ['6 files', '+120 −30', 'about 3 min', 'medium risk'],
+      facts: ['6 files', '+120 −30'],
       since: '2026-10-15T09:00:00Z',
       actions: [{ id: 'start-review', label: 'Start review', primary: true }],
       open: { args: { repoRoot: '/work/widgets', number: 40 } },

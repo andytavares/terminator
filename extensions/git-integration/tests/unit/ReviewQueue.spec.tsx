@@ -12,15 +12,6 @@ vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
 }))
 
-const PASSING_DOTS: ReviewQueuePR['signalDots'] = {
-  tests: 'pass',
-  coverage: 'pass',
-  ci: 'pass',
-  lint: 'pass',
-  churn: 'pass',
-  blast: 'pass',
-}
-
 function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
   return {
     number: 1,
@@ -36,10 +27,7 @@ function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
     ciStatus: 'passing',
     headRefName: 'feat',
     baseRefName: 'main',
-    riskLevel: 'low',
-    estimatedMinutes: 10,
     sessionStatus: 'not-started',
-    signalDots: PASSING_DOTS,
     approvalCount: 0,
     approvedBy: [],
     requestedReviewers: [],
@@ -94,15 +82,12 @@ describe('ReviewQueue — summarises the queue in one line instead of four tiles
   it('summarises the queue in one line instead of four tiles', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      prQueue: [makePr({ number: 1, riskLevel: 'high' })],
+      prQueue: [makePr({ number: 1, sessionStatus: 'in-progress' })],
       totalPrCount: 1,
     })
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText(/waiting on you/)).toBeTruthy()
-    expect(screen.getByText(/of reading/)).toBeTruthy()
-    // Two of the old tile labels told the reader what to do rather than naming
-    // a metric; the grouping below already does that.
-    expect(screen.queryByText('High risk — read these first')).toBeNull()
+    expect(screen.getByText('1 already started')).toBeTruthy()
   })
 
   it('renders PR rows when queue has PRs', () => {
@@ -173,20 +158,6 @@ describe('ReviewQueue — says a page is on its way rather than asking for a cli
   })
 })
 
-describe('ReviewQueue — says nothing about medium or low risk', () => {
-  it('says nothing about medium or low risk', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      prQueue: [
-        makePr({ riskLevel: 'medium', number: 1, title: 'Medium PR' }),
-        makePr({ riskLevel: 'low', number: 2, title: 'Low PR' }),
-      ],
-    })
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.queryByText(/risk/i)).toBeNull()
-  })
-})
-
 describe('ReviewQueue — shows Resume action for paused PRs', () => {
   it('shows Resume action for paused PRs', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -250,7 +221,7 @@ describe('ReviewQueue (continued) — one list, two lines per row', () => {
 
 describe('ReviewQueue (continued) — one list, two lines per row — has one heading with the total, and none of the old groups', () => {
   it('has one heading with the total, and none of the old groups', () => {
-    renderMany([makePr({ number: 1 }), makePr({ number: 2, riskLevel: 'high' })], {
+    renderMany([makePr({ number: 1 }), makePr({ number: 2 })], {
       totalPrCount: 47,
     })
     const headings = screen.getAllByRole('heading', { level: 3 })
@@ -335,7 +306,6 @@ describe('ReviewQueue (continued) — one list, two lines per row — lays the s
           mergeStateStatus: 'dirty',
           approvalCount: 2,
           approvedBy: ['a', 'b'],
-          riskLevel: 'high',
           ciStatus: 'failing',
           requestedReviewers: ['me'],
           sessionStatus: 'in-progress',
@@ -346,7 +316,7 @@ describe('ReviewQueue (continued) — one list, two lines per row — lays the s
       { currentUserLogin: 'me' }
     )
     expect(metaLine()).toBe(
-      'Draft · Conflicts · alice · 139d · 2 approved · High risk · CI failing · Your review requested · 1 of 3 viewed'
+      'Draft · Conflicts · alice · 139d · 2 approved · CI failing · Your review requested · 1 of 3 viewed'
     )
   })
 })
@@ -357,11 +327,11 @@ describe('ReviewQueue (continued) — one list, two lines per row — leaves a q
     expect(metaLine()).toBe('alice · 2d')
   })
 
-  it('shows the size and the reading time in the right column, with no risk chip', () => {
-    renderMany([makePr({ additions: 1234, deletions: 3, fileCount: 1, estimatedMinutes: 7 })])
+  it('shows the changed lines and file count in the right column, with no reading time', () => {
+    renderMany([makePr({ additions: 1234, deletions: 3, fileCount: 1 })])
     const row = screen.getByRole('group', { name: /^#\d+ / })
-    expect(within(row).getByText(wholeText('+1,234 −3 · 1 file'))).toBeTruthy()
-    expect(within(row).getByText('~7 min')).toBeTruthy()
+    expect(within(row).getAllByText(wholeText('+1,234 −3 · 1 file'))).not.toHaveLength(0)
+    expect(within(row).queryByText(/min$/)).toBeNull()
   })
 
   it('opens a row on Enter', async () => {

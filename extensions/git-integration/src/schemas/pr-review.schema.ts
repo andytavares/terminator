@@ -1,39 +1,8 @@
 import { z } from 'zod'
 
-// ─── Signal dots ─────────────────────────────────────────────────────────────
+// ─── Check signal ─────────────────────────────────────────────────────────────
 
 const SignalValueSchema = z.enum(['pass', 'warn', 'fail', 'unknown'])
-
-/** @internal */
-const SignalDotsSchema = z.object({
-  tests: SignalValueSchema,
-  coverage: SignalValueSchema,
-  ci: SignalValueSchema,
-  lint: SignalValueSchema,
-  churn: SignalValueSchema,
-  blast: SignalValueSchema,
-})
-
-// ─── Risk score ───────────────────────────────────────────────────────────────
-
-/** @internal */
-const RiskScoreSchema = z.object({
-  level: z.enum(['low', 'medium', 'high']),
-  composite: z.number().nullable(),
-  metrics: z.object({
-    changeSize: z.number().nullable(),
-    churn90d: z.number().nullable(),
-    blastRadius: z.number().nullable(),
-    testFilePresent: z.boolean().nullable(),
-    complexityDelta: z.number().nullable(),
-    patchCoverage: z.number().nullable(),
-  }),
-  dominantDriver: z.string(),
-  topImporters: z.array(z.string()),
-  importerCount: z.number(),
-})
-
-// ─── File metrics (raw input to computeRiskScore) ────────────────────────────
 
 // ─── Changed file ─────────────────────────────────────────────────────────────
 
@@ -45,10 +14,9 @@ const PrChangedFileSchema = z.object({
   additions: z.number(),
   deletions: z.number(),
   isBinary: z.boolean(),
-  tier: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
   whyHere: z.string(),
-  riskScore: RiskScoreSchema,
-  estimatedMinutes: z.number(),
+  /** Commits touching the file in the last 90 days; null until measured. */
+  churn90d: z.number().nullable().default(null),
 })
 
 // ─── Chapter ──────────────────────────────────────────────────────────────────
@@ -58,9 +26,8 @@ const ChapterSchema = z.object({
   id: z.string(),
   name: z.string(),
   files: z.array(PrChangedFileSchema),
-  estimatedMinutes: z.number(),
   status: z.enum(['not-started', 'in-progress', 'complete']),
-  /** One line on what the chapter changes, e.g. "Changes markViewed and viewAll · 1 test file". */
+  /** One line on what the chapter changes, e.g. "Changes markViewed and viewAll". */
   summary: z.string().optional(),
 })
 
@@ -153,21 +120,6 @@ const PrInsightsSchema = z.object({
     functions: z.array(FunctionComplexitySchema),
     source: InsightSourceSchema,
   }),
-  coverage: z.object({
-    /**
-     * The primary question is "does this changed block have a test", not a
-     * percentage: a changed function counts as tested when a test file (in the
-     * PR or already in the repo) references it.
-     */
-    changedFunctions: z.number(),
-    testedFunctions: z.number(),
-    untestedFunctions: z.array(z.string()),
-    /** Percent of new lines covered, from CI, when CI publishes it. Secondary. */
-    patchPercent: z.number().nullable(),
-    source: InsightSourceSchema,
-    changedSourceFiles: z.number(),
-    changedSourceFilesWithTests: z.number(),
-  }),
   health: z.object({
     flags: z.array(z.object({ kind: z.string(), label: z.string(), path: z.string() })),
     source: InsightSourceSchema,
@@ -202,7 +154,6 @@ export const PrReviewDetailSchema = z.object({
   mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).default('unknown'),
   ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
   lintStatus: SignalValueSchema.default('unknown'),
-  coverageStatus: SignalValueSchema.default('unknown'),
   statusChecks: z.array(StatusCheckSchema).default([]),
   approvals: z.array(PrApprovalSchema).default([]),
   requestedReviewers: z.array(z.string()).default([]),
@@ -233,9 +184,6 @@ export const ReviewQueuePRSchema = z.object({
   fileCount: z.number(),
   additions: z.number(),
   deletions: z.number(),
-  estimatedMinutes: z.number(),
-  riskLevel: z.enum(['low', 'medium', 'high']),
-  signalDots: SignalDotsSchema,
   sessionStatus: z.enum(['not-started', 'in-progress', 'paused']),
   viewedFileCount: z.number().default(0),
   approvalCount: z.number().default(0),
@@ -285,8 +233,6 @@ export const DashboardPRSchema = z.object({
   additions: z.number(),
   deletions: z.number(),
   fileCount: z.number(),
-  riskLevel: z.enum(['low', 'medium', 'high']),
-  estimatedMinutes: z.number(),
   ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
   reviewDecision: z.enum(['approved', 'changes-requested', 'review-required', 'none']),
   unresolvedThreads: z.number(),
@@ -344,16 +290,7 @@ export const ThreadSchema = z.object({
   resolved: z.boolean().default(false),
 })
 
-// ─── Notes and draft comments (S2, S5) ─────────────────────────────────────────
-
-const ReviewNoteSchema = z.object({
-  id: z.string(),
-  path: z.string(),
-  line: z.number(),
-  side: z.enum(['LEFT', 'RIGHT']).default('RIGHT'),
-  body: z.string(),
-  createdAt: z.string(),
-})
+// ─── Draft comments (S5) ─────────────────────────────────────────
 
 const DraftCommentSchema = z.object({
   id: z.string(),
@@ -385,8 +322,6 @@ export const ReviewSessionSchema = z.object({
   viewedAt: z.record(z.string(), z.string()).default({}),
   /** Hunk headers marked viewed, per file path; they collapse to their header. */
   viewedHunks: z.record(z.string(), z.array(z.string())).default({}),
-  /** v2: private notes (S2). A note containing "??" is a question. */
-  notes: z.array(ReviewNoteSchema).default([]),
   /** v2: draft comments, sent together on submit (S5). */
   drafts: z.array(DraftCommentSchema).default([]),
 })
@@ -400,20 +335,6 @@ export interface PrHead {
   headSHA: string
 }
 
-export type SignalDots = z.infer<typeof SignalDotsSchema>
-export type RiskScore = z.infer<typeof RiskScoreSchema>
-export interface FileMetrics {
-  path: string
-  additions: number
-  deletions: number
-  churn90d: number | null
-  blastRadius: number | null
-  testFilePresent: boolean
-  complexityDelta: number | null
-  patchCoverage: number | null
-  topImporters: string[]
-  importerCount: number
-}
 export type PrChangedFile = z.infer<typeof PrChangedFileSchema>
 export type Chapter = z.infer<typeof ChapterSchema>
 export type PrReviewDetail = z.infer<typeof PrReviewDetailSchema>
@@ -431,5 +352,4 @@ export type FunctionComplexity = z.infer<typeof FunctionComplexitySchema>
 export type PrInsights = z.infer<typeof PrInsightsSchema>
 export type DashboardSection = z.infer<typeof DashboardSectionSchema>
 export type DashboardPR = z.infer<typeof DashboardPRSchema>
-export type ReviewNote = z.infer<typeof ReviewNoteSchema>
 export type DraftComment = z.infer<typeof DraftCommentSchema>

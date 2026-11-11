@@ -1,27 +1,16 @@
 import type { PrChangedFile, PrReviewDetail } from '../../schemas/pr-review.schema'
 import { plural } from '@terminator/extension-sdk'
 import { choose } from '../text'
-import { filesRiskLevel } from '../../github/pr-review-service'
 
 type Insights = NonNullable<PrReviewDetail['insights']>
-type RiskLevel = 'high' | 'medium' | 'low'
 
 export interface Signal {
-  kind: 'risk' | 'tests' | 'complexity' | 'reading' | 'health'
+  kind: 'complexity' | 'reading' | 'health'
   tone: 'danger' | 'warning' | 'success' | 'neutral'
   label: string
   value: string
   detail: string | null
   source: string
-}
-
-const RISK_SOURCE = 'computeRiskScore · git log, git grep'
-const UNTESTED_SHOWN = 3
-
-const RISK_TONE: Record<RiskLevel, Signal['tone']> = {
-  high: 'danger',
-  medium: 'warning',
-  low: 'neutral',
 }
 
 const READING_TONE: Record<Insights['understandability']['level'], Signal['tone']> = {
@@ -44,7 +33,6 @@ export function overviewTotals(pr: PrReviewDetail) {
     fileCount: files.length,
     additions: sumOf(files, (file) => file.additions),
     deletions: sumOf(files, (file) => file.deletions),
-    minutes: Math.round(sumOf(files, (file) => file.estimatedMinutes)),
   }
 }
 
@@ -52,37 +40,8 @@ export function insightsPending(pr: PrReviewDetail): boolean {
   return pr.insights === null
 }
 
-function shortPath(path: string): string {
-  const parts = path.split('/')
-  if (parts.length <= 2) return path
-  return `…/${parts.slice(-2).join('/')}`
-}
-
-function riskHotspots(measured: PrChangedFile[]): PrChangedFile[] {
-  return [...measured]
-    .filter((file) => file.riskScore.level !== 'low')
-    .sort((a, b) => (b.riskScore.composite ?? 0) - (a.riskScore.composite ?? 0))
-    .slice(0, 3)
-}
-
 function capitalised(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
-}
-
-function riskSignal(files: PrChangedFile[]): Signal {
-  const base = { kind: 'risk', label: 'Risk', source: RISK_SOURCE } as const
-  const measured = files.filter((file) => file.riskScore.composite != null)
-  if (measured.length === 0) {
-    return { ...base, tone: 'neutral', value: 'Not measured', detail: null }
-  }
-  const level = filesRiskLevel(files)
-  const [top] = riskHotspots(measured)
-  const detail = choose(
-    top === undefined,
-    null,
-    top && `${shortPath(top.path)} (${top.riskScore.dominantDriver})`
-  )
-  return { ...base, tone: RISK_TONE[level], value: capitalised(level), detail }
 }
 
 function branchChange(branchDelta: number): string {
@@ -102,38 +61,6 @@ function complexitySignal(insights: Insights): Signal {
     value: branchChange(branchDelta),
     detail: choose(rising, `Largest: ${largest?.name} +${largest?.branchDelta}`, null),
     source,
-  }
-}
-
-type Coverage = Insights['coverage']
-
-function coverageValue(coverage: Coverage): string {
-  if (coverage.changedFunctions === 0) return 'No functions changed'
-  return `${coverage.testedFunctions} of ${coverage.changedFunctions} functions`
-}
-
-function untestedDetail(names: string[]): string | null {
-  if (names.length === 0) return null
-  const shown = names.slice(0, UNTESTED_SHOWN)
-  const hidden = names.length - shown.length
-  const more = choose(hidden > 0, [`+${hidden} more`], [])
-  return `No test: ${[...shown, ...more].join(', ')}`
-}
-
-function coverageTone(coverage: Coverage): Signal['tone'] {
-  if (coverage.changedFunctions === 0) return 'neutral'
-  return choose(coverage.untestedFunctions.length > 0, 'warning', 'success')
-}
-
-function testCoverageSignal(insights: Insights): Signal {
-  const { coverage } = insights
-  return {
-    kind: 'tests',
-    tone: coverageTone(coverage),
-    label: 'Tests',
-    value: coverageValue(coverage),
-    detail: untestedDetail(coverage.untestedFunctions),
-    source: coverage.source,
   }
 }
 
@@ -172,13 +99,6 @@ function healthSignals(insights: Insights): Signal[] {
 }
 
 export function overviewSignals(pr: PrReviewDetail): Signal[] {
-  const risk = riskSignal(filesOf(pr))
-  if (pr.insights === null) return [risk]
-  return [
-    risk,
-    testCoverageSignal(pr.insights),
-    complexitySignal(pr.insights),
-    readingSignal(pr.insights),
-    ...healthSignals(pr.insights),
-  ]
+  if (pr.insights === null) return []
+  return [complexitySignal(pr.insights), readingSignal(pr.insights), ...healthSignals(pr.insights)]
 }

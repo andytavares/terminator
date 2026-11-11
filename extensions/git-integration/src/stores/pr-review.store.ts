@@ -6,9 +6,6 @@ import type {
   ReviewQueuePR,
   Thread,
   IssueComment,
-  RiskScore,
-  SignalDots,
-  ReviewNote,
   DraftComment,
   PrHead,
   PrChangedFile,
@@ -52,7 +49,6 @@ export interface PrReviewStore {
   historyRewritten: boolean
   /** When the stored session was last opened, for the resume card (S2). */
   lastAccessedAt: string | null
-  notes: ReviewNote[]
   drafts: DraftComment[]
 
   // Inline comments (keyed by path)
@@ -91,15 +87,8 @@ export interface PrReviewStore {
   setThreads(path: string, threads: Thread[]): void
   setIssueComments(comments: IssueComment[]): void
 
-  updateFileRiskScore(chapterId: string, filePath: string, riskScore: RiskScore): void
-  /** Applies many risk scores in one update, rebuilding the chapters once. */
-  updateFileRiskScores(scores: Record<string, RiskScore>): void
-  patchFileComplexity(chapterId: string, filePath: string, complexityDelta: number): void
-  updateQueuePrRisk(
-    prNumber: number,
-    riskLevel: 'low' | 'medium' | 'high',
-    signalDots: SignalDots
-  ): void
+  /** Sets each file's 90-day commit count, rebuilding the chapters once. */
+  updateFileChurn(churnByPath: Record<string, number>): void
 
   setRateLimitState(state: RateLimitState | null): void
   setCurrentUserLogin(login: string | null): void
@@ -115,8 +104,6 @@ export interface PrReviewStore {
    */
   reconcileHead(head: PrHead, changedPaths: string[] | 'all', addedPaths?: string[]): void
 
-  addNote(head: PrHead, note: ReviewNote): void
-  removeNote(head: PrHead, id: string): void
   addDraft(head: PrHead, draft: DraftComment): void
   updateDraft(head: PrHead, id: string, body: string): void
   removeDraft(head: PrHead, id: string): void
@@ -150,7 +137,6 @@ type SessionFields = Pick<
   | 'currentFilePath'
   | 'viewedAt'
   | 'viewedHunks'
-  | 'notes'
   | 'drafts'
 >
 
@@ -178,7 +164,6 @@ function emptyReviewState() {
     lastSeenHeadSHA: null,
     historyRewritten: false,
     lastAccessedAt: null,
-    notes: [],
     drafts: [],
     threads: {},
     issueComments: [],
@@ -201,7 +186,6 @@ async function persistSession(store: SessionFields, head: PrHead): Promise<void>
     lastAccessedAt: new Date().toISOString(),
     viewedAt: store.viewedAt,
     viewedHunks: store.viewedHunks,
-    notes: store.notes,
     drafts: store.drafts,
   }
   await githubAPI.sessionSet(sessionKey(head.repoRoot, head.prNumber), session)
@@ -302,24 +286,6 @@ function withFiles(
   return { ...activePr, chapters }
 }
 
-/** Adds the complexity weight (0.10 of the 80-point scale) to a scored file's composite. The level
- *  stays: it comes from fixed thresholds (risk-thresholds.ts), not from the composite. */
-function withComplexity(file: PrChangedFile, complexityDelta: number): PrChangedFile {
-  const prevComposite = file.riskScore.composite ?? 0
-  const compContrib = complexityDelta <= 0 ? 0 : Math.min(1, complexityDelta / 15) * 0.1 * 80
-  const scored = file.riskScore.metrics.changeSize != null
-  const newComposite = Math.min(
-    100,
-    Math.round(scored ? prevComposite + compContrib : prevComposite)
-  )
-  const riskScore: RiskScore = {
-    ...file.riskScore,
-    composite: newComposite || null,
-    metrics: { ...file.riskScore.metrics, complexityDelta },
-  }
-  return { ...file, riskScore }
-}
-
 function queueActions(set: SetState) {
   return {
     setQueue: (prs: ReviewQueuePR[]) => set({ prQueue: prs }),
@@ -330,8 +296,6 @@ function queueActions(set: SetState) {
     setHasMorePrs: (hasMore: boolean) => set({ hasMorePrs: hasMore }),
     setTotalPrCount: (total: number | null) => set({ totalPrCount: total }),
     setNextPrCursor: (cursor: string | undefined) => set({ nextPrCursor: cursor }),
-    updateQueuePrRisk: (prNumber: number, riskLevel: RiskScore['level'], signalDots: SignalDots) =>
-      set((s) => ({ prQueue: withViewedCount(s.prQueue, prNumber, { riskLevel, signalDots }) })),
     markPrInProgress: (prNumber: number) =>
       set((s) => ({
         prQueue: s.prQueue.map((pr) =>
@@ -374,43 +338,22 @@ function viewedActions(set: SetState, get: GetState) {
   }
 }
 
-function riskActions(set: SetState) {
-  const updateFiles = (
-    matches: (chapterId: string, path: string) => boolean,
-    update: (file: PrChangedFile) => PrChangedFile
-  ) =>
-    set((state) => (state.activePr ? { activePr: withFiles(state.activePr, matches, update) } : {}))
+function churnActions(set: SetState) {
   return {
-    updateFileRiskScore: (chapterId: string, filePath: string, riskScore: RiskScore) =>
-      updateFiles(
-        (c, p) => c === chapterId && p === filePath,
-        (f) => ({ ...f, riskScore })
-      ),
-    updateFileRiskScores: (scores: Record<string, RiskScore>) =>
-      updateFiles(
-        (_c, p) => !!scores[p],
-        (f) => ({ ...f, riskScore: scores[f.path] })
-      ),
-    patchFileComplexity: (chapterId: string, filePath: string, complexityDelta: number) =>
-      updateFiles(
-        (c, p) => c === chapterId && p === filePath,
-        (f) => withComplexity(f, complexityDelta)
-      ),
+    updateFileChurn: (churnByPath: Record<string, number>) =>
+      set((state) => {
+        if (!state.activePr) return {}
+        const matches = (_chapterId: string, path: string) => churnByPath[path] !== undefined
+        const withChurn = (f: PrChangedFile) => ({ ...f, churn90d: churnByPath[f.path] })
+        return { activePr: withFiles(state.activePr, matches, withChurn) }
+      }),
   }
 }
 
-/** Notes and drafts, each change saved with the session. */
-function noteActions(set: SetState, get: GetState) {
+/** Drafts, each change saved with the session. */
+function draftActions(set: SetState, get: GetState) {
   const thenPersist = (head: PrHead) => persistSession(get(), head)
   return {
-    addNote: (head: PrHead, note: ReviewNote) => {
-      set((s) => ({ notes: [...s.notes, note] }))
-      thenPersist(head)
-    },
-    removeNote: (head: PrHead, id: string) => {
-      set((s) => ({ notes: s.notes.filter((n) => n.id !== id) }))
-      thenPersist(head)
-    },
     addDraft: (head: PrHead, draft: DraftComment) => {
       set((s) => ({ drafts: [...s.drafts, draft] }))
       thenPersist(head)
@@ -455,7 +398,6 @@ function prSessionActions(set: SetState, get: GetState) {
         lastSeenHeadSHA: session.headSHA,
         historyRewritten: false,
         lastAccessedAt: session.lastAccessedAt,
-        notes: session.notes ?? [],
         drafts: session.drafts ?? [],
       }),
   }
@@ -489,7 +431,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   ...queueActions(set),
   ...viewActions(set),
   ...viewedActions(set, get),
-  ...riskActions(set),
-  ...noteActions(set, get),
+  ...churnActions(set),
+  ...draftActions(set, get),
   ...prSessionActions(set, get),
 }))

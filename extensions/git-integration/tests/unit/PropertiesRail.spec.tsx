@@ -19,19 +19,19 @@ beforeEach(() => {
 describe('PropertiesRail — Signals', () => {
   it('shows a signal row with its value and its detail underneath', () => {
     render(<PropertiesRail pr={buildPr()} />)
-    expect(rail().getByText('High')).toBeTruthy()
-    expect(rail().getByText('playwright.config.ts (Wide blast radius — 41 importers)')).toBeTruthy()
+    expect(rail().getByText('+23 branches')).toBeTruthy()
+    expect(rail().getByText('Largest: selectSpecs +9')).toBeTruthy()
   })
 
   it('says the analysis is running while insights are missing', () => {
     render(<PropertiesRail pr={buildPr({ insights: null })} />)
     expect(rail().getByText('Analysing this PR…')).toBeTruthy()
-    expect(rail().queryByText('Tests')).toBeNull()
+    expect(rail().queryByText('Complexity')).toBeNull()
   })
 
   it('carries each signal source as its tooltip', () => {
     render(<PropertiesRail pr={buildPr()} />)
-    expect(rail().getAllByTitle('CI check codecov/patch').length).toBeGreaterThan(0)
+    expect(rail().getAllByTitle('reading-order graph').length).toBeGreaterThan(0)
   })
 })
 

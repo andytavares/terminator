@@ -29,22 +29,16 @@ vi.mock('../../src/components/pr-review/FullFileList', () => ({
 vi.mock('../../src/components/pr-review/ReviewDiffPane', () => ({
   ReviewDiffPane: ({
     onMarkViewed,
-    onShowRisk,
     onPrevFile,
   }: {
     onMarkViewed: () => void
-    onShowRisk: () => void
     onPrevFile: () => void
   }) => (
     <div data-testid="review-diff-pane">
       <button onClick={onMarkViewed}>MarkViewed</button>
-      <button onClick={onShowRisk}>ShowRisk</button>
       <button onClick={onPrevFile}>PrevFile</button>
     </div>
   ),
-}))
-vi.mock('../../src/components/pr-review/WhyThisFile', () => ({
-  WhyThisFile: () => <div data-testid="risk-panel" />,
 }))
 vi.mock('../../src/components/pr-review/ReviewSubmitPanel', () => ({
   ReviewSubmitPanel: ({ onClose }: { onClose: () => void }) => (
@@ -64,30 +58,13 @@ const mockFile = {
   additions: 5,
   deletions: 2,
   isBinary: false,
-  tier: 1 as const,
   whyHere: 'changed',
-  estimatedMinutes: 3,
-  riskScore: {
-    level: 'low' as const,
-    composite: 5,
-    dominantDriver: 'changeSize',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {
-      changeSize: 5,
-      churn90d: null,
-      blastRadius: null,
-      testFilePresent: null,
-      complexityDelta: null,
-      patchCoverage: null,
-    },
-  },
+  churn90d: null,
 }
 
 const mockChapter = {
   id: 'ch-1',
   name: 'Chapter 1',
-  estimatedMinutes: 10,
   status: 'not-started' as const,
   files: [mockFile],
 }
@@ -105,7 +82,6 @@ const mockPr = PrReviewDetailSchema.parse({
   headSHA: 'abc',
   ciStatus: 'passing' as const,
   lintStatus: 'pass' as const,
-  coverageStatus: 'pass' as const,
   chapters: [mockChapter],
 })
 
@@ -116,7 +92,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   usePrReviewStore.getState().reset()
   localStorage.clear()
-  useReviewUiStore.setState({ groupBy: 'all', fileListHidden: false })
+  useReviewUiStore.setState({ groupBy: 'all' })
 })
 
 /** Seeds the real review store, renders the view on `mockPr` with `prOverrides`, and returns a
@@ -193,9 +169,9 @@ describe('PrReviewView — pausing', () => {
     expect(mockClose).toHaveBeenCalled()
   })
 
-  it('shows review progress once, in the header, with the unviewed files estimate', async () => {
+  it('shows review progress once, in the header', async () => {
     await renderView({}, { currentFilePath: 'src/foo.ts' })
-    expect(screen.getByText('0 of 1 viewed · 3 min left')).toBeTruthy()
+    expect(screen.getByText('0 of 1 viewed')).toBeTruthy()
     expect(screen.queryByText(/files reviewed/)).toBeNull()
   })
 
@@ -205,34 +181,20 @@ describe('PrReviewView — pausing', () => {
   })
 })
 
-describe('PrReviewView — opens the Agent tab of the inspector from Ask agent, and closes it', () => {
-  it('opens the Agent tab of the inspector from Ask agent, and closes it', async () => {
+describe('PrReviewView — opens the inspector from Ask agent, and closes it', () => {
+  it('opens the inspector from Ask agent, and closes it', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
     await user.click(screen.getByRole('button', { name: 'Ask agent about this PR' }))
-    expect(screen.getByRole('tab', { name: /Agent/, selected: true })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Agent' })).toBeTruthy()
     expect(screen.getByTestId('agent-panel')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Close inspector' }))
     expect(screen.queryByTestId('agent-panel')).toBeNull()
-    expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
   })
 
-  it('hides and restores the file list from the View menu', async () => {
-    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
+  it('has no View menu and always shows the file list', async () => {
+    await renderView({}, { currentFilePath: 'src/foo.ts' })
+    expect(screen.queryByRole('button', { name: 'View' })).toBeNull()
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'View' }))
-    await user.click(screen.getByRole('switch', { name: /^Show file list/ }))
-    expect(screen.queryByTestId('full-file-list')).toBeNull()
-    await user.click(screen.getByRole('switch', { name: /^Show file list/ }))
-    expect(screen.getByTestId('full-file-list')).toBeTruthy()
-  })
-})
-
-describe('PrReviewView — shows risk panel when ShowRisk is clicked', () => {
-  it('shows risk panel when ShowRisk is clicked', async () => {
-    const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
-    await user.click(screen.getByRole('button', { name: 'ShowRisk' }))
-    expect(screen.getByRole('tab', { name: 'Why this file', selected: true })).toBeTruthy()
-    expect(screen.getByTestId('risk-panel')).toBeTruthy()
   })
 
   it('opens submit panel when FinishChapter is clicked on the last (only) chapter', async () => {
@@ -325,72 +287,9 @@ function makeLargeFile(path: string, additions: number) {
   return { ...mockFile, path, additions, deletions: 0 }
 }
 
-/** A one-chapter PR of 500 added lines, open at its only file. */
-function renderLargePr() {
-  const bigFile = makeLargeFile('src/big.ts', 500)
-  return renderView(
-    { chapters: [{ ...mockChapter, files: [bigFile] }] },
-    { currentFilePath: 'src/big.ts' }
-  )
-}
-
-describe('PrReviewView (continued) — large-PR warning', () => {
-  it('shows large-PR banner when PR exceeds 400 LOC', async () => {
-    const { user } = await renderLargePr()
-    await user.click(screen.getByRole('button', { name: /500 LOC/ }))
-    expect(screen.getByText(/Large PR — 500 LOC, estimated 125 min to review/)).toBeTruthy()
-  })
-
-  it('does not show large-PR banner when PR is under 400 LOC', async () => {
-    await renderView()
-    expect(screen.queryByRole('button', { name: /LOC ·/ })).toBeNull()
-  })
-
-  it('dismisses large-PR banner when × clicked', async () => {
-    const { user } = await renderLargePr()
-    await user.click(screen.getByRole('button', { name: /500 LOC/ }))
-    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
-    expect(screen.queryByRole('button', { name: /500 LOC/ })).toBeNull()
-  })
-
-  it('toggles focus mode on/off', async () => {
-    const { user } = await renderLargePr()
-    expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'View' }))
-    await user.click(screen.getByRole('switch', { name: /^Focus mode/ }))
-    await user.click(screen.getByRole('button', { name: 'Focus mode', pressed: true }))
-    expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
-  })
-})
-
-describe('PrReviewView (continued) — large-PR warning — drops all-low-risk chapters in focus mode instead of showing their full file list', () => {
-  it('drops all-low-risk chapters in focus mode instead of showing their full file list', async () => {
-    const lowFile = makeLargeFile('src/low.ts', 300)
-    const highFile = {
-      ...makeLargeFile('src/high.ts', 300),
-      riskScore: { ...mockFile.riskScore, level: 'high' as const },
-    }
-    const lowChapter = { ...mockChapter, id: 'ch-low', name: 'Low only', files: [lowFile] }
-    const highChapter = { ...mockChapter, id: 'ch-high', name: 'High risk', files: [highFile] }
-    const { user } = await renderView(
-      { chapters: [lowChapter, highChapter] },
-      { currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' }
-    )
-    await user.click(screen.getByRole('button', { name: 'View' }))
-    await user.click(screen.getByRole('switch', { name: /^Focus mode/ }))
-    // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
-    expect(
-      screen.getByRole('progressbar', { name: 'Files viewed' }).getAttribute('aria-valuemax')
-    ).toBe('1')
-  })
-})
-
-describe('PrReviewView (continued) — large-PR warning — progress bar does not exceed 100% when viewedFiles exceeds displayPr files in focus mode', () => {
-  it('progress bar does not exceed 100% when viewedFiles exceeds displayPr files in focus mode', async () => {
-    const bigFile = {
-      ...makeLargeFile('src/low.ts', 500),
-      riskScore: { ...mockFile.riskScore, level: 'low' as const },
-    }
+describe('PrReviewView — progress counts only displayed files', () => {
+  it('progress bar does not exceed 100% when viewedFiles holds paths outside the PR', async () => {
+    const bigFile = makeLargeFile('src/low.ts', 500)
     // 3 viewed files but only 1 file in PR
     await renderView(
       { chapters: [{ ...mockChapter, files: [bigFile] }] },
@@ -579,5 +478,28 @@ describe('PrReviewView — after a push', () => {
       />
     )
     expect(screen.getByText('1 commit since you last looked')).toBeTruthy()
+  })
+})
+
+describe('PrReviewView — only my files', () => {
+  const twoFiles = [{ ...mockChapter, files: [f('src/mine.ts'), f('src/theirs.ts')] }]
+
+  it('offers no Only my files toggle when the viewer owns no changed file', async () => {
+    await renderView({ chapters: twoFiles, ownedPaths: [] }, { currentFilePath: 'src/mine.ts' })
+    expect(screen.queryByRole('button', { name: 'Only my files' })).toBeNull()
+  })
+
+  it('shows only the owned files while the toggle is pressed', async () => {
+    const { user } = await renderView(
+      { chapters: twoFiles, ownedPaths: ['src/mine.ts'] },
+      { currentFilePath: 'src/mine.ts' }
+    )
+    const total = () =>
+      screen.getByRole('progressbar', { name: 'Files viewed' }).getAttribute('aria-valuemax')
+    const toggle = screen.getByRole('button', { name: 'Only my files' })
+    expect(total()).toBe('2')
+    await user.click(toggle)
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(total()).toBe('1')
   })
 })

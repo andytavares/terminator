@@ -38,9 +38,19 @@ const TOKEN_TS_DIFF: ParsedPrFile = {
       {
         header: '@@ -1,3 +1,3 @@',
         lines: [
-          { type: 'context', content: 'export function parseToken(raw: string): string {', oldLineNumber: 1, newLineNumber: 1 },
+          {
+            type: 'context',
+            content: 'export function parseToken(raw: string): string {',
+            oldLineNumber: 1,
+            newLineNumber: 1,
+          },
           { type: 'remove', content: '  return raw.trim()', oldLineNumber: 2, newLineNumber: null },
-          { type: 'add', content: '  return raw.trim().toLowerCase()', oldLineNumber: null, newLineNumber: 2 },
+          {
+            type: 'add',
+            content: '  return raw.trim().toLowerCase()',
+            oldLineNumber: null,
+            newLineNumber: 2,
+          },
           { type: 'context', content: '}', oldLineNumber: 3, newLineNumber: 3 },
         ],
       },
@@ -86,7 +96,9 @@ describe('blastRadius()', () => {
 
     const second = await blastRadius(clone.repo, clone.headSha, [TOKEN_TS_DIFF])
 
-    expect(first).toEqual([{ name: 'parseToken', path: 'src/token.ts', usedIn: 3, alsoDefinedIn: 1 }])
+    expect(first).toEqual([
+      { name: 'parseToken', path: 'src/token.ts', usedIn: 3, alsoDefinedIn: 1 },
+    ])
     expect(second).toEqual(first)
   })
 

@@ -115,8 +115,7 @@ describe('parseDashboard', () => {
     const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(pr.section).toBe('mine')
     expect(pr.repo).toBe('acme/widgets')
-    expect(pr.riskLevel).toBe('medium') // 150 total hits the medium threshold
-    expect(pr.estimatedMinutes).toBe(3) // ceil(150/60)
+    expect([pr.additions, pr.deletions]).toEqual([100, 50])
     expect(pr.ciStatus).toBe('passing')
     expect(pr.reviewDecision).toBe('review-required')
     expect(pr.unresolvedThreads).toBe(1)
@@ -333,16 +332,6 @@ describe('parseDashboard — keeps mine rows independent of dedup against other 
 
   it('handles a missing data payload gracefully', () => {
     expect(parseDashboard({}, { login: 'alice', localRoots: new Map() })).toEqual([])
-  })
-})
-
-describe('parseDashboard — flags a high-risk large PR', () => {
-  it('flags a high-risk large PR', () => {
-    const node = prNode({ additions: 300, deletions: 200 })
-    const raw = { data: { mine: { nodes: [node] } } }
-    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
-    expect(pr.riskLevel).toBe('high')
-    expect(pr.estimatedMinutes).toBe(9) // ceil(500/60)
   })
 })
 

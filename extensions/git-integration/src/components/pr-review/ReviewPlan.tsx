@@ -2,7 +2,6 @@ import React, { useId } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { plural } from '@terminator/extension-sdk'
 import type { Chapter } from '../../schemas/pr-review.schema'
-import { chapterRiskLevel } from '../../github/pr-review-service'
 import { choose, splitPath } from '../text'
 import './review-plan.css'
 import './review-layout.css'
@@ -14,8 +13,6 @@ interface Props {
 
 const SHOWN_FILE_NAMES = 3
 
-const RISK_LABEL = { high: 'High risk', medium: 'Medium risk', low: 'Low risk' } as const
-
 function totalLines(chapter: Chapter): number {
   return chapter.files.reduce((sum, f) => sum + f.additions + f.deletions, 0)
 }
@@ -26,26 +23,24 @@ function fileNamesOf(chapter: Chapter): string {
   return names.join(', ') + choose(hidden > 0, ` +${hidden}`, '')
 }
 
+function addedLines(chapter: Chapter): number {
+  return chapter.files.reduce((sum, f) => sum + f.additions, 0)
+}
+
+/** "+120 −4": the lines a chapter adds and removes. */
+function changedLinesText(chapter: Chapter): string {
+  const added = addedLines(chapter)
+  return `+${added} −${totalLines(chapter) - added}`
+}
+
 function ChangeBar({ chapter, largest }: { chapter: Chapter; largest: number }) {
-  const added = chapter.files.reduce((sum, f) => sum + f.additions, 0)
+  const added = addedLines(chapter)
   const removed = totalLines(chapter) - added
   return (
     <span className="review-plan__bar" aria-hidden="true">
       <b className="review-plan__bar-added" style={{ width: `${(added / largest) * 100}%` }} />
       <b className="review-plan__bar-removed" style={{ width: `${(removed / largest) * 100}%` }} />
     </span>
-  )
-}
-
-/** Risk and file count: the two facts between a chapter's name and its size. */
-function ChapterFacts({ chapter }: { chapter: Chapter }) {
-  const risk = chapterRiskLevel(chapter)
-  const fileCount = chapter.files.length
-  return (
-    <>
-      <span className={`review-plan__risk review-plan__risk--${risk}`}>{RISK_LABEL[risk]}</span>
-      <span className="review-plan__files">{filesText(fileCount)}</span>
-    </>
   )
 }
 
@@ -67,8 +62,7 @@ function RowAccessibleText({ chapter, labelId, descriptionId }: AccessibleTextPr
         Start here: {chapter.name}
       </span>
       <span id={descriptionId} className="pr-visually-hidden">
-        {RISK_LABEL[chapterRiskLevel(chapter)]}, {filesText(chapter.files.length)},{' '}
-        {chapter.estimatedMinutes} min
+        {filesText(chapter.files.length)}, {changedLinesText(chapter)} lines
       </span>
     </>
   )
@@ -107,14 +101,14 @@ function PlanRow({ chapter, number, largest, onStartAt }: RowProps) {
       <RowAccessibleText chapter={chapter} labelId={labelId} descriptionId={descriptionId} />
       <span className="review-plan__number">{number}</span>
       <ChapterName chapter={chapter} />
-      <ChapterFacts chapter={chapter} />
+      <span className="review-plan__files">{filesText(chapter.files.length)}</span>
       <span className="review-plan__change">
         <ChangeBar chapter={chapter} largest={largest} />
         <span className="review-plan__start">
           Start here <ArrowRight aria-hidden="true" />
         </span>
       </span>
-      <span className="review-plan__minutes">{chapter.estimatedMinutes} min</span>
+      <span className="review-plan__lines">{changedLinesText(chapter)}</span>
     </button>
   )
 }
@@ -130,13 +124,12 @@ export function ReviewPlan({ chapters, onStartAt }: Props) {
   const headingId = useId()
   if (chapters.length === 0) return null
   const largest = Math.max(1, ...chapters.map(totalLines))
-  const minutes = chapters.reduce((sum, c) => sum + c.estimatedMinutes, 0)
   return (
     <section className="review-plan" aria-labelledby={headingId}>
       <header className="review-plan__heading">
         <h2 id={headingId}>Review plan</h2>
         <span>
-          {chapters.length} {plural(chapters.length, 'chapter')} · about {minutes} min
+          {chapters.length} {plural(chapters.length, 'chapter')}
         </span>
       </header>
       <div className="review-plan__rows">

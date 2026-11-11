@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useEffect } from 'react'
 import { renderHook, act } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
-import { computeRiskScore } from '../../src/github/pr-review-service'
 import { buildThreads } from '../../src/github/pr-review-service-renderer'
 import { reviewQueuePr } from './support/review-queue-pr'
 import {
@@ -20,7 +19,6 @@ import {
 
 const mockListOpenPrsAPI = vi.fn()
 const mockPrReviewDetailAPI = vi.fn()
-const mockFileMetricsAPI = vi.fn()
 const mockFilesMetricsAPI = vi.fn()
 const mockPrInlineCommentsAPI = vi.fn()
 const mockSessionsForRepoAPI = vi.fn()
@@ -35,16 +33,7 @@ vi.mock('../../src/api/github', () => ({
     currentUser: (...args: unknown[]) => mockCurrentUserAPI(...args),
     listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
     prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
-    // Adapts the per-file fixtures below to the batched call the hook now makes.
-    filesMetrics: async (root: string, paths: string[]) => {
-      mockFilesMetricsAPI(root, paths)
-      const metrics: Record<string, unknown> = {}
-      for (const path of paths) {
-        const one = await mockFileMetricsAPI(root, path)
-        if (one && !('error' in one)) metrics[path] = one
-      }
-      return { metrics }
-    },
+    filesMetrics: (...args: unknown[]) => mockFilesMetricsAPI(...args),
     prInlineComments: (...args: unknown[]) => mockPrInlineCommentsAPI(...args),
     prIssueComments: (...args: unknown[]) => mockPrIssueCommentsAPI(...args),
     sessionsForRepo: (...args: unknown[]) => mockSessionsForRepoAPI(...args),
@@ -53,16 +42,6 @@ vi.mock('../../src/api/github', () => ({
   },
 }))
 
-vi.mock('../../src/github/pr-review-service', async (importActual) => {
-  const actual = await importActual<typeof import('../../src/github/pr-review-service')>()
-  return {
-    // Keep the real queueRiskLevel + thresholds so the size-floor logic runs for real;
-    // only computeRiskScore (the per-file scorer) is stubbed to a fixed low result.
-    ...actual,
-    computeRiskScore: vi.fn(),
-  }
-})
-
 vi.mock('../../src/github/pr-review-service-renderer', () => ({
   buildThreads: vi.fn(),
 }))
@@ -70,7 +49,6 @@ vi.mock('../../src/github/pr-review-service-renderer', () => ({
 // Aliases so test assertions work without changes
 const mockListOpenPrs = mockListOpenPrsAPI
 const mockPrReviewDetail = mockPrReviewDetailAPI
-const mockFileMetrics = mockFileMetricsAPI
 const mockPrInlineComments = mockPrInlineCommentsAPI
 
 // Parsed as the review channel's answer is, so the schema's defaults are filled in.
@@ -86,46 +64,27 @@ const validActivePr = PrReviewDetailSchema.parse({
   headSHA: 'abc123',
   ciStatus: 'passing' as const,
   lintStatus: 'pass' as const,
-  coverageStatus: 'pass' as const,
   chapters: [],
 })
 
-const NO_METRICS = {
-  changeSize: null,
-  churn90d: null,
-  blastRadius: null,
-  testFilePresent: null,
-  complexityDelta: null,
-  patchCoverage: null,
-}
-
 type ChangedFile = ReturnType<typeof file>
 
-/** A modified file at `path` in `tier`, with a low risk score and no metrics yet. */
-function file(path: string, tier: 1 | 2 | 3 = 1): PrChangedFile {
+/** A modified file at `path`, not yet measured. */
+function file(path: string): PrChangedFile {
   return {
     path,
     changeType: 'modified' as const,
     additions: 4,
     deletions: 1,
     isBinary: false,
-    tier,
     whyHere: 'changed',
-    estimatedMinutes: 1,
-    riskScore: {
-      level: 'low' as const,
-      composite: null,
-      dominantDriver: '',
-      topImporters: [],
-      importerCount: 0,
-      metrics: { ...NO_METRICS },
-    },
+    churn90d: null,
   }
 }
 
 /** A chapter holding `files`. */
 function chapterWithFiles(id: string, files: ChangedFile[]) {
-  return { id, name: id, estimatedMinutes: 1, status: 'not-started' as const, files }
+  return { id, name: id, status: 'not-started' as const, files }
 }
 
 /** The active PR with one chapter of `files`. */
@@ -133,40 +92,17 @@ function prWithFiles(files: ChangedFile[], overrides: Partial<PrReviewDetail> = 
   return { ...validActivePr, ...overrides, chapters: [chapterWithFiles('ch-1', files)] }
 }
 
-/** A PR whose one file, src/foo.ts, has no score yet, with CI in `ciStatus`. */
-function makePrWithFile(ciStatus: 'passing' | 'failing' | 'pending' | 'none' = 'passing') {
-  return prWithFiles([file('src/foo.ts')], { ciStatus, coverageStatus: 'unknown' as const })
-}
-
 const store = () => usePrReviewStore.getState()
-
-/** PR 42's queue row, low risk, with every signal dot unknown except CI, which passes. */
-function queueRow42() {
-  const row = reviewQueuePr(42)
-  return { ...row, signalDots: { ...row.signalDots, ci: 'pass' as const } }
-}
 
 /** Opens `activePr` in the store, with PR 42 queued. */
 function withActivePr(activePr: PrReviewDetail | null) {
-  usePrReviewStore.setState({ activePr, prQueue: [queueRow42()] })
+  usePrReviewStore.setState({ activePr, prQueue: [reviewQueuePr(42)] })
 }
 
-/** The risk score each of `paths` holds in the open PR. */
-function compositeOf(...paths: string[]) {
+/** The 90-day commit count each of `paths` holds in the open PR. */
+function churnOf(...paths: string[]) {
   const files = store().activePr?.chapters.flatMap((c) => c.files) ?? []
-  return paths.map((path) => files.find((f) => f.path === path)?.riskScore.composite)
-}
-
-/** Every file's metrics: low churn and blast radius, a test file, and `extra`. */
-function metricsAnswer(extra: Record<string, unknown> = {}) {
-  mockFileMetrics.mockResolvedValue({
-    churn90d: 5,
-    blastRadius: 2,
-    topImporters: [],
-    importerCount: 0,
-    testFilePresent: true,
-    ...extra,
-  })
+  return paths.map((path) => files.find((f) => f.path === path)?.churn90d)
 }
 
 /** Calls a hook's loader once, inside act. */
@@ -252,21 +188,11 @@ function threadOf(comment: ReturnType<typeof reviewComment>) {
   return { ...place, comments: [comment], collapsed: false, resolved: false }
 }
 
-const LOW_RISK = {
-  level: 'low' as const,
-  composite: 10,
-  dominantDriver: 'changeSize' as const,
-  topImporters: [],
-  importerCount: 0,
-  metrics: { ...NO_METRICS, changeSize: 5 },
-}
-
 beforeEach(() => {
   mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
   mockActiveReviewsForRepoAPI.mockResolvedValue({ error: 'NOT_FOUND' })
   mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [] })
   mockCurrentUserAPI.mockResolvedValue({ login: 'testuser' })
-  vi.mocked(computeRiskScore).mockReturnValue(LOW_RISK)
   vi.mocked(buildThreads).mockReturnValue([
     { id: 'thread-1', path: 'src/foo.ts', line: 10, startLine: null, comments: [] },
   ] as never)
@@ -276,7 +202,6 @@ beforeEach(() => {
       github: {
         listOpenPrs: mockListOpenPrs,
         prReviewDetail: mockPrReviewDetail,
-        fileMetrics: mockFileMetrics,
         prInlineComments: mockPrInlineComments,
       },
     },
@@ -548,52 +473,23 @@ describe('useFetchFileMetrics', () => {
     withActivePr(validActivePr)
     const { result } = renderHook(() => useFetchFileMetrics(null))
     await load(result.current)
-    expect(mockFileMetrics).not.toHaveBeenCalled()
+    expect(mockFilesMetricsAPI).not.toHaveBeenCalled()
   })
 
   it('does nothing when no activePr and no prDetail arg', async () => {
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
-    expect(mockFileMetrics).not.toHaveBeenCalled()
+    expect(mockFilesMetricsAPI).not.toHaveBeenCalled()
   })
 })
 
-describe('useFetchFileMetrics — keeps a large but mechanically-simple PR at high risk via the size floor', () => {
-  it('keeps a large but mechanically-simple PR at high risk via the size floor', async () => {
-    const big = { ...file('src/big.ts'), additions: 500, deletions: 0 }
-    big.riskScore.metrics.changeSize = 500
-    withActivePr(prWithFiles([big]))
-    // Low per-file signals → per-file risk is 'low', but 500 lines changed
-    // must still resolve to 'high' because of the size floor.
-    metricsAnswer({ churn90d: 1, blastRadius: 1 })
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-    expect(queuedPrs()[0].riskLevel).toBe('high')
-  })
-})
-
-describe('useFetchFileMetrics — does nothing when all files are tier-3 (lock files excluded from risk scoring)', () => {
-  it('does nothing when all files are tier-3 (lock files excluded from risk scoring)', async () => {
-    withActivePr(
-      prWithFiles([{ ...file('package-lock.json', 3), additions: 1000, deletions: 1000 }])
-    )
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-    // Tier 3 files are excluded, so no metrics calls
-    expect(mockFileMetrics).not.toHaveBeenCalled()
-  })
-})
-
-describe('useFetchFileMetrics — handles fileMetrics returning an error object (null value)', () => {
-  it('handles fileMetrics returning an error object (null value)', async () => {
+describe('useFetchFileMetrics — a failed metrics answer', () => {
+  it('leaves every file unmeasured when the channel answers an error', async () => {
     withActivePr(prWithFiles([file('src/foo.ts')]))
-    // Return an error — should produce null (filtered out)
-    mockFileMetrics.mockResolvedValue({ error: 'RATE_LIMITED' })
+    mockFilesMetricsAPI.mockResolvedValue({ error: 'RATE_LIMITED' })
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
-    // No file was measured, so neither the file nor the queue row gets a score.
-    expect(compositeOf('src/foo.ts')).toEqual([null])
-    expect(queuedPrs()).toEqual([queueRow42()])
+    expect(churnOf('src/foo.ts')).toEqual([null])
   })
 })
 
@@ -654,43 +550,13 @@ describe('useLoadPrDetail — additional branches', () => {
   })
 })
 
-describe('useFetchFileMetrics — the queue row coverage dot', () => {
-  it.each([
-    [90, 'pass'],
-    [60, 'warn'],
-    [30, 'fail'],
-  ])('sets the coverage dot for %i%% patch coverage to %s', async (patchCoverage, dot) => {
-    withActivePr(makePrWithFile())
-    metricsAnswer({ patchCoverage })
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-    expect(queuedPrs()[0].signalDots.coverage).toBe(dot)
-  })
-})
-
-describe('useFetchFileMetrics — the queue row CI dot', () => {
-  it.each([
-    ['failing', 'fail'],
-    ['pending', 'warn'],
-    ['none', 'unknown'],
-  ] as const)('sets the CI dot for CI %s to %s', async (ciStatus, dot) => {
-    withActivePr(makePrWithFile(ciStatus))
-    metricsAnswer()
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current)
-    expect(queuedPrs()[0].signalDots.ci).toBe(dot)
-  })
-})
-
-describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — accepts prDetail argument instead of activePr', () => {
-  it('accepts prDetail argument instead of activePr', async () => {
+describe('useFetchFileMetrics — accepts prDetail argument instead of activePr', () => {
+  it('measures the given PR when none is open', async () => {
     withActivePr(null)
-    metricsAnswer()
+    mockFilesMetricsAPI.mockResolvedValue({ metrics: { 'src/foo.ts': { churn90d: 3 } } })
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current, makePrWithFile())
-    expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
-    // The queue row's tests dot moves from unknown: the given PR was scored.
-    expect(queuedPrs()[0].signalDots.tests).toBe('pass')
+    await load(result.current, prWithFiles([file('src/foo.ts')]))
+    expect(mockFilesMetricsAPI).toHaveBeenCalledWith('/repo', ['src/foo.ts'])
   })
 })
 
@@ -774,28 +640,28 @@ describe('useLoadIssueComments — a failed load', () => {
 })
 
 describe('useFetchFileMetrics — one batched request', () => {
-  it('asks for every non-generated file in one call and applies the scores in one update', async () => {
-    const one = chapterWithFiles('ch-1', [
-      file('src/a.ts'),
-      file('src/b.ts'),
-      file('package-lock.json', 3),
-    ])
+  it("asks for every file in one call and sets each file's churn", async () => {
+    const one = chapterWithFiles('ch-1', [file('src/a.ts'), file('package-lock.json')])
     withActivePr({
       ...validActivePr,
       chapters: [one, chapterWithFiles('ch-2', [file('src/c.ts')])],
     })
-    metricsAnswer({ churn90d: 1, blastRadius: 1 })
+    mockFilesMetricsAPI.mockResolvedValue({
+      metrics: {
+        'src/a.ts': { churn90d: 7 },
+        'package-lock.json': { churn90d: 2 },
+        'src/c.ts': { churn90d: 0 },
+      },
+    })
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
     expect(mockFilesMetricsAPI).toHaveBeenCalledTimes(1)
-    expect(mockFilesMetricsAPI).toHaveBeenCalledWith('/repo', ['src/a.ts', 'src/b.ts', 'src/c.ts'])
-    // The stubbed scorer gives 10; the lock file is not scored.
-    expect(compositeOf('src/a.ts', 'src/b.ts', 'src/c.ts', 'package-lock.json')).toEqual([
-      10,
-      10,
-      10,
-      null,
+    expect(mockFilesMetricsAPI).toHaveBeenCalledWith('/repo', [
+      'src/a.ts',
+      'package-lock.json',
+      'src/c.ts',
     ])
+    expect(churnOf('src/a.ts', 'package-lock.json', 'src/c.ts')).toEqual([7, 2, 0])
   })
 })
 

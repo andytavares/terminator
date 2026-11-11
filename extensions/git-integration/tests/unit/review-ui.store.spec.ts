@@ -36,36 +36,17 @@ function run(id: string, status: AgentRun['status']): AgentRun {
 beforeEach(() => {
   localStorage.clear()
   useReviewUiStore.setState({
-    commentVisibility: 'all',
-    agentNotesOn: true,
     diffRange: 'since',
-    fileListHidden: false,
-    diffViewMode: 'unified',
-    hideFormattingHunks: true,
     groupBy: 'all',
   })
   useReviewUiStore.getState().resetForPr()
 })
 
 describe('review UI store', () => {
-  it('cycles comment visibility all → unresolved → hidden → all and remembers it', () => {
-    const s = useReviewUiStore.getState()
-    s.cycleCommentVisibility()
-    expect(useReviewUiStore.getState().commentVisibility).toBe('unresolved')
-    s.cycleCommentVisibility()
-    expect(useReviewUiStore.getState().commentVisibility).toBe('hidden')
-    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!).commentVisibility).toBe('hidden')
-    s.cycleCommentVisibility()
-    expect(useReviewUiStore.getState().commentVisibility).toBe('all')
-  })
-
-  it('remembers agent notes, diff range and file list preferences', () => {
-    const s = useReviewUiStore.getState()
-    s.setAgentNotesOn(false)
-    s.setDiffRange('whole')
-    s.toggleFileList()
+  it('remembers the diff range preference', () => {
+    useReviewUiStore.getState().setDiffRange('whole')
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY)!)
-    expect(saved).toMatchObject({ agentNotesOn: false, diffRange: 'whole', fileListHidden: true })
+    expect(saved).toMatchObject({ diffRange: 'whole' })
   })
 })
 
@@ -112,29 +93,16 @@ describe('review UI store — upserts agent runs newest first without duplicates
     const runs = useReviewUiStore.getState().agentRuns
     expect(runs.map((r) => `${r.id}:${r.status}`)).toEqual(['a:done', 'b:running'])
   })
-
-  it('sets and persists diff view mode and formatting-hunk visibility', () => {
-    const s = useReviewUiStore.getState()
-    s.setDiffViewMode('split')
-    s.setHideFormattingHunks(false)
-    expect(useReviewUiStore.getState().diffViewMode).toBe('split')
-    expect(useReviewUiStore.getState().hideFormattingHunks).toBe(false)
-    const saved = JSON.parse(localStorage.getItem(PREFS_KEY)!)
-    expect(saved).toMatchObject({ diffViewMode: 'split', hideFormattingHunks: false })
-  })
 })
 
-describe('review UI store — loads persisted diffViewMode and hideFormattingHunks from localStorage on module init', () => {
-  it('loads persisted diffViewMode and hideFormattingHunks from localStorage on module init', async () => {
-    localStorage.setItem(
-      PREFS_KEY,
-      JSON.stringify({ diffViewMode: 'split', hideFormattingHunks: false })
-    )
+describe('review UI store — loads persisted preferences from localStorage on module init', () => {
+  it('loads a persisted diff range and grouping on module init', async () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ diffRange: 'whole', groupBy: 'chapters' }))
     vi.resetModules()
     const fresh = await import('../../src/stores/review-ui.store')
     expect(fresh.useReviewUiStore.getState()).toMatchObject({
-      diffViewMode: 'split',
-      hideFormattingHunks: false,
+      diffRange: 'whole',
+      groupBy: 'chapters',
     })
   })
 
@@ -143,8 +111,8 @@ describe('review UI store — loads persisted diffViewMode and hideFormattingHun
     vi.resetModules()
     const fresh = await import('../../src/stores/review-ui.store')
     expect(fresh.useReviewUiStore.getState()).toMatchObject({
-      diffViewMode: 'unified',
-      hideFormattingHunks: true,
+      diffRange: 'since',
+      groupBy: 'all',
     })
   })
 })
@@ -152,7 +120,7 @@ describe('review UI store — loads persisted diffViewMode and hideFormattingHun
 describe('review UI store — resetForPr clears per-PR state but keeps preferences', () => {
   it('resetForPr clears per-PR state but keeps preferences', () => {
     const s = useReviewUiStore.getState()
-    s.setCommentVisibility('hidden')
+    s.setDiffRange('whole')
     s.setSelection({ path: 'a.ts', side: 'RIGHT', startLine: 1, endLine: 3 })
     s.upsertAgentRun(run('a', 'running'))
     s.setKeyboardHelpOpen(true)
@@ -161,6 +129,6 @@ describe('review UI store — resetForPr clears per-PR state but keeps preferenc
     expect(after.selection).toBeNull()
     expect(after.agentRuns).toEqual([])
     expect(after.keyboardHelpOpen).toBe(false)
-    expect(after.commentVisibility).toBe('hidden')
+    expect(after.diffRange).toBe('whole')
   })
 })

@@ -1,5 +1,4 @@
 import React from 'react'
-import { Flame } from 'lucide-react'
 import { plural } from '@terminator/extension-sdk'
 import { UsesPopover } from '../UsesPopover'
 import type { PrChangedFile, ReadingStep } from '../../../schemas/pr-review.schema'
@@ -15,7 +14,6 @@ export interface FileHeaderProps {
   usesWithDef: ReadingStepUse[]
   /** Which head the diff shows, when it is not the pull request's latest. */
   menuNote: string | null
-  onShowRisk: () => void
   onPeekDefinition: () => void
 }
 
@@ -34,21 +32,6 @@ function FileTitle(props: { file: PrChangedFile }) {
   )
 }
 
-function RiskChip(props: { file: PrChangedFile; onShowRisk: () => void }) {
-  if (props.file.riskScore.level !== 'high') return null
-  return (
-    <button
-      type="button"
-      className="fh-risk"
-      onClick={props.onShowRisk}
-      title="Why this risk level?"
-    >
-      <Flame aria-hidden="true" />
-      High risk
-    </button>
-  )
-}
-
 function ChangedSince() {
   return (
     <span className="fh-changed" title="Changed since you viewed">
@@ -57,38 +40,32 @@ function ChangedSince() {
   )
 }
 
-/** Medium and low files have no risk chip; this opens the same explanation. */
-function WhyThisFileButton(props: { file: PrChangedFile; onShowRisk: () => void }) {
-  if (props.file.riskScore.level === 'high') return null
+function ChurnFact({ churn }: { churn: number }) {
   return (
-    <button type="button" className="fh-why-file" onClick={props.onShowRisk}>
-      Why this file
-    </button>
+    <span>
+      Changed {churn} {plural(churn, 'time')} in 90 days
+    </span>
   )
 }
 
-function WhyHere(props: FileHeaderProps & { children: React.ReactNode }) {
-  const churn = props.file.riskScore.metrics.churn90d
+/** The reading-order reason and the 90-day change count; only the count when there is no reason. */
+function WhyHere(props: { file: PrChangedFile; children: React.ReactNode }) {
+  const { whyHere, churn90d } = props.file
   return (
     <div className="fh-why">
-      <span>
-        <span className="fh-why-label">Why here:</span> {props.file.whyHere}
-      </span>
-      {props.children}
-      {churn != null && (
-        <>
-          <span className="fh-sep">·</span>
-          <span>
-            Changed {churn} {plural(churn, 'time')} in 90 days
-          </span>
-        </>
+      {whyHere && (
+        <span>
+          <span className="fh-why-label">Why here:</span> {whyHere}
+        </span>
       )}
-      <WhyThisFileButton file={props.file} onShowRisk={props.onShowRisk} />
+      {props.children}
+      {whyHere && churn90d != null && <span className="fh-sep">·</span>}
+      {churn90d != null && <ChurnFact churn={churn90d} />}
     </div>
   )
 }
 
-/** The file's header: its path, size and risk, then why it is in the review. */
+/** The file's header: its path and size, then why it is in the review. */
 export function FileHeader(props: FileHeaderProps) {
   const { file, viewedFiles } = props
   const uses = props.usesWithDef.map((u) => ({
@@ -102,12 +79,11 @@ export function FileHeader(props: FileHeaderProps) {
         <FileTitle file={file} />
         <span className="fh-add">+{file.additions}</span>
         <span className="fh-del">−{file.deletions}</span>
-        <RiskChip file={file} onShowRisk={props.onShowRisk} />
         {props.showChangedSince && <ChangedSince />}
         <span className="fh-spacer" />
         {props.menuNote && <span className="fh-note">{props.menuNote}</span>}
       </div>
-      <WhyHere {...props}>
+      <WhyHere file={file}>
         {uses.length > 0 && <span className="fh-sep">·</span>}
         <UsesPopover uses={uses} onPeekDefinition={props.onPeekDefinition} />
       </WhyHere>

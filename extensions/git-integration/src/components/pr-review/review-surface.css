@@ -33,18 +33,6 @@
   color: var(--tm-on-accent);
 }
 
-.rs-pip {
-  cursor: pointer;
-  border: 0;
-  padding: 0 3px;
-}
-
-.rs-pip--ag {
-  background: var(--tm-agent-dim);
-  color: var(--tm-agent);
-  outline: 1px dashed var(--tm-agent);
-}
-
 .rs-thread {
   margin: 6px 14px 8px 56px;
   border: 1px solid var(--tm-border-strong);
@@ -175,38 +163,12 @@
   color: var(--tm-warning);
 }
 
-.rs-gutter-chip--danger {
-  color: var(--tm-danger);
-}
-
 .rs-line--selected td {
   background: var(--tm-agent-dim) !important;
 }
 
 .rs-line--selected td.diff-line__num-gutter {
   box-shadow: inset 3px 0 0 var(--tm-agent);
-}
-
-.rs-note-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 6px 14px 8px 56px;
-}
-
-.rs-note-composer textarea {
-  font: var(--tm-font-size-sm) / 1.4 var(--tm-font-ui);
-  padding: 6px 8px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  background: var(--tm-bg-card);
-  color: var(--tm-text-primary);
-  resize: vertical;
-}
-
-.rs-note-composer-actions {
-  display: flex;
-  gap: 6px;
 }
 
 .diff-gap-row {

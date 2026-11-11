@@ -14,10 +14,6 @@ vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
 }))
 
-vi.mock('../../src/github/pr-review-service', () => ({
-  chapterRiskLevel: vi.fn().mockReturnValue('low'),
-}))
-
 const mockSetCurrentChapter = vi.fn()
 
 function setupStore(state: { currentChapterId?: string | null; viewedFiles?: Set<string> } = {}) {
@@ -41,7 +37,6 @@ function makeChapter(id: string, name: string, files: string[] = ['a.ts']): Chap
   return {
     id,
     name,
-    estimatedMinutes: 5,
     status: 'not-started',
     files: files.map((f) => changedFile(f)),
   }
@@ -120,15 +115,15 @@ describe('ChapterNav — chapter header', () => {
     expect(screen.getAllByLabelText('complete')).toHaveLength(2)
   })
 
-  it('shows viewed and total files and the estimate for each chapter', () => {
+  it('shows viewed and total files for each chapter, with no time estimate', () => {
     setupStore({ currentChapterId: null, viewedFiles: new Set(['a.ts']) })
     const chapters = [
       makeChapter('c1', 'Core', ['a.ts', 'b.ts']),
       makeChapter('c2', 'Tests', ['c.ts']),
     ]
     render(<ChapterNav chapters={chapters} />)
-    expect(screen.getByText('1/2 · 5 min')).toBeTruthy()
-    expect(screen.getByText('0/1 · 5 min')).toBeTruthy()
+    expect(screen.getByText('1/2')).toBeTruthy()
+    expect(screen.getByText('0/1')).toBeTruthy()
   })
 
   it('names each chapter header with its name, file count and whether it is viewed', () => {

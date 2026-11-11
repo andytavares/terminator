@@ -18,24 +18,8 @@ const file: PrChangedFile = {
   additions: 3,
   deletions: 0,
   isBinary: false,
-  tier: 1,
   whyHere: 'changed',
-  estimatedMinutes: 1,
-  riskScore: {
-    level: 'low',
-    composite: 1,
-    dominantDriver: 'changeSize',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {
-      changeSize: 3,
-      churn90d: null,
-      blastRadius: null,
-      testFilePresent: null,
-      complexityDelta: null,
-      patchCoverage: null,
-    },
-  },
+  churn90d: null,
 }
 
 const pr = PrReviewDetailSchema.parse({
@@ -50,7 +34,6 @@ const pr = PrReviewDetailSchema.parse({
   headSHA: 'abc',
   ciStatus: 'passing',
   lintStatus: 'pass',
-  coverageStatus: 'pass',
   chapters: [
     { id: 'ch-1', name: 'Math', estimatedMinutes: 1, status: 'not-started', files: [file] },
   ],
@@ -192,7 +175,6 @@ function renderPaneWithQuestion() {
       onMarkViewed={vi.fn()}
       onPrevFile={vi.fn()}
       onNextFile={vi.fn()}
-      onShowRisk={vi.fn()}
     />
   )
 }

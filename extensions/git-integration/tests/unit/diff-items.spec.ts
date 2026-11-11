@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { buildDiffItems, type DiffItemSource, type MovedMark } from '../../src/review/diff-items'
-import { buildSplitRows } from '../../src/components/FileDiffView'
 import type { DiffHunk, DiffLine } from '../../src/schemas/git.schema'
 
 const contextLine = (n: number): DiffLine => ({
@@ -16,10 +15,8 @@ function diffItemSource(
   overrides: Partial<DiffItemSource> = {}
 ): DiffItemSource {
   return {
-    mode: 'unified',
     hunkCount: hunks.length,
     visibleHunks: hunks.map((hunk, index) => ({ hunk, index })),
-    splitRows: hunks.map((h) => buildSplitRows(h.lines)),
     gapViews: new Map(),
     hotspots: [],
     movedMark: () => null,
@@ -99,22 +96,12 @@ describe('buildDiffItems() — moved blocks', () => {
       movedMark: (n) => collapsedMark(n === 1),
     })
     expect(keysOf(source)).toEqual(['0-header', '0-0'])
-    expect(keysOf({ ...source, mode: 'split' })).toEqual(['0-header', '0-row-0'])
   })
 
   it('reads a removed unified line on the left, by its old line number', () => {
     const hunks = [hunkOf('@@ a', [contextLine(5), removedAt7, addedAt8])]
     const source = diffItemSource(hunks, { movedMark: hidingOnly('LEFT', 7) })
     expect(keysOf(source)).toEqual(['0-header', '0-0', '0-2'])
-  })
-
-  it('hides a split row by either side, each read by its own line number', () => {
-    const hunks = [hunkOf('@@ a', [contextLine(5), removedAt7, addedAt8])]
-    const visibleSplitKeys = (movedMark: DiffItemSource['movedMark']) =>
-      keysOf(diffItemSource(hunks, { mode: 'split', movedMark }))
-    expect(visibleSplitKeys(hidingOnly('LEFT', 7))).toEqual(['0-header', '0-row-0'])
-    expect(visibleSplitKeys(hidingOnly('RIGHT', 8))).toEqual(['0-header', '0-row-0'])
-    expect(visibleSplitKeys(hidingOnly('LEFT', 5))).toEqual(['0-header', '0-row-1'])
   })
 })
 

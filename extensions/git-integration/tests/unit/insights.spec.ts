@@ -15,9 +15,7 @@ const insightsOf = (files: unknown[], opts: ComputeInsightsOptions) =>
 const baseOpts: ComputeInsightsOptions = {
   readingOrder: [],
   chapters: [],
-  statusChecks: [],
   dryViolations: [],
-  localCoverage: null,
 }
 
 /** A changed file as GitHub lists it, with its patch given line by line. */
@@ -183,79 +181,6 @@ describe('measureDiffComplexity()', () => {
   })
 })
 
-const ADD_ONE_FILE = changedFileWithPatch(
-  'src/util.ts',
-  [
-    '@@ -0,0 +1,3 @@ export function addOne',
-    '+export function addOne(n: number) {',
-    '+  return n + 1',
-    '+}',
-  ],
-  { additions: 3, deletions: 0 }
-)
-
-const ADD_ONE_SPEC_FILE = changedFileWithPatch(
-  'tests/unit/util.spec.ts',
-  ['@@ -0,0 +1,2 @@ describe', '+const result = addOne(1)', '+expect(result).toBe(2)'],
-  { additions: 2, deletions: 0 }
-)
-
-const SUBTRACT_ONE_FILE = changedFileWithPatch(
-  'src/util.ts',
-  [
-    '@@ -0,0 +1,3 @@ export function subtractOne',
-    '+export function subtractOne(n: number) {',
-    '+  return n - 1',
-    '+}',
-  ],
-  { additions: 3, deletions: 0 }
-)
-
-const ONE_CONSTANT_FILE = changedFileWithPatch('src/util.ts', [
-  '@@ -0,0 +1,1 @@',
-  '+export const x = 1',
-])
-
-describe('computeInsights() — coverage of changed functions', () => {
-  it('marks a changed function tested when a PR test file references it', async () => {
-    const insights = await insightsOf([ADD_ONE_FILE, ADD_ONE_SPEC_FILE], baseOpts)
-    expect(insights.coverage.changedFunctions).toBe(1)
-    expect(insights.coverage.testedFunctions).toBe(1)
-    expect(insights.coverage.untestedFunctions).toEqual([])
-    expect(insights.coverage.source).toBe('test files referencing each changed function')
-  })
-
-  it('falls back to findTestReferences (repo grep) when no PR test file covers a function', async () => {
-    const withoutRepoTests = await insightsOf([SUBTRACT_ONE_FILE], baseOpts)
-    expect(withoutRepoTests.coverage.untestedFunctions).toContain('subtractOne')
-
-    const withRepoTests = await insightsOf([SUBTRACT_ONE_FILE], {
-      ...baseOpts,
-      findTestReferences: async (symbols) => new Set(symbols.filter((s) => s === 'subtractOne')),
-    })
-    expect(withRepoTests.coverage.testedFunctions).toBe(1)
-    expect(withRepoTests.coverage.untestedFunctions).toEqual([])
-  })
-})
-
-describe('computeInsights() — patch coverage percentage', () => {
-  it('parses a patch-coverage percentage from a matching status check description', async () => {
-    const insights = await insightsOf([ONE_CONSTANT_FILE], {
-      ...baseOpts,
-      statusChecks: [{ name: 'codecov/patch', state: 'pass', description: '84.21% of diff hit' }],
-    })
-    expect(insights.coverage.patchPercent).toBe(84)
-  })
-
-  it('falls back to localCoverage, then to null, when no CI check reports it', async () => {
-    const withLocal = await insightsOf([ONE_CONSTANT_FILE], { ...baseOpts, localCoverage: 72.6 })
-    expect(withLocal.coverage.patchPercent).toBe(73)
-
-    const withNeither = await insightsOf([ONE_CONSTANT_FILE], baseOpts)
-    expect(withNeither.coverage.patchPercent).toBeNull()
-  })
-})
-
 const FREED_FILE = changedFileWithPatch(
   'src/freed.ts',
   [
@@ -343,13 +268,9 @@ function oversizedFunctionFiles() {
 }
 
 describe('computeInsights() — health flags', () => {
-  it('flags TODO, eslint-disable, @ts-ignore and new any in added lines', async () => {
+  it('flags a new TODO and no language-specific marker in added lines', async () => {
     const insights = await insightsOf([MARKERS_FILE], baseOpts)
-    const kinds = insights.health.flags.map((f) => f.kind)
-    expect(kinds).toContain('todo')
-    expect(kinds).toContain('eslint-disable')
-    expect(kinds).toContain('ts-ignore')
-    expect(kinds).toContain('any')
+    expect(insights.health.flags.map((f) => f.kind)).toEqual(['todo'])
     expect(insights.health.source).toBe('tree-sitter · detectDryViolations')
   })
 
@@ -374,15 +295,6 @@ const FEATURE_FILE = changedFileWithPatch(
   { additions: 3, deletions: 0 }
 )
 
-const LOCK_FILE = changedFileWithPatch(
-  'package-lock.json',
-  ['@@ -0,0 +1,1 @@', '-"a": "1"', '+"a": "2"'],
-  {
-    additions: 500,
-    deletions: 500,
-  }
-)
-
 /** A reading order where each step uses the symbol the step before it defines. */
 function chainedReadingOrder(paths: string[]): ReadingStep[] {
   return paths.map((path, i) => ({
@@ -399,15 +311,13 @@ function chapterOfPaths(id: string, paths: string[]): Chapter {
     id,
     name: `Chapter ${id}`,
     files: paths.map((path) => ({ path }) as never),
-    estimatedMinutes: 1,
     status: 'not-started',
   }
 }
 
 describe('computeInsights() — understandability', () => {
-  it('counts semantic lines-to-read, excludes tier-3 files, and rates level', async () => {
-    const insights = await insightsOf([FEATURE_FILE, LOCK_FILE], baseOpts)
-    // Only src/feature.ts's semantic hunk counts; the lock file is tier 3.
+  it('counts semantic lines-to-read and rates level', async () => {
+    const insights = await insightsOf([FEATURE_FILE], baseOpts)
     expect(insights.understandability.linesToRead).toBe(3)
     expect(insights.understandability.newExports).toBeGreaterThan(0)
     expect(insights.understandability.level).toBe('easy')

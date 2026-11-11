@@ -1,5 +1,4 @@
 import type { DashboardPR, DashboardSection } from '../schemas/pr-review.schema'
-import { queueRiskLevel } from './pr-review-service'
 import {
   CHECKS_FIELDS,
   REVIEW_REQUEST_FIELDS,
@@ -243,8 +242,6 @@ function mapNode(node: RawPrNode, section: DashboardSection, viewer: DashboardVi
     additions,
     deletions,
     fileCount: node.changedFiles,
-    riskLevel: queueRiskLevel(additions + deletions),
-    estimatedMinutes: Math.max(1, Math.ceil((additions + deletions) / 60)),
     ...reviewProgressOf(node, viewer.login),
     ...sectionExtrasOf(node, viewer),
     sessionStatus: 'not-started',

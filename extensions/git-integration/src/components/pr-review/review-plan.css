@@ -20,7 +20,7 @@
 }
 .review-plan__row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 88px 64px 120px 56px;
+  grid-template-columns: 28px minmax(0, 1fr) 64px 120px 88px;
   align-items: center;
   gap: var(--tm-space-3);
   width: 100%;
@@ -72,41 +72,13 @@
   font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
-.review-plan__risk {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--tm-font-size-xs);
-  font-weight: 600;
-}
-.review-plan__risk::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.review-plan__risk--high {
-  color: var(--tm-danger);
-}
-.review-plan__risk--medium {
-  color: var(--tm-warning);
-}
-/* Low risk is plain muted text: only medium and high carry a coloured dot. */
-.review-plan__risk--low {
-  color: var(--tm-text-muted);
-  font-weight: 400;
-}
-.review-plan__risk--low::before {
-  display: none;
-}
 .review-plan__files,
-.review-plan__minutes {
+.review-plan__lines {
   font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
-.review-plan__minutes {
+.review-plan__lines {
   text-align: right;
 }
 .review-plan__bar {
@@ -148,7 +120,7 @@
 
 @container pr-overview (max-width: 640px) {
   .review-plan__row {
-    grid-template-columns: 28px minmax(0, 1fr) 88px 56px;
+    grid-template-columns: 28px minmax(0, 1fr) 88px;
   }
   .review-plan__files,
   .review-plan__change {

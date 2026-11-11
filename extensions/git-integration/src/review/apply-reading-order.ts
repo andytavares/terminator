@@ -3,7 +3,7 @@ import type { Chapter, ReadingStep } from '../schemas/pr-review.schema'
 /**
  * Puts buildChapters' groups into reading order: chapters by their earliest
  * step, files within a chapter by step, each file's reason taken from its step.
- * Files with no step (no grammar, lock files) keep their order after the rest.
+ * Files with no step (no grammar) keep their order after the rest.
  */
 export function applyReadingOrder(chapters: Chapter[], order: ReadingStep[]): Chapter[] {
   if (order.length === 0) return chapters
@@ -39,15 +39,10 @@ function symbolList(symbols: string[]): string {
   return `${named.slice(0, -1).join(', ')} and ${named.at(-1)}`
 }
 
-/** The chapter with a one-line summary: the symbols its steps change, then its test files. */
+/** The chapter with a one-line summary: the symbols its steps change. */
 function withSummary(chapter: Chapter, byPath: Map<string, ReadingStep>): Chapter {
   const symbols = [...new Set(chapter.files.map((f) => byPath.get(f.path)?.symbol ?? null))].filter(
     (symbol): symbol is string => symbol !== null
   )
-  const tests = chapter.files.filter((f) => f.tier === 2).length
-  const parts = [
-    symbols.length > 0 ? `Changes ${symbolList(symbols)}` : null,
-    tests > 0 ? `${tests} test file${tests === 1 ? '' : 's'}` : null,
-  ].filter((part): part is string => part !== null)
-  return parts.length > 0 ? { ...chapter, summary: parts.join(' · ') } : chapter
+  return symbols.length > 0 ? { ...chapter, summary: `Changes ${symbolList(symbols)}` } : chapter
 }

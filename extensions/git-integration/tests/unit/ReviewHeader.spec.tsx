@@ -20,10 +20,6 @@ const pending: StatusCheck[] = [
   { name: 'lint', state: 'pass' },
 ]
 
-function noOwnedFilter() {
-  return { ownedCount: 0, ownedOnly: false, onToggleOwnedOnly: vi.fn() }
-}
-
 function baseProps(overrides: Partial<ReviewHeaderProps> = {}): ReviewHeaderProps {
   return {
     prNumber: 42,
@@ -36,15 +32,9 @@ function baseProps(overrides: Partial<ReviewHeaderProps> = {}): ReviewHeaderProp
       { id: 'c1', fileCount: 6, viewedCount: 2 },
       { id: 'c2', fileCount: 4, viewedCount: 0 },
     ],
-    minutesLeft: 6,
     draftCount: 0,
     onSubmit: vi.fn(),
     onPause: vi.fn(),
-    largePr: null,
-    onDismissLargePr: vi.fn(),
-    focusMode: false,
-    onToggleFocusMode: vi.fn(),
-    ...noOwnedFilter(),
     onAskAgent: vi.fn(),
     onRefresh: vi.fn(),
     refreshing: false,
@@ -112,55 +102,6 @@ describe('ReviewHeader (continued) — checks pill — opens a popover with the 
 })
 
 describe('ReviewHeader (continued)', () => {
-  describe('large-PR pill', () => {
-    it('is absent when largePr is null', () => {
-      render(<ReviewHeader {...baseProps({ largePr: null })} />)
-      expect(screen.queryByText(/LOC/)).toBeNull()
-    })
-
-    it('shows LOC and estimated minutes when set', () => {
-      render(<ReviewHeader {...baseProps({ largePr: { loc: 1234, minutes: 20 } })} />)
-      expect(screen.getByRole('button', { name: /1,234 LOC · ~20 min/ })).toBeTruthy()
-    })
-
-    it('opens a popover with the warning sentence and a dismiss button', async () => {
-      const user = userEvent.setup()
-      const onDismissLargePr = vi.fn()
-      render(
-        <ReviewHeader {...baseProps({ largePr: { loc: 1234, minutes: 20 }, onDismissLargePr })} />
-      )
-      await user.click(screen.getByRole('button', { name: /1,234 LOC/ }))
-      expect(
-        screen.getByText(
-          'Large PR — 1,234 LOC, estimated 20 min to review. Consider requesting it be split.'
-        )
-      ).toBeTruthy()
-      await user.click(screen.getByRole('button', { name: /dismiss/i }))
-      expect(onDismissLargePr).toHaveBeenCalledTimes(1)
-    })
-  })
-})
-
-describe('ReviewHeader (continued)', () => {
-  describe('focus pill', () => {
-    it('is absent when focusMode is false', () => {
-      render(<ReviewHeader {...baseProps({ focusMode: false })} />)
-      expect(screen.queryByRole('button', { name: /^focus mode$/i })).toBeNull()
-    })
-
-    it('is shown and pressed when focusMode is true, and toggles off on click', async () => {
-      const user = userEvent.setup()
-      const onToggleFocusMode = vi.fn()
-      render(<ReviewHeader {...baseProps({ focusMode: true, onToggleFocusMode })} />)
-      const btn = screen.getByRole('button', { name: /^focus mode$/i })
-      expect(btn.getAttribute('aria-pressed')).toBe('true')
-      await user.click(btn)
-      expect(onToggleFocusMode).toHaveBeenCalledTimes(1)
-    })
-  })
-})
-
-describe('ReviewHeader (continued)', () => {
   describe('progress', () => {
     it('draws one segment per chapter, named by the viewed total', () => {
       render(<ReviewHeader {...baseProps({ viewedCount: 3, totalFiles: 12 })} />)
@@ -182,14 +123,10 @@ describe('ReviewHeader (continued)', () => {
       expect(second.style.getPropertyValue('--filled')).toBe('0%')
     })
 
-    it('says how many files are viewed and how long is left', () => {
-      render(<ReviewHeader {...baseProps({ viewedCount: 4, totalFiles: 23, minutesLeft: 26 })} />)
-      expect(screen.getByText('4 of 23 viewed · 26 min left')).toBeTruthy()
-    })
-
-    it('leaves the time out when nothing is left to read', () => {
-      render(<ReviewHeader {...baseProps({ viewedCount: 10, totalFiles: 10, minutesLeft: 0 })} />)
-      expect(screen.getByText('10 of 10 viewed')).toBeTruthy()
+    it('says how many files are viewed, with no reading time', () => {
+      render(<ReviewHeader {...baseProps({ viewedCount: 4, totalFiles: 23 })} />)
+      expect(screen.getByText('4 of 23 viewed')).toBeTruthy()
+      expect(screen.queryByText(/min/)).toBeNull()
     })
   })
 })
@@ -245,9 +182,9 @@ describe('ReviewHeader (continued) — More menu', () => {
     ])
   })
 
-  it('holds the View menu in the header', () => {
+  it('has no View menu', () => {
     render(<ReviewHeader {...baseProps()} />)
-    expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'View' })).toBeNull()
   })
 })
 
@@ -358,17 +295,5 @@ describe('ReviewHeader — submit and pause', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Pause review' }))
     expect(onPause).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('menu')).toBeNull()
-  })
-})
-
-describe('ReviewHeader — only my files', () => {
-  it('shows a pressed pill while the filter is on, and turns it off on click', async () => {
-    const user = userEvent.setup()
-    const onToggleOwnedOnly = vi.fn()
-    render(<ReviewHeader {...baseProps({ ownedCount: 3, ownedOnly: true, onToggleOwnedOnly })} />)
-    const pill = screen.getByRole('button', { name: /^my files$/i })
-    expect(pill.getAttribute('aria-pressed')).toBe('true')
-    await user.click(pill)
-    expect(onToggleOwnedOnly).toHaveBeenCalledTimes(1)
   })
 })

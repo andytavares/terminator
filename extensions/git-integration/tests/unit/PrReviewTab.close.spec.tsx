@@ -67,12 +67,11 @@ beforeEach(() => {
 })
 
 describe('closing a PR under review', () => {
-  it('keeps the notes, drafts and viewed marks the reviewer has not submitted, and shows the queue', async () => {
+  it('keeps the drafts and viewed marks the reviewer has not submitted, and shows the queue', async () => {
     usePrReviewStore.setState({
       activePr,
       viewedFiles: new Set(['src/a.ts']),
       viewedAt: { 'src/a.ts': 'abc123' },
-      notes: [{ id: 'n1', path: 'src/a.ts', line: 3, side: 'RIGHT', body: 'why?', createdAt: 't' }],
       drafts: [
         {
           id: 'd1',
@@ -92,7 +91,6 @@ describe('closing a PR under review', () => {
     const saved = ReviewSessionSchema.parse(storedSessions.get(key))
     expect(saved.pausedAt).not.toBeNull()
     expect(saved.drafts.map((d) => d.body)).toEqual(['rename this'])
-    expect(saved.notes.map((n) => n.body)).toEqual(['why?'])
     expect(saved.viewedAt).toEqual({ 'src/a.ts': 'abc123' })
     expect(screen.getByTestId('review-queue')).toBeTruthy()
   })

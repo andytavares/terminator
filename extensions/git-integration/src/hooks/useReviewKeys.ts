@@ -8,7 +8,6 @@ export interface ReviewKeyHandlers {
   prevChapter(): void
   nextUnviewedFile(): void
   markViewed(): void
-  toggleFileList?(): void
   toggleInsights(): void
   openSubmit(): void
 }
@@ -41,13 +40,9 @@ const KEY_ACTIONS: Record<string, KeyAction> = {
   n: (h) => h.nextUnviewedFile(),
   v: (h) => h.markViewed(),
   s: (_h, ui) => ui.setDiffRange(ui.diffRange === 'since' ? 'whole' : 'since'),
-  c: (_h, ui) => ui.cycleCommentVisibility(),
-  C: (_h, ui) => ui.setAgentNotesOn(!ui.agentNotesOn),
   a: emitKeyEvent(REVIEW_KEY_EVENTS.askAgent),
   e: emitKeyEvent(REVIEW_KEY_EVENTS.explain),
   r: emitKeyEvent(REVIEW_KEY_EVENTS.comment),
-  m: emitKeyEvent(REVIEW_KEY_EVENTS.note),
-  t: (h, ui) => (h.toggleFileList ? h.toggleFileList() : ui.toggleFileList()),
   i: (h) => h.toggleInsights(),
   '?': (_h, ui) => ui.setKeyboardHelpOpen(!ui.keyboardHelpOpen),
 }

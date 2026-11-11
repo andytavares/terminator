@@ -27,7 +27,9 @@ describe('groupSameShapeHunks()', () => {
     expect(groups[0].maskedValues.get('src/api/upload.ts#0')).toEqual(['2', '4'])
     expect(groups[0].maskedValues.get('src/api/download.ts#0')).toEqual(['1', '7'])
   })
+})
 
+describe('groupSameShapeHunks() — within one file', () => {
   it('groups hunks within one file', () => {
     const groups = groupsOf([
       {
@@ -47,7 +49,9 @@ describe('groupSameShapeHunks()', () => {
     expect(groups[0].first).toEqual({ path: 'src/config.ts', hunkIndex: 0 })
     expect(groups[0].rest).toEqual([{ path: 'src/config.ts', hunkIndex: 1 }])
   })
+})
 
+describe('groupSameShapeHunks() — what never folds', () => {
   it('never folds a hunk whose operator differs', () => {
     const groups = groupsOf([
       changing('src/limits.ts', ['-if (count >= 3) stop()', '+if (count >= 5) stop()']),
@@ -80,7 +84,9 @@ describe('groupSameShapeHunks()', () => {
     expect(groups).toHaveLength(1)
     expect(groups[0].maskedValues.get('src/trace.ts#0')).toEqual(['"b"', '`error`'])
   })
+})
 
+describe('groupSameShapeHunks() — what is ignored', () => {
   it('never groups hunks with fewer than two changed lines', () => {
     const groups = groupsOf([
       changing('src/a.ts', ['+  retries: 3,']),

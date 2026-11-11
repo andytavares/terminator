@@ -8,7 +8,7 @@ import type { AgentScope } from '../../../schemas/review-agent.schema'
 import type { FileDiff } from '../../../schemas/git.schema'
 import type { DiffItem } from '../../../review/diff-items'
 import type { VirtualDiffListHandle } from '../VirtualDiffList'
-import type { ComposerAnchor, NoteAnchor } from './types'
+import type { ComposerAnchor } from './types'
 import { hunkNearTop, rangeStart } from './lines'
 
 interface ComposerRequestSource {
@@ -38,7 +38,6 @@ export interface KeyEventSource {
   ) => void
   selectionTouchesRevealed: (sel: LineSelection | null) => boolean
   setComposerAnchor: (anchor: ComposerAnchor) => void
-  setNoteAnchor: (anchor: NoteAnchor) => void
   peekDefinition: () => void
 }
 
@@ -146,17 +145,12 @@ function keyEventHandlers(src: KeyEventSource): Array<[string, () => void]> {
     const anchor = { line: sel.endLine, startLine: rangeStart(sel), side: sel.side }
     src.setComposerAnchor({ ...anchor, initialBody: '', fromFindingId: null })
   }
-  const noteOnSelection = () => {
-    const sel = selectionHere(src)
-    if (sel) src.setNoteAnchor({ line: sel.endLine, side: sel.side })
-  }
   return [
     [REVIEW_KEY_EVENTS.nextHunk, () => src.scrollHunkIntoView(1)],
     [REVIEW_KEY_EVENTS.prevHunk, () => src.scrollHunkIntoView(-1)],
     [REVIEW_KEY_EVENTS.askAgent, reviewSelection],
     [REVIEW_KEY_EVENTS.explain, explain],
     [REVIEW_KEY_EVENTS.comment, commentOnSelection],
-    [REVIEW_KEY_EVENTS.note, noteOnSelection],
     [REVIEW_KEY_EVENTS.peekDefinition, () => src.peekDefinition()],
   ]
 }

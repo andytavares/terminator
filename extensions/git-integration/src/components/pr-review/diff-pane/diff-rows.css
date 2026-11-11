@@ -17,24 +17,6 @@
   font-size: var(--tm-font-size-sm);
 }
 
-/* Split view */
-.diff-split-header {
-  background: var(--tm-bg-base);
-  color: var(--tm-text-muted);
-  padding: 4px 10px;
-  font-size: var(--tm-font-size-sm);
-  font-family: var(--tm-font-ui);
-}
-.diff-table--split {
-  background: var(--tm-bg-base);
-  flex: 0 1 auto;
-  min-width: 0;
-  table-layout: fixed;
-  font-family: var(--tm-font-mono);
-  font-size: var(--tm-font-size-sm);
-  border-collapse: collapse;
-}
-
 /* Hunk row: names the enclosing symbol in the UI face; the ranges stay out of it. */
 .diff-hunk-header {
   background: var(--tm-bg-base);

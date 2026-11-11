@@ -38,7 +38,6 @@ function makePr(overrides: Partial<PrReviewDetail> = {}): PrReviewDetail {
     mergeStateStatus: 'clean',
     ciStatus: 'passing',
     lintStatus: 'unknown',
-    coverageStatus: 'unknown',
     statusChecks: [],
     approvals: [],
     requestedReviewers: [],

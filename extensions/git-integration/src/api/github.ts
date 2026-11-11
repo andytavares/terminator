@@ -10,11 +10,6 @@ const bridge = () => window.electronAPI.extensionBridge
 
 export interface RawFileMetrics {
   churn90d: number
-  blastRadius: number
-  topImporters: string[]
-  importerCount: number
-  testFilePresent: boolean
-  patchCoverage?: number | null
 }
 
 export interface StackPlan {
@@ -164,14 +159,6 @@ export const githubAPI = {
 
   prCompare: (repoRoot: string, fromSha: string, toSha: string) =>
     invoke<BridgeResult<PrCompareResult>>('github:pr-compare', { repoRoot, fromSha, toSha }),
-
-  testsForBlock: (input: {
-    repoRoot: string
-    headSHA: string
-    path: string
-    code: string
-    hunkHeader?: string
-  }) => bridge().invoke('github:tests-for-block', input),
 
   cloneRepo: (repo: string, folder: string) =>
     bridge().invoke('github:clone-repo', { repo, folder }),

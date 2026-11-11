@@ -6,7 +6,6 @@ import { ChapterFileList } from '../../src/components/pr-review/ChapterFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { Chapter } from '../../src/schemas/pr-review.schema'
 import { changedFile } from './support/pr-review-file'
-import { makeRiskScore } from './risk-score-fixtures'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
@@ -18,20 +17,16 @@ function makeChapter(): Chapter {
   return {
     id: 'ch-1',
     name: 'Core',
-    estimatedMinutes: 5,
     status: 'not-started',
     files: [
       changedFile('src/foo.ts', {
         additions: 3,
         deletions: 1,
-        riskScore: makeRiskScore(),
         whyHere: 'Core logic',
       }),
       changedFile('src/bar.ts', {
         changeType: 'added',
         additions: 10,
-        tier: 2,
-        riskScore: makeRiskScore(),
         whyHere: 'New feature',
       }),
     ],

@@ -98,10 +98,6 @@
 .file-tree-glyph--todo {
   color: var(--tm-text-muted);
 }
-.file-tree-glyph--risk {
-  color: var(--tm-danger);
-}
-
 .file-tree-name {
   overflow: hidden;
   text-overflow: ellipsis;

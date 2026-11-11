@@ -1,6 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { applyReadingOrder } from '../../src/review/apply-reading-order'
-import { findTestReferencesInRepo } from '../../src/review/test-references'
 import type { Chapter, PrChangedFile, ReadingStep } from '../../src/schemas/pr-review.schema'
 
 function file(path: string): PrChangedFile {
@@ -10,29 +9,13 @@ function file(path: string): PrChangedFile {
     additions: 10,
     deletions: 2,
     isBinary: false,
-    tier: 1,
     whyHere: 'Source file — implementation',
-    riskScore: {
-      level: 'low',
-      composite: null,
-      metrics: {
-        changeSize: null,
-        churn90d: null,
-        blastRadius: null,
-        testFilePresent: null,
-        complexityDelta: null,
-        patchCoverage: null,
-      },
-      dominantDriver: 'Not yet computed',
-      topImporters: [],
-      importerCount: 0,
-    },
-    estimatedMinutes: 1,
+    churn90d: null,
   }
 }
 
 function chapter(id: string, paths: string[]): Chapter {
-  return { id, name: id, files: paths.map(file), estimatedMinutes: 1, status: 'not-started' }
+  return { id, name: id, files: paths.map(file), status: 'not-started' }
 }
 
 function step(n: number, path: string, reason: string): ReadingStep {
@@ -78,9 +61,8 @@ describe('applyReadingOrder', () => {
 })
 
 describe('applyReadingOrder — chapter summary', () => {
-  it('summarises each chapter by the symbols its steps change and its test files', () => {
+  it('summarises each chapter by the symbols its steps change, with no test-file count', () => {
     const review = chapter('review', ['src/session.ts', 'src/store.ts', 'tests/session.spec.ts'])
-    review.files[2] = { ...review.files[2], tier: 2 }
     const out = applyReadingOrder(
       [review],
       [
@@ -89,7 +71,7 @@ describe('applyReadingOrder — chapter summary', () => {
         step(3, 'tests/session.spec.ts', 'Tests step 1, read right after it'),
       ]
     )
-    expect(out[0].summary).toBe('Changes markViewed and viewAll · 1 test file')
+    expect(out[0].summary).toBe('Changes markViewed and viewAll')
   })
 
   it('names at most three symbols in a chapter summary and counts the rest', () => {
@@ -122,46 +104,5 @@ describe('applyReadingOrder — without steps', () => {
     )
     expect(out[0].files.map((f) => f.path)).toEqual(['src/a.ts', 'src/b.ts', 'package-lock.json'])
     expect(out[0].files[2].whyHere).toBe('Source file — implementation')
-  })
-})
-
-describe('findTestReferencesInRepo', () => {
-  it('greps test files once and returns the symbols they mention', async () => {
-    const runGit = vi.fn().mockResolvedValue('computeRiskScore\ncomputeRiskScore\nqueueRiskLevel\n')
-    const found = await findTestReferencesInRepo(
-      '/repo',
-      ['computeRiskScore', 'shardByDuration', 'queueRiskLevel'],
-      runGit
-    )
-    expect([...found].sort()).toEqual(['computeRiskScore', 'queueRiskLevel'])
-    expect(runGit).toHaveBeenCalledTimes(1)
-    const args = runGit.mock.calls[0][1] as string[]
-    expect(args.slice(0, 4)).toEqual(['grep', '-h', '-o', '-w'])
-    expect(args).toContain('computeRiskScore|shardByDuration|queueRiskLevel')
-    expect(args).toContain('*.spec.*')
-  })
-})
-
-describe('findTestReferencesInRepo — symbols and repositories it cannot grep', () => {
-  it.each([
-    { name: 'no symbols', repoRoot: '/repo', symbols: [] as string[], gitRuns: 0 },
-    { name: 'an uncloned repo', repoRoot: 'gh:acme/widgets', symbols: ['a'], gitRuns: 0 },
-    { name: 'a grep with no match', repoRoot: '/repo', symbols: ['a'], gitRuns: 1 },
-  ])(
-    'returns nothing for $name, after $gitRuns git runs',
-    async ({ repoRoot, symbols, gitRuns }) => {
-      // git grep exits 1 when nothing matches.
-      const runGit = vi.fn().mockRejectedValue(new Error('exit 1'))
-      const found = await findTestReferencesInRepo(repoRoot, symbols, runGit)
-      expect([...found]).toEqual([])
-      expect(runGit).toHaveBeenCalledTimes(gitRuns)
-    }
-  )
-
-  it('greps only for the symbols that are plain identifiers', async () => {
-    const runGit = vi.fn().mockResolvedValue('')
-    await findTestReferencesInRepo('/repo', ['ok_name', 'bad name', 'a|b'], runGit)
-    const args = runGit.mock.calls[0][1] as string[]
-    expect(args.slice(0, 7)).toEqual(['grep', '-h', '-o', '-w', '-E', 'ok_name', '--'])
   })
 })
