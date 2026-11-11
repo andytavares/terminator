@@ -4,7 +4,6 @@
  * starting over an order its run left nothing behind for.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
-import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
@@ -12,7 +11,9 @@ import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/found
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentNode } from '../helpers/run-nodes.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { orderStoreAt } from '../../src/state/live-index.js'
+import { indexFor, orderStoreAt } from '../../src/state/live-index.js'
+import { writeRunGraph } from '../../src/ipc/run-channels.js'
+import type { RunGraph } from '../../src/line/run-graph.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { strandedAgents } from '../../src/runtime/runtime-state.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -67,12 +68,14 @@ async function saveTypedOrder(over: Partial<WorkOrder>): Promise<void> {
 describe('agents handed back to their terminals', () => {
   it('are offered for this order only, and only while their terminal is open', async () => {
     await saveTypedOrder({ status: 'running', recipe: 'direct' })
-    const graph = {
+    const graph: RunGraph = {
       orderId: 'WO-1',
       recipe: 'direct',
       nodes: [agentNode('build', { state: 'running', sessionId: 's-open', startedAt: AT })],
     }
-    fs.writeFileSync(path.join(dataDir, 'orders', 'WO-1', 'run-graph.json'), JSON.stringify(graph))
+    // Through the index, as every writer must: a graph written behind its back stays unseen once
+    // background work read this order's graph first.
+    await writeRunGraph(dataDir, graph, indexFor(dataDir))
     theRunner.terminalFor.mockImplementation((sessionId: unknown) =>
       sessionId === 's-closed' ? null : { terminalSessionId: 't-1', projectId: 'p-1' }
     )
