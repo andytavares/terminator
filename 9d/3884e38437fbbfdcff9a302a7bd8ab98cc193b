@@ -1,0 +1,86 @@
+extensions/git-integration/tests/unit/ReviewHeader.spec.tsx
+  s_6c2c30985200c2::t_abb103190c8269 273-275
+  s_6c2c30985200c2::t_274c73aeff12f3 175,179
+extensions/git-integration/src/components/pr-review/review-header.css
+  s_6c2c30985200c2::t_ca24981dec0615 47
+extensions/git-integration/src/components/pr-review/KeyboardHelp.tsx
+  s_6c2c30985200c2::t_07ad045a815ddc 8-14,17,22,24-25,27,29
+extensions/git-integration/tests/unit/useReviewKeys.spec.tsx
+  s_6c2c30985200c2::t_cee45e79d4d3a9 7,12,20,33-34,37,51-54,56,58,61,63,67-68,70-71,74,76-77,80-83,85-86,90,92-93,95-98,105,108-117,119,121-123,127,130-133,139-140
+extensions/git-integration/src/components/pr-review/VerdictBar.tsx
+  s_6c2c30985200c2::t_068243834c4953 1-67,74-78,80-84,86,88-93,95-96,98-101,103-115,123-164,171-175
+  s_6c2c30985200c2::t_3ad328b0217847 116-122
+  s_6c2c30985200c2::t_70e0c643725ae9 68-73,79,85,87,94,97,102,165-170
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_6c2c30985200c2::t_cb34efcc729562 3,14,207,211,215-216,227,229
+  s_6c2c30985200c2::t_9ebda3459d017e 203-204,233-244
+  s_6c2c30985200c2::t_2b549115d163fb 218-223
+  s_6c2c30985200c2::t_f9f500b389bab5 217
+extensions/git-integration/src/hooks/useReviewKeys.ts
+  s_6c2c30985200c2::t_229030f81bab93 2,5,16-22,25,34,39,42-43,45-49,65
+extensions/git-integration/tests/unit/KeyboardHelp.spec.tsx
+  s_6c2c30985200c2::t_c94341883bc745 26,29-37
+extensions/git-integration/tests/unit/VerdictBar.spec.tsx
+  s_6c2c30985200c2::t_9ebda3459d017e 105,107
+  s_6c2c30985200c2::t_a22be60955a8b3 83,85
+  s_6c2c30985200c2::t_0793e2ccd04feb 1-82,84,86-104,106,108-160
+extensions/git-integration/src/components/pr-review/verdict-bar.css
+  s_6c2c30985200c2::t_70e0c643725ae9 43,48,52
+  s_6c2c30985200c2::t_cf40a218a206c3 1-42,44-47,49-51,53-54
+extensions/git-integration/tests/unit/ReviewFooter.spec.tsx
+  s_6c2c30985200c2::t_5154c3c747299d 59,68
+  s_6c2c30985200c2::t_abb103190c8269 57
+extensions/git-integration/src/components/pr-review/diff-pane/usePaneEvents.ts
+  s_6c2c30985200c2::t_3ad328b0217847 111-116,125-133,188-189
+  s_6c2c30985200c2::t_0ad4983a4d4c6f 5,9,12,24,28-39,46-47,52-53,99-110,117-124,136-152,171-173,175-176,184,190,193-210,230-231,239,248
+  s_6c2c30985200c2::t_233ebde4698fe8 174,186
+  s_6c2c30985200c2::t_7d2bdc05475cba 134,153-154,159-166
+  s_6c2c30985200c2::t_ae34307fc5af02 135
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_6c2c30985200c2::t_8c3137416406ac 33,37,42,149-163,165,167,169-170,224,227-228,233,340-341,346,350,353,355-356,360-362,367,372-373,377,379-384
+  s_6c2c30985200c2::t_b817e01b9edb64 91,172-187,374,385
+  s_6c2c30985200c2::t_509cadaef9ad69 168,188
+  s_6c2c30985200c2::t_5154c3c747299d 226,252
+  s_6c2c30985200c2::t_f164c6fc51db97 171
+extensions/git-integration/src/components/pr-review/ResumeCard.tsx
+  s_6c2c30985200c2::t_9eaae5ad2b060f 20
+extensions/git-integration/src/components/pr-review/review-chrome.css
+  s_6c2c30985200c2::t_03a1d02660fbee 86,88,91
+extensions/git-integration/src/components/pr-review/diff-pane/usePaneState.ts
+  s_6c2c30985200c2::t_cb34efcc729562 53-55
+docs/user-guide/USER-GUIDE.md
+  s_6c2c30985200c2::t_5264e6447532a0 827,832-833,840-841,843
+tests/e2e/pr-review-queue.spec.ts
+  s_6c2c30985200c2::t_8507b13b3d7fb0 196-197
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_6c2c30985200c2::t_0ded405f1ab153 143
+  s_6c2c30985200c2::t_9ebda3459d017e 846-849
+  s_6c2c30985200c2::t_6215f622b43b3a 815-818,821-834,837-844,851,853,855-859
+extensions/git-integration/src/components/pr-review/ReviewFooter.tsx
+  s_6c2c30985200c2::t_9eaae5ad2b060f 39,52
+extensions/git-integration/src/stores/review-ui.store.ts
+  s_6c2c30985200c2::t_598bd36c6eff16 28-38,44-45,77-80,93-95,158-179,204,209
+extensions/git-integration/tests/unit/review-ui.store.spec.ts
+  s_6c2c30985200c2::t_32458abbe2de25 3,135-166
+  s_6c2c30985200c2::t_f825d30b9858df 167
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_6c2c30985200c2::t_b65ef5fb1568df 1-2,5,17,155,165,171,237-238,243,245-263,281,297-298,301,506,544,581,585-592,612
+extensions/git-integration/src/components/pr-review/ReviewHeader.tsx
+  s_6c2c30985200c2::t_395e533f0594f9 182,186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9d3884e38437fbbfdcff9a302a7bd8ab98cc193b",
+  "prompts": {},
+  "sessions": {
+    "s_6c2c30985200c2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0fcc256-8205-49ce-a757-893d4406f77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
