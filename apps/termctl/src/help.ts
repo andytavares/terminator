@@ -3,14 +3,13 @@ import { flagName, schemaTypes } from './flags.js'
 
 const GLOBAL_FLAGS: Array<[string, string]> = [
   ['--json', 'Print the raw result'],
-  ['--yes', 'Run a destructive command without asking'],
-  ['--help', 'Show help for termctl, a group or a command'],
+    ['--help', 'Show help for termctl, a group or a command'],
   ['--socket <path>', "Connect to this socket instead of the app's"],
 ]
 
 /** Rows of two columns, the first padded so the second lines up. */
 export function columns(rows: Array<[string, string]>): string {
-  const width = Math.max(...rows.map(([left]) => left.length))
+  const width = rows.length ? Math.max(...rows.map(([left]) => left.length)) : 0
   return rows.map(([left, right]) => `  ${left.padEnd(width)}  ${right}`.trimEnd()).join('\n')
 }
 
@@ -43,7 +42,7 @@ export function groupHelp(group: string, commands: Command[]): string {
   const rows = commands
     .filter((command) => command.group === group)
     .map((command): [string, string] => [command.verb ?? '', command.tool.description ?? ''])
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort()
   return [`Usage: termctl ${group} <verb> [flags]`, '', 'Verbs:', columns(rows), ''].join('\n')
 }
 
