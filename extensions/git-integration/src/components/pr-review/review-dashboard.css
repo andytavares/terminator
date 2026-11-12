@@ -267,7 +267,7 @@
 .rp-search {
   flex: 1 1 200px;
   min-width: 0;
-  height: var(--tm-control-height-sm);
+  height: var(--tm-control-height);
   padding: 0 9px;
   font: inherit;
 }

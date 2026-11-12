@@ -834,8 +834,8 @@
 .projects-browser__area-edit .area-combobox input {
   padding: 0 8px;
   font-size: var(--tm-font-size-sm);
-  height: 22px;
-  line-height: 22px;
+  height: var(--tm-control-height);
+  line-height: normal;
 }
 
 /* ── Project task list ─────────────────────────────────────────── */
@@ -965,7 +965,7 @@
   width: 100%;
   box-sizing: border-box;
   font-size: var(--tm-font-size-md);
-  padding: 6px 10px;
+  padding: 0 10px;
   font-family: var(--tm-font-ui, sans-serif);
 }
 

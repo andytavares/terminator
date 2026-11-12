@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  height: 30px;
+  height: var(--tm-control-height);
   padding: 0 9px;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border-strong);
@@ -63,7 +63,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  height: 30px;
+  height: var(--tm-control-height);
   padding: 0 6px 0 9px;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-accent-glow);

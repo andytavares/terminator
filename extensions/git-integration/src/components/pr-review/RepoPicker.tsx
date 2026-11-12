@@ -202,15 +202,9 @@ function RepoTools(props: RepoToolsProps) {
         value={props.query}
         onChange={(e) => props.setQuery(e.target.value)}
       />
-      <Button size="sm" onClick={selectShown}>
-        Select all shown
-      </Button>
-      <Button size="sm" onClick={() => props.sel.setSelected(new Set())}>
-        Clear
-      </Button>
-      <Button size="sm" onClick={() => void props.load(true)}>
-        Refresh list
-      </Button>
+      <Button onClick={selectShown}>Select all shown</Button>
+      <Button onClick={() => props.sel.setSelected(new Set())}>Clear</Button>
+      <Button onClick={() => void props.load(true)}>Refresh list</Button>
     </div>
   )
 }
