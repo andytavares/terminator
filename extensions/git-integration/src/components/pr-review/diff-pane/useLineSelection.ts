@@ -20,22 +20,20 @@ interface SelectionTarget {
   path: string
   selection: LineSelection | null
   setSelection: (selection: LineSelection | null) => void
+  /** Called with the lines a finished gutter press or drag selected. */
+  onDragSelected: (selection: LineSelection) => void
 }
 
 export type LineDrag = ReturnType<typeof useLineSelection>
 
-function inRange(lineNum: number, a: number, b: number): boolean {
-  return lineNum >= Math.min(a, b) && lineNum <= Math.max(a, b)
-}
-
-/** A gutter drag selects lines and, released anywhere, stores the selection; the SelectionBar under
- *  it then offers Comment, Ask agent, Explain and Add note. */
+/** A gutter press or drag selects lines and, released anywhere, stores the selection and hands it
+ *  to `onDragSelected`, which opens the comment composer on it. */
 function useDragEnd(
   target: SelectionTarget,
   refs: { drag: { current: DragState }; justEnded: { current: boolean } },
   setPreview: (p: DragPreview | null) => void
 ) {
-  const { path, setSelection } = target
+  const { path, setSelection, onDragSelected } = target
   const { drag: dragRef, justEnded } = refs
   useEffect(() => {
     const endGutterDrag = () => {
@@ -49,17 +47,18 @@ function useDragEnd(
         justEnded.current = false
       }, 0)
       setPreview(null)
-      const startLine = Math.min(drag.startLine, drag.endLine)
-      setSelection({
+      const selection = {
         path,
         side: drag.side,
-        startLine,
+        startLine: Math.min(drag.startLine, drag.endLine),
         endLine: Math.max(drag.startLine, drag.endLine),
-      })
+      }
+      setSelection(selection)
+      onDragSelected(selection)
     }
     window.addEventListener('mouseup', endGutterDrag)
     return () => window.removeEventListener('mouseup', endGutterDrag)
-  }, [path, setSelection, dragRef, justEnded, setPreview])
+  }, [path, setSelection, onDragSelected, dragRef, justEnded, setPreview])
 }
 
 /** The handlers a row's gutter and body use while the reviewer drags over lines. */
@@ -85,18 +84,46 @@ function useDragHandlers(dragRef: { current: DragState }, setPreview: (p: DragPr
   return { onGutterMouseDown, onRowMouseEnter }
 }
 
-/** Whether a line is in the range being dragged, or else in the stored selection. */
-function selected(
-  lineNum: number,
+interface RangeSource {
+  preview: DragPreview | null
+  selection: LineSelection | null
+  path: string
+}
+
+/** The range being dragged, or else the stored selection of this file and side. */
+function activeRange(
   side: Side,
-  state: { preview: DragPreview | null; target: SelectionTarget }
-) {
-  const { preview, target } = state
-  if (lineNum === 0) return false
-  if (preview && preview.side === side) return inRange(lineNum, preview.startLine, preview.endLine)
-  const sel = target.selection
-  if (!sel || sel.path !== target.path || sel.side !== side) return false
-  return lineNum >= sel.startLine && lineNum <= sel.endLine
+  source: RangeSource
+): { startLine: number; endLine: number } | null {
+  const { preview, selection } = source
+  if (preview && preview.side === side) {
+    const { startLine, endLine } = preview
+    return { startLine: Math.min(startLine, endLine), endLine: Math.max(startLine, endLine) }
+  }
+  if (!selection || selection.path !== source.path || selection.side !== side) return null
+  return selection
+}
+
+/** Whether a line is in the range being dragged, or else in the stored selection. */
+function selected(lineNum: number, side: Side, source: RangeSource): boolean {
+  const range = activeRange(side, source)
+  if (lineNum === 0 || !range) return false
+  return lineNum >= range.startLine && lineNum <= range.endLine
+}
+
+/** Whether a line is selected, and whether it is the selection's first line. */
+function useRangeQueries(source: RangeSource) {
+  const { preview, selection, path } = source
+  const isLineSelected = useCallback(
+    (lineNum: number, side: Side) => selected(lineNum, side, { preview, selection, path }),
+    [preview, selection, path]
+  )
+  const isSelectionStart = useCallback(
+    (lineNum: number, side: Side) =>
+      activeRange(side, { preview, selection, path })?.startLine === lineNum,
+    [preview, selection, path]
+  )
+  return { isLineSelected, isSelectionStart }
 }
 
 /** Selecting lines by dragging over the gutter, and clearing the selection on a background click. */
@@ -107,19 +134,20 @@ export function useLineSelection(target: SelectionTarget) {
   useDragEnd(target, { drag: dragRef, justEnded: justEndedRef }, setDragPreview)
   const handlers = useDragHandlers(dragRef, setDragPreview)
   const { selection, path, setSelection } = target
-  const isLineSelected = useCallback(
-    (lineNum: number, side: Side) =>
-      selected(lineNum, side, { preview: dragPreview, target: { selection, path, setSelection } }),
-    [dragPreview, selection, path, setSelection]
-  )
+  const queries = useRangeQueries({ preview: dragPreview, selection, path })
   const clearSelectionOnBackgroundClick = useCallback(
     (e: React.MouseEvent) => {
       if (justEndedRef.current) return
       const el = e.target as HTMLElement
-      if (el.closest('.rs-float') || el.closest('.diff-gutter-btn')) return
+      if (el.closest('.rs-float, .diff-gutter-btn, .comment-composer')) return
       if (selection?.path === path) setSelection(null)
     },
     [selection, path, setSelection]
   )
-  return { dragPreview, ...handlers, isLineSelected, clearSelectionOnBackgroundClick }
+  return {
+    dragPreview,
+    ...handlers,
+    ...queries,
+    clearSelectionOnBackgroundClick,
+  }
 }

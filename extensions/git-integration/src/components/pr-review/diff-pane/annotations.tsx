@@ -7,7 +7,7 @@ import { SelectionBar } from '../SelectionBar'
 import type { DraftComment, Thread } from '../../../schemas/pr-review.schema'
 import type { LineSelection } from '../../../stores/review-ui.store'
 import type { PaneContext, Side } from './types'
-import { rangeStart } from './lines'
+import { commentAnchor } from './lines'
 
 interface LineRef {
   ctx: PaneContext
@@ -150,25 +150,24 @@ function linesScope(ctx: PaneContext, sel: LineSelection) {
 function FloatBar(props: { ctx: PaneContext; sel: LineSelection }) {
   const { ctx, sel } = props
   const { annot, actions } = ctx
-  const comment = { line: sel.endLine, startLine: rangeStart(sel), side: sel.side }
   return (
     <SelectionBar
       canComment={!ctx.gaps.selectionTouchesRevealed(sel)}
       onAskAgent={() => actions.openAgentPanel(linesScope(ctx, sel), 'review')}
       onExplain={() => actions.openAgentPanel(linesScope(ctx, sel), 'explain', true)}
-      onComment={() =>
-        annot.setComposerAnchor({ ...comment, initialBody: '', fromFindingId: null })
-      }
+      onComment={() => annot.setComposerAnchor(commentAnchor(sel))}
     />
   )
 }
 
-/** The float bar sits under the selection's last line, once the drag is over. */
+/** The float bar sits under the selection's last line, once the drag is over and while no
+ *  composer is open. */
 function barAt(props: LineRef): LineSelection | null {
   const { ctx, lineNum, side } = props
   const sel = ctx.selection
   if (!sel || sel.path !== ctx.file.path || sel.side !== side) return null
   if (sel.endLine !== lineNum || ctx.drag.dragPreview !== null) return null
+  if (ctx.annot.composerAnchor !== null) return null
   return sel
 }
 
