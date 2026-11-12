@@ -209,6 +209,36 @@ describe('HomeScreen — acting on an ask', () => {
   })
 })
 
+describe('HomeScreen — a row click selects, Open opens', () => {
+  it('opens a question in place from its row only through a button', async () => {
+    const user = userEvent.setup()
+    state.facts = [asking()]
+    render(<HomeScreen />)
+    await user.click(screen.getByText('Run the migration against staging?'))
+    expect(screen.queryByLabelText('Terminal excerpt')).toBeNull()
+    await user.click(within(askRows()[0]).getByRole('button', { name: 'Open' }))
+    expect(screen.getByLabelText('Terminal excerpt')).toBeTruthy()
+  })
+
+  it('opens where a review ask came from with its Open button', async () => {
+    const user = userEvent.setup()
+    state.facts = [
+      fact({
+        sessionId: 'f',
+        state: 'idle',
+        agent: {} as SessionFacts['agent'],
+        lastActivityAt: NOW - 41 * 60_000,
+        turnEndedAt: NOW - 41 * 60_000,
+      }),
+    ]
+    render(<HomeScreen />)
+    await user.click(screen.getByText('Agent finished'))
+    expect(reveal).not.toHaveBeenCalled()
+    await user.click(within(askRows()[0]).getByRole('button', { name: 'Open' }))
+    expect(reveal).toHaveBeenCalledWith('f')
+  })
+})
+
 describe('HomeScreen — dismissing an ask', () => {
   it('marks an ask done with E and drops its row, counting it in Settled today', async () => {
     const user = userEvent.setup()
