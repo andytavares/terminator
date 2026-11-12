@@ -1,0 +1,51 @@
+packages/core-renderer/tests/unit/renderer/components/DeskModel.spec.tsx
+  s_390d10981d2a2d::t_3a3b0b21f4416c 42
+packages/core-renderer/src/components/home/useWorkThreads.ts
+  s_390d10981d2a2d::t_6e7204410bdd5d 144,147,155
+packages/core-renderer/src/components/home/InFlightMenu.tsx
+  s_390d10981d2a2d::t_207fca6e232580 77-80
+packages/core-renderer/src/home/settle.ts
+  s_390d10981d2a2d::t_6e7204410bdd5d 16-17,20-30,32,35
+packages/core-renderer/tests/unit/renderer/home/settle.spec.ts
+  s_390d10981d2a2d::t_fa8caa01bb45dc 12,33-53
+  s_390d10981d2a2d::t_8f2d77ff6cc60d 54-55
+packages/core-renderer/tests/unit/renderer/home/work-threads-settle.spec.tsx
+  s_390d10981d2a2d::t_3a3b0b21f4416c 27
+  s_390d10981d2a2d::t_840bba5c5c3dcc 44
+packages/core-renderer/src/components/home/ArchivedTasks.tsx
+  s_390d10981d2a2d::t_6e7204410bdd5d 7
+packages/core-renderer/tests/unit/renderer/components/sidebar/InboxSidebar.spec.tsx
+  s_390d10981d2a2d::t_3a3b0b21f4416c 112,259,263-273
+packages/core-renderer/tests/unit/renderer/components/sidebar/inbox.spec.ts
+  s_390d10981d2a2d::t_3a3b0b21f4416c 40
+packages/core-renderer/src/components/home/start-work.ts
+  s_390d10981d2a2d::t_6e7204410bdd5d 319
+packages/core-renderer/src/home/work-marks.ts
+  s_390d10981d2a2d::t_ef6218e4ec0f60 69-74,122-123
+  s_390d10981d2a2d::t_6e7204410bdd5d 12-13,26,33,37-38,103,121
+packages/core-renderer/tests/unit/renderer/components/InFlight.spec.tsx
+  s_390d10981d2a2d::t_3a3b0b21f4416c 100
+packages/core-renderer/tests/unit/renderer/home/work-marks.spec.ts
+  s_390d10981d2a2d::t_3a3b0b21f4416c 16
+  s_390d10981d2a2d::t_fa8caa01bb45dc 5,69,73-78,80
+packages/core-renderer/src/components/home/SettledTasks.tsx
+  s_390d10981d2a2d::t_6e7204410bdd5d 18
+packages/core-renderer/src/components/sidebar/InboxSidebar.tsx
+  s_390d10981d2a2d::t_2359ab4c63ab21 23,52,65,67,70,298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c96c5ec89a240586d4eed6e8040b6402efc90684",
+  "prompts": {},
+  "sessions": {
+    "s_390d10981d2a2d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2134d568-f37b-46c6-ae8d-19e076067902",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
