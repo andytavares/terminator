@@ -3,6 +3,7 @@ import { rmSync } from 'node:fs'
 import { closeApp, createWorkspace, e2eTempDir, launchApp, type AppHandle } from './helpers'
 import { makeRepoWithRemote } from './git-harness'
 import { openHome } from './session-views'
+import { gitIntegrationFrame } from './extension-page'
 
 // Layout that only a rendered window shows: Start work and Home stay usable when the window is
 // small. Everything else about these screens has renderer tests.
@@ -81,6 +82,23 @@ async function insightsScrollsInAShortWindow(): Promise<void> {
   await expect.poll(async () => (await firstQuestion.boundingBox())?.y ?? 0).toBeLessThan(topBefore)
 }
 
+/** The Contributions period picker opens under its button, not at the bottom of the frame. */
+async function thePeriodPickerOpensUnderItsButton(): Promise<void> {
+  const { page } = handle
+  await openHome(page)
+  await page.getByRole('radio', { name: 'Insights' }).click()
+  await expect.poll(() => Boolean(gitIntegrationFrame(handle, 'home'))).toBe(true)
+  const frame = gitIntegrationFrame(handle, 'home')!
+  const button = frame.getByRole('button', { name: 'This year' })
+  await button.click()
+  const popover = frame.getByRole('group', { name: 'Period' })
+  await expect(popover).toBeVisible()
+  const below = await button.boundingBox()
+  const opened = await popover.boundingBox()
+  expect(Math.abs((opened?.y ?? 0) - ((below?.y ?? 0) + (below?.height ?? 0)))).toBeLessThan(12)
+  await page.keyboard.press('Escape')
+}
+
 test('Start work and Home fit a small window', async () => {
   await test.step(
     'the Repeat form keeps Schedule on screen and the divider runs to the footer',
@@ -91,4 +109,8 @@ test('Start work and Home fit a small window', async () => {
     theScheduledTableFitsANarrowWindow
   )
   await test.step('Insights scrolls in that short window', insightsScrollsInAShortWindow)
+})
+
+test('the Contributions period picker opens under its button', async () => {
+  await thePeriodPickerOpensUnderItsButton()
 })

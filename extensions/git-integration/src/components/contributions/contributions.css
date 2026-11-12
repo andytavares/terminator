@@ -29,15 +29,12 @@
   flex: 1;
 }
 
-/* A picker's own wrapper, so the popover anchors to the button's corner. */
+/* A picker's own wrapper: the popover anchors to it (showPopover's source). */
 .ct-picker {
   position: relative;
 }
 
 .ct-picker .tmui-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
