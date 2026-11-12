@@ -1,3 +1,4 @@
+import { dirname } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { sealedAppEnvironment } from '../../e2e/e2e-environment'
 import { e2eWorkerCount } from '../../e2e/worker-count'
@@ -21,10 +22,12 @@ describe('the environment an e2e app launches in', () => {
   })
 
   it('puts the stubs first on PATH and names no developer directory', () => {
-    const [first] = sealed.PATH.split(':')
+    const [first, ...rest] = sealed.PATH.split(':')
     expect(first).toMatch(/fixtures\/bin$/)
-    expect(sealed.PATH).not.toContain('/opt/homebrew')
-    expect(sealed.PATH).not.toContain('.local/bin')
+    // Node's own folder is on PATH on purpose, and Homebrew is where Node lives on many Macs.
+    const others = rest.filter((entry) => entry !== dirname(process.execPath)).join(':')
+    expect(others).not.toContain('/opt/homebrew')
+    expect(others).not.toContain('.local/bin')
   })
 })
 
