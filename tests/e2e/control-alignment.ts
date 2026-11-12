@@ -73,7 +73,8 @@ function afterDrawnFrame(): Promise<void> {
   )
 }
 
-/** The misaligned control pairs, and any radio or checkbox drawn wrong, on `page` (or an extension frame), read after a drawn frame so a
+/** The misaligned control pairs, any radio or checkbox drawn wrong, and any field not at the one
+ * control height, on `page` (or an extension frame), read after a drawn frame so a
  * layout still being applied is not measured, labelled with `screen`. */
 export async function misalignedOn(
   page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
@@ -89,7 +90,11 @@ export async function misalignedOn(
       `${screen}: ${m.first} (${m.heights[0]}px) beside ${m.second} (${m.heights[1]}px), ` +
       `centres ${m.centres[0].toFixed(1)} / ${m.centres[1].toFixed(1)}`
   )
-  return [...misaligned, ...(await wronglyDrawnTogglesOn(page, screen))]
+  return [
+    ...misaligned,
+    ...(await wronglyDrawnTogglesOn(page, screen)),
+    ...(await offHeightFieldsOn(page, screen)),
+  ]
 }
 
 /** A radio or checkbox that is not drawn at the design system's size and corner. */
@@ -127,4 +132,61 @@ async function wronglyDrawnTogglesOn(
   return found.map(
     (t) => `${screen}: ${t.control} is ${t.size[0]}x${t.size[1]}, radius ${t.radius}`
   )
+}
+
+const FIELDS =
+  'select:not([multiple]):not([size]), input:not([type="checkbox"]):not([type="radio"])' +
+  ':not([type="range"]):not([type="hidden"]):not([type="file"]):not([type="color"])'
+
+/** Runs in the page, so it uses only the DOM and its argument, the field selector, which
+ *  Playwright passes as data. Each field's box: the field when it paints an edge, else the one
+ *  wrapper that paints it (a search box with an icon), else null (a bare field in a chip row). */
+async function fieldBoxesOf(fields: string): Promise<{ expected: number; boxes: FieldBox[] }> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  const swatch = document.body.appendChild(document.createElement('div'))
+  swatch.style.height = 'var(--tm-control-height)'
+  const expected = swatch.getBoundingClientRect().height
+  swatch.remove()
+  const edged = (el: Element) => {
+    const style = getComputedStyle(el)
+    const painted = !['rgba(0, 0, 0, 0)', 'transparent'].includes(style.backgroundColor)
+    return painted || parseFloat(style.borderTopWidth) > 0
+  }
+  const boxOf = (el: Element) => {
+    const parent = el.parentElement
+    if (edged(el)) return el
+    const only = parent !== null && parent.querySelectorAll(fields).length === 1
+    return only && edged(parent) ? parent : null
+  }
+  const boxes = [...document.querySelectorAll(fields)]
+    .filter((el) => !el.closest('.xterm, .cm-editor, .tmui-tooltip'))
+    .map(boxOf)
+    .filter((box): box is Element => box !== null)
+    .map((box) => ({
+      ...box.getBoundingClientRect().toJSON(),
+      shown: box.checkVisibility(),
+      name: `${box.tagName.toLowerCase()}.${[...box.classList].join('.')} "${(box.getAttribute('aria-label') ?? box.getAttribute('placeholder') ?? '').slice(0, 30)}"`,
+    }))
+  return { expected, boxes }
+}
+
+interface FieldBox {
+  width: number
+  height: number
+  shown: boolean
+  name: string
+}
+
+/** Every field and select on `page` not drawn at `--tm-control-height`, labelled with `screen`.
+ *  Fields in a row line up only when every field is one height, whatever it sits beside. A page
+ *  that loads no tokens (a bare fixture) has no one height to hold fields to. */
+export async function offHeightFieldsOn(
+  page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
+  screen: string
+): Promise<string[]> {
+  const { expected, boxes } = await page.evaluate(fieldBoxesOf, FIELDS)
+  if (expected === 0) return []
+  const off = boxes.filter((b) => b.shown && b.width > 0 && Math.abs(b.height - expected) > 0.5)
+  const unique = [...new Map(off.map((b) => [b.name, b])).values()]
+  return unique.map((b) => `${screen}: ${b.name} is ${b.height}px, not ${expected}px`)
 }

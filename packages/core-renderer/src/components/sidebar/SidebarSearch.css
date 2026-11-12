@@ -5,7 +5,9 @@
   background: var(--tm-bg-elevated);
   border: 1px solid var(--tm-border);
   border-radius: 5px;
-  padding: 4px 8px;
+  box-sizing: border-box;
+  height: var(--tm-control-height);
+  padding: 0 8px;
   flex: 1;
   min-width: 0;
 }

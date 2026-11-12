@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  height: 30px;
+  height: var(--tm-control-height);
   padding: 0 9px;
   margin-top: 12px;
   background: var(--tm-bg-input);

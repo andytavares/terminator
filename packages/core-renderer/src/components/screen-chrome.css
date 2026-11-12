@@ -39,7 +39,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
+  box-sizing: border-box;
+  height: var(--tm-control-height);
   padding: 0 8px;
   border-radius: var(--tm-radius-sm);
   border: 1px solid var(--tm-border-strong);
@@ -106,7 +107,7 @@
 .home-menu .sidebar-menu__button,
 .wall__toggle,
 .wall__select select {
-  height: 26px;
+  height: var(--tm-control-height);
   border-radius: var(--tm-radius-sm);
   border: 1px solid var(--tm-border-strong);
   background: var(--tm-bg-input);

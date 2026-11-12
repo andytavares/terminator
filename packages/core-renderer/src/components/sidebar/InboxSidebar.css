@@ -16,7 +16,7 @@
 }
 
 .inbox__repo {
-  height: var(--tm-control-height-sm);
+  height: var(--tm-control-height);
   max-width: 40%;
   padding: 0 6px;
   border: 1px solid var(--tm-border);
