@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   INBOX_PINNED_KEY,
+  INBOX_RESTORED_KEY,
   INBOX_SETTLED_KEY,
   INBOX_SNOOZED_KEY,
   useWorkMarks,
@@ -12,7 +13,7 @@ const stored = (key: string): unknown => JSON.parse(localStorage.getItem(key) ??
 
 beforeEach(() => {
   localStorage.clear()
-  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {}, restored: {} })
 })
 
 describe('useWorkMarks', () => {
@@ -65,13 +66,18 @@ describe('useWorkMarks — forgetting', () => {
 })
 
 describe('useWorkMarks — restore', () => {
-  it('removes the key from settled and snoozed and keeps other keys', () => {
+  it('removes the key from settled and snoozed, records when, and keeps other keys', () => {
     useWorkMarks.getState().settle('a', 1)
     useWorkMarks.getState().snooze('a', 99)
     useWorkMarks.getState().settle('b', 2)
-    useWorkMarks.getState().restore('a')
-    expect(useWorkMarks.getState()).toMatchObject({ settled: { b: 2 }, snoozed: {} })
+    useWorkMarks.getState().restore('a', 50)
+    expect(useWorkMarks.getState()).toMatchObject({
+      settled: { b: 2 },
+      snoozed: {},
+      restored: { a: 50 },
+    })
     expect(stored(INBOX_SETTLED_KEY)).toEqual({ b: 2 })
+    expect(stored(INBOX_RESTORED_KEY)).toEqual({ a: 50 })
   })
 })
 

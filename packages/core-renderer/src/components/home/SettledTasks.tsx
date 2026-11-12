@@ -15,7 +15,7 @@ function SettledRow({ thread }: { thread: WorkThread }): React.JSX.Element {
         size="sm"
         variant="ghost"
         aria-label={`Restore ${thread.title}`}
-        onClick={() => restore(thread.key)}
+        onClick={() => restore(thread.key, Date.now())}
       >
         Restore
       </Button>

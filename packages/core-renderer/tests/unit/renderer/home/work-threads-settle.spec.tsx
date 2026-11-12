@@ -24,7 +24,7 @@ const sessionOn = (branch: string, ageMs: number) =>
   fact({ sessionId: branch, state: 'working', branch, lastActivityAt: NOW - ageMs })
 
 beforeEach(() => {
-  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {}, restored: {} })
 })
 
 describe('shownThreads', () => {
@@ -41,6 +41,7 @@ describe('shownThreads', () => {
       settled: { [keyOf('by-hand')]: 1 },
       pinned: { [keyOf('pinned-quiet')]: 1 },
       snoozed: {},
+      restored: {},
     }
     const { threads, settledThreads } = shownThreads(input(facts), [], marks)
     expect(settledThreads.map((t) => t.key).sort()).toEqual([keyOf('by-hand'), keyOf('quiet')])

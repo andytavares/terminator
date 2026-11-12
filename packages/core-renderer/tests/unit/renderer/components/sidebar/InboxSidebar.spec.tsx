@@ -109,7 +109,7 @@ beforeEach(() => {
     ]),
   })
   localStorage.clear()
-  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {}, restored: {} })
   useInboxFilter.setState({ filter: { text: '', repoRoot: null } })
   useDraggedThread.setState({ thread: null })
   useToastStore.setState({ toasts: [] })
@@ -256,11 +256,21 @@ describe('InboxList — Restore on a settled card', () => {
     expect(cardTitles()).toEqual(['Work a'])
   })
 
-  it('offers no Restore on a card settled only by a quiet day, which Restore cannot bring back', async () => {
+  it('brings back a card settled only by a quiet day', async () => {
     const user = userEvent.setup()
     renderInbox([threadOf('a', { lastActivity: NOW - 25 * HOUR_MS })])
     await user.click(screen.getByRole('button', { name: '1 settled' }))
-    expect(within(cardFor('Work a')).queryByRole('button', { name: 'Restore' })).toBeNull()
+    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Restore' }))
+    expect(cardTitles()).toEqual(['Work a'])
+  })
+})
+
+describe('InboxList — finished tasks', () => {
+  it('leaves out a task marked done, which Archived tasks on Home holds', () => {
+    const done = { ...threadOf('done', { state: 'done' }), taskId: 't1' }
+    renderInbox([threadOf('active'), done])
+    expect(cardTitles()).toEqual(['Work active'])
+    expect(screen.queryByRole('button', { name: /settled/ })).toBeNull()
   })
 })
 

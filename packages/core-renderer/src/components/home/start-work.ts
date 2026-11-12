@@ -316,7 +316,7 @@ function restoreStarted(request: WorkRequest): void {
     request.kind === 'ticket'
       ? workKeyId({ tracker: request.issue.tracker, key: request.issue.key })
       : workKeyId({ repoRoot: folderPath, branch: request.branch })
-  useWorkMarks.getState().restore(key)
+  useWorkMarks.getState().restore(key, Date.now())
 }
 
 /** Does the work. Null when it started; otherwise what to tell the person, in plain words. */

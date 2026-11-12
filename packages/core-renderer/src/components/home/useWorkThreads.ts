@@ -141,9 +141,10 @@ export function useWorkThreads(): WorkThreads {
   const settled = useWorkMarks((s) => s.settled)
   const pinned = useWorkMarks((s) => s.pinned)
   const snoozed = useWorkMarks((s) => s.snoozed)
+  const restored = useWorkMarks((s) => s.restored)
   const result = useMemo(() => {
     // `allThreads` keeps settled threads so a Focus item's done check still sees the work.
-    const marks = { settled, pinned, snoozed }
+    const marks = { settled, pinned, snoozed, restored }
     const { threads, settledThreads } = shownThreads(input, parkedKeys, marks)
     return {
       threads,
@@ -151,7 +152,7 @@ export function useWorkThreads(): WorkThreads {
       groups: groupThreads(threads),
       allThreads: parkedByHand(allWorkThreads(input), parkedKeys),
     }
-  }, [input, parkedKeys, settled, pinned, snoozed])
+  }, [input, parkedKeys, settled, pinned, snoozed, restored])
   useWakeOnActivity(result.allThreads)
   useEffect(() => {
     const live = new Set(result.allThreads.map((t) => t.key))

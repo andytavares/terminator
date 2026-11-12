@@ -4,12 +4,9 @@ import { useWorkThreads } from './useWorkThreads'
 import { toggleArchived } from './thread-actions'
 import { toggleDone } from './task-actions'
 import { recordUse } from '../../usage/record'
+import { isKeptAside } from '../../home/settle'
 import type { WorkThread } from '../../home/work-threads'
 import './Tasks.css'
-
-/** What is kept out of the lists: archived work, and tasks marked done that can still be reopened. */
-const isKeptAside = (thread: WorkThread): boolean =>
-  thread.archived || (thread.state === 'done' && thread.taskId !== null)
 
 function ArchivedRow({ thread }: { thread: WorkThread }): React.JSX.Element {
   const [verb, undo] = thread.archived
