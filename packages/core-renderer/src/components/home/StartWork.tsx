@@ -18,6 +18,7 @@ import {
   cycleRunAs,
   globalStartFailure,
   isAgentRun,
+  openWorkspaceTerminal,
   startWork,
   useRunAsOptions,
   useStartWorkStore,
@@ -45,6 +46,7 @@ const TABS: Array<{ id: LauncherTab; label: string }> = [
   { id: 'prompt', label: 'Prompt' },
   { id: 'branch', label: 'Branch' },
   { id: 'across', label: 'Across repos' },
+  { id: 'terminal', label: 'Terminal' },
   { id: 'scratch', label: 'Scratch terminal' },
 ]
 
@@ -224,6 +226,7 @@ async function submit({ view, onClose, setError }: SubmitInput): Promise<void> {
     onClose()
     return void startScratchSession()
   }
+  if (view.tab === 'terminal') return startTerminal(view, onClose, setError)
   if (view.repo === null && !view.global) return setError('Add a workspace in the sidebar first.')
   const problem = scheduleProblem(view)
   if (problem !== null) return setError(problem)
@@ -235,6 +238,17 @@ async function submit({ view, onClose, setError }: SubmitInput): Promise<void> {
     })
     onClose()
   } else setError(message)
+}
+
+async function startTerminal(
+  view: ActionsInput['view'],
+  onClose: () => void,
+  setError: (message: string | null) => void
+): Promise<void> {
+  if (view.repo === null) return setError('Add a workspace in the sidebar first.')
+  const message = await openWorkspaceTerminal(view.repo)
+  if (message === null) onClose()
+  else setError(message)
 }
 
 const SCHEDULE_FEATURE = 'core.start-work.schedule'
@@ -324,6 +338,7 @@ const PLACEHOLDERS: Record<LauncherTab, string> = {
   prompt: 'What should it do?',
   branch: 'Search branches',
   across: 'Not used on this tab',
+  terminal: 'Nothing to type for a terminal',
   scratch: 'Nothing to type for a scratch terminal',
 }
 
@@ -336,7 +351,7 @@ function SearchRow({ view, actions }: PartProps): React.JSX.Element {
         value={view.query}
         placeholder={PLACEHOLDERS[view.tab]}
         aria-label="Search tickets or type a prompt"
-        disabled={view.tab === 'scratch'}
+        disabled={view.tab === 'scratch' || view.tab === 'terminal'}
         onChange={(e) => actions.typeQuery(e.target.value)}
       />
       <Kbd>Esc</Kbd>
@@ -395,6 +410,7 @@ function EditHead({ view, actions, editing }: PartProps & { editing: Schedule })
 }
 
 const HINTS: Partial<Record<LauncherTab, string>> = {
+  terminal: 'A shell in the workspace folder, on its current branch. Enter opens it.',
   scratch: 'A terminal that belongs to no branch. Enter opens it.',
 }
 
@@ -523,7 +539,7 @@ function BranchRows({ view, actions, selectedIndex }: Launcher): React.JSX.Eleme
 }
 
 function RunAsPanel({ view, actions }: Launcher): React.JSX.Element {
-  if (view.tab === 'scratch') return <div className="start-work__side" />
+  if (view.tab === 'scratch' || view.tab === 'terminal') return <div className="start-work__side" />
   return (
     <div className="start-work__side">
       <div className="start-work__label">Run it as</div>
@@ -619,6 +635,7 @@ function GlobalSummary(): React.JSX.Element {
 function startLabel(view: Launcher['view']): string {
   if (view.editing !== null) return 'Save changes'
   if (view.tab === 'scratch') return 'Start terminal'
+  if (view.tab === 'terminal') return 'Open terminal'
   if (view.isPrompt && view.when.when !== 'now') return 'Schedule'
   if (view.selected?.kind === 'ticket') return `Start ${view.selected.issue.key}`
   return 'Start'

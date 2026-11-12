@@ -626,6 +626,38 @@ describe('StartWork — scratch and branch tabs', () => {
   })
 })
 
+describe('StartWork — terminal tab', () => {
+  it('opens a plain shell in the chosen workspace, with no ticket, prompt or new worktree', async () => {
+    const user = userEvent.setup()
+    const onClose = await open()
+    await goToTab(user, 'Terminal')
+    expect(screen.getByRole('button', { name: 'Workspace: terminator' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /^Open terminal/ }))
+    await waitFor(() => expect(launched.inBranch).toHaveBeenCalledWith('p-main', undefined, false))
+    expect(onClose).toHaveBeenCalled()
+    expect(launched.createFromDraft).not.toHaveBeenCalled()
+    expect(launched.scratch).not.toHaveBeenCalled()
+    expect(setLink).not.toHaveBeenCalled()
+  })
+
+  it('opens it in another workspace when one is picked', async () => {
+    const user = userEvent.setup()
+    seedTwoWorkspaces()
+    useWorkspaceStore.setState({
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [mainProject]],
+        ['ws-2', [secondWorkspaceProject]],
+      ]),
+    })
+    await open()
+    await goToTab(user, 'Terminal')
+    await user.click(pickerButton())
+    await user.click(within(listbox()).getByRole('option', { name: /atlas/ }))
+    await user.click(screen.getByRole('button', { name: /^Open terminal/ }))
+    await waitFor(() => expect(launched.inBranch).toHaveBeenCalledWith('p-atlas', undefined, false))
+  })
+})
+
 describe('StartWork — branch tab', () => {
   it('Branch tab lists the repo worktrees and starts a session on the chosen one', async () => {
     const user = userEvent.setup()

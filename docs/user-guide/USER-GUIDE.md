@@ -461,12 +461,13 @@ A ticket linked to several branches joins them as a task, and Terminator stores 
 
 #### Start work
 
-**Start work** (`Cmd+N`, the header button, or Quick Actions) opens a launcher with five tabs:
+**Start work** (`Cmd+N`, the header button, the Inbox's **+**, or Quick Actions) opens a launcher with six tabs:
 
 - **My tickets** lists your open Linear tickets by state. Type to search.
 - **Prompt** starts from a sentence that describes the task.
 - **Branch** starts on an existing branch.
 - **Across repos** starts one task in several repos (see above).
+- **Terminal** opens a plain shell in the chosen workspace's folder, on its current branch. It needs no ticket and no prompt, and makes no new worktree.
 - **Scratch terminal** opens a terminal that belongs to no branch.
 
 Press `Tab` to choose how to run it: as an **agent in an agent tab** (the default agent, with a picker when you have more than one), **Claude in a terminal**, **Terminal only**, or a **Foundry** order. In an agent tab, the ticket is the agent's first prompt and has no length limit. The agent's questions show in the tab and on Home. **Claude in a terminal** types `claude '<prompt>'` into a shell and refuses a prompt over 1024 bytes. The **Workspace** button at the right of the tabs shows where the work will run and why Terminator suggested that workspace. Press the button or `Cmd+R` to pick another. Type to filter, and press `Enter` to choose. `Enter` starts the work, and Terminator opens what it started so you land in it.

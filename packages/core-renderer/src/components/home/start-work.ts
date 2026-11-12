@@ -319,6 +319,14 @@ function restoreStarted(request: WorkRequest): void {
   useWorkMarks.getState().restore(key, Date.now())
 }
 
+/** A plain shell in the workspace's own checkout: no ticket, no prompt, no new worktree. */
+export async function openWorkspaceTerminal(workspace: Workspace): Promise<Outcome> {
+  const projectId = mainProjectId(workspace)
+  if (projectId instanceof Error) return projectId.message
+  const sessionId = await startSessionInBranch(projectId, undefined, false)
+  return sessionId === null ? 'The terminal could not be opened.' : null
+}
+
 /** Does the work. Null when it started; otherwise what to tell the person, in plain words. */
 export async function startWork(request: WorkRequest): Promise<Outcome> {
   const option = useExtensionRegistry.getState().startWorkOptions.get(request.runAs)
