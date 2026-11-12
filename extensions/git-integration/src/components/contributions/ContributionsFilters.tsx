@@ -58,7 +58,7 @@ function PickerMenu(props: {
         {props.buttonText}
       </Button>
       {open && (
-        <Popover label={props.label} onDismiss={() => setOpen(false)}>
+        <Popover label={props.label} align="end" onDismiss={() => setOpen(false)}>
           {props.children(() => setOpen(false))}
         </Popover>
       )}
