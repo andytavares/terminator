@@ -20,20 +20,18 @@ interface SelectionTarget {
   path: string
   selection: LineSelection | null
   setSelection: (selection: LineSelection | null) => void
-  /** Called with the lines a finished gutter press or drag selected. */
-  onDragSelected: (selection: LineSelection) => void
 }
 
 export type LineDrag = ReturnType<typeof useLineSelection>
 
-/** A gutter press or drag selects lines and, released anywhere, stores the selection and hands it
- *  to `onDragSelected`, which opens the comment composer on it. */
+/** A gutter press or drag selects lines and, released anywhere, stores the selection, which the
+ *  float bar then offers to comment on or ask the agent about. */
 function useDragEnd(
   target: SelectionTarget,
   refs: { drag: { current: DragState }; justEnded: { current: boolean } },
   setPreview: (p: DragPreview | null) => void
 ) {
-  const { path, setSelection, onDragSelected } = target
+  const { path, setSelection } = target
   const { drag: dragRef, justEnded } = refs
   useEffect(() => {
     const endGutterDrag = () => {
@@ -54,11 +52,10 @@ function useDragEnd(
         endLine: Math.max(drag.startLine, drag.endLine),
       }
       setSelection(selection)
-      onDragSelected(selection)
     }
     window.addEventListener('mouseup', endGutterDrag)
     return () => window.removeEventListener('mouseup', endGutterDrag)
-  }, [path, setSelection, onDragSelected, dragRef, justEnded, setPreview])
+  }, [path, setSelection, dragRef, justEnded, setPreview])
 }
 
 /** The handlers a row's gutter and body use while the reviewer drags over lines. */

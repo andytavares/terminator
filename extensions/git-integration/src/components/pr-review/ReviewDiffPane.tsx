@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VirtualDiffList, type VirtualDiffListHandle } from './VirtualDiffList'
-import { laterKey, type LineSelection } from '../../stores/review-ui.store'
+import { laterKey } from '../../stores/review-ui.store'
 import { extensionOf } from '../../utils/syntax'
 import { classifyHunk } from '../../github/pr-review-service'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
@@ -9,7 +9,7 @@ import type { FileDiff } from '../../schemas/git.schema'
 import type { DiffItem } from '../../review/diff-items'
 import type { ReviewBand } from '../../review/review-layout'
 import { REWRITTEN_NOTE, useDiffLoad } from './diff-pane/useDiffLoad'
-import { useGaps, type GapControl } from './diff-pane/useFileText'
+import { useGaps } from './diff-pane/useFileText'
 import { useLineLookups } from './diff-pane/line-lookups'
 import { useLineSelection } from './diff-pane/useLineSelection'
 import {
@@ -30,10 +30,10 @@ import {
   useSameShapeFolds,
   useViewedHunks,
 } from './diff-pane/usePaneState'
-import { commentAnchor, maxLineNumber, numColWidthFor } from './diff-pane/lines'
+import { maxLineNumber, numColWidthFor } from './diff-pane/lines'
 import { renderDiffItem } from './diff-pane/rows'
 import { FileHeader } from './diff-pane/FileHeader'
-import type { Annotating, PaneContext } from './diff-pane/types'
+import type { PaneContext } from './diff-pane/types'
 import './review-surface.css'
 
 interface Props {
@@ -204,20 +204,8 @@ function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   return { request, loaded, gaps, moved, folds, items, formatting }
 }
 
-/** Opens the composer on lines the reviewer pressed or dragged in the gutter. GitHub cannot
- *  comment on revealed context lines, so those keep only the float bar. */
-function useOpenComposerOn(gaps: GapControl, setComposerAnchor: Annotating['setComposerAnchor']) {
-  const { selectionTouchesRevealed } = gaps
-  return useCallback(
-    (selection: LineSelection) => {
-      if (!selectionTouchesRevealed(selection)) setComposerAnchor(commentAnchor(selection))
-    },
-    [selectionTouchesRevealed, setComposerAnchor]
-  )
-}
-
 /** The line lookups, drag selection and composers for the file shown. */
-function useLineState(src: { props: Props; store: ReviewStore; ui: UiStore; gaps: GapControl }) {
+function useLineState(src: { props: Props; store: ReviewStore; ui: UiStore }) {
   const { props, store, ui } = src
   const { pr, file } = props
   const fileThreads = useMemo(() => store.threads[file.path] ?? [], [store.threads, file.path])
@@ -229,12 +217,10 @@ function useLineState(src: { props: Props; store: ReviewStore; ui: UiStore; gaps
     insights: pr.insights,
   })
   const annot = useAnnotating()
-  const onDragSelected = useOpenComposerOn(src.gaps, annot.setComposerAnchor)
   const drag = useLineSelection({
     path: file.path,
     selection: ui.selection,
     setSelection: ui.setSelection,
-    onDragSelected,
   })
   useComposerRequest({
     path: file.path,
@@ -342,7 +328,7 @@ function useWiring(props: Props): Wiring {
     [repoRoot, pr.number, pr.headSHA]
   )
   const view = useDiffView(props, store, ui)
-  const lines = useLineState({ props, store, ui, gaps: view.gaps })
+  const lines = useLineState({ props, store, ui })
   return { props, store, ui, view, lines, head }
 }
 
