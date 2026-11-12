@@ -658,6 +658,35 @@ describe('StartWork — terminal tab', () => {
   })
 })
 
+describe('StartWork — terminal tab, when it cannot open', () => {
+  it('stays open and says why when the shell does not start', async () => {
+    const user = userEvent.setup()
+    launched.inBranch.mockResolvedValue(null)
+    const onClose = await open()
+    await goToTab(user, 'Terminal')
+    await user.click(screen.getByRole('button', { name: /^Open terminal/ }))
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'The terminal could not be opened.'
+    )
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('asks for a workspace first when there is none', async () => {
+    const user = userEvent.setup()
+    useWorkspaceStore.setState({ workspaces: [], projectsByWorkspaceId: new Map() })
+    const onClose = await open()
+    await goToTab(user, 'Terminal')
+    await user.click(screen.getByRole('button', { name: /^Open terminal/ }))
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Add a workspace in the sidebar first.'
+    )
+    expect(launched.inBranch).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
 describe('StartWork — branch tab', () => {
   it('Branch tab lists the repo worktrees and starts a session on the chosen one', async () => {
     const user = userEvent.setup()
