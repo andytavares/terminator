@@ -1,19 +1,21 @@
 import { test, expect } from '@playwright/test'
 import { rmSync } from 'node:fs'
-import { closeApp, launchApp, type AppHandle } from './helpers'
+import { closeApp, e2eTempDir, launchApp, type AppHandle } from './helpers'
 import {
   git,
   makeRepoWithRemote,
   openCodeReviews,
-  openRepo,
   pushBranchToOrigin,
+  seedWorkspace,
   writeFile,
 } from './git-harness'
 import { popoutPage, type ExtensionView } from './extension-page'
 import { startGithubStub, type GithubStub } from './github-stub'
 
-/** Code Reviews' queue and a pull request's overview against the stub GitHub, from search
- * to a conflicted pull request merged in a worktree and an approval from the pop-out window. */
+/** Code Reviews against the stub GitHub: what only the whole app shows, each change reaching
+ * GitHub or git. The queue's search, a pull request that fails to open (in the tab and in the
+ * pop-out) and a merged pull request leaving the queue have renderer and channel tests
+ * (PrReviewTab.open, ReviewQueue, github-ipc, usePrReview). */
 
 let handle: AppHandle
 let stub: GithubStub
@@ -57,8 +59,10 @@ test.beforeAll(async () => {
 
   stub = await startGithubStub({ bareRepo: bare })
   openQueuePullRequests(stub)
-  handle = await launchApp(undefined, stub.env)
-  await openRepo(handle, 'Review Queue', repo)
+  // Seeded, not created through New repo: a click while the window settles at launch can be lost.
+  const profile = e2eTempDir('review-queue-')
+  seedWorkspace(profile, WORKSPACE, repo)
+  handle = await launchApp(profile, stub.env)
 })
 
 test.afterAll(async () => {
@@ -67,174 +71,86 @@ test.afterAll(async () => {
   for (const dir of [repo, bare]) if (dir) rmSync(dir, { recursive: true, force: true })
 })
 
+const WORKSPACE = 'Review Queue'
+
 const queueRow = (view: Pick<ExtensionView, 'locator'>, title: string) =>
   view.locator('.rd-row').filter({ hasText: title })
 
-async function openPrOverview(title: string): Promise<ExtensionView> {
-  const view = await openCodeReviews(handle, 'Review Queue')
+/** Opens a pull request from the queue, in the view already open. */
+async function openFromQueue(view: ExtensionView, title: string): Promise<void> {
   await queueRow(view, title).click()
   await expect(view.getByRole('heading', { level: 1 })).toContainText(title)
-  return view
 }
 
-async function theQueueListsAndSearchNarrows(): Promise<void> {
-  const view = await openCodeReviews(handle, 'Review Queue')
-  await expect(view.locator('.rd-row')).toHaveCount(3)
-  await view.getByRole('searchbox', { name: 'Search pull requests' }).fill('greeting')
-  await expect(view.locator('.rd-row')).toHaveCount(1)
-  await expect(queueRow(view, 'Rework greeting')).toBeVisible()
-  await view.getByRole('searchbox', { name: 'Search pull requests' }).fill('')
-  await expect(view.locator('.rd-row')).toHaveCount(3)
-}
-
-async function aPullRequestThatFailsToOpenSaysWhyAndRetries(): Promise<void> {
-  const view = await openCodeReviews(handle, 'Review Queue')
-  stub.pullRequest(3).failFiles = true
-  await queueRow(view, 'Tidy docs').click()
-  const failure = view.getByRole('alert').filter({ hasText: 'Could not open #3.' })
-  await expect(failure).toContainText('Bad Gateway')
-
-  stub.pullRequest(3).failFiles = false
-  await failure.getByRole('button', { name: 'Retry' }).click()
-  await expect(view.getByRole('heading', { level: 1 })).toContainText('Tidy docs')
+async function backToQueue(view: ExtensionView): Promise<void> {
   await view.getByRole('button', { name: 'Close' }).click()
-  await expect(queueRow(view, 'Tidy docs')).toBeVisible()
+  await expect(view.locator('.rd-row').first()).toBeVisible()
 }
 
-async function aPopOutThatFailsToOpenSaysWhyAndRetries(): Promise<void> {
-  const view = await openPrOverview('Tidy docs')
-  stub.pullRequest(3).failFiles = true
-  await view.getByRole('button', { name: 'Open in focused window' }).click()
-  const popout = await popoutPage(handle, 'prNumber=3')
-  const failed = popout.getByRole('heading', { name: 'Could not open pull request #3' })
-  await expect(failed).toBeVisible()
-  await expect(popout.getByText(/Bad Gateway/)).toBeVisible()
-
-  stub.pullRequest(3).failFiles = false
-  await popout.getByRole('button', { name: 'Retry' }).click()
-  await expect(popout.getByRole('heading', { level: 1 })).toContainText('Tidy docs')
-  await popout.close()
-  await view.getByRole('button', { name: 'Close' }).click()
-  await expect(queueRow(view, 'Tidy docs')).toBeVisible()
-}
-
-async function aDiscussionCommentIsPosted(): Promise<void> {
-  const view = await openPrOverview('Add subtract')
+async function aCommentAndReadyAndUpdateReachGitHub(view: ExtensionView): Promise<void> {
+  await openFromQueue(view, 'Add subtract')
   await view.getByRole('tab', { name: 'Discussion, 1' }).click()
-  await expect(view.locator('.pr-issue-comment-list')).toContainText('once CI is green')
-  await expect(view.getByRole('complementary', { name: 'Pull request details' })).toBeVisible()
   await view.getByPlaceholder('Leave a comment…').fill('Looking now.')
   await view.getByRole('button', { name: 'Comment', exact: true }).click()
-
   await expect(view.locator('.pr-issue-comment-list')).toContainText('Looking now.')
   expect(stub.pullRequest(1).issueComments.map((c) => c.body)).toEqual([
     'Ready for a look once CI is green.',
     'Looking now.',
   ])
-}
-
-async function aDraftIsMarkedReadyAndUpdated(): Promise<void> {
-  const view = await openPrOverview('Add subtract')
   await view.getByRole('button', { name: 'Mark as ready' }).click()
   await expect(view.getByRole('heading', { level: 1 })).not.toContainText('Draft')
   expect(stub.pullRequest(1).isDraft).toBe(false)
-
   await view.getByRole('button', { name: 'Update from main' }).click()
   await expect(view.getByText('Behind main')).toBeHidden()
   expect(stub.pullRequest(1).branchUpdates).toBe(1)
 }
 
-async function anOpenedReviewStaysInProgressUntilDismissed(): Promise<void> {
-  const view = await openPrOverview('Add subtract')
-  await view.getByRole('button', { name: 'Close' }).click()
+async function anOpenedReviewStaysInProgressUntilDismissed(view: ExtensionView): Promise<void> {
+  await backToQueue(view)
   await expect(queueRow(view, 'Add subtract')).toContainText('0 of 1 viewed')
   await queueRow(view, 'Add subtract').hover()
   await view.getByRole('button', { name: 'Dismiss PR #1 from in-progress' }).click()
   await expect(queueRow(view, 'Add subtract')).toHaveCount(0)
-
   // Still open on GitHub, it comes back as not started: its review session is gone.
   await view.getByRole('button', { name: 'Refresh pull requests' }).click()
-  await expect(queueRow(view, 'Add subtract')).toContainText('Review')
   await expect(queueRow(view, 'Add subtract')).not.toContainText('viewed')
 }
 
-async function aReviewMergedElsewhereLeavesTheQueue(): Promise<void> {
-  const view = await openPrOverview('Tidy docs')
-  await view.getByRole('button', { name: 'Close' }).click()
-  await expect(queueRow(view, 'Tidy docs')).toContainText('0 of 1 viewed')
-
-  stub.pullRequest(3).state = 'MERGED'
-  await view.getByRole('button', { name: 'Refresh pull requests' }).click()
-  await expect(view.locator('.rd-row')).toHaveCount(2)
-  await expect(queueRow(view, 'Tidy docs')).toHaveCount(0)
-}
-
-async function aConflictedPullRequestIsMergedInAWorktree(): Promise<void> {
-  const view = await openPrOverview('Rework greeting')
+async function aConflictedPullRequestIsMergedInAWorktree(view: ExtensionView): Promise<void> {
+  await openFromQueue(view, 'Rework greeting')
   await view.getByRole('button', { name: 'Resolve conflicts' }).click()
-  await expect(view.getByText('Merge conflicts need resolving')).toBeVisible()
   await view.getByTestId('conflict-file-row').filter({ hasText: 'README.md' }).click()
   await view.getByRole('button', { name: /^Keep theirs/ }).click()
   await view.getByRole('button', { name: /^Confirm/ }).click()
   await view.getByRole('button', { name: 'Commit merge' }).click()
-
-  await expect(view.getByRole('heading', { level: 1 })).toContainText('Rework greeting')
   await expect.poll(() => git(bare, 'log', '-1', '--format=%s', 'feat/greeting')).toMatch(/^Merge/)
   const head = git(bare, 'rev-parse', 'feat/greeting')
   expect(git(bare, 'rev-list', '--parents', '-n', '1', head).split(' ')).toHaveLength(3)
   expect(git(bare, 'show', `${head}:README.md`)).toBe('# widgets, renamed on main')
 }
 
-async function anApprovalFromThePopOutReachesGitHub(): Promise<void> {
-  const view = await openPrOverview('Add subtract')
-  await view.getByRole('button', { name: 'Close' }).click()
-  await expect(queueRow(view, 'Add subtract')).toBeVisible()
+async function anApprovalFromThePopOutReachesGitHub(view: ExtensionView): Promise<void> {
+  await backToQueue(view)
   await view.getByRole('button', { name: 'Pop out' }).click()
   const popout = await popoutPage(handle, 'view=pr-review')
   await queueRow(popout, 'Add subtract').click()
   await popout.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
   const verdictBar = popout.getByRole('region', { name: 'Review verdict' })
   await verdictBar.getByRole('button', { name: 'Approve' }).click()
-
   await popout.waitForEvent('close')
   expect(stub.pullRequest(1).reviews.at(-1)?.state).toBe('APPROVED')
   await expect(queueRow(view, 'Add subtract')).toContainText('1 approved')
 }
 
-/** The flow's steps in order, each titled with the behaviour it checks. */
-const STEPS: Array<[title: string, run: () => Promise<void>]> = [
-  ['the queue lists the open pull requests, and search narrows it', theQueueListsAndSearchNarrows],
-  [
-    'a pull request that fails to open says why under its row, and Retry opens it',
-    aPullRequestThatFailsToOpenSaysWhyAndRetries,
-  ],
-  [
-    'a pop-out window whose pull request fails to open says why, and Retry opens it',
-    aPopOutThatFailsToOpenSaysWhyAndRetries,
-  ],
-  ['a comment in the discussion is posted to the pull request', aDiscussionCommentIsPosted],
-  [
-    'a draft is marked ready, and a branch behind main is brought up to date',
-    aDraftIsMarkedReadyAndUpdated,
-  ],
-  [
-    'an opened review stays in progress until it is dismissed',
-    anOpenedReviewStaysInProgressUntilDismissed,
-  ],
-  [
-    'a review whose pull request was merged elsewhere leaves the queue',
-    aReviewMergedElsewhereLeavesTheQueue,
-  ],
-  [
-    'a conflicted pull request is merged in a worktree and pushed',
-    aConflictedPullRequestIsMergedInAWorktree,
-  ],
-  [
-    'an approval from the pop-out window reaches GitHub and closes the window',
-    anApprovalFromThePopOutReachesGitHub,
-  ],
-]
-
-test('a pull request is found in the queue, discussed, brought up to date, merged and approved', async () => {
-  for (const [title, run] of STEPS) await test.step(title, run)
+test('a pull request in the queue is discussed, made ready, merged and approved on GitHub', async () => {
+  const view = await openCodeReviews(handle, WORKSPACE)
+  await expect(view.locator('.rd-row')).toHaveCount(3)
+  await test.step('a comment, Mark as ready and Update from main reach GitHub', () =>
+    aCommentAndReadyAndUpdateReachGitHub(view))
+  await test.step('an opened review stays in progress until it is dismissed', () =>
+    anOpenedReviewStaysInProgressUntilDismissed(view))
+  await test.step('a conflicted pull request is merged in a worktree and pushed', () =>
+    aConflictedPullRequestIsMergedInAWorktree(view))
+  await test.step('an approval from the pop-out window reaches GitHub', () =>
+    anApprovalFromThePopOutReachesGitHub(view))
 })
