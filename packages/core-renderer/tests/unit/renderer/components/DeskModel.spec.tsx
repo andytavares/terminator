@@ -39,7 +39,7 @@ beforeEach(() => {
   seedDesk()
   useDeskSelection.setState({ expandedGroupIds: [], groupBy: 'move' })
   useParkedThreads.setState({ keys: [] })
-  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {}, restored: {} })
 })
 
 const workThreadOf = (key: string): WorkThread => {

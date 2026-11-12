@@ -20,7 +20,7 @@ import { settleWithUndo } from '../home/InFlightMenu'
 import { carryThread, useDraggedThread } from '../home/thread-drag'
 import { SidebarSearch } from './SidebarSearch'
 import { useWorkMarks } from '../../home/work-marks'
-import { isSettled } from '../../home/settle'
+import { isKeptAside, isSettled } from '../../home/settle'
 import {
   asksHiddenByRepo,
   filterInbox,
@@ -49,10 +49,7 @@ export function InboxSidebar({ now }: { now?: number }): React.JSX.Element {
     [workspaces]
   )
   // The Inbox draws its own settled section, so it takes the settled threads back.
-  const shown = useMemo(
-    () => [...threads, ...settledThreads].filter((t) => !t.archived),
-    [threads, settledThreads]
-  )
+  const shown = useMemo(() => [...threads, ...settledThreads], [threads, settledThreads])
   useEffect(() => {
     useWorkMarks.getState().forgetGone(new Set(allThreads.map((t) => t.key)), Date.now())
   }, [allThreads])
@@ -65,11 +62,12 @@ interface InboxListProps {
   repos: readonly Repo[]
 }
 
-/** Search and the repo filter, the cards, then the settled section.
+/** Search and the repo filter, the cards, then the settled section; kept-aside work is left out.
  * @internal */
-export function InboxList({ threads, now, repos }: InboxListProps): React.JSX.Element {
+export function InboxList({ threads: all, now, repos }: InboxListProps): React.JSX.Element {
   const { filter, setFilter } = useInboxFilter()
   const marks = useWorkMarks()
+  const threads = all.filter((t) => !isKeptAside(t))
   const { cards, settled } = inboxSections(filterInbox(threads, filter), marks, now)
   return (
     <div className="inbox" onKeyDown={moveBetweenCards}>
@@ -290,17 +288,14 @@ function AttachButton({ thread }: { thread: WorkThread }): React.JSX.Element | n
   )
 }
 
-/** A thread settled by a quiet day has no mark to clear, so only marked ones offer Restore. */
 function SettleOrRestore({ thread, settled }: { thread: WorkThread; settled: boolean }) {
-  const marked = useWorkMarks((s) => thread.key in s.settled || thread.key in s.snoozed)
   if (settled) {
-    if (!marked) return null
     return (
       <IconButton
         size="sm"
         icon={RotateCcw}
         label="Restore"
-        onClick={() => useWorkMarks.getState().restore(thread.key)}
+        onClick={() => useWorkMarks.getState().restore(thread.key, Date.now())}
       />
     )
   }

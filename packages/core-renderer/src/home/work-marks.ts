@@ -9,6 +9,8 @@ export const INBOX_SETTLED_KEY = 'terminator.sidebar.inbox-settled'
 export const INBOX_PINNED_KEY = 'terminator.sidebar.inbox-pinned'
 /** @internal */
 export const INBOX_SNOOZED_KEY = 'terminator.sidebar.inbox-snoozed'
+/** @internal */
+export const INBOX_RESTORED_KEY = 'terminator.sidebar.inbox-restored'
 /** Home's old hand dismissals; read once into `settled`, then removed. */
 const DISMISSED_THREADS_KEY = 'terminator.home.dismissed-threads'
 const DISMISSED_SESSIONS_KEY = 'terminator.home.dismissed-sessions'
@@ -21,17 +23,19 @@ const STORAGE_KEYS: Record<MarkKind, string> = {
   settled: INBOX_SETTLED_KEY,
   pinned: INBOX_PINNED_KEY,
   snoozed: INBOX_SNOOZED_KEY,
+  restored: INBOX_RESTORED_KEY,
 }
 
 interface WorkMarksState {
   settled: Marks
   pinned: Marks
   snoozed: Marks
+  restored: Marks
   settle: (key: string, at: number) => void
   togglePin: (key: string, at: number) => void
   snooze: (key: string, until: number) => void
-  /** Brings a settled or snoozed thread back, as Undo and Restore do. */
-  restore: (key: string) => void
+  /** Brings a settled, snoozed or day-quiet thread back at `at`, as Undo and Restore do. */
+  restore: (key: string, at: number) => void
   /** Brings settled or snoozed threads back to the top. */
   wake: (keys: readonly string[]) => void
   /** Forgets marks over 30 days old whose thread is not among `liveKeys` any more. */
@@ -62,6 +66,12 @@ function removeStored(key: string): void {
 const without = (marks: Marks, keys: readonly string[]): Marks =>
   Object.fromEntries(Object.entries(marks).filter(([key]) => !keys.includes(key)))
 
+/** The settled and snoozed marks with `keys` cleared, so those threads come back. */
+const woken = (s: WorkMarksState, keys: readonly string[]) => ({
+  settled: without(s.settled, keys),
+  snoozed: without(s.snoozed, keys),
+})
+
 /** The changed kinds, written to storage as they are set. */
 function persisted(changes: Partial<Record<MarkKind, Marks>>): Partial<WorkMarksState> {
   for (const [kind, marks] of Object.entries(changes)) {
@@ -90,6 +100,7 @@ export const useWorkMarks = create<WorkMarksState>((set) => ({
   settled: readSettledMigrating(),
   pinned: readMarks('pinned'),
   snoozed: readMarks('snoozed'),
+  restored: readMarks('restored'),
   settle: (key, at) =>
     set((s) =>
       persisted({ settled: { ...s.settled, [key]: at }, pinned: without(s.pinned, [key]) })
@@ -107,11 +118,8 @@ export const useWorkMarks = create<WorkMarksState>((set) => ({
     set((s) =>
       persisted({ snoozed: { ...s.snoozed, [key]: until }, pinned: without(s.pinned, [key]) })
     ),
-  restore: (key) =>
-    set((s) =>
-      persisted({ settled: without(s.settled, [key]), snoozed: without(s.snoozed, [key]) })
-    ),
-  wake: (keys) =>
-    set((s) => persisted({ settled: without(s.settled, keys), snoozed: without(s.snoozed, keys) })),
+  restore: (key, at) =>
+    set((s) => persisted({ ...woken(s, [key]), restored: { ...s.restored, [key]: at } })),
+  wake: (keys) => set((s) => persisted(woken(s, keys))),
   forgetGone: (liveKeys, now) => set((s) => forgotten(s, liveKeys, now)),
 }))

@@ -74,7 +74,10 @@ export function settleWithUndo(thread: WorkThread): void {
     type: 'info',
     message: `Settled "${thread.title}"`,
     duration: 6000,
-    action: { label: 'Undo', onSelect: () => useWorkMarks.getState().restore(thread.key) },
+    action: {
+      label: 'Undo',
+      onSelect: () => useWorkMarks.getState().restore(thread.key, Date.now()),
+    },
   })
 }
 

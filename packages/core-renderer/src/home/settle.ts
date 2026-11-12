@@ -13,14 +13,26 @@ export interface WorkMarks {
   pinned: Readonly<Record<string, number>>
   /** Until when each thread is snoozed. */
   snoozed: Readonly<Record<string, number>>
+  /** When each thread was last brought back by Restore. */
+  restored: Readonly<Record<string, number>>
 }
 
-/** Settled by hand, snoozed, or quiet for a day; pinned never, and an unanswered ask never on its own. */
+/** Archived work, and tasks marked done that can still be reopened: Home's Archived tasks holds them. */
+export const isKeptAside = (thread: WorkThread): boolean =>
+  thread.archived || (thread.state === 'done' && thread.taskId !== null)
+
+/** Quiet for a day since its last activity or its last Restore, whichever is later. */
+function quietForADay(thread: WorkThread, marks: WorkMarks, now: number): boolean {
+  const quietSince = Math.max(thread.lastActivity, marks.restored[thread.key] ?? 0)
+  return thread.state !== 'needs-you' && now - quietSince >= AUTO_SETTLE_AFTER_MS
+}
+
+/** Settled by hand, snoozed, or quiet for a day; never pinned or kept-aside work, nor an unanswered ask on its own. */
 export function isSettled(thread: WorkThread, marks: WorkMarks, now: number): boolean {
-  if (marks.pinned[thread.key] !== undefined) return false
+  if (isKeptAside(thread) || marks.pinned[thread.key] !== undefined) return false
   if (marks.settled[thread.key] !== undefined) return true
   if ((marks.snoozed[thread.key] ?? 0) > now) return true
-  return thread.state !== 'needs-you' && now - thread.lastActivity >= AUTO_SETTLE_AFTER_MS
+  return quietForADay(thread, marks, now)
 }
 
 /** The threads whose agent ended a turn or started asking since `before` was read. */

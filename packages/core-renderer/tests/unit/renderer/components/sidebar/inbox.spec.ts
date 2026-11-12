@@ -37,7 +37,7 @@ function threadOf(key: string, fixture: ThreadFixture = {}): WorkThread {
   } as unknown as WorkThread
 }
 
-const noMarks: WorkMarks = { settled: {}, pinned: {}, snoozed: {} }
+const noMarks: WorkMarks = { settled: {}, pinned: {}, snoozed: {}, restored: {} }
 const keysOf = (threads: readonly WorkThread[]) => threads.map((t) => t.key)
 
 describe('inboxSections — order', () => {

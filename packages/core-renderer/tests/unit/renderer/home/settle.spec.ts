@@ -9,7 +9,7 @@ import type { WorkThread } from '../../../../src/home/work-threads'
 import type { TaskState } from '../../../../src/home/task-state'
 
 const NOW = 10 * AUTO_SETTLE_AFTER_MS
-const noMarks: WorkMarks = { settled: {}, pinned: {}, snoozed: {} }
+const noMarks: WorkMarks = { settled: {}, pinned: {}, snoozed: {}, restored: {} }
 
 function threadOf(key: string, patch: Partial<WorkThread> = {}): WorkThread {
   return { key, state: 'running', lastActivity: NOW, ...patch } as unknown as WorkThread
@@ -27,6 +27,29 @@ describe('isSettled', () => {
     expect(isSettled(threadOf('a', quiet), noMarks, NOW)).toBe(true)
     expect(isSettled(threadOf('a', quiet), { ...noMarks, pinned: { a: 1 } }, NOW)).toBe(false)
     expect(isSettled(threadOf('a', { ...quiet, state: 'needs-you' }), noMarks, NOW)).toBe(false)
+  })
+})
+
+describe('isSettled — Restore and finished tasks', () => {
+  const quiet = { lastActivity: NOW - 2 * AUTO_SETTLE_AFTER_MS }
+
+  it('keeps a quiet thread out of Settled for a day after Restore, then settles it again', () => {
+    const restoredAt = (at: number): WorkMarks => ({ ...noMarks, restored: { a: at } })
+    expect(isSettled(threadOf('a', quiet), restoredAt(NOW - 1), NOW)).toBe(false)
+    expect(isSettled(threadOf('a', quiet), restoredAt(NOW - AUTO_SETTLE_AFTER_MS), NOW)).toBe(true)
+  })
+
+  it('never settles a task marked done or archived work, which Archived tasks holds', () => {
+    const doneTask = threadOf('a', { ...quiet, state: 'done', taskId: 't1' })
+    const archived = threadOf('b', { ...quiet, archived: true })
+    expect(isSettled(doneTask, { ...noMarks, settled: { a: 1 } }, NOW)).toBe(false)
+    expect(isSettled(archived, noMarks, NOW)).toBe(false)
+  })
+
+  it('settles a quiet finished thread that has no task, which nothing else holds', () => {
+    expect(isSettled(threadOf('a', { ...quiet, state: 'done', taskId: null }), noMarks, NOW)).toBe(
+      true
+    )
   })
 })
 

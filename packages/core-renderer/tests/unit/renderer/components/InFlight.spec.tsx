@@ -97,7 +97,7 @@ function resetDesk(): void {
   useDeskSelection.setState({ expandedGroupIds: [] })
   useParkedThreads.setState({ keys: [] })
   useTaskStore.setState({ tasks: [] })
-  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {} })
+  useWorkMarks.setState({ settled: {}, pinned: {}, snoozed: {}, restored: {} })
   // Change stats are cached per project; a test that mocks other stats must not leak them.
   useChangeStatsStore.setState({ entries: new Map() })
 }
