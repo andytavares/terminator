@@ -1,6 +1,6 @@
 {
   "name": "@terminator/extension-notepad",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "Markdown Notepad extension for Terminator",
   "scripts": {
