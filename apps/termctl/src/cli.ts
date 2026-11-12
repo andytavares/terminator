@@ -44,6 +44,7 @@ export interface CliIo {
 interface CommandLine {
   json: boolean
   yes: boolean
+  verbose: boolean
   help: boolean
   socket: string | null
   /** The group, the verb and the tool's flags, with the global flags taken out. */
@@ -56,7 +57,8 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
   try {
     line = parseCommandLine(argv)
   } catch (error) {
-    return fail(io, error)
+    io.stderr.write(String(error))
+    return EXIT_SUCCESS
   }
   const socketPath = socketLocation({
     flag: line.socket,
