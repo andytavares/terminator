@@ -41,6 +41,8 @@ interface Fixture {
   opensIn?: WorkThread['opensIn']
   title?: string
   laneSessionIds?: string[][]
+  ticketKey?: string
+  links?: WorkThread['links']
 }
 
 /** One lane per entry of `laneSessionIds`, each in the fixture's repo. */
@@ -65,6 +67,8 @@ function threadOf(key: string, fixture: Fixture = {}): WorkThread {
     lanes: lanesOf(key, fixture),
     sessions: sessions.map((s) => ({ ...s, isClosed: false })),
     opensIn: fixture.opensIn ?? null,
+    ticketKey: fixture.ticketKey,
+    links: fixture.links ?? [],
   } as unknown as WorkThread
 }
 
@@ -213,9 +217,17 @@ describe('InboxList — dragging a card to an agent tab', () => {
     expect(cardFor('Work a').className).not.toContain('inbox-card--dragging')
   })
 
-  it('cannot be picked up when no lane has a session', () => {
-    renderInbox([threadOf('a')])
-    expect(openButtonOf('Work a').getAttribute('draggable')).not.toBe('true')
+  it('lifts a card with no session, carrying its title, ticket and links as text', () => {
+    const links = [{ label: 'Pull request', url: 'https://github.com/acme/api/pull/12' }]
+    renderInbox([threadOf('a', { ticketKey: 'API-12', links })])
+    expect(openButtonOf('Work a').getAttribute('draggable')).toBe('true')
+    const transfer = dataTransfer()
+    fireEvent.dragStart(openButtonOf('Work a'), { dataTransfer: transfer })
+    expect(transfer.setData).toHaveBeenCalledWith(
+      'text/plain',
+      'Work a · API-12\nPull request: https://github.com/acme/api/pull/12'
+    )
+    expect(transfer.setData).not.toHaveBeenCalledWith(SESSION_DRAG_TYPE, expect.anything())
   })
 })
 
