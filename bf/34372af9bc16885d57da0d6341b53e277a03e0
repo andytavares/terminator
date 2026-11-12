@@ -1,0 +1,21 @@
+tests/e2e/pr-review-queue.spec.ts
+  s_a539605f01651d::t_364e22be89d5f0 3,9,15-18,62-65,74-75,79-80,85,87,90-91,108-109,119-120,132-133,145-155
+tests/e2e/git-harness.ts
+  s_a539605f01651d::t_c4b041f20c37ea 57-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bf34372af9bc16885d57da0d6341b53e277a03e0",
+  "prompts": {},
+  "sessions": {
+    "s_a539605f01651d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0a86124c-2aef-43ab-b6f7-81c11071cf27",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
