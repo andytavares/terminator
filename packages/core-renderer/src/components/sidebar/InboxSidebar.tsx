@@ -214,14 +214,18 @@ function WorkspaceTabButtons(props: TabButtonsProps): React.JSX.Element {
   return (
     <>
       {Array.from(tabs.values()).map((tab) => (
-        <WorkspaceTabButton key={tab.id} tab={tab} {...props} />
+        <InboxTabButton key={tab.id} tab={tab} {...props} />
       ))}
     </>
   )
 }
 
 /** Opens the tab on the filtered repo; with All repos, first asks which repo. */
-function WorkspaceTabButton(props: TabButtonsProps & { tab: WorkspaceTabRegistration }) {
+interface TabButtonProps extends TabButtonsProps {
+  tab: WorkspaceTabRegistration
+}
+
+function InboxTabButton(props: TabButtonProps): React.JSX.Element {
   const { tab, repo, onSelect } = props
   const [picking, setPicking] = useState(false)
   const pressed = useWorkspaceTabOpen(tab.id, repo)
