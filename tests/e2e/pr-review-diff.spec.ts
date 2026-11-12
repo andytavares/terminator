@@ -15,15 +15,23 @@ let repo: string
 let bare: string
 
 /** 15 new files of 61 lines in 5 folders: 915 changed lines, the chapters band. Every file is the
- *  same settings object with other numbers, so all but the first fold as the same change. */
+ *  same settings object with other numbers, so all but the first fold as the same change. The
+ *  first folder is deep, so its chapter name is a path longer than the chapter rail. */
+function folderOf(pkg: number): string {
+  return pkg === 1 ? 'python/klaviyo/step_service/settings_store/pkg1' : `pkg${pkg}`
+}
+
 function largePrFiles(): Record<string, string> {
   const files: Record<string, string> = {}
   for (let pkg = 1; pkg <= 5; pkg++) {
     for (let n = 1; n <= 3; n++) {
       const keys = Array.from({ length: 59 }, (_, i) => `  key${i}: ${pkg * 100 + n * 10 + i},`)
-      files[`pkg${pkg}/settings${n}.ts`] = ['export const settings = {', ...keys, '}', ''].join(
-        '\n'
-      )
+      files[`${folderOf(pkg)}/settings${n}.ts`] = [
+        'export const settings = {',
+        ...keys,
+        '}',
+        '',
+      ].join('\n')
     }
   }
   return files
@@ -68,6 +76,26 @@ test('a pull request over 800 lines shows one chapter at a time and folds repeat
     'Same change as'
   )
   await expect(view.getByRole('button', { name: 'Done, next chapter' })).toBeVisible()
+})
+
+test("a chapter's long path name wraps instead of running under its hunk count", async () => {
+  // Under 1100px the review view folds the chapter rail to a strip with no names.
+  await handle.app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setSize(1600, 800)
+  )
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await view.locator('.rd-row').filter({ hasText: 'Add settings' }).click()
+  await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
+  const name = view
+    .getByRole('navigation', { name: 'PR chapters' })
+    .getByRole('button', { name: /^python\/klaviyo/ })
+    .locator('.chapter-nav-name')
+  await expect(name).toBeVisible()
+  const spill = await name.evaluate((el) => el.scrollWidth - el.clientWidth)
+  await handle.app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setSize(1280, 800)
+  )
+  expect(spill).toBe(0)
 })
 
 test("a click on a line's + opens the comment composer on that line", async () => {
