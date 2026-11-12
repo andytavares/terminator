@@ -106,18 +106,13 @@ export interface AskRowProps {
 export function AskRow(props: AskRowProps): React.JSX.Element {
   const { ask, now, cursor, handlers } = props
   const expanded = cursor.expandedId === ask.id
-  // A click on a button inside the row is that button's, not the row's.
-  const onRowClick = (event: React.MouseEvent): void => {
-    handlers.select(ask.id)
-    if (!(event.target as Element).closest('button')) handlers.activate(ask)
-  }
   return (
     <li className="move__item">
       <div
         className="mi"
         data-expanded={expanded || undefined}
         aria-current={cursor.selectedId === ask.id || undefined}
-        onClick={onRowClick}
+        onClick={() => handlers.select(ask.id)}
       >
         <AskSummary ask={ask} glyphs={props.glyphs} />
         {!expanded && <AskRowActions ask={ask} handlers={handlers} />}
@@ -195,6 +190,9 @@ function AskRowActions({
           </Button>
         )
       })}
+      <Button size="sm" variant="ghost" onClick={() => handlers.activate(ask)}>
+        Open
+      </Button>
     </span>
   )
 }
