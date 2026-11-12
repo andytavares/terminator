@@ -46,6 +46,9 @@
 
 .desk-dr-b {
   display: grid;
+  /* A bare 1fr column grows to its longest unbroken line, so the drawer would scroll sideways. */
+  grid-template-columns: minmax(0, 1fr);
+  overflow-wrap: anywhere;
   gap: 14px;
   padding: 4px 18px 18px;
   overflow-y: auto;
