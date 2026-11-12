@@ -158,6 +158,37 @@ describe('Composer — dragging a Home row or an Inbox card over it', () => {
   })
 })
 
+const cardText = 'Rate limits · API-12\nPull request: https://github.com/acme/api/pull/12'
+
+/** A held Inbox card with no session: it carries only its text. */
+function cardDrag() {
+  holdThread([])
+  return {
+    types: [THREAD_DRAG_TYPE, 'text/plain'],
+    getData: (type: string) => (type === 'text/plain' ? cardText : ''),
+    files: [],
+    dropEffect: 'none',
+  }
+}
+
+describe('Composer — dragging an Inbox card with no session over it', () => {
+  it('offers to add the card to the message', async () => {
+    await mountComposer()
+    const dataTransfer = cardDrag()
+    fireEvent.dragOver(composer(), { dataTransfer })
+    expect(screen.getByText('Drop to add Rate limits to your message')).toBeTruthy()
+    expect(dataTransfer.dropEffect).toBe('copy')
+  })
+
+  it('adds the card on a new line after what is typed, and attaches no session', async () => {
+    await mountComposer()
+    await userEvent.setup().type(box(), 'Look at this')
+    fireEvent.drop(box(), { dataTransfer: cardDrag() })
+    expect(box().value).toBe(`Look at this\n${cardText}`)
+    expect(attached()).toBe(noAttachedContext)
+  })
+})
+
 describe('Composer — a thread left held by an earlier drag', () => {
   it('ignores it when a single session is dragged', async () => {
     await mountComposer()

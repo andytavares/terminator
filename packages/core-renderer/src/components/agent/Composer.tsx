@@ -19,7 +19,7 @@ import {
   useAttachedContextStore,
 } from '../../stores/attached-context.store'
 import { useTabDragStore } from '../../terminal/tab-drag'
-import { heldThreadOf } from '../home/thread-drag'
+import { THREAD_DRAG_TYPE, heldThreadOf } from '../home/thread-drag'
 import type { WorkThread } from '../../home/work-threads'
 import { CitationCommentPopover } from './cite'
 import { readBase64 } from '../../../../core-shared/src/read-base64'
@@ -69,6 +69,12 @@ const imagesOf = (files: FileList | null): File[] =>
 
 const isSessionDrag = (e: React.DragEvent): boolean =>
   e.dataTransfer.types.includes(SESSION_DRAG_TYPE)
+
+/** An Inbox card or Home row with no session: it carries only its text. */
+const isCardTextDrag = (e: React.DragEvent): boolean =>
+  e.dataTransfer.types.includes(THREAD_DRAG_TYPE) && !isSessionDrag(e)
+
+const isContextDrag = (e: React.DragEvent): boolean => isSessionDrag(e) || isCardTextDrag(e)
 
 const CHIP_QUOTE_CHARS = 40
 
@@ -396,11 +402,11 @@ function ComposerInput(props: {
       onKeyDown={(e) => submitOnEnter(e, props.onSubmit)}
       onPaste={(e) => onFiles(imagesOf(e.clipboardData.files))}
       onDrop={(e) => {
-        if (isSessionDrag(e)) return
+        if (isContextDrag(e)) return
         e.preventDefault()
         onFiles(imagesOf(e.dataTransfer.files))
       }}
-      onDragOver={(e) => !isSessionDrag(e) && e.preventDefault()}
+      onDragOver={(e) => !isContextDrag(e) && e.preventDefault()}
     />
   )
 }
@@ -415,8 +421,9 @@ function carriesOnlyTab(thread: WorkThread | null, sessionId: string): boolean {
   return carried.includes(sessionId) && carried.every((id) => id === sessionId)
 }
 
-/** The composer takes sessions dragged from the sidebar, Home, the Inbox, or the tab bar as context. */
-function useContextDrop(sessionId: string) {
+/** The composer takes sessions dragged from the sidebar, Home, the Inbox, or the tab bar as context,
+ *  and adds a dragged card with no session to the message as text. */
+function useContextDrop(sessionId: string, onText: (text: string) => void) {
   const [dragOver, setDragOver] = useState(false)
   const tabOver = useTabDragStore(
     (s) => s.overContextDrop === sessionId && s.sessionId !== sessionId
@@ -426,7 +433,7 @@ function useContextDrop(sessionId: string) {
     carriesOnlyTab(heldThreadOf(e.dataTransfer.types), sessionId)
   const handlers = {
     onDragOver: (e: React.DragEvent) => {
-      if (!isSessionDrag(e)) return
+      if (!isContextDrag(e)) return
       e.preventDefault()
       e.dataTransfer.dropEffect = onlyTab(e) ? 'none' : 'copy'
       setHeld(heldThreadOf(e.dataTransfer.types))
@@ -436,9 +443,10 @@ function useContextDrop(sessionId: string) {
       if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false)
     },
     onDrop: (e: React.DragEvent) => {
-      if (!isSessionDrag(e)) return
+      if (!isContextDrag(e)) return
       e.preventDefault()
       setDragOver(false)
+      if (isCardTextDrag(e)) return onText(e.dataTransfer.getData('text/plain'))
       if (onlyTab(e)) return
       void attachSessions(sessionId, e.dataTransfer.getData(SESSION_DRAG_TYPE).split('\n'))
     },
@@ -459,6 +467,9 @@ function namesToAttach(thread: WorkThread, sessionId: string): string {
 function DropHint(props: { sessionId: string; thread: WorkThread | null }) {
   const { thread } = props
   if (thread === null) return <>Drop to attach this session as context</>
+  if (carriedSessionIds(thread).length === 0) {
+    return <>{`Drop to add ${thread.title} to your message`}</>
+  }
   if (carriesOnlyTab(thread, props.sessionId)) {
     return <>This is the agent you are dragging; nothing to attach</>
   }
@@ -472,8 +483,14 @@ function DropHint(props: { sessionId: string; thread: WorkThread | null }) {
   )
 }
 
-function ContextDropZone(props: { sessionId: string; children: React.ReactNode }) {
-  const { dropping, held, handlers } = useContextDrop(props.sessionId)
+interface DropZoneProps {
+  sessionId: string
+  onText: (text: string) => void
+  children: React.ReactNode
+}
+
+function ContextDropZone(props: DropZoneProps) {
+  const { dropping, held, handlers } = useContextDrop(props.sessionId, props.onText)
   return (
     <div
       className={`agent-composer${dropping ? ' agent-composer--drop' : ''}`}
@@ -522,8 +539,9 @@ export function Composer(props: ComposerProps): React.JSX.Element {
   const { queue, submit, remove, edit } = useSender(props, attachments, draft)
   useSendRequests(sessionId, submit, disabled)
   const takeFiles = (files: File[]): void => void attachments.add(files)
+  const addText = (text: string): void => draft.set(draft.text ? `${draft.text}\n${text}` : text)
   return (
-    <ContextDropZone sessionId={sessionId}>
+    <ContextDropZone sessionId={sessionId} onText={addText}>
       <QueueList messages={queue} onEdit={edit} onRemove={remove} />
       <Attachments attachments={attachments}>
         <ContextChips sessionId={sessionId} onShowSource={props.onShowSource} />
