@@ -56,6 +56,7 @@ function rowProps(at: LineRef, expanded: boolean) {
     expanded,
     language: ctx.lang,
     selected: ctx.drag.isLineSelected(lineNum, side),
+    selectionStart: ctx.drag.isSelectionStart(lineNum, side),
     commented: ctx.lookups.isCommented(lineNum, side),
     chip: chipOn(at),
     gutterWidth: ctx.lookups.gutterWidth,

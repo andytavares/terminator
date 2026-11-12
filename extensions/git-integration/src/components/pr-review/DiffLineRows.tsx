@@ -36,6 +36,8 @@ interface LineRowProps {
   expanded: boolean
   language: Language
   selected: boolean
+  /** The first line of the selection, the one row that shows the comment button. */
+  selectionStart: boolean
   commented: boolean
   chip: GutterChip | null
   /** Changed-word spans of a replaced line; the unified view marks them. */
@@ -45,11 +47,12 @@ interface LineRowProps {
 }
 
 function rowClassName(props: LineRowProps): string {
-  const { line, expanded, selected, commented } = props
+  const { line, expanded, selected, selectionStart, commented } = props
   return [
     `diff-line diff-line--${line.type}`,
     choose(expanded, ' diff-line--expanded', ''),
     choose(selected, ' diff-line--selecting rs-line--selected', ''),
+    choose(selectionStart, ' diff-line--selection-start', ''),
     choose(commented, ' diff-line--commented', ''),
   ].join('')
 }

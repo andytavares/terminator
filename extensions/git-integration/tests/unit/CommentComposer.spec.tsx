@@ -138,6 +138,13 @@ describe('CommentComposer (new comment) — shows New comment · line N header, 
   })
 })
 
+describe('CommentComposer (new comment) — names the line range of a multi-line comment', () => {
+  it('shows "New comment · lines N–M" when startLine is set', () => {
+    render(<CommentComposer {...newCommentProps} startLine={4} line={12} />)
+    expect(screen.getByText(/New comment · lines 4–12/)).toBeTruthy()
+  })
+})
+
 describe('CommentComposer (reply)', () => {
   it('calls prCommentReply on submit, not addDraft', async () => {
     const user = userEvent.setup()

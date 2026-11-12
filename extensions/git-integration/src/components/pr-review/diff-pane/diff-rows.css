@@ -48,7 +48,7 @@
 .diff-line--selecting td {
   background: color-mix(in srgb, var(--tm-accent) 18%, transparent) !important;
 }
-.diff-line--selecting .diff-gutter-btn {
+.diff-line--selection-start .diff-gutter-btn {
   opacity: 1;
 }
 

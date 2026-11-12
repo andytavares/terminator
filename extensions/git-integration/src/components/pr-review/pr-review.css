@@ -530,12 +530,16 @@
 
 /* ─── CommentComposer ─────────────────────────────────────────────────────── */
 
+/* The composer renders inside the monospace diff table, so it sets its own UI font. */
 .comment-composer {
+  margin: var(--tm-space-2) 20px var(--tm-space-2) var(--diff-code-offset, 88px);
+  max-width: 760px;
   border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  margin: 6px 10px;
+  border-radius: var(--tm-radius-md);
   overflow: hidden;
-  background: var(--tm-overlay-subtle);
+  background: var(--tm-bg-elevated);
+  font: var(--tm-font-size-md) / 1.5 var(--tm-font-ui);
+  white-space: normal;
 }
 
 .comment-composer-textarea {
@@ -568,10 +572,18 @@
 
 .comment-composer-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
   padding: 8px 12px;
   border-top: 1px solid var(--tm-border);
+}
+
+.comment-composer-actions .rs-note {
+  margin-right: auto;
+}
+
+.comment-composer-actions button {
+  flex-shrink: 0;
 }
 
 /* ─── RiskBreakdownPanel ──────────────────────────────────────────────────── */
