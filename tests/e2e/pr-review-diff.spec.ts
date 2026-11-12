@@ -98,7 +98,7 @@ test("a chapter's long path name wraps instead of running under its hunk count",
   expect(spill).toBe(0)
 })
 
-test("a click on a line's + opens the comment composer on that line", async () => {
+test("a click on a line's + offers Comment, Ask agent and Explain, and Comment opens the composer", async () => {
   const view = await openCodeReviews(handle, 'Review Diff')
   await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
   await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
@@ -106,11 +106,16 @@ test("a click on a line's + opens the comment composer on that line", async () =
   const row = file.locator('tr[data-new-line="2"]')
   await row.hover()
   await row.getByRole('button', { name: 'Add comment' }).click()
+  const bar = file.locator('.rs-float')
+  await expect(bar.getByRole('button', { name: 'Ask agent' })).toBeVisible()
+  await expect(bar.getByRole('button', { name: 'Explain' })).toBeVisible()
+  await expect(view.getByTestId('composer')).toHaveCount(0)
+  await bar.getByRole('button', { name: /^Comment/ }).click()
   await expect(view.getByTestId('composer')).toContainText('line 2')
   await view.getByTestId('composer').getByRole('button', { name: 'Cancel' }).click()
 })
 
-test('a drag down the + gutter opens the comment composer on the dragged lines', async () => {
+test('a drag down the + gutter selects the lines, and Comment opens the composer on them', async () => {
   const view = await openCodeReviews(handle, 'Review Diff')
   await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
   await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
@@ -121,6 +126,10 @@ test('a drag down the + gutter opens the comment composer on the dragged lines',
   await view.mouse.down()
   await file.locator('tr[data-new-line="3"]').hover()
   await view.mouse.up()
+  await file
+    .locator('.rs-float')
+    .getByRole('button', { name: /^Comment/ })
+    .click()
   await expect(view.getByTestId('composer')).toContainText('lines 1–3')
   await view.getByTestId('composer').hover()
   const plus = (line: number) =>
