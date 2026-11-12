@@ -187,9 +187,6 @@ interface CardProps {
   settled?: boolean
 }
 
-const hasSessions = (thread: WorkThread): boolean =>
-  thread.lanes.some((lane) => lane.sessionIds.length > 0)
-
 function cardClass(pinned: boolean, held: boolean): string {
   return `inbox-card${pinned ? ' inbox-card--pinned' : ''}${held ? ' inbox-card--dragging' : ''}`
 }
@@ -211,7 +208,7 @@ function InboxCard({ thread, now, pinned, settled = false }: CardProps): React.J
         className="inbox-card__open"
         data-inbox-card
         title={thread.title}
-        draggable={hasSessions(thread)}
+        draggable
         onDragStart={(event) => carryThread(event, thread)}
         onDragEnd={() => useDraggedThread.setState({ thread: null })}
         onClick={() => openThread(thread)}

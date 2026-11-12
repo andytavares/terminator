@@ -9,7 +9,7 @@ import type { DiffItem } from '../../../review/diff-items'
 import type { PrHead } from '../../../schemas/pr-review.schema'
 import type { VirtualDiffListHandle } from '../VirtualDiffList'
 import type { ComposerAnchor } from './types'
-import { rangeStart } from './lines'
+import { commentAnchor } from './lines'
 
 interface ComposerRequestSource {
   path: string
@@ -209,8 +209,7 @@ function keyEventHandlers(src: KeyEventSource): Array<[string, () => void]> {
   const commentOnSelection = () => {
     const sel = selectionHere(src)
     if (!sel || src.selectionTouchesRevealed(sel)) return
-    const anchor = { line: sel.endLine, startLine: rangeStart(sel), side: sel.side }
-    src.setComposerAnchor({ ...anchor, initialBody: '', fromFindingId: null })
+    src.setComposerAnchor(commentAnchor(sel))
   }
   return [
     [REVIEW_KEY_EVENTS.nextHunk, () => src.scrollHunkIntoView(1)],

@@ -42,7 +42,8 @@
   white-space: normal;
 }
 
-.rs-thread .rs-thread-th {
+.rs-thread .rs-thread-th,
+.comment-composer .rs-thread-th {
   display: flex;
   gap: 8px;
   align-items: center;

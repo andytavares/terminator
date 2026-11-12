@@ -125,7 +125,7 @@ On a first pass, the comments of other people can get in the way. The **Comments
 
 ## STEP 5 · Ask the agent `#214`
 
-Drag across line numbers. A bar appears under the selection.
+Click a line's **+** to comment on that line, or drag down the **+** gutter to comment on several lines. The comment box opens when you release. Only the first selected line keeps its **+**. Click **Cancel** and a bar appears under the selection.
 
 ![Selection with float bar](code-review-guide/12-selection-bar.jpg)
 

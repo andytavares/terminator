@@ -97,6 +97,12 @@
   margin-top: 0;
 }
 
+/* A card with only buttons under its header: the form's padding, which these cards lack. */
+.integrations__tracker > .integrations__actions {
+  margin-top: 0;
+  padding: 12px;
+}
+
 .integrations__actions .ext-btn svg {
   width: 12px;
   height: 12px;

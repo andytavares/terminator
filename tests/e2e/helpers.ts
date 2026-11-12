@@ -218,17 +218,41 @@ const POINTER_ACTIONS = [
 ] as const
 let drawsBeforePointerActions = false
 
-/** Makes every locator's pointer action wait for the window to draw first (see `untilDrawn`).
- * The app's windows are hidden in an e2e run, and on CI a hidden window drew late: a click on
- * Task Vault's sidebar went to the frame drawn before it and did nothing. */
+/** The same actions called on a page with a selector, such as `page.click('.sidebar-header__add')`. */
+const PAGE_POINTER_ACTIONS = [
+  'click',
+  'dblclick',
+  'hover',
+  'check',
+  'uncheck',
+  'setChecked',
+  'tap',
+  'dragAndDrop',
+] as const
+
+/** Makes every pointer action, on a locator or on a page, wait for the window to draw first (see
+ * `untilDrawn`). The app's windows are hidden in an e2e run, and on CI a hidden window drew late:
+ * a click on Task Vault's sidebar went to the frame drawn before it and did nothing, and so did
+ * createWorkspace's `page.click` on New repo just after launch. */
 function drawBeforePointerActions(page: Page): void {
   if (drawsBeforePointerActions) return
   drawsBeforePointerActions = true
-  const prototype = Object.getPrototypeOf(page.locator('body')) as Record<string, unknown>
-  for (const name of POINTER_ACTIONS) {
-    const act = prototype[name] as (this: Locator, ...args: unknown[]) => Promise<unknown>
-    prototype[name] = async function (this: Locator, ...args: unknown[]) {
-      await untilDrawn(this.page())
+  waitForDrawOn(Object.getPrototypeOf(page.locator('body')), POINTER_ACTIONS, (l: Locator) =>
+    l.page()
+  )
+  waitForDrawOn(Object.getPrototypeOf(page), PAGE_POINTER_ACTIONS, (p: Page) => p)
+}
+
+/** Wraps each named method of `prototype` so it first waits for its page to draw. */
+function waitForDrawOn<Self>(
+  prototype: Record<string, unknown>,
+  names: readonly string[],
+  pageOf: (self: Self) => Page
+): void {
+  for (const name of names) {
+    const act = prototype[name] as (this: Self, ...args: unknown[]) => Promise<unknown>
+    prototype[name] = async function (this: Self, ...args: unknown[]) {
+      await untilDrawn(pageOf(this))
       return act.apply(this, args)
     }
   }

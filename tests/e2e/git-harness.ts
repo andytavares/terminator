@@ -54,6 +54,16 @@ export function pushBranchToOrigin(
   git(repo, 'checkout', '--quiet', 'main')
 }
 
+/** Writes a workspace for `folderPath` into the profile's workspace store before the app starts,
+ *  so a spec needs no New repo click while the window is still settling. */
+export function seedWorkspace(userDataDir: string, name: string, folderPath: string): void {
+  const at = new Date().toISOString()
+  const workspace = { id: `seeded-${name}`, name, folderPath, color: '#6366f1', tags: [] }
+  const store = { workspaces: [{ ...workspace, createdAt: at, updatedAt: at }], projects: [] }
+  mkdirSync(userDataDir, { recursive: true })
+  writeFileSync(join(userDataDir, 'workspaces.json'), JSON.stringify(store))
+}
+
 /** Opens `repo` as a workspace and selects its branch, so its project tabs exist. */
 export async function openRepo(handle: AppHandle, name: string, repo: string): Promise<void> {
   await createWorkspace(handle.page, name, repo)
