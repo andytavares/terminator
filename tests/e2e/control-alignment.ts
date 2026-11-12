@@ -134,57 +134,59 @@ async function wronglyDrawnTogglesOn(
   )
 }
 
-/** A single-line field or select, or the box that draws one around a bare input (a search box
- *  with an icon), that is not the design system's one control height. */
-interface OffHeight {
-  control: string
-  height: number
-  expected: number
-}
-
 const FIELDS =
   'select:not([multiple]):not([size]), input:not([type="checkbox"]):not([type="radio"])' +
   ':not([type="range"]):not([type="hidden"]):not([type="file"]):not([type="color"])'
 
-/** The box the person sees as the field: the input itself, or the wrapper that paints its edge.
- *  Null for a bare field in a row of chips or a palette bar: it draws no box to line up. */
-function fieldBox(el: Element, fields: string): Element | null {
-  if (boxed(el)) return el
-  const parent = el.parentElement
-  const wraps = parent !== null && parent.querySelectorAll(fields).length === 1
-  return wraps && boxed(parent) ? parent : null
-}
-
-function offHeightFields(selector: string): OffHeight[] {
-  const swatch = document.createElement('div')
+/** Runs in the page, so it uses only the DOM and its argument, the field selector, which
+ *  Playwright passes as data. Each field's box: the field when it paints an edge, else the one
+ *  wrapper that paints it (a search box with an icon), else null (a bare field in a chip row). */
+async function fieldBoxesOf(fields: string): Promise<{ expected: number; boxes: FieldBox[] }> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  const swatch = document.body.appendChild(document.createElement('div'))
   swatch.style.height = 'var(--tm-control-height)'
-  document.body.appendChild(swatch)
   const expected = swatch.getBoundingClientRect().height
   swatch.remove()
-  // A page that loads no tokens (a bare fixture) has no one height to hold fields to.
-  if (expected === 0) return []
-  const boxes = new Set(
-    [...document.querySelectorAll(selector)]
-      .filter((el) => visibleOnScreen(el) && !el.closest('.xterm, .cm-editor, .tmui-tooltip'))
-      .map((el) => fieldBox(el, selector))
-      .filter((box): box is Element => box !== null)
-  )
-  return [...boxes].flatMap((box) => {
-    const height = box.getBoundingClientRect().height
-    return Math.abs(height - expected) <= 0.5 ? [] : [{ control: described(box), height, expected }]
-  })
+  const edged = (el: Element) => {
+    const style = getComputedStyle(el)
+    const painted = !['rgba(0, 0, 0, 0)', 'transparent'].includes(style.backgroundColor)
+    return painted || parseFloat(style.borderTopWidth) > 0
+  }
+  const boxOf = (el: Element) => {
+    const parent = el.parentElement
+    if (edged(el)) return el
+    const only = parent !== null && parent.querySelectorAll(fields).length === 1
+    return only && edged(parent) ? parent : null
+  }
+  const boxes = [...document.querySelectorAll(fields)]
+    .filter((el) => !el.closest('.xterm, .cm-editor, .tmui-tooltip'))
+    .map(boxOf)
+    .filter((box): box is Element => box !== null)
+    .map((box) => ({
+      ...box.getBoundingClientRect().toJSON(),
+      shown: box.checkVisibility(),
+      name: `${box.tagName.toLowerCase()}.${[...box.classList].join('.')} "${(box.getAttribute('aria-label') ?? box.getAttribute('placeholder') ?? '').slice(0, 30)}"`,
+    }))
+  return { expected, boxes }
+}
+
+interface FieldBox {
+  width: number
+  height: number
+  shown: boolean
+  name: string
 }
 
 /** Every field and select on `page` not drawn at `--tm-control-height`, labelled with `screen`.
- *  Fields in a row line up only when every field is one height, whatever it sits beside. */
+ *  Fields in a row line up only when every field is one height, whatever it sits beside. A page
+ *  that loads no tokens (a bare fixture) has no one height to hold fields to. */
 export async function offHeightFieldsOn(
   page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
   screen: string
 ): Promise<string[]> {
-  const helpers = [visibleOnScreen, boxed, described, fieldBox, offHeightFields]
-  const script = `(async () => { ${[afterDrawnFrame, ...helpers].map(String).join('\n')}
-    await afterDrawnFrame()
-    return offHeightFields(${JSON.stringify(FIELDS)}) })()`
-  const found = (await page.evaluate(script)) as OffHeight[]
-  return found.map((f) => `${screen}: ${f.control} is ${f.height}px, not ${f.expected}px`)
+  const { expected, boxes } = await page.evaluate(fieldBoxesOf, FIELDS)
+  if (expected === 0) return []
+  const off = boxes.filter((b) => b.shown && b.width > 0 && Math.abs(b.height - expected) > 0.5)
+  const unique = [...new Map(off.map((b) => [b.name, b])).values()]
+  return unique.map((b) => `${screen}: ${b.name} is ${b.height}px, not ${expected}px`)
 }
