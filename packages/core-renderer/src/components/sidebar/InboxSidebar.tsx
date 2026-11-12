@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { AlarmClock, Check, ChevronRight, Paperclip, Pin, Plus, RotateCcw } from 'lucide-react'
-import { IconButton } from '@terminator/extension-ui'
+import { IconButton, Menu, MenuItem } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { attachSessions } from '../../stores/attached-context.store'
-import { useExtensionRegistry } from '../../extensions/registry'
+import { useExtensionRegistry, type WorkspaceTabRegistration } from '../../extensions/registry'
 import { revealSession } from '../../terminal/navigate-to-session'
 import { useNow } from '../session/useNow'
 import { useWorkThreads } from '../home/useWorkThreads'
@@ -12,7 +12,7 @@ import { useDeskSelection } from '../home/desk-selection'
 import { useStartWorkStore } from '../home/start-work'
 import { leadSessionOf } from '../home/thread-actions'
 import { openInExtension, untilLabel } from '../home/desk-actions'
-import { useOpenInApp } from '../home/open-in-app'
+import { tabIconOf, useOpenInApp } from '../home/open-in-app'
 import { compactAge } from '../home/thread-format'
 import { StateGlyph } from '../home/StateGlyph'
 import { SnoozeMenu } from '../home/SnoozeMenu'
@@ -35,17 +35,26 @@ const MINUTE_MS = 60_000
 const CARD = '[data-inbox-card]'
 
 interface Repo {
+  /** The workspace id, which opens the repo's extension tabs. */
+  id: string
   root: string
   name: string
 }
 
+type SelectWorkspaceTab = (workspaceId: string, tabId: string) => void
+
+interface InboxSidebarProps {
+  now?: number
+  onSelectWorkspaceTab: SelectWorkspaceTab
+}
+
 /** The Inbox sidebar: Home's work threads as cards, joined from the live stores. */
-export function InboxSidebar({ now }: { now?: number }): React.JSX.Element {
+export function InboxSidebar({ now, onSelectWorkspaceTab }: InboxSidebarProps): React.JSX.Element {
   const { threads, settledThreads, allThreads } = useWorkThreads()
   const clock = useNow(MINUTE_MS)
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const repos = useMemo(
-    () => workspaces.map((w) => ({ root: w.folderPath, name: w.name })),
+    () => workspaces.map((w) => ({ id: w.id, root: w.folderPath, name: w.name })),
     [workspaces]
   )
   // The Inbox draws its own settled section, so it takes the settled threads back.
@@ -53,25 +62,34 @@ export function InboxSidebar({ now }: { now?: number }): React.JSX.Element {
   useEffect(() => {
     useWorkMarks.getState().forgetGone(new Set(allThreads.map((t) => t.key)), Date.now())
   }, [allThreads])
-  return <InboxList threads={shown} now={now ?? clock} repos={repos} />
+  return (
+    <InboxList
+      threads={shown}
+      now={now ?? clock}
+      repos={repos}
+      onSelectWorkspaceTab={onSelectWorkspaceTab}
+    />
+  )
 }
 
 interface InboxListProps {
   threads: readonly WorkThread[]
   now: number
   repos: readonly Repo[]
+  onSelectWorkspaceTab: SelectWorkspaceTab
 }
 
 /** Search and the repo filter, the cards, then the settled section; kept-aside work is left out.
  * @internal */
-export function InboxList({ threads: all, now, repos }: InboxListProps): React.JSX.Element {
+export function InboxList(props: InboxListProps): React.JSX.Element {
+  const { threads: all, now } = props
   const { filter, setFilter } = useInboxFilter()
   const marks = useWorkMarks()
   const threads = all.filter((t) => !isKeptAside(t))
   const { cards, settled } = inboxSections(filterInbox(threads, filter), marks, now)
   return (
     <div className="inbox" onKeyDown={moveBetweenCards}>
-      <InboxControls filter={filter} onChange={setFilter} repos={repos} />
+      <InboxControls filter={filter} onChange={setFilter} {...props} />
       <div className="inbox__scroll">
         <HiddenAsksLine threads={threads.filter((t) => !isSettled(t, marks, now))} />
         <ul className="inbox__cards" aria-label="Inbox">
@@ -136,9 +154,11 @@ interface ControlsProps {
   filter: InboxFilter
   onChange: (filter: InboxFilter) => void
   repos: readonly Repo[]
+  onSelectWorkspaceTab: SelectWorkspaceTab
 }
 
-function InboxControls({ filter, onChange, repos }: ControlsProps): React.JSX.Element {
+function InboxControls(props: ControlsProps): React.JSX.Element {
+  const { filter, onChange, repos, onSelectWorkspaceTab } = props
   return (
     <div className="inbox__controls">
       <SidebarSearch
@@ -146,19 +166,12 @@ function InboxControls({ filter, onChange, repos }: ControlsProps): React.JSX.El
         onChange={(text) => onChange({ ...filter, text })}
         onClear={() => onChange({ ...filter, text: '' })}
       />
-      <select
-        aria-label="Repo"
-        className="inbox__repo"
-        value={filter.repoRoot ?? ''}
-        onChange={(e) => onChange({ ...filter, repoRoot: e.target.value || null })}
-      >
-        <option value="">All repos</option>
-        {repos.map((repo) => (
-          <option key={repo.root} value={repo.root}>
-            {repo.name}
-          </option>
-        ))}
-      </select>
+      <RepoSelect {...props} />
+      <WorkspaceTabButtons
+        repo={repos.find((repo) => repo.root === filter.repoRoot) ?? null}
+        repos={repos}
+        onSelect={onSelectWorkspaceTab}
+      />
       <IconButton
         icon={Plus}
         label="Start work"
@@ -167,6 +180,102 @@ function InboxControls({ filter, onChange, repos }: ControlsProps): React.JSX.El
       />
     </div>
   )
+}
+
+/** All repos, or one repo, for the cards and the tab buttons. */
+function RepoSelect({ filter, onChange, repos }: ControlsProps): React.JSX.Element {
+  return (
+    <select
+      aria-label="Repo"
+      className="inbox__repo"
+      value={filter.repoRoot ?? ''}
+      onChange={(e) => onChange({ ...filter, repoRoot: e.target.value || null })}
+    >
+      <option value="">All repos</option>
+      {repos.map((repo) => (
+        <option key={repo.root} value={repo.root}>
+          {repo.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+interface TabButtonsProps {
+  /** The repo the filter shows; null for All repos. */
+  repo: Repo | null
+  repos: readonly Repo[]
+  onSelect: SelectWorkspaceTab
+}
+
+/** One button per extension's repo tab, as on the tree's repo header, for the filtered repo. */
+function WorkspaceTabButtons(props: TabButtonsProps): React.JSX.Element {
+  const tabs = useExtensionRegistry((s) => s.workspaceTabs)
+  return (
+    <>
+      {Array.from(tabs.values()).map((tab) => (
+        <WorkspaceTabButton key={tab.id} tab={tab} {...props} />
+      ))}
+    </>
+  )
+}
+
+/** Opens the tab on the filtered repo; with All repos, first asks which repo. */
+function WorkspaceTabButton(props: TabButtonsProps & { tab: WorkspaceTabRegistration }) {
+  const { tab, repo, onSelect } = props
+  const [picking, setPicking] = useState(false)
+  const pressed = useWorkspaceTabOpen(tab.id, repo)
+  return (
+    <span className="inbox__tab">
+      <IconButton
+        icon={tabIconOf(tab)}
+        label={repo ? `${tab.label}: ${repo.name}` : tab.label}
+        pressed={pressed}
+        onClick={() => (repo ? onSelect(repo.id, tab.id) : setPicking(true))}
+      />
+      {picking && (
+        <RepoMenu
+          label={`Open ${tab.label} for`}
+          repos={props.repos}
+          onPick={(picked) => onSelect(picked.id, tab.id)}
+          onClose={() => setPicking(false)}
+        />
+      )}
+    </span>
+  )
+}
+
+interface RepoMenuProps {
+  label: string
+  repos: readonly Repo[]
+  onPick: (repo: Repo) => void
+  onClose: () => void
+}
+
+/** Every repo by name; picking one closes the menu. */
+function RepoMenu({ label, repos, onPick, onClose }: RepoMenuProps): React.JSX.Element {
+  return (
+    <Menu label={label} align="end" onDismiss={onClose}>
+      {repos.map((repo) => (
+        <MenuItem
+          key={repo.id}
+          onSelect={() => {
+            onClose()
+            onPick(repo)
+          }}
+        >
+          {repo.name}
+        </MenuItem>
+      ))}
+    </Menu>
+  )
+}
+
+/** Whether the tab is showing on this repo now. */
+function useWorkspaceTabOpen(tabId: string, repo: Repo | null): boolean {
+  const activeTabId = useExtensionRegistry((s) => s.activeWorkspaceTabId)
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
+  return repo !== null && activeTabId === tabId && activeWorkspaceId === repo.id
 }
 
 /** Shows the thread's most recent session, else its extension's view, else its drawer on Home. */
