@@ -40,13 +40,19 @@ function dropOn(target: WorkThread): void {
   if (dragged !== null && canMergeThreads(dragged, target)) void mergeAndSay(dragged, target)
 }
 
-/** Starts a drag that carries the thread's sessions to an agent tab or a terminal. */
+/** The thread as text an agent can read: its title and ticket, then one line per link. */
+function threadText(thread: WorkThread): string {
+  const title = thread.ticketKey ? `${thread.title} · ${thread.ticketKey}` : thread.title
+  return [title, ...thread.links.map((link) => `${link.label}: ${link.url}`)].join('\n')
+}
+
+/** Starts a drag that carries the thread's sessions to an agent tab or a terminal, and the
+ *  thread as text for a thread with no session. */
 export function carryThread(event: React.DragEvent, thread: WorkThread): void {
+  const sessionIds = thread.lanes.flatMap((lane) => lane.sessionIds)
   event.dataTransfer.setData(THREAD_DRAG_TYPE, thread.key)
-  event.dataTransfer.setData(
-    SESSION_DRAG_TYPE,
-    thread.lanes.flatMap((lane) => lane.sessionIds).join('\n')
-  )
+  event.dataTransfer.setData('text/plain', threadText(thread))
+  if (sessionIds.length > 0) event.dataTransfer.setData(SESSION_DRAG_TYPE, sessionIds.join('\n'))
   event.dataTransfer.effectAllowed = 'copyMove'
   useDraggedThread.setState({ thread })
 }

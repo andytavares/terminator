@@ -248,3 +248,46 @@ test(
     await aPromptSurvivesARestart()
   }
 )
+
+test('a Settings dropdown is the themed field in the UI font, with room for its chevron', async () => {
+  const { page } = handle
+  await openSettingsSection(page, 'Appearance & Terminal')
+  const select = content(page).locator('#home-layout')
+  const label = content(page).locator('label[for="home-layout"]')
+  const drawn = await select.evaluate((el) => {
+    const style = getComputedStyle(el)
+    return {
+      appearance: style.appearance,
+      font: style.fontFamily,
+      paddingTop: style.paddingTop,
+      paddingBottom: style.paddingBottom,
+      roomForChevron: parseFloat(style.paddingRight) >= 20,
+    }
+  })
+  const labelFont = await label.evaluate((el) => getComputedStyle(el).fontFamily)
+  expect(drawn).toEqual({
+    appearance: 'none',
+    font: labelFont,
+    paddingTop: '0px',
+    paddingBottom: '0px',
+    roomForChevron: true,
+  })
+})
+
+test("every Integrations card keeps its buttons inside the card's padding", async () => {
+  const { page } = handle
+  await openSettingsSection(page, 'Integrations')
+  const cards = content(page).locator('.integrations__tracker')
+  await expect(cards.first()).toBeVisible()
+  const insets = await cards.evaluateAll((all) =>
+    all.flatMap((card) => {
+      const outer = card.getBoundingClientRect()
+      return [...card.querySelectorAll('.integrations__actions button')].map((button) => {
+        const inner = button.getBoundingClientRect()
+        return Math.min(inner.left - outer.left, outer.bottom - inner.bottom)
+      })
+    })
+  )
+  expect(insets.length).toBeGreaterThan(0)
+  for (const inset of insets) expect(inset).toBeGreaterThanOrEqual(12)
+})

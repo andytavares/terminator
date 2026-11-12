@@ -98,6 +98,32 @@ input:where(
   opacity: 0.5;
 }
 
+/* A dropdown is the themed field too. The OS popup button keeps its own baseline and chevron,
+   ignores vertical padding, and takes a view's monospace field font, so its text sat low beside a
+   chevron at the edge. Its chevron is two gradient strokes, since a select cannot hold an icon or
+   a pseudo-element. The weight of :not() beats one view class, so every dropdown gets it. */
+select:not([multiple], [size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-right: 24px;
+  font-family: var(--tm-font-ui);
+  line-height: normal;
+  cursor: pointer;
+  --tm-select-stroke:
+    transparent calc(50% - 0.75px), var(--tm-text-muted) calc(50% - 0.75px) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px);
+  background-image:
+    linear-gradient(45deg, var(--tm-select-stroke)),
+    linear-gradient(135deg, var(--tm-select-stroke));
+  background-position:
+    right 13px center,
+    right 8px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
 /* One 14px box for both; padding 0 so a container's form reset cannot grow it. */
 input[type='checkbox'],
 input[type='radio'] {
