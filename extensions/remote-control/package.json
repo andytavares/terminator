@@ -12,15 +12,15 @@
   },
   "dependencies": {
     "@fastify/static": "10.1.8",
-    "@fastify/websocket": "11.3.4",
+    "@fastify/websocket": "11.3.6",
     "@terminator/extension-sdk": "6.3.0",
     "@terminator/extension-ui": "1.0.0",
-    "fastify": "5.12.7",
-    "lucide-react": "1.62.0",
+    "fastify": "5.12.8",
+    "lucide-react": "1.67.0",
     "qrcode.react": "4.2.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "ws": "8.22.0",
+    "ws": "8.22.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
