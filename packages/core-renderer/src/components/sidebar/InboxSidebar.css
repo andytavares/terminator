@@ -214,3 +214,9 @@
 .inbox__chevron--open {
   transform: rotate(90deg);
 }
+
+/* Anchors a repo tab button's "Open … for" menu. */
+.inbox__tab {
+  position: relative;
+  display: inline-flex;
+}

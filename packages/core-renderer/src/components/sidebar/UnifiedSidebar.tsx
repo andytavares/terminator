@@ -98,7 +98,7 @@ function SidebarContent({ props, views, rows, ctx, dialogs }: ContentProps): Rea
   if (useSidebarMode() === 'inbox') {
     return (
       <Suspense fallback={null}>
-        <InboxSidebar now={props.now} />
+        <InboxSidebar now={props.now} onSelectWorkspaceTab={props.onSelectWorkspaceTab} />
       </Suspense>
     )
   }

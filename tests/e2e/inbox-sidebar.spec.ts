@@ -11,6 +11,7 @@ import {
 } from './helpers'
 import type { AppHandle } from './helpers'
 import { openHome } from './session-views'
+import { gitView } from './git-harness'
 
 // Reported: the Inbox stayed blank with three terminals open, and opening one more changed
 // nothing. Their branches had been dismissed on Home earlier, and a dismissal hid every
@@ -85,4 +86,29 @@ test('an Inbox card dragged onto an agent tab attaches its terminal as context',
     .locator('.inbox-card__open')
     .dragTo(page.locator('.agent-composer'))
   await expect(page.locator('.agent-context-chip')).toContainText('terminal output')
+})
+
+test("the Inbox's Git and Foundry buttons open the repo's tabs, asking which repo under All repos", async () => {
+  const { page } = handle
+  await createWorkspace(page, 'quicknote', gitFolder())
+  await showInbox(page)
+  const controls = page.locator('.inbox__controls')
+  await controls.getByRole('button', { name: 'Git', exact: true }).click()
+  await page
+    .getByRole('menu', { name: 'Open Git for' })
+    .getByRole('menuitem', { name: 'quicknote' })
+    .click()
+  const reviews = await gitView(handle, 'code-reviews')
+  await expect(reviews.locator('body')).toBeVisible()
+  await controls.getByRole('combobox', { name: 'Repo' }).selectOption({ label: 'quicknote' })
+  await expect(controls.getByRole('button', { name: 'Git: quicknote' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await controls.getByRole('button', { name: 'Foundry: quicknote' }).click()
+  await expect(page.locator('[data-extension-panel="terminator.foundry"]')).toBeVisible()
+  await expect(controls.getByRole('button', { name: 'Git: quicknote' })).toHaveAttribute(
+    'aria-pressed',
+    'false'
+  )
 })

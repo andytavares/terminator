@@ -73,12 +73,21 @@ function threadOf(key: string, fixture: Fixture = {}): WorkThread {
 }
 
 const repos = [
-  { root: '/repos/api', name: 'api' },
-  { root: '/repos/web', name: 'web' },
+  { id: 'ws-api', root: '/repos/api', name: 'api' },
+  { id: 'ws-web', root: '/repos/web', name: 'web' },
 ]
 
+const onSelectWorkspaceTab = vi.fn()
+
 const renderInbox = (threads: WorkThread[], now = NOW) =>
-  render(<InboxList threads={threads} now={now} repos={repos} />)
+  render(
+    <InboxList
+      threads={threads}
+      now={now}
+      repos={repos}
+      onSelectWorkspaceTab={onSelectWorkspaceTab}
+    />
+  )
 
 /** The card titles above the settled section, top to bottom. */
 const cardTitles = () =>
@@ -418,5 +427,69 @@ describe('InboxList — the age and the actions each have their own space', () =
     expect(age.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // eslint-disable-next-line testing-library/no-node-access -- sharing one cell is the layout under test; the cell has no role
     expect(age.parentElement!.contains(pin)).toBe(true)
+  })
+})
+
+function useTwoRepoTabs() {
+  beforeEach(() => {
+    useInboxFilter.setState({ filter: { text: '', repoRoot: null } })
+    useExtensionRegistry.setState({
+      workspaceTabs: new Map([
+        ['terminator.git', { id: 'terminator.git', label: 'Git', component: () => null }],
+        [
+          'terminator.foundry',
+          { id: 'terminator.foundry', label: 'Foundry', component: () => null },
+        ],
+      ]),
+      activeWorkspaceTabId: null,
+    })
+  })
+}
+
+describe("InboxList — a repo's extension tabs open it", () => {
+  useTwoRepoTabs()
+
+  it('opens the filtered repo in the tab its button names', async () => {
+    const user = userEvent.setup()
+    useInboxFilter.setState({ filter: { text: '', repoRoot: '/repos/web' } })
+    renderInbox([threadOf('a')])
+    await user.click(screen.getByRole('button', { name: 'Git: web' }))
+    expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-web', 'terminator.git')
+    await user.click(screen.getByRole('button', { name: 'Foundry: web' }))
+    expect(onSelectWorkspaceTab).toHaveBeenLastCalledWith('ws-web', 'terminator.foundry')
+  })
+
+  it('asks which repo when the filter shows all repos, then opens that one', async () => {
+    const user = userEvent.setup()
+    renderInbox([threadOf('a')])
+    await user.click(screen.getByRole('button', { name: 'Git' }))
+    expect(onSelectWorkspaceTab).not.toHaveBeenCalled()
+    const menu = screen.getByRole('menu', { name: 'Open Git for' })
+    await user.click(within(menu).getByRole('menuitem', { name: 'api' }))
+    expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-api', 'terminator.git')
+    expect(screen.queryByRole('menu', { name: 'Open Git for' })).toBeNull()
+  })
+})
+
+describe("InboxList — a repo's extension tabs show their state", () => {
+  useTwoRepoTabs()
+
+  it('shows the tab as pressed while it is open on the filtered repo', () => {
+    useInboxFilter.setState({ filter: { text: '', repoRoot: '/repos/web' } })
+    useWorkspaceStore.setState({ activeWorkspaceId: 'ws-web' })
+    useExtensionRegistry.setState({ activeWorkspaceTabId: 'terminator.git' })
+    renderInbox([threadOf('a')])
+    expect(screen.getByRole('button', { name: 'Git: web' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+    expect(screen.getByRole('button', { name: 'Foundry: web' }).getAttribute('aria-pressed')).toBe(
+      'false'
+    )
+  })
+
+  it('offers no tab buttons when no extension adds a repo tab', () => {
+    useExtensionRegistry.setState({ workspaceTabs: new Map() })
+    renderInbox([threadOf('a')])
+    expect(screen.queryByRole('button', { name: /^Git/ })).toBeNull()
   })
 })

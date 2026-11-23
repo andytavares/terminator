@@ -120,6 +120,7 @@ The sidebar has a second mode, **Inbox**. It lists your work as cards in place o
 - **Pin:** Click the pin. A pinned card stays at the top, under the work that needs you, and never settles on its own.
 - **Auto-settle:** Work with no activity for 24 hours settles on its own. An unanswered question never does.
 - **Search and repo filter:** The search field matches title, ticket, repo and branch. While you search, **N settled matches** opens, so settled work is found too. **All repos** narrows the list to one repo. When it hides work that needs you in another repo, a line says so, and **Show** shows every repo again. The search and the repo stay set when you switch to the tree and back.
+- **Git, Foundry and other repo tabs:** Next to the repo filter, each repo tab has a button, the same as on a repo header in the tree. With one repo picked, the button opens that repo's tab, such as **Git** with its code reviews, or closes it when it shows already. With **All repos**, the button first lists the repos, and you pick one.
 - **Keyboard:** From the search field, `↓` moves onto the first card. `↑` and `↓` move between cards.
 
 Home and the Inbox share one list of settled, pinned and snoozed work. Settle work in one and it is settled in the other. Terminator keeps the list for each profile on this machine. It forgets an entry 30 days after its work is gone.
