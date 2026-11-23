@@ -407,8 +407,9 @@
 .chapter-nav-main {
   display: contents;
 }
-/* Level 2: the chapter's name. */
+/* Level 2: the chapter's name. A directory path has no spaces, so it breaks anywhere. */
 .chapter-nav-name {
+  overflow-wrap: anywhere;
   font-size: var(--tm-font-size-lg);
   font-weight: 600;
   color: var(--tm-text-primary);

@@ -543,8 +543,8 @@ describe('ReviewDiffPane — section viewed toggle', () => {
   })
 })
 
-describe("ReviewDiffPane — a click on a line's + opens the composer on that line", () => {
-  it("a click on a line's + selects the line and opens the composer on it", async () => {
+describe("ReviewDiffPane — a click on a line's + offers Comment, Ask agent and Explain", () => {
+  it("a click on a line's + selects the line and shows the float bar, not the composer", async () => {
     const user = userEvent.setup()
     const uiStore = await useRealUiStore()
     await renderDiffPane(oneLineDiff())
@@ -557,16 +557,14 @@ describe("ReviewDiffPane — a click on a line's + opens the composer on that li
       startLine: 1,
       endLine: 1,
     })
-    expect(await screen.findByTestId('composer')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Ask agent' })).toBeNull()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(await screen.findByRole('button', { name: 'Ask agent' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Explain' })).toBeTruthy()
+    expect(screen.queryByTestId('composer')).toBeNull()
   })
 })
 
-describe('ReviewDiffPane — a gutter drag across rows opens the composer on the dragged lines', () => {
-  it('a gutter drag across rows opens the composer on the dragged lines and keeps them selected', async () => {
+describe('ReviewDiffPane — a gutter drag across rows selects them, and Comment opens the composer on them', () => {
+  it('a gutter drag across rows selects them, and Comment opens the composer on the dragged lines', async () => {
     const user = userEvent.setup()
     const uiStore = await useRealUiStore()
     const diff = oneHunk(
@@ -585,6 +583,8 @@ describe('ReviewDiffPane — a gutter drag across rows opens the composer on the
     ])
 
     await waitFor(() => expect(selectedRows()).toHaveLength(3))
+    expect(screen.queryByTestId('composer')).toBeNull()
+    await user.click(screen.getByRole('button', { name: /Comment/ }))
     const composer = await screen.findByTestId('composer')
     expect([composer.dataset.startLine, composer.dataset.line]).toEqual(['1', '3'])
     expect(uiStore.getState().selection).toEqual({
@@ -1246,7 +1246,9 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
   it('opens the composer for a selection inside the diff', async () => {
     await useRealUiStore()
     await renderLoaded()
-    await userEvent.setup().click(gutterButton(rowOfLine(11)))
+    const user = userEvent.setup()
+    await user.click(gutterButton(rowOfLine(11)))
+    await user.click(await screen.findByRole('button', { name: /Comment/ }))
     await screen.findByTestId('composer')
   })
 })
