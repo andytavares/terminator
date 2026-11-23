@@ -11,11 +11,11 @@
     "test:coverage": "cd ../.. && vitest run extensions/foundry/ --coverage.enabled --coverage.reportsDirectory=extensions/foundry/coverage"
   },
   "dependencies": {
-    "@tanstack/react-query": "5.105.0",
+    "@tanstack/react-query": "5.107.1",
     "@terminator/extension-sdk": "6.3.0",
     "@terminator/extension-ui": "1.0.0",
     "js-yaml": "5.5.0",
-    "lucide-react": "1.62.0",
+    "lucide-react": "1.70.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zod": "4.6.7"
