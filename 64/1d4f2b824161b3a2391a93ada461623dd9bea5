@@ -1,0 +1,31 @@
+packages/extension-ui/package.json
+  s_71c7d408ca4a8c::t_6bf44502c7896e 44,47
+extensions/git-integration/src/components/contributions/ContributionsOnHome.tsx
+  s_71c7d408ca4a8c::t_6eab5a214338be 4
+tests/unit/renderer/App.spec.tsx
+  s_71c7d408ca4a8c::t_ca0263063b1420 1933-1934
+knip.jsonc
+  s_71c7d408ca4a8c::t_0a444711c6edac 31
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_71c7d408ca4a8c::t_9622d90121401c 775
+packages/core-renderer/src/components/home/PlanTheDay.tsx
+  s_71c7d408ca4a8c::t_6eab5a214338be 161
+package-lock.json
+  s_71c7d408ca4a8c::t_36ca721cc0ca55 173,23000,23003
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "641d4f2b824161b3a2391a93ada461623dd9bea5",
+  "prompts": {},
+  "sessions": {
+    "s_71c7d408ca4a8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2f230232-a1ee-40c0-8645-30224ef21075",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
