@@ -158,7 +158,7 @@ export function CarriedOverColumn({ rows, full }: { rows: PlanRow[]; full: boole
   )
 }
 
-export function FocusColumn(props: { today: FocusItem[]; reviewMinutes: number }): JSX.Element {
+function FocusColumn(props: { today: FocusItem[]; reviewMinutes: number }): JSX.Element {
   const removeFocus = useFocusStore((s) => s.removeFocus)
   const slots = Array.from({ length: FOCUS_LIMIT }, (_, index) => props.today[index])
   return (
