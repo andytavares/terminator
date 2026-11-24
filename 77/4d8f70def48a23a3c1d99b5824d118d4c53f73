@@ -1,0 +1,21 @@
+tests/e2e/core-ipc.spec.ts
+  s_28a512f10b1dc8::t_4a95e94a711df8 25-45
+  s_28a512f10b1dc8::t_43d5d2cdf8f73c 171
+  s_28a512f10b1dc8::t_86dcf5e4c42cb5 46-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "774d8f70def48a23a3c1d99b5824d118d4c53f73",
+  "prompts": {},
+  "sessions": {
+    "s_28a512f10b1dc8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "04eaa9a2-78f7-40b4-b919-36cbd1141a56",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
