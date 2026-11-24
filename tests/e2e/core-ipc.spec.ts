@@ -13,13 +13,40 @@ import {
   quickActionsPanel,
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
-import type { ElectronAPI as ViewElectronAPI } from '../../packages/extension-sdk/types/renderer'
 import { extensionFrame, findExtensionFrame } from './extension-page'
 
 declare global {
   interface Window {
     /** What Notes' view heard from fs.onChanged since the spec last cleared it. */
     __fsEvents: Array<{ projectRoot: string }>
+  }
+}
+
+// The view calls this spec makes. Importing the SDK's view type instead would also load its
+// global Window.electronAPI, which replaces the window's type for every spec.
+interface ViewElectronAPI {
+  workspace: { getActive(): Promise<{ workspaceId: string; repoRoot: string }> }
+  fs: {
+    readFile(path: string): Promise<unknown>
+    watchStart(projectRoot: string): Promise<unknown>
+    watchStop(): Promise<unknown>
+    onChanged(handler: (event: { projectRoot: string }) => void): unknown
+  }
+  shell: {
+    exec(options: {
+      command: string
+      args: string[]
+      cwd: string
+      workspaceRoot?: string
+    }): Promise<unknown>
+  }
+  git: {
+    checkout(repoRoot: string, branch: string): Promise<unknown>
+    removeWorktree(repoRoot: string, worktreePath: string): Promise<unknown>
+  }
+  terminal: {
+    listSessions(): Promise<Array<{ tabTitle: string }>>
+    closeAll(): Promise<{ terminatedCount: number }>
   }
 }
 
@@ -141,8 +168,7 @@ async function shellExecIsConfined(): Promise<void> {
     workspaceRoot: repo,
   })
   expect(outside).toEqual({ error: 'CWD_OUT_OF_SCOPE' })
-  // The type allows only git and gh; the handler must refuse the rest on its own.
-  const notGit = await fromView(exec, { command: 'ls' as 'git', args: [], cwd: repo })
+  const notGit = await fromView(exec, { command: 'ls', args: [], cwd: repo })
   expect(notGit).toMatchObject({ error: 'VALIDATION_ERROR' })
 }
 
