@@ -1,0 +1,48 @@
+tests/e2e/tools/capture-foundry-screenshot.spec.ts
+  s_28a512f10b1dc8::t_13028f3b6ff795 80-82,84
+  s_28a512f10b1dc8::t_6f0da181d2bb7f 83
+tests/e2e/github-stub-gh.ts
+  s_28a512f10b1dc8::t_76a8d197e1570e 319
+tests/e2e/control-alignment.ts
+  s_28a512f10b1dc8::t_65c1bb5b48a416 13-18
+  s_28a512f10b1dc8::t_696f5b1b16fa30 59-60
+  s_28a512f10b1dc8::t_c6960c72ad0bc9 86-94,97
+extensions/foundry/tests/helpers/line-run.ts
+  s_28a512f10b1dc8::t_b7a784c1cdf29d 60
+  s_28a512f10b1dc8::t_62e8f90b3640f4 5
+tests/e2e/core-ipc.spec.ts
+  s_28a512f10b1dc8::t_46a5c8515ceacc 140-141
+  s_28a512f10b1dc8::t_4b5ec01eecbad4 118,120,122
+  s_28a512f10b1dc8::t_890156b3a8e5f3 110,112-113
+  s_28a512f10b1dc8::t_ec0f5b3ac836e4 129-130
+  s_28a512f10b1dc8::t_a1f4ef6f613652 16-17
+  s_28a512f10b1dc8::t_b4b9016b0d690e 61,63,66-67
+  s_28a512f10b1dc8::t_b2689f7a9ebc9e 62,64-65
+  s_28a512f10b1dc8::t_9252ad2d2c5c1e 131-135,137-138,142
+  s_28a512f10b1dc8::t_e49881ffe2ddd0 84
+  s_28a512f10b1dc8::t_41bd1ababa2642 111,114,119,121,123,125
+  s_28a512f10b1dc8::t_594c6f82ed4007 74
+  s_28a512f10b1dc8::t_993262739348cb 85-86
+  s_28a512f10b1dc8::t_a95444edbc7f6d 190
+  s_28a512f10b1dc8::t_3e1b07a7063d90 18-24
+  s_28a512f10b1dc8::t_52a0cea9ba242c 92
+  s_28a512f10b1dc8::t_ec1db5cdb05523 146
+  s_28a512f10b1dc8::t_8a926fee5f9a0d 68-69
+  s_28a512f10b1dc8::t_b06f3ea05f98eb 139,144-145,150,160-163,191,195,197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ad12f5c62dd2a29b5ad77f8df39075284cdac085",
+  "prompts": {},
+  "sessions": {
+    "s_28a512f10b1dc8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "04eaa9a2-78f7-40b4-b919-36cbd1141a56",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
