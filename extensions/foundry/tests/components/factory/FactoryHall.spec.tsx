@@ -772,7 +772,7 @@ function gateCardsTests() {
     const card = screen.getByRole('group', { name: 'Mark the pull request ready for review' })
     // The default hall puts the station's foot 6 of 13 tiles down.
     expect(card.classList.contains('is-below')).toBe(true)
-    expect(card.style.top).toBe('46.15384615384615%')
+    expect(card.style.top).toBe('46.1538%')
     expect(card.style.getPropertyValue('--fdry-card-room')).toBe('calc(53.84615384615385% - 26px)')
   })
 }

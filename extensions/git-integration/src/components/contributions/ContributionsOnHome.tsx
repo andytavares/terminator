@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { ContributionsSection } from './ContributionsSection'
 
-export const SHOW_CONTRIBUTIONS_KEY = 'terminator.git-integration.home.showContributions'
+const SHOW_CONTRIBUTIONS_KEY = 'terminator.git-integration.home.showContributions'
 
 /** Insights' Contributions section, while "Show contributions on Insights" is on; follows the switch live. */
 export function ContributionsOnHome(): React.JSX.Element | null {

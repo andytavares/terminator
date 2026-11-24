@@ -1930,7 +1930,8 @@ describe('App — extension:focus-view', () => {
         viewParam: 'main',
       })
     )
-    expect(screen.getByTitle('terminator.foundry main').matches(':focus')).toBe(true)
+    // jsdom 31 does not match :focus on a focused iframe; :focus-within still matches it.
+    expect(screen.getByTitle('terminator.foundry main').matches(':focus-within')).toBe(true)
   })
 })
 
