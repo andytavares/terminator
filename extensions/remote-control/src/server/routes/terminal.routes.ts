@@ -105,7 +105,7 @@ class SessionStreams {
 
   detachBroadcast(sessionId: string): void {
     const dispose = this.broadcastDisposers.get(sessionId)
-    if (!dispose) return
+    if (typeof dispose !== 'function') return
     dispose()
     this.broadcastDisposers.delete(sessionId)
   }
