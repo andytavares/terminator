@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import staticPlugin from '@fastify/static'
+import rateLimitPlugin from '@fastify/rate-limit'
 import { join, resolve, dirname } from 'path'
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '@terminator/extension-sdk'
@@ -82,6 +83,8 @@ interface ServerConnections {
 
 // One session store per browser surface; 8-hour cookie lifetime.
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000
+// One /app/ load measured 42 requests; this leaves room for reloads and extension views.
+const REQUESTS_PER_MINUTE = 1000
 const SHIM_TAG = '<script type="module" src="/remote-shim.js"></script>'
 
 function getRemoteRendererDir(appPath: string): string {
@@ -330,6 +333,11 @@ export async function createRemoteServer(
     // Who is watching, so the Remote Control view can say so and disconnect one.
     deviceRegistry: new ConnectedDeviceRegistry(),
   }
+  // Limits only the routes added after it, so it is registered first.
+  await parts.fastify.register(rateLimitPlugin, {
+    max: REQUESTS_PER_MINUTE,
+    timeWindow: '1 minute',
+  })
   gateSurfaceAssets(parts.fastify, parts.sessions)
   await parts.fastify.register(websocketPlugin)
   await registerSurfaces(parts)

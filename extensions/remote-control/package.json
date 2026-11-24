@@ -11,6 +11,7 @@
     "test:coverage": "cd ../.. && vitest run extensions/remote-control/ --coverage.enabled --coverage.reportsDirectory=extensions/remote-control/coverage"
   },
   "dependencies": {
+    "@fastify/rate-limit": "11.2.2",
     "@fastify/static": "10.1.10",
     "@fastify/websocket": "11.3.7",
     "@terminator/extension-sdk": "6.3.0",
