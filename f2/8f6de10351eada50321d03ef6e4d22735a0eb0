@@ -1,0 +1,24 @@
+packages/core-renderer/src/components/terminal/TerminalSession.tsx
+  s_2815f0768467ac::t_23ad4bed58c7bb 8-11,60
+packages/core-renderer/src/terminal/terminal-links.ts
+  s_2815f0768467ac::t_23ad4bed58c7bb 1,63-66
+  s_2815f0768467ac::t_b03349a8563999 67-68
+packages/core-renderer/tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_2815f0768467ac::t_c05b9c3c34aa49 960-985
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f28f6de10351eada50321d03ef6e4d22735a0eb0",
+  "prompts": {},
+  "sessions": {
+    "s_2815f0768467ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fd30bf3f-03ac-4b5f-a79e-be127569d72c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
