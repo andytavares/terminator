@@ -1,0 +1,23 @@
+tests/e2e/terminal-glyph-font.spec.ts
+  s_d9b35d02fd19b9::t_a0ac7d6c49e2bd 1-28
+package.json
+  s_d9b35d02fd19b9::t_c90cc3e693c121 106
+package-lock.json
+  s_d9b35d02fd19b9::t_3cf478603ae801 52,11976-11978
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "34063985d07e3ea978414be8ce5821006d97bd42",
+  "prompts": {},
+  "sessions": {
+    "s_d9b35d02fd19b9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "35877c0b-95e8-461f-b5ca-37b977e64e72",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
