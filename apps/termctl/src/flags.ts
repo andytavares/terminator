@@ -13,7 +13,7 @@ export type ToolArguments = Record<string, unknown>
 
 /** `workspaceId` → `workspace-id`. */
 export function flagName(property: string): string {
-  return property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
+  return property.replace(/[A-Z]/, (letter) => `-${letter.toLowerCase()}`)
 }
 
 /** The types a schema allows: its own `type`, or those of its `anyOf` variants. */
@@ -34,7 +34,7 @@ export function parseToolArguments(schema: JsonSchema, args: string[]): ToolArgu
     if (key === undefined) throw new UsageError(unknownArgument(args[index]))
     const property = properties[key]
     if (schemaTypes(property).includes('boolean')) {
-      result[key] = inline !== 'false'
+      result[key] = inline === 'true'
       continue
     }
     const text = inline ?? args[++index]

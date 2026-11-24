@@ -14,7 +14,7 @@ export function formatResult(text: string, options: { json: boolean }): string {
 /** The records of a list tool's result; none when the result is not a list of records. */
 export function resultRows(text: string): Row[] {
   const rows = unwrapped(parsedOrUndefined(text))
-  return isRowList(rows) ? rows : []
+  return rows as Row[]
 }
 
 function parsedOrUndefined(text: string): unknown {
@@ -38,7 +38,7 @@ function isRow(value: unknown): value is Row {
 }
 
 function isScalar(value: unknown): boolean {
-  return value === null || typeof value !== 'object'
+  return typeof value !== 'object'
 }
 
 export function rowsTable(rows: Row[]): string {
@@ -59,5 +59,6 @@ export function rowsTable(rows: Row[]): string {
 }
 
 function cellText(value: unknown): string {
-  return value === null || value === undefined || !isScalar(value) ? '' : String(value)
+  if (value instanceof Date) return value.toISOString()
+  return value === undefined || !isScalar(value) ? '' : String(value)
 }
