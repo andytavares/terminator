@@ -957,6 +957,32 @@ describe('TerminalInstance — links — activate on cmd+click — punctuation a
   })
 })
 
+/** Clicks a link a program printed with OSC 8, which xterm hands to the terminal's linkHandler. */
+function clickHyperlink(uri: string, init: MouseEventInit) {
+  new TerminalInstance('ses-osc8', 1000)
+  const options = vi.mocked(Terminal).mock.calls.at(-1)![0]!
+  options.linkHandler!.activate(new MouseEvent('mouseup', init), uri, {
+    start: { x: 1, y: 1 },
+    end: { x: uri.length, y: 1 },
+  })
+}
+
+describe('TerminalInstance — links — OSC 8 hyperlinks', () => {
+  it('opens the link in the browser on cmd+click, with no confirm dialog', () => {
+    const confirm = vi.spyOn(window, 'confirm')
+    clickHyperlink('https://github.com/andytavares/agent-manager/pull/13', { metaKey: true })
+    expect(mockOpenExternal).toHaveBeenCalledWith(
+      'https://github.com/andytavares/agent-manager/pull/13'
+    )
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('opens nothing without cmd', () => {
+    clickHyperlink('https://example.com', {})
+    expect(mockOpenExternal).not.toHaveBeenCalled()
+  })
+})
+
 describe('TerminalInstance — links — activate on cmd+click — what is not opened', () => {
   it.each(['//example.com/path', 'packages/core-renderer/src/foo.ts', 'just some output text'])(
     'recognises no link in %j',

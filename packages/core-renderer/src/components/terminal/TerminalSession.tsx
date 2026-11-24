@@ -5,7 +5,10 @@ import '@xterm/xterm/css/xterm.css'
 import { previewWindow } from '../../terminal/preview-window'
 import { subscribeToSessionOutput } from '../../terminal/output-router'
 import { webglContexts } from '../../terminal/webgl-contexts'
-import { registerLinkProviders as registerTerminalLinkProviders } from '../../terminal/terminal-links'
+import {
+  hyperlinkHandler,
+  registerLinkProviders as registerTerminalLinkProviders,
+} from '../../terminal/terminal-links'
 import { isQuickActionsLeader } from '../../../../core-shared/src/quick-actions-leader'
 
 const IDLE_DEBOUNCE_MS = 1500
@@ -54,6 +57,7 @@ function createTerminal(
     lineHeight: 1.2,
     theme,
     cursorBlink: true,
+    linkHandler: hyperlinkHandler,
   })
 }
 

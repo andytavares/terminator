@@ -1,4 +1,4 @@
-import type { ILink, ILinkProvider, Terminal } from '@xterm/xterm'
+import type { ILink, ILinkHandler, ILinkProvider, Terminal } from '@xterm/xterm'
 
 // A link never ends in the punctuation that ends its sentence: the
 // lookbehind makes the match give back a trailing `.` `,` `;` `:` `!` `?`.
@@ -58,6 +58,12 @@ function modifierHeld(event: MouseEvent | KeyboardEvent): boolean {
 function openTarget(target: LinkTarget): void {
   if ('url' in target) window.electronAPI.shell.openExternal(target.url).catch(() => {})
   else window.electronAPI.shell.openPath(target.path).catch(() => {})
+}
+
+/** Opens a link a program printed with OSC 8 on ⌘-click. xterm's own handler asks with confirm()
+ * and then calls window.open(), which the main process denies, so the link never opens. */
+export const hyperlinkHandler: ILinkHandler = {
+  activate: (event, uri) => modifierHeld(event) && openTarget({ url: uri }),
 }
 
 /** What the pointer is over and whether ⌘ (Ctrl off macOS) is held. xterm underlines a hovered
