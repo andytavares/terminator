@@ -10,9 +10,12 @@ interface Misalignment {
   centres: [number, number]
 }
 
-const CONTROLS =
-  'button, [role="button"], select, input:not([type="checkbox"]):not([type="radio"])' +
-  ':not([type="range"]):not([type="hidden"]):not([type="file"]):not([type="color"])'
+function controlSelector(): string {
+  return (
+    'button, [role="button"], select, input:not([type="checkbox"]):not([type="radio"])' +
+    ':not([type="range"]):not([type="hidden"]):not([type="file"]):not([type="color"])'
+  )
+}
 
 function visibleOnScreen(el: Element): boolean {
   const box = el.getBoundingClientRect()
@@ -53,8 +56,8 @@ function mismatch(a: Element, b: Element): Misalignment | null {
   return { first: described(a), second: described(b), heights, centres }
 }
 
-function misalignedControls(selector: string): Misalignment[] {
-  const controls = [...document.querySelectorAll(selector)].filter(
+function misalignedControls(): Misalignment[] {
+  const controls = [...document.querySelectorAll(controlSelector())].filter(
     (el) => visibleOnScreen(el) && !el.closest('.xterm, .cm-editor, .tmui-tooltip')
   )
   return controls.flatMap((a, i) =>
@@ -80,10 +83,18 @@ export async function misalignedOn(
   page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
   screen: string
 ): Promise<string[]> {
-  const helpers = [visibleOnScreen, boxed, described, besideEachOther, mismatch, misalignedControls]
+  const helpers = [
+    controlSelector,
+    visibleOnScreen,
+    boxed,
+    described,
+    besideEachOther,
+    mismatch,
+    misalignedControls,
+  ]
   const script = `(async () => { ${[afterDrawnFrame, ...helpers].map(String).join('\n')}
     await afterDrawnFrame()
-    return misalignedControls(${JSON.stringify(CONTROLS)}) })()`
+    return misalignedControls() })()`
   const found = (await page.evaluate(script)) as Misalignment[]
   const misaligned = found.map(
     (m) =>
