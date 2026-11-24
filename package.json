@@ -115,7 +115,7 @@
     "js-yaml": "5.5.0",
     "jscpd": "5.4.3",
     "jsdom": "31.0.0",
-    "knip": "6.44.2",
+    "knip": "6.45.0",
     "lint-staged": "17.6.0",
     "oxlint": "1.93.0",
     "oxlint-tsgolint": "7.0.2006",
