@@ -5,14 +5,20 @@
   min-height: 0;
 }
 
-/* Search and the repo filter: the same band the tree's header draws. */
+/* Search and the repo filter: the same band the tree's header draws. Search takes the first
+ * row; the repo filter and the buttons share the second. */
 .inbox__controls {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
+  gap: 8px 5px;
   padding: 14px 10px 13px;
   border-bottom: 1px solid var(--tm-border);
+}
+
+.inbox__controls > .sidebar-search {
+  flex-basis: 100%;
 }
 
 .inbox__repo {

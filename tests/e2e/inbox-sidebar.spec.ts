@@ -112,3 +112,25 @@ test("the Inbox's Git and Foundry buttons open the repo's tabs, asking which rep
     'false'
   )
 })
+
+test('the Inbox search has a row of its own above the repo picker and buttons', async () => {
+  const { page } = handle
+  await createWorkspace(page, 'quicknote', gitFolder())
+  await showInbox(page)
+  const controls = page.locator('.inbox__controls')
+  const search = controls.locator('.sidebar-search')
+  const repoPicker = controls.getByRole('combobox', { name: 'Repo' })
+
+  await expect
+    .poll(async () => {
+      const band = await controls.evaluate((el) => {
+        const style = getComputedStyle(el)
+        return el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      })
+      return Math.round(band - (await search.boundingBox())!.width)
+    })
+    .toBe(0)
+  const searchBox = (await search.boundingBox())!
+  const pickerBox = (await repoPicker.boundingBox())!
+  expect(pickerBox.y).toBeGreaterThanOrEqual(searchBox.y + searchBox.height)
+})
