@@ -19,6 +19,8 @@ declare global {
   interface Window {
     /** What Notes' view heard from fs.onChanged since the spec last cleared it. */
     __fsEvents: Array<{ projectRoot: string }>
+    /** What the main window heard from fs.onChanged since the spec last cleared it. */
+    __windowFsEvents: unknown[]
   }
 }
 
@@ -131,9 +133,10 @@ async function fileWatchReportsUntilStopped(): Promise<void> {
   const [watched, other] = [join(repo, 'watched'), join(repo, 'other')]
   mkdirSync(watched)
   mkdirSync(other)
-  await handle.page.evaluate(
-    '(window.__windowFsEvents = [], window.electronAPI.fs.onChanged((e) => window.__windowFsEvents.push(e)), null)'
-  )
+  await handle.page.evaluate(() => {
+    window.__windowFsEvents = []
+    window.electronAPI.fs.onChanged((e) => window.__windowFsEvents.push(e))
+  })
   await fromView((api, directory) => {
     window.__fsEvents = []
     api.fs.onChanged((e) => window.__fsEvents.push(e))
@@ -141,7 +144,7 @@ async function fileWatchReportsUntilStopped(): Promise<void> {
   }, watched)
   await writeUntilViewIsTold([watched], watched)
   // The view asked, so the view is told: the window, which did not, hears nothing.
-  expect(await handle.page.evaluate('window.__windowFsEvents')).toEqual([])
+  expect(await handle.page.evaluate(() => window.__windowFsEvents)).toEqual([])
   const watchStop = (api: ViewElectronAPI) => api.fs.watchStop()
   expect(await fromView(watchStop)).toEqual({ ok: true })
   await fromView((api, directory) => {
