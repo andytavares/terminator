@@ -76,14 +76,12 @@ async function captureWindow(): Promise<Buffer> {
 
 /** Clicks land inside the extension's frame by the accessible name the tab renders. */
 async function openSurface(label: string): Promise<void> {
-  await runInFoundry(
-    `Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === ${JSON.stringify(
-      label
-    )})?.click()`
-  )
   const view = await extensionPage(handle, 'foundry')
-  const tab = view.locator('nav[aria-label="Foundry surfaces"] button', { hasText: label })
-  await expect(tab).toHaveAttribute('aria-pressed', 'true')
+  const tab = view
+    .getByRole('tablist', { name: 'Foundry surfaces' })
+    .getByRole('tab', { name: label })
+  await tab.click()
+  await expect(tab).toHaveAttribute('aria-selected', 'true')
 }
 
 /** Run in the Foundry view: types an idea into the Forge, and makes it an order. */

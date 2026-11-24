@@ -2,6 +2,7 @@
  * An agreed order and agents that do its work, for specs that run the Line
  * end to end over `foundry-host.ts`.
  */
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -56,7 +57,7 @@ export function agentsAnswer(runner: ReturnType<typeof fakeRunner>, transcripts:
     onTurnEnd: (turns: number) => void
     whenStarted: (end: () => void) => void
   }) => {
-    const sessionId = `${input.phase}-${Math.random().toString(36).slice(2, 8)}`
+    const sessionId = `${input.phase}-${randomUUID()}`
     if (input.phase === 'builder') {
       const file = `${path.basename(input.featureDir).toLowerCase()}.css`
       fs.writeFileSync(path.join(input.worktreePath, file), 'a { color: red }\n')

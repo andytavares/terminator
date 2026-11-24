@@ -316,7 +316,7 @@ function repoCommand(context: StubContext, args: string[], cwd: string): string 
     return JSON.stringify(pickFields(json, flagValue(args, '--json') ?? 'name'))
   }
   if (verb === 'clone') {
-    execFileSync('git', ['clone', '--quiet', context.bareRepo, args[2]], { cwd })
+    execFileSync('git', ['clone', '--quiet', '--', context.bareRepo, args[2]], { cwd })
     return ''
   }
   throw new GhFailure(1, `unknown command "repo ${verb}"`)

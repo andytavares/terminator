@@ -145,6 +145,19 @@ describe('RemoteServer health route', () => {
   })
 })
 
+describe('RemoteServer request rate limit', () => {
+  it('answers 429 once a client passes the limit it was told', async () => {
+    const first = await remoteServer.inject({ method: 'GET', url: '/health' })
+    const limit = Number(first.headers['x-ratelimit-limit'])
+    expect(limit).toBeGreaterThan(0)
+    for (let sent = 1; sent < limit; sent++) {
+      expect((await remoteServer.inject({ method: 'GET', url: '/health' })).statusCode).toBe(200)
+    }
+    const over = await remoteServer.inject({ method: 'GET', url: '/health' })
+    expect(over.statusCode).toBe(429)
+  })
+})
+
 describe('RemoteServer disconnectAllClients', () => {
   it('disconnectAllClients() calls subscriberManager.destroyAll', async () => {
     await remoteServer.disconnectAllClients()

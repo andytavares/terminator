@@ -13,7 +13,44 @@ import {
   quickActionsPanel,
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
-import { extensionFrame } from './extension-page'
+import { extensionFrame, findExtensionFrame } from './extension-page'
+
+declare global {
+  interface Window {
+    /** What Notes' view heard from fs.onChanged since the spec last cleared it. */
+    __fsEvents: Array<{ projectRoot: string }>
+    /** What the main window heard from fs.onChanged since the spec last cleared it. */
+    __windowFsEvents: unknown[]
+  }
+}
+
+// The view calls this spec makes. Importing the SDK's view type instead would also load its
+// global Window.electronAPI, which replaces the window's type for every spec.
+interface ViewElectronAPI {
+  workspace: { getActive(): Promise<{ workspaceId: string; repoRoot: string }> }
+  fs: {
+    readFile(path: string): Promise<unknown>
+    watchStart(projectRoot: string): Promise<unknown>
+    watchStop(): Promise<unknown>
+    onChanged(handler: (event: { projectRoot: string }) => void): unknown
+  }
+  shell: {
+    exec(options: {
+      command: string
+      args: string[]
+      cwd: string
+      workspaceRoot?: string
+    }): Promise<unknown>
+  }
+  git: {
+    checkout(repoRoot: string, branch: string): Promise<unknown>
+    removeWorktree(repoRoot: string, worktreePath: string): Promise<unknown>
+  }
+  terminal: {
+    listSessions(): Promise<Array<{ tabTitle: string }>>
+    closeAll(): Promise<{ terminatedCount: number }>
+  }
+}
 
 // The parts of window.electronAPI only an extension's view calls, run inside Notes' view
 // through the preload every view gets. The handlers behind them have integration tests in
@@ -50,16 +87,20 @@ async function openNotesView(): Promise<void> {
     .toBe(true)
 }
 
-/** Calls window.electronAPI in Notes' view: `call` is an expression over `api`. */
-function fromView<T>(call: string): Promise<T> {
-  return inExtensionView<T>(handle, NOTES, `(async (api) => ${call})(window.electronAPI)`)
+/** Runs `call` in Notes' view, with the view's window.electronAPI and `arg`. */
+async function fromView<T, Arg = undefined>(
+  call: (api: ViewElectronAPI, arg: Arg) => T | Promise<T>,
+  arg?: Arg
+): Promise<T> {
+  const frame = await findExtensionFrame(handle, NOTES)
+  const api = await frame.evaluateHandle(() => window.electronAPI as unknown as ViewElectronAPI)
+  // Playwright types the argument as Unboxed<Arg>, which is Arg for the plain values sent here.
+  return api.evaluate<T, Arg>(call as never, arg as Arg)
 }
 
 async function getActiveNamesSelection(): Promise<void> {
   await openNotesView()
-  const active = await fromView<{ workspaceId: string; repoRoot: string }>(
-    'api.workspace.getActive()'
-  )
+  const active = await fromView((api) => api.workspace.getActive())
   const { workspaces } = await handle.page.evaluate(() => window.electronAPI.workspace.list())
   expect(active.workspaceId).toBe(workspaces.find((w) => w.name === WS)!.id)
   // A repository's root is git's top level, which resolves the temp dir's symlink.
@@ -69,18 +110,15 @@ async function getActiveNamesSelection(): Promise<void> {
 async function readFileReadsOrReportsMissing(): Promise<void> {
   const file = join(repo, 'read-me.md')
   writeFileSync(file, '# Template\n')
-  expect(await fromView(`api.fs.readFile(${JSON.stringify(file)})`)).toEqual({
-    content: '# Template\n',
-  })
-  expect(await fromView(`api.fs.readFile(${JSON.stringify(file + '.gone')})`)).toEqual({
-    error: 'FILE_NOT_FOUND',
-  })
+  const readFile = (api: ViewElectronAPI, path: string) => api.fs.readFile(path)
+  expect(await fromView(readFile, file)).toEqual({ content: '# Template\n' })
+  expect(await fromView(readFile, file + '.gone')).toEqual({ error: 'FILE_NOT_FOUND' })
 }
 
 /** Writes in each directory again on every look, until the view is told about `expected`: macOS
  * arms a watch a moment after it starts, and a change made before that has no event. */
 async function writeUntilViewIsTold(directories: string[], expected: string): Promise<string[]> {
-  const roots = () => fromView<string[]>('window.__fsEvents.map((e) => e.projectRoot)')
+  const roots = () => fromView(() => window.__fsEvents.map((e) => e.projectRoot))
   await expect
     .poll(async () => {
       for (const directory of directories)
@@ -95,38 +133,50 @@ async function fileWatchReportsUntilStopped(): Promise<void> {
   const [watched, other] = [join(repo, 'watched'), join(repo, 'other')]
   mkdirSync(watched)
   mkdirSync(other)
-  await handle.page.evaluate(
-    '(window.__windowFsEvents = [], window.electronAPI.fs.onChanged((e) => window.__windowFsEvents.push(e)), null)'
-  )
-  await fromView(
-    `(window.__fsEvents = [], api.fs.onChanged((e) => window.__fsEvents.push(e)), api.fs.watchStart(${JSON.stringify(watched)}))`
-  )
+  await handle.page.evaluate(() => {
+    window.__windowFsEvents = []
+    window.electronAPI.fs.onChanged((e) => window.__windowFsEvents.push(e))
+  })
+  await fromView((api, directory) => {
+    window.__fsEvents = []
+    api.fs.onChanged((e) => window.__fsEvents.push(e))
+    return api.fs.watchStart(directory)
+  }, watched)
   await writeUntilViewIsTold([watched], watched)
   // The view asked, so the view is told: the window, which did not, hears nothing.
-  expect(await handle.page.evaluate('window.__windowFsEvents')).toEqual([])
-  expect(await fromView('api.fs.watchStop()')).toEqual({ ok: true })
-  await fromView(`(window.__fsEvents = [], api.fs.watchStart(${JSON.stringify(other)}))`)
+  expect(await handle.page.evaluate(() => window.__windowFsEvents)).toEqual([])
+  const watchStop = (api: ViewElectronAPI) => api.fs.watchStop()
+  expect(await fromView(watchStop)).toEqual({ ok: true })
+  await fromView((api, directory) => {
+    window.__fsEvents = []
+    return api.fs.watchStart(directory)
+  }, other)
   expect(await writeUntilViewIsTold([watched, other], other)).not.toContain(watched)
-  await fromView('api.fs.watchStop()')
+  await fromView(watchStop)
 }
 
 async function shellExecIsConfined(): Promise<void> {
-  const ran = await fromView<{ exitCode: number; stdout: string }>(
-    `api.shell.exec({ command: 'git', args: ['branch', '--show-current'], cwd: ${JSON.stringify(repo)} })`
-  )
+  type ExecOptions = Parameters<ViewElectronAPI['shell']['exec']>[0]
+  const exec = (api: ViewElectronAPI, options: ExecOptions) => api.shell.exec(options)
+  const ran = await fromView(exec, {
+    command: 'git',
+    args: ['branch', '--show-current'],
+    cwd: repo,
+  })
   expect(ran).toMatchObject({ exitCode: 0, stdout: 'main\n' })
-  const outside = await fromView(
-    `api.shell.exec({ command: 'git', args: ['status'], cwd: ${JSON.stringify(tmpdir())}, workspaceRoot: ${JSON.stringify(repo)} })`
-  )
+  const outside = await fromView(exec, {
+    command: 'git',
+    args: ['status'],
+    cwd: tmpdir(),
+    workspaceRoot: repo,
+  })
   expect(outside).toEqual({ error: 'CWD_OUT_OF_SCOPE' })
-  const notGit = await fromView<{ error: string }>(
-    `api.shell.exec({ command: 'ls', args: [], cwd: ${JSON.stringify(repo)} })`
-  )
-  expect(notGit.error).toBe('VALIDATION_ERROR')
+  const notGit = await fromView(exec, { command: 'ls', args: [], cwd: repo })
+  expect(notGit).toMatchObject({ error: 'VALIDATION_ERROR' })
 }
 
 async function checkoutMovesRepositoryAndCard(): Promise<void> {
-  const result = await fromView(`api.git.checkout(${JSON.stringify(repo)}, 'made-in-app')`)
+  const result = await fromView((api, root) => api.git.checkout(root, 'made-in-app'), repo)
   expect(result).toEqual({ success: true })
   expect(git(repo, 'branch', '--show-current')).toBe('made-in-app')
   await expect(projectGroup(handle.page, 'made-in-app')).toBeVisible()
@@ -136,9 +186,10 @@ async function worktreeRemovalDeletesIt(): Promise<void> {
   const worktree = join(e2eTempDir('terminator-e2e-wt-'), 'wt')
   git(repo, 'worktree', 'add', '-b', 'to-remove', worktree)
   expect(existsSync(worktree)).toBe(true)
-  const result = await fromView(
-    `api.git.removeWorktree(${JSON.stringify(repo)}, ${JSON.stringify(worktree)})`
-  )
+  const result = await fromView((api, [root, path]) => api.git.removeWorktree(root, path), [
+    repo,
+    worktree,
+  ] as const)
   expect(result).toEqual({ success: true })
   expect(existsSync(worktree)).toBe(false)
 }
@@ -165,13 +216,14 @@ async function listSessionsAndCloseAllEndEveryTerminal(): Promise<void> {
   await projectGroup(page, 'made-in-app').click()
   const open = await page.locator('.tab-bar__tab--session').count()
   await openNotesView()
-  const listed = await fromView<Array<{ tabTitle: string }>>('api.terminal.listSessions()')
+  const listSessions = (api: ViewElectronAPI) => api.terminal.listSessions()
+  const listed = await fromView(listSessions)
   expect(listed.map((s) => s.tabTitle)).toEqual(
     expect.arrayContaining(['Terminal 1', 'Terminal 2'])
   )
-  const closed = await fromView<{ terminatedCount: number }>('api.terminal.closeAll()')
+  const closed = await fromView((api) => api.terminal.closeAll())
   expect(closed.terminatedCount).toBe(listed.length)
-  expect(await fromView('api.terminal.listSessions()')).toEqual([])
+  expect(await fromView(listSessions)).toEqual([])
   // Back on the branch, every tab that was open says its terminal ended.
   await projectGroup(page, 'made-in-app').click()
   const ended = page.locator('.tab-bar__tab--session', { hasText: '[exited]' })

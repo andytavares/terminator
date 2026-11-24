@@ -67,7 +67,7 @@ async function linkedToTarget(
   args: z.infer<typeof LinksGetForTargetRequestSchema>
 ) {
   const { targetId } = args
-  const pattern = `%${targetId.replace(/[%_]/g, '\\$&')}%`
+  const pattern = `%${targetId.replace(/[\\%_]/g, '\\$&')}%`
   const taskRows = await db.query<Record<string, unknown>>(
     `SELECT * FROM tasks WHERE terminator_links LIKE ? ESCAPE '\\'`,
     [pattern]
