@@ -1,0 +1,27 @@
+extensions/remote-control/package.json
+  s_28a512f10b1dc8::t_0779e034c11bd9 14
+extensions/remote-control/src/server/remote-server.ts
+  s_28a512f10b1dc8::t_98fa6f56440ea0 336-340
+  s_28a512f10b1dc8::t_fae1aac56edd27 86-87
+  s_28a512f10b1dc8::t_186145fef59295 4
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_28a512f10b1dc8::t_8c8956a17c2538 148-160
+package-lock.json
+  s_28a512f10b1dc8::t_a6647fd13dcc5a 169,3424-3445,23018
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9db4a087abd2e2c990f7b045f8ebfeadbb85f01e",
+  "prompts": {},
+  "sessions": {
+    "s_28a512f10b1dc8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "04eaa9a2-78f7-40b4-b919-36cbd1141a56",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
